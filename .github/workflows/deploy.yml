@@ -1,0 +1,88 @@
+# Prod deploy: SADECE elle tetiklenir (Actions > Deploy (prod) > Run workflow).
+# Akis: testler -> jar -> sunucuya kopyala -> naiad-deploy (yedek, restart, health check,
+# saglik kontrolu gecmezse otomatik geri donus).
+name: Deploy (prod)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Deploy edilecek branch, tag ya da commit
+        required: true
+        default: main
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: galeri
+          POSTGRES_USER: galeri_app
+          POSTGRES_PASSWORD: ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U galeri_app -d galeri"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DB_URL: jdbc:postgresql://localhost:5432/galeri
+      DB_USER: galeri_app
+      DB_PASSWORD: ci_password
+      JWT_SECRET: ci-only-jwt-secret-0123456789abcdef0123
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: chmod +x mvnw
+      - name: Test + jar
+        run: ./mvnw -B verify
+
+      - name: Jar'i bul
+        id: jar
+        run: |
+          JAR=$(find target -maxdepth 1 -name '*.jar' ! -name '*-plain.jar' | head -n1)
+          test -s "$JAR"
+          echo "path=$JAR" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: SSH anahtari
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Jar'i sunucuya kopyala
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: scp -i ~/.ssh/deploy_key -o BatchMode=yes "${{ steps.jar.outputs.path }}" "deploy@$DEPLOY_HOST:incoming/galeri.jar"
+
+      - name: Devreye al (yedek + restart + health check)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: ssh -i ~/.ssh/deploy_key -o BatchMode=yes "deploy@$DEPLOY_HOST" "sudo /usr/local/bin/naiad-deploy galeri ${{ steps.jar.outputs.sha }}"
+
+      - name: Ozet
+        if: always()
+        run: |
+          echo "### Galeri deploy: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ref: \`${{ inputs.ref }}\` (${{ steps.jar.outputs.sha }})" >> "$GITHUB_STEP_SUMMARY"

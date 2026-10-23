@@ -1,0 +1,79 @@
+# Gelistirici + reviewer agent.
+# Tetikleyiciler:
+#   - Bir issue'ya "ai-task" etiketi eklenince (sablondan acilan issue'lar otomatik alir)
+#   - Issue ya da PR yorumunda "@claude" gecince (or. "@claude review", "@claude su testi de ekle")
+# Sadece repo sahibi tetikleyebilir.
+name: Claude agent
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    if: >-
+      github.actor == github.repository_owner && (
+        (github.event_name == 'issues' && github.event.label.name == 'ai-task') ||
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: galeri
+          POSTGRES_USER: galeri_app
+          POSTGRES_PASSWORD: ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U galeri_app -d galeri"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DB_URL: jdbc:postgresql://localhost:5432/galeri
+      DB_USER: galeri_app
+      DB_PASSWORD: ci_password
+      JWT_SECRET: ci-only-jwt-secret-0123456789abcdef0123
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: chmod +x mvnw
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: panel/package-lock.json
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          label_trigger: ai-task
+          claude_args: |
+            --model sonnet
+            --max-turns 60
+            --allowedTools "Bash(./mvnw:*),Bash(chmod:*),Bash(git:*),Bash(ls:*),Bash(cat:*),Bash(grep:*),Bash(find:*),Bash(npm:*)"

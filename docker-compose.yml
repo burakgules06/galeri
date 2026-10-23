@@ -1,0 +1,22 @@
+# Sadece lokal gelistirme: docker compose up -d
+# Diger projelerle cakismasin diye 5434 portunda.
+services:
+  db:
+    image: postgres:16
+    container_name: galeri-db-dev
+    environment:
+      POSTGRES_DB: galeri
+      POSTGRES_USER: galeri_app
+      POSTGRES_PASSWORD: dev_sifre_123
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - galeri_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U galeri_app -d galeri"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  galeri_pgdata:

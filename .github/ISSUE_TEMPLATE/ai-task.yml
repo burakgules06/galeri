@@ -1,0 +1,27 @@
+name: AI görevi
+description: Agent'ın üstleneceği bir geliştirme görevi (açılınca agent otomatik başlar)
+title: "[AI] "
+labels: ["ai-task"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Ne yapılsın?
+      description: Kullanıcı açısından istenen davranış. Kısa ve net yaz.
+      placeholder: Araç listesine yakıt tipi ve vites filtresi eklensin.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Kabul kriterleri
+      description: Ne olursa iş bitmiş sayılır?
+      placeholder: |
+        - Liste yakıt tipi ve vitese göre filtrelenebiliyor
+        - Filtreler sayfa yenilense de korunuyor
+        - Birim testi var
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notlar
+      description: Dokunulmaması gereken yerler, ipuçları, ilgili dosyalar (opsiyonel).
