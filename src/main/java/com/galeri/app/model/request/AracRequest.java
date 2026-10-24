@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 // Tutarlar kurus cinsinden (1.250.000,50 TL = 125000050).
+// alisHesapId bos ise alis odemesi deftere yazilmaz (ornegin senetli alis, 3. adim).
 public record AracRequest(
         @NotBlank String plaka,
         @NotBlank @Size(max = 40) String marka,
@@ -28,5 +29,6 @@ public record AracRequest(
         UUID saticiId,
         UUID alanCalisanId,
         @PositiveOrZero Long gercekAlisKurus,
-        @PositiveOrZero Long resmiAlisKurus
+        @PositiveOrZero Long resmiAlisKurus,
+        UUID alisHesapId          // pesin alis: gercek alis bedeli bu kasa/banka hesabindan deftere yazilir
 ) {}

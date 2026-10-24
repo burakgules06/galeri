@@ -9,6 +9,8 @@ import { AracFormu } from "./AracFormu";
 import { HasarSemasi } from "./HasarSemasi";
 import { SatisFormu } from "./SatisFormu";
 import { StoktaGun } from "./StoktaGun";
+import { HareketListesi } from "../para/HareketListesi";
+import { MasrafFormu } from "../para/MasrafFormu";
 
 export function AracDetaySayfasi({ id }: { id: string }) {
   const { veri, setVeri, hata } = useYukle(() => api.arac(id), [id]);
@@ -71,10 +73,13 @@ export function AracDetaySayfasi({ id }: { id: string }) {
                   <Bilgi etiket="Alıcı" deger={admin.alici?.ad ?? "—"} />
                   <Bilgi etiket="Satan çalışan" deger={admin.satanCalisan?.ad ?? "—"} />
                   <Bilgi etiket="Satış bedeli" deger={tl(admin.satisKurus)} sayi vurgu />
-                  <Bilgi etiket="Fark (masraflar hariç)" deger={admin.satisKurus != null && admin.gercekAlisKurus != null ? tl(admin.satisKurus - admin.gercekAlisKurus) : "—"} sayi />
                 </>}
               </dl>
             </Kart>
+          )}
+
+          {admin && (
+            <MaliyetKarti key={`${admin.gercekAlisKurus}-${admin.satisKurus}-${admin.alisHesapId}`} arac={a} />
           )}
         </div>
 
@@ -94,6 +99,51 @@ export function AracDetaySayfasi({ id }: { id: string }) {
       {admin && <SatisFormu acik={form === "sat"} kapat={() => setForm(null)} arac={admin}
         kaydedildi={(d) => { setVeri(d); setForm(null); }} />}
     </div>
+  );
+}
+
+// Maliyet = gercek alis + araca bagli masraflar (defterden). Kar sadece satilmis aracta.
+function MaliyetKarti({ arac }: { arac: AracDetay }) {
+  const { veri, hata, yenile } = useYukle(() => api.maliyet(arac.id), [arac.id]);
+  const [masrafAcik, setMasrafAcik] = useState(false);
+  const masraflar = (veri?.hareketler ?? []).filter((h) => h.tur === "ARAC_MASRAF");
+
+  return (
+    <Kart baslik="Maliyet">
+      <HataKutusu mesaj={hata} />
+      {veri && (
+        <>
+          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+            <div>
+              <dt className="text-[13px] text-murekkep-2">Alış</dt>
+              <dd className="font-cond text-[19px] font-medium">{tl(veri.alisKurus)}</dd>
+              {!veri.alisDefterde && veri.alisKurus > 0 && <dd className="text-[13px] text-uyari">Ödemesi kasaya işlenmedi</dd>}
+            </div>
+            <Bilgi etiket="Masraflar" deger={tl(veri.masrafKurus)} sayi />
+            <Bilgi etiket="Toplam maliyet" deger={tl(veri.toplamKurus)} sayi vurgu />
+            {veri.karKurus != null && <>
+              <Bilgi etiket="Satış bedeli" deger={tl(veri.satisKurus)} sayi />
+              <div>
+                <dt className="text-[13px] text-murekkep-2">{veri.karKurus >= 0 ? "Kâr" : "Zarar"}</dt>
+                <dd className={`font-cond text-[19px] font-bold ${veri.karKurus >= 0 ? "text-basari" : "text-tehlike"}`}>{tl(Math.abs(veri.karKurus))}</dd>
+              </div>
+            </>}
+          </dl>
+
+          <div className="mt-4 pt-3 border-t border-cizgi">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-[15px] text-murekkep-2">Masraf dökümü</h3>
+              <Buton tur="ikincil" className="h-9" onClick={() => setMasrafAcik(true)}>Masraf ekle</Buton>
+            </div>
+            {masraflar.length === 0
+              ? <p className="text-[14px] text-murekkep-3">Bu araca henüz masraf girilmedi.</p>
+              : <HareketListesi hareketler={masraflar} yon={() => 0} degisti={yenile} aracGoster={false} />}
+          </div>
+        </>
+      )}
+      <MasrafFormu acik={masrafAcik} kapat={() => setMasrafAcik(false)} arac={arac}
+        kaydedildi={() => { setMasrafAcik(false); yenile(); }} />
+    </Kart>
   );
 }
 

@@ -5,17 +5,19 @@ import { AracDetaySayfasi } from "../features/araclar/AracDetaySayfasi";
 import { AracListesi } from "../features/araclar/AracListesi";
 import { AylikGorunum } from "../features/aylik/AylikGorunum";
 import { KisiListesi } from "../features/kisiler/KisiListesi";
+import { ParaSayfasi } from "../features/para/ParaSayfasi";
 import { useRota, type Rota } from "../shared/useRota";
 
-type Bolum = "araclar" | "aylik" | "kisiler";
+type Bolum = "araclar" | "para" | "aylik" | "kisiler";
 
 const IKON: Record<Bolum, ReactNode> = {
   araclar: <path d="M5 16l1.6-5.2A2 2 0 0 1 8.5 9.4h7a2 2 0 0 1 1.9 1.4L19 16M4 16h16v3a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1h-9v1a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM7.5 13.5h.01M16.5 13.5h.01" />,
   aylik: <path d="M4 19V9M10 19V5M16 19v-7M3 19h18" />,
+  para: <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h15A1.5 1.5 0 0 1 21 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 16.5zM3 10h18M7 14.5h3" />,
   kisiler: <path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.6c2 .7 3.2 2.6 3.6 5.4" />,
 };
 
-const ETIKET: Record<Bolum, string> = { araclar: "Araçlar", aylik: "Alım ve satım", kisiler: "Kişiler" };
+const ETIKET: Record<Bolum, string> = { araclar: "Araçlar", para: "Kasa", aylik: "Alım ve satım", kisiler: "Kişiler" };
 
 function bolumu(rota: Rota): Bolum {
   return rota.sayfa === "arac" ? "araclar" : rota.sayfa;
@@ -24,13 +26,14 @@ function bolumu(rota: Rota): Bolum {
 export function Dashboard() {
   const { auth, isAdmin, logout } = useAuth();
   const rota = useRota();
-  const bolumler: Bolum[] = isAdmin ? ["araclar", "aylik", "kisiler"] : ["araclar", "aylik"];
+  const bolumler: Bolum[] = isAdmin ? ["araclar", "para", "aylik", "kisiler"] : ["araclar", "aylik"];
   const aktif = bolumu(rota);
 
   const icerik =
     rota.sayfa === "arac" ? <AracDetaySayfasi id={rota.id} />
     : rota.sayfa === "aylik" ? <AylikGorunum />
     : rota.sayfa === "kisiler" && isAdmin ? <KisiListesi />
+    : rota.sayfa === "para" && isAdmin ? <ParaSayfasi />
     : <AracListesi />;
 
   return (

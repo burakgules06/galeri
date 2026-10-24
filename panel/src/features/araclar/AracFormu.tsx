@@ -35,11 +35,15 @@ function AracFormuIcerik({ kapat, kaydedildi, mevcut }: Props) {
   const [alanCalisan, setAlanCalisan] = useState(mevcut?.alanCalisan?.id ?? "");
   const [gercek, setGercek] = useState(kurusToInput(mevcut?.gercekAlisKurus));
   const [resmi, setResmi] = useState(kurusToInput(mevcut?.resmiAlisKurus));
+  // null: henuz secilmedi, yeni aracta kasa varsayilir. "": deftere yazilmaz.
+  const [alisHesap, setAlisHesap] = useState<string | null>(mevcut ? (mevcut.alisHesapId ?? "") : null);
   const [hata, setHata] = useState<string | null>(null);
   const [kaydediliyor, setKaydediliyor] = useState(false);
 
   const kisiler = useYukle(() => api.kisiler(), []);
   const calisanlar = useYukle(() => api.calisanlar(), []);
+  const hesaplar = useYukle(() => api.hesaplar(), []);
+  const alisHesapId = alisHesap ?? hesaplar.veri?.[0]?.id ?? "";
   const [ekKisiler, setEkKisiler] = useState<KisiResponse[]>([]);
   const tumKisiler = [...ekKisiler, ...(kisiler.veri ?? [])];
 
@@ -55,7 +59,7 @@ function AracFormuIcerik({ kapat, kaydedildi, mevcut }: Props) {
       plaka, marka, model, modelYili: yilSayi, yakit, vites, km: kmSayi,
       renk: renk.trim() || null, tramerKurus: tutarlar[0], notlar: notlar.trim() || null,
       alisTarihi, saticiId: satici?.id ?? null, alanCalisanId: alanCalisan || null,
-      gercekAlisKurus: tutarlar[1], resmiAlisKurus: tutarlar[2],
+      gercekAlisKurus: tutarlar[1], resmiAlisKurus: tutarlar[2], alisHesapId: alisHesapId || null,
     };
     setKaydediliyor(true);
     setHata(null);
@@ -130,6 +134,12 @@ function AracFormuIcerik({ kapat, kaydedildi, mevcut }: Props) {
               <input className={girdiSinifi} value={resmi} onChange={(e) => setResmi(e.target.value)} inputMode="decimal" placeholder="980.000" />
             </Alan>
           </div>
+          <Alan etiket="Ödeme nereden" ipucu="Peşin alışta gerçek alış bedeli bu hesaptan düşülür. Değiştirirsen eski kayıt ters hareketle düzeltilir.">
+            <select className={girdiSinifi} value={alisHesapId} onChange={(e) => setAlisHesap(e.target.value)}>
+              {(hesaplar.veri ?? []).map((h) => <option key={h.id} value={h.id}>{h.ad}</option>)}
+              <option value="">Kasaya işleme (senetli vb.)</option>
+            </select>
+          </Alan>
         </section>
 
         <Alan etiket="Notlar">

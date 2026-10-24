@@ -21,6 +21,7 @@ import com.galeri.app.repository.AracParcaRepository;
 import com.galeri.app.repository.AracRepository;
 import com.galeri.app.repository.KisiRepository;
 import com.galeri.app.repository.PanelUserRepository;
+import com.galeri.app.service.DefterService;
 import com.galeri.app.support.TestOturum;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,17 +55,19 @@ class AracServiceImplTest {
     @Mock private AracParcaRepository aracParcaRepository;
     @Mock private KisiRepository kisiRepository;
     @Mock private PanelUserRepository panelUserRepository;
+    @Mock private DefterService defterService;
 
     // "Su an": 1 Temmuz 2026, 09:00 Istanbul (06:00 UTC)
     private final Clock clock = Clock.fixed(Instant.parse("2026-07-01T06:00:00Z"), ZoneOffset.UTC);
 
     private final UUID tenantId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
+    private final UUID kasaId = UUID.randomUUID();
     private AracServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new AracServiceImpl(aracRepository, aracParcaRepository, kisiRepository, panelUserRepository, clock);
+        service = new AracServiceImpl(aracRepository, aracParcaRepository, kisiRepository, panelUserRepository, defterService, clock);
         TestOturum.ac(userId, tenantId, "ADMIN");
     }
 
@@ -75,7 +78,7 @@ class AracServiceImplTest {
 
     private AracRequest istek(String plaka) {
         return new AracRequest(plaka, "Renault", "Clio", (short) 2022, Yakit.BENZIN, Vites.MANUEL, 31000,
-                "Kırmızı", null, null, LocalDate.of(2026, 6, 1), null, null, 72000000L, 60000000L);
+                "Kırmızı", null, null, LocalDate.of(2026, 6, 1), null, null, 72000000L, 60000000L, kasaId);
     }
 
     private Arac stoktaArac(UUID id, UUID tenant) {
@@ -111,6 +114,18 @@ class AracServiceImplTest {
         assertThat(kaydedilen.getValue().getTenantId()).isEqualTo(tenantId);
         assertThat(sonuc.arac().stoktaGun()).isEqualTo(30);
         assertThat(sonuc.gercekAlisKurus()).isEqualTo(72000000L);
+        verify(defterService).aracAlisiniEsitle(kaydedilen.getValue(), kasaId);
+    }
+
+    @Test
+    void aracGuncellenince_alisHareketiDeftereEsitlenir() {
+        UUID id = UUID.randomUUID();
+        Arac arac = stoktaArac(id, tenantId);
+        when(aracRepository.findById(id)).thenReturn(Optional.of(arac));
+
+        service.guncelle(id, istek("34 KLM 4521"));
+
+        verify(defterService).aracAlisiniEsitle(arac, kasaId);
     }
 
     @Test

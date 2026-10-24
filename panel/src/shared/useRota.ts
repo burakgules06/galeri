@@ -1,17 +1,19 @@
-// Basit hash yonlendirme: #/araclar, #/araclar/<id>, #/aylik, #/kisiler
+// Basit hash yonlendirme: #/araclar, #/araclar/<id>, #/aylik, #/kisiler, #/para
 import { useEffect, useState } from "react";
 
 export type Rota =
   | { sayfa: "araclar" }
   | { sayfa: "arac"; id: string }
   | { sayfa: "aylik" }
-  | { sayfa: "kisiler" };
+  | { sayfa: "kisiler" }
+  | { sayfa: "para" };
 
 function coz(hash: string): Rota {
   const parcalar = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   if (parcalar[0] === "araclar" && parcalar[1]) return { sayfa: "arac", id: parcalar[1] };
   if (parcalar[0] === "aylik") return { sayfa: "aylik" };
   if (parcalar[0] === "kisiler") return { sayfa: "kisiler" };
+  if (parcalar[0] === "para") return { sayfa: "para" };
   return { sayfa: "araclar" };
 }
 

@@ -1,5 +1,5 @@
 // Gosterim yardimcilari. Tutarlar backend'de kurus (tam sayi); arayuzde TL.
-import type { AracDurum, Parca, ParcaDurum, Vites, Yakit } from "./types";
+import type { AracDurum, HareketResponse, HareketTur, Parca, ParcaDurum, Vites, Yakit } from "./types";
 
 const tlFmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2, minimumFractionDigits: 0 });
 const sayiFmt = new Intl.NumberFormat("tr-TR");
@@ -70,4 +70,20 @@ export function plakaBicimle(girdi: string): string {
   const m = t.match(/^(\d{0,2})([A-Z]{0,3})(\d{0,4})$/);
   if (!m) return girdi.toLocaleUpperCase("tr-TR");
   return [m[1], m[2], m[3]].filter(Boolean).join(" ");
+}
+
+export const HAREKET_TUR: Record<HareketTur, string> = {
+  ARAC_ALIS: "Araç alışı", ARAC_MASRAF: "Araç masrafı", GENEL_GIDER: "Genel gider", SERMAYE: "Sermaye",
+};
+
+/**
+ * Hareketin bir hesaba gore yonu: +1 giris, -1 cikis, 0 ilgisiz.
+ * hesapId yoksa kasa/banka toplamina gore bakilir (kasadan bankaya aktarim 0 sayilir).
+ */
+export function hareketYonu(h: HareketResponse, hesapId: string | null): 1 | -1 | 0 {
+  if (hesapId) return h.hedef.id === hesapId ? 1 : h.kaynak.id === hesapId ? -1 : 0;
+  const para = (t: string) => t === "KASA" || t === "BANKA";
+  if (para(h.hedef.tur) && !para(h.kaynak.tur)) return 1;
+  if (para(h.kaynak.tur) && !para(h.hedef.tur)) return -1;
+  return 0;
 }
