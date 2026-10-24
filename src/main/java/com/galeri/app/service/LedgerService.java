@@ -1,7 +1,10 @@
 package com.galeri.app.service;
 
+import com.galeri.app.model.entity.Contact;
+import com.galeri.app.model.entity.LedgerEntry;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.ExpenseRoot;
+import com.galeri.app.model.enums.PlanDirection;
 import com.galeri.app.model.request.AccountRequest;
 import com.galeri.app.model.request.ExpenseRequest;
 import com.galeri.app.model.response.AccountResponse;
@@ -9,6 +12,7 @@ import com.galeri.app.model.response.CategoryResponse;
 import com.galeri.app.model.response.LedgerEntryResponse;
 import com.galeri.app.model.response.VehicleCost;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -40,4 +44,22 @@ public interface LedgerService {
 
     /** Aracin gecerli alis hareketinin kaynak hesabi; yoksa null. */
     UUID purchaseAccountId(UUID vehicleId);
+
+    // ------------------------------------------------------------------ odeme plani (PaymentPlanService cagirir)
+
+    /** Satis: INCOME -> BALANCE(odeyen). Odeyenin carisi yoksa acilir. */
+    LedgerEntry writeSale(Vehicle vehicle, Contact payer, long amountCents, LocalDate date);
+
+    /**
+     * Taksit kapanisi. SALE: tahsilat (COLLECTION) BALANCE(odeyen) -> kasa/banka;
+     * PURCHASE: odeme (PAYMENT) kasa/banka -> BALANCE(odeyen). accountId kasa ya da banka olmali.
+     */
+    LedgerEntry writeSettlement(PlanDirection direction, Vehicle vehicle, Contact payer, UUID accountId,
+                                long amountCents, LocalDate date, String description);
+
+    /** Hareketi ters hareketle duzeltir (bagli kayit kontrolu yapmadan; plan islemleri icin). */
+    void reverse(UUID entryId);
+
+    /** Aracin duzeltilmemis tum satis hareketlerini terser (satisi geri al). */
+    void reverseVehicleSales(UUID vehicleId);
 }

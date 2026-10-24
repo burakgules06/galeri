@@ -17,7 +17,12 @@ public record DashboardResponse(
         int inStockCount,
         long stockCostCents,
         long averageDaysInStock,
-        List<MonthStat> months
+        List<MonthStat> months,
+        int overdueCount,               // vadesi gecmis, odenmemis tahsilatlar (satis taksitleri)
+        long overdueCents,
+        List<InstallmentResponse> week, // bugun ve sonraki 6 gun vadesi gelen odenmemis taksitler (tahsilat ve odeme)
+        long weekCollectCents,
+        long weekPayCents
 ) {
 
     /** Sermaye ortagi: sermayesi ve toplam sermayedeki payi. owner = dukkan sahibi. */

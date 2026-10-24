@@ -3,7 +3,9 @@ package com.galeri.app.controller;
 import com.galeri.app.model.GenericResponse;
 import com.galeri.app.model.request.ContactRequest;
 import com.galeri.app.model.response.ContactResponse;
+import com.galeri.app.model.response.ContactStatement;
 import com.galeri.app.service.ContactService;
+import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.service.impl.GenericResponseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,11 +23,18 @@ import java.util.UUID;
 public class ContactController {
 
     private final ContactService contactService;
+    private final PaymentPlanService paymentPlanService;
     private final GenericResponseService responseService;
 
     @GetMapping
     public GenericResponse<List<ContactResponse>> search(@RequestParam(required = false) String q) {
         return responseService.success(contactService.search(q));
+    }
+
+    // Cari hesap ozeti: BALANCE hareketleri eskiden yeniye, yuruyen bakiye ve acik taksitler.
+    @GetMapping("/{id}/statement")
+    public GenericResponse<ContactStatement> statement(@PathVariable UUID id) {
+        return responseService.success(paymentPlanService.statement(id));
     }
 
     @PostMapping

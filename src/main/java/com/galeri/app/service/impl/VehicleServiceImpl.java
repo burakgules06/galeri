@@ -5,6 +5,7 @@ import com.galeri.app.exception.runtime.PlateAlreadyInStockException;
 import com.galeri.app.exception.runtime.RecordNotFoundException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.exception.runtime.VehicleAlreadySoldException;
+import com.galeri.app.exception.runtime.VehicleNotSoldException;
 import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.Vehicle;
@@ -27,6 +28,7 @@ import com.galeri.app.repository.VehiclePartRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.security.CurrentUser;
 import com.galeri.app.service.LedgerService;
+import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.service.VehicleService;
 import com.galeri.app.util.PlateUtil;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +58,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final ContactRepository contactRepository;
     private final PanelUserRepository panelUserRepository;
     private final LedgerService ledgerService;
+    private final PaymentPlanService paymentPlanService;
     private final Clock clock;
 
     // ------------------------------------------------------------------ okuma
@@ -169,11 +172,31 @@ public class VehicleServiceImpl implements VehicleService {
         if (vehicle.getStatus() != VehicleStatus.IN_STOCK) throw new VehicleAlreadySoldException();
         if (request.saleDate().isBefore(vehicle.getPurchaseDate())) throw new InvalidDateException();
 
+        Contact buyer = getContact(request.buyerId(), vehicle.getTenantId());
         vehicle.setStatus(VehicleStatus.SOLD);
         vehicle.setSaleDate(request.saleDate());
-        vehicle.setBuyer(getContact(request.buyerId(), vehicle.getTenantId()));
+        vehicle.setBuyer(buyer);
         vehicle.setSoldBy(getStaff(request.soldById(), vehicle.getTenantId()));
         vehicle.setSalePriceCents(request.salePriceCents());
+        paymentPlanService.recordSale(vehicle, buyer, request);
+        return toAdmin(vehicle, toDetail(vehicle));
+    }
+
+    @Override
+    @Transactional
+    public VehicleDetailAdmin undoSale(UUID id) {
+        Vehicle vehicle = getVehicle(id);
+        if (vehicle.getStatus() != VehicleStatus.SOLD) throw new VehicleNotSoldException();
+        // Ayni plakayla stokta baska arac varsa geri donus tekillik kisitini bozar
+        if (vehicleRepository.existsByTenantIdAndPlateAndStatus(vehicle.getTenantId(), vehicle.getPlate(), VehicleStatus.IN_STOCK)) {
+            throw new PlateAlreadyInStockException();
+        }
+        paymentPlanService.undoSale(vehicle);
+        vehicle.setStatus(VehicleStatus.IN_STOCK);
+        vehicle.setSaleDate(null);
+        vehicle.setBuyer(null);
+        vehicle.setSoldBy(null);
+        vehicle.setSalePriceCents(null);
         return toAdmin(vehicle, toDetail(vehicle));
     }
 

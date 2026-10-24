@@ -5,8 +5,10 @@ import com.galeri.app.exception.runtime.CorrectionNotCorrectableException;
 import com.galeri.app.exception.runtime.EntryAlreadyCorrectedException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidCategoryException;
+import com.galeri.app.exception.runtime.LinkedEntryException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.model.entity.Account;
+import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.ExpenseCategory;
 import com.galeri.app.model.entity.LedgerEntry;
 import com.galeri.app.model.entity.PanelUser;
@@ -21,6 +23,7 @@ import com.galeri.app.model.response.LedgerEntryResponse;
 import com.galeri.app.model.response.VehicleCost;
 import com.galeri.app.repository.AccountRepository;
 import com.galeri.app.repository.ExpenseCategoryRepository;
+import com.galeri.app.repository.InstallmentRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehicleRepository;
@@ -58,6 +61,7 @@ class LedgerServiceImplTest {
     @Mock private ExpenseCategoryRepository categoryRepository;
     @Mock private VehicleRepository vehicleRepository;
     @Mock private PanelUserRepository panelUserRepository;
+    @Mock private InstallmentRepository installmentRepository;
 
     private static final LocalDate DAY = LocalDate.of(2026, 7, 1);
 
@@ -70,7 +74,8 @@ class LedgerServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new LedgerServiceImpl(accountRepository, entryRepository, categoryRepository, vehicleRepository, panelUserRepository);
+        service = new LedgerServiceImpl(accountRepository, entryRepository, categoryRepository, vehicleRepository, panelUserRepository,
+                installmentRepository);
         TestSession.open(userId, tenantId, "ADMIN");
 
         cash = account(AccountType.CASH, tenantId);
@@ -249,6 +254,44 @@ class LedgerServiceImplTest {
         when(entryRepository.findById(reversal.getId())).thenReturn(Optional.of(reversal));
 
         assertThatThrownBy(() -> service.correct(reversal.getId())).isInstanceOf(CorrectionNotCorrectableException.class);
+    }
+
+    @Test
+    void satisHareketi_kasaEkranindanDuzeltilemez() {
+        LedgerEntry sale = entry(LedgerEntryType.VEHICLE_SALE, expense, cash, 100L);
+        when(entryRepository.findById(sale.getId())).thenReturn(Optional.of(sale));
+
+        assertThatThrownBy(() -> service.correct(sale.getId())).isInstanceOf(LinkedEntryException.class);
+        verify(entryRepository, never()).save(any());
+    }
+
+    @Test
+    void taksiteBagliTahsilat_kasaEkranindanDuzeltilemez() {
+        LedgerEntry collection = entry(LedgerEntryType.COLLECTION, expense, cash, 100L);
+        when(entryRepository.findById(collection.getId())).thenReturn(Optional.of(collection));
+        when(installmentRepository.existsByPaidEntryId(collection.getId())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.correct(collection.getId())).isInstanceOf(LinkedEntryException.class);
+    }
+
+    @Test
+    void satisGelirdenOdeyeninCarisineYazilir_cariYoksaAcilir() {
+        Vehicle vehicle = vehicle();
+        Account income = account(AccountType.INCOME, tenantId);
+        when(accountRepository.findFirstByTenantIdAndType(tenantId, AccountType.INCOME)).thenReturn(Optional.of(income));
+        Contact evim = new Contact();
+        evim.setId(UUID.randomUUID());
+        evim.setTenantId(tenantId);
+        evim.setName("Eminevim");
+        when(accountRepository.findFirstByTenantIdAndTypeAndContactId(tenantId, AccountType.BALANCE, evim.getId())).thenReturn(Optional.empty());
+
+        LedgerEntry e = service.writeSale(vehicle, evim, 150000000L, DAY);
+
+        assertThat(e.getType()).isEqualTo(LedgerEntryType.VEHICLE_SALE);
+        assertThat(e.getSourceAccount()).isSameAs(income);
+        assertThat(e.getTargetAccount().getType()).isEqualTo(AccountType.BALANCE);
+        assertThat(e.getTargetAccount().getContactId()).isEqualTo(evim.getId());
+        assertThat(e.getAmountCents()).isEqualTo(150000000L);
     }
 
     // ------------------------------------------------------------------ bakiye

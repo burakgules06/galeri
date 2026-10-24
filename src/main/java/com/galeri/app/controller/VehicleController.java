@@ -5,8 +5,10 @@ import com.galeri.app.model.enums.VehicleStatus;
 import com.galeri.app.model.request.VehiclePartsRequest;
 import com.galeri.app.model.request.VehicleRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
+import com.galeri.app.model.response.PaymentPlanResponse;
 import com.galeri.app.model.response.VehicleDetailAdmin;
 import com.galeri.app.model.response.VehicleSummary;
+import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.service.VehicleService;
 import com.galeri.app.service.impl.GenericResponseService;
 import jakarta.validation.Valid;
@@ -24,6 +26,7 @@ import java.util.UUID;
 public class VehicleController {
 
     private final VehicleService vehicleService;
+    private final PaymentPlanService paymentPlanService;
     private final GenericResponseService responseService;
 
     @GetMapping
@@ -60,5 +63,17 @@ public class VehicleController {
     @PreAuthorize("hasRole('ADMIN')")
     public GenericResponse<VehicleDetailAdmin> sell(@PathVariable UUID id, @Valid @RequestBody VehicleSaleRequest request) {
         return responseService.success(vehicleService.sell(id, request));
+    }
+
+    @DeleteMapping("/{id}/sale")
+    @PreAuthorize("hasRole('ADMIN')")
+    public GenericResponse<VehicleDetailAdmin> undoSale(@PathVariable UUID id) {
+        return responseService.success(vehicleService.undoSale(id));
+    }
+
+    @GetMapping("/{id}/payment-plans")
+    @PreAuthorize("hasRole('ADMIN')")
+    public GenericResponse<List<PaymentPlanResponse>> paymentPlans(@PathVariable UUID id) {
+        return responseService.success(paymentPlanService.plans(id));
     }
 }
