@@ -4,6 +4,10 @@ import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.response.MonthlyTrades;
 import com.galeri.app.model.response.MonthlyTrades.StaffMonthly;
+import com.galeri.app.model.response.StaffSummary;
+import com.galeri.app.model.response.YearlyTrades;
+import com.galeri.app.model.response.YearlyTrades.Kind;
+import com.galeri.app.model.response.YearlyTrades.TradeItem;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.support.TestSession;
@@ -20,6 +24,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -83,6 +88,39 @@ class ReportServiceImplTest {
         assertThat(result.staff()).hasSize(1);
         assertThat(result.staff().get(0).name()).isEqualTo("Ahmet");
         assertThat(result.staff().get(0).bought()).extracting(v -> v.plate()).containsExactly("06 ABC 123");
+    }
+
+    @Test
+    void yillik_yoneticiHerkesiVeBelirtilmemisiGorur() {
+        TestSession.open(UUID.randomUUID(), tenantId, "ADMIN");
+        when(panelUserRepository.findByTenant_IdOrderByFullName(tenantId)).thenReturn(List.of(ahmet, veli));
+        when(vehicleRepository.findByTenantIdAndPurchaseDateBetween(tenantId, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)))
+                .thenReturn(List.of(vehicle("06 ABC 123", ahmet, LocalDate.of(2026, 3, 10), null, null),
+                        vehicle("34 KLM 45", null, LocalDate.of(2026, 2, 3), null, null)));
+        when(vehicleRepository.findByTenantIdAndSaleDateBetween(tenantId, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)))
+                .thenReturn(List.of(vehicle("06 TR 7788", null, LocalDate.of(2025, 12, 1), veli, LocalDate.of(2026, 4, 2))));
+
+        YearlyTrades result = service.yearlyTrades(2026);
+
+        assertThat(result.staff()).extracting(StaffSummary::name).containsExactly("Ahmet", "Veli", "Belirtilmemiş");
+        assertThat(result.items()).extracting(TradeItem::plate).containsExactly("34 KLM 45", "06 ABC 123", "06 TR 7788");
+        assertThat(result.items().get(2).kind()).isEqualTo(Kind.SOLD);
+        assertThat(result.items().get(2).staffName()).isEqualTo("Veli");
+    }
+
+    @Test
+    void yillik_calisanSadeceKendiKayitlariniGorur() {
+        TestSession.open(ahmet.getId(), tenantId, "STAFF");
+        when(panelUserRepository.findById(ahmet.getId())).thenReturn(Optional.of(ahmet));
+        when(vehicleRepository.findByTenantIdAndPurchaseDateBetween(any(), any(), any())).thenReturn(List.of(
+                vehicle("06 ABC 123", ahmet, LocalDate.of(2026, 3, 10), null, null),
+                vehicle("35 VL 100", veli, LocalDate.of(2026, 3, 11), null, null)));
+        when(vehicleRepository.findByTenantIdAndSaleDateBetween(any(), any(), any())).thenReturn(List.of());
+
+        YearlyTrades result = service.yearlyTrades(2026);
+
+        assertThat(result.staff()).extracting(StaffSummary::name).containsExactly("Ahmet");
+        assertThat(result.items()).extracting(TradeItem::plate).containsExactly("06 ABC 123");
     }
 
     private static PanelUser user(String name) {

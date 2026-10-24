@@ -1,6 +1,7 @@
 package com.galeri.app.repository;
 
 import com.galeri.app.model.entity.LedgerEntry;
+import com.galeri.app.model.enums.AccountType;
 import com.galeri.app.model.enums.LedgerEntryType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -53,6 +54,16 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> 
     List<UUID> correctedIds(@Param("ids") Collection<UUID> ids);
 
     List<LedgerEntry> findByVehicle_IdAndType(UUID vehicleId, LedgerEntryType type);
+
+    // Arac bazinda masraf toplami (duzeltmeler ters yonde oldugu icin kendiliginden duser): [vehicleId, totalCents]
+    @Query("""
+            select e.vehicle.id, sum(case when e.targetAccount.type = :vehicleType then e.amountCents else -e.amountCents end)
+            from LedgerEntry e
+            where e.tenantId = :tenantId and e.type = :type and e.vehicle is not null
+            group by e.vehicle.id
+            """)
+    List<Object[]> vehicleExpenseTotals(@Param("tenantId") UUID tenantId, @Param("type") LedgerEntryType type,
+                                        @Param("vehicleType") AccountType vehicleType);
 
     // Kategori kullanim sayisi (hizli butonlar icin), duzeltmeler sayilmaz: [categoryId, count]
     @Query("""

@@ -82,6 +82,8 @@ Panel tarafında `apiFetch<T>()` doğrudan `data`'yı verir; hata olursa `ApiErr
 - Test adları Türkçe ve davranışı anlatır: `yanlisSifre_401Doner`.
 
 ### Panel
+- Tasarım kuralları (tipografi, renk anlamları, grafik paleti ve sırası, kart kalıpları, mobil): **`design/README.md`**. Yeni ekrandan önce oku.
+- Grafikler kütüphanesiz SVG: `panel/src/shared/charts` (BarChart, Donut, SplitBar). Yeni grafik bunları kullanır.
 - Görsel dil `panel/src/index.css` içindeki `@theme` değişkenleridir (plaka mavisi, Barlow / Barlow Condensed, ekspertiz renkleri). Bileşenlerde sabit renk kodu yazma, yeni renk gerekiyorsa önce oraya ekle. Araç her yerde `Plate` bileşeniyle gösterilir.
 - `npm run lint` ve `npm run build` temiz geçmeli (CI'da ikisi de zorunlu).
 - Component dosyası sadece component export eder; context/hook ayrı `.ts` dosyasında (`auth/useAuth.ts` gibi).

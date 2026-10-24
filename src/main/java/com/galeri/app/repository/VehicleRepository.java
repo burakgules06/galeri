@@ -14,18 +14,27 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
 
     @Query("""
             select v from Vehicle v
+            left join fetch v.buyer b
+            left join v.seller s
             where v.tenantId = :tenantId
               and (:status is null or v.status = :status)
               and (:q = ''
                    or lower(v.plate) like lower(concat('%', :q, '%'))
                    or lower(v.make) like lower(concat('%', :q, '%'))
-                   or lower(v.model) like lower(concat('%', :q, '%')))
+                   or lower(v.model) like lower(concat('%', :q, '%'))
+                   or (:withContacts = true and (lower(b.name) like lower(concat('%', :q, '%'))
+                                                 or lower(s.name) like lower(concat('%', :q, '%'))))
+                   or (:phone <> '' and (b.phone like concat('%', :phone, '%') or s.phone like concat('%', :phone, '%'))))
             order by v.purchaseDate desc, v.createdAt desc
             """)
-    // q bos string ise filtre yok; status null ise tum durumlar.
-    List<Vehicle> search(@Param("tenantId") UUID tenantId, @Param("status") VehicleStatus status, @Param("q") String q);
+    // q bos string ise filtre yok; status null ise tum durumlar. withContacts / phone sadece ADMIN icin dolu:
+    // alici ve satici adi ya da telefonuyla arar (STAFF kisilerin bilgisini goremez).
+    List<Vehicle> search(@Param("tenantId") UUID tenantId, @Param("status") VehicleStatus status, @Param("q") String q,
+                         @Param("withContacts") boolean withContacts, @Param("phone") String phone);
 
     boolean existsByTenantIdAndPlateAndStatus(UUID tenantId, String plate, VehicleStatus status);
+
+    List<Vehicle> findByTenantIdAndStatus(UUID tenantId, VehicleStatus status);
 
     List<Vehicle> findByTenantIdAndPurchaseDateBetween(UUID tenantId, LocalDate start, LocalDate end);
 

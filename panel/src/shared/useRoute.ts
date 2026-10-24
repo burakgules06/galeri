@@ -1,7 +1,8 @@
-// Basit hash yonlendirme: #/vehicles, #/vehicles/<id>, #/monthly, #/contacts, #/ledger
+// Basit hash yonlendirme: #/ (ana ekran), #/vehicles, #/vehicles/<id>, #/monthly, #/contacts, #/ledger
 import { useEffect, useState } from "react";
 
 export type Route =
+  | { page: "home" }
   | { page: "vehicles" }
   | { page: "vehicle"; id: string }
   | { page: "monthly" }
@@ -10,11 +11,11 @@ export type Route =
 
 function parse(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
-  if (parts[0] === "vehicles" && parts[1]) return { page: "vehicle", id: parts[1] };
+  if (parts[0] === "vehicles") return parts[1] ? { page: "vehicle", id: parts[1] } : { page: "vehicles" };
   if (parts[0] === "monthly") return { page: "monthly" };
   if (parts[0] === "contacts") return { page: "contacts" };
   if (parts[0] === "ledger") return { page: "ledger" };
-  return { page: "vehicles" };
+  return { page: "home" };
 }
 
 export function navigate(path: string) {

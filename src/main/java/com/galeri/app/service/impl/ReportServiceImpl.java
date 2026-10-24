@@ -5,6 +5,10 @@ import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.response.MonthlyTrades;
 import com.galeri.app.model.response.MonthlyTrades.MonthlyVehicle;
 import com.galeri.app.model.response.MonthlyTrades.StaffMonthly;
+import com.galeri.app.model.response.StaffSummary;
+import com.galeri.app.model.response.YearlyTrades;
+import com.galeri.app.model.response.YearlyTrades.Kind;
+import com.galeri.app.model.response.YearlyTrades.TradeItem;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.security.CurrentUser;
@@ -62,6 +66,43 @@ public class ReportServiceImpl implements ReportService {
                 .map(Row::toResponse)
                 .toList();
         return new MonthlyTrades(year, month, result);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public YearlyTrades yearlyTrades(int year) {
+        UUID tenantId = CurrentUser.tenantId();
+        LocalDate start = LocalDate.of(year, 1, 1);
+        LocalDate end = LocalDate.of(year, 12, 31);
+        boolean admin = CurrentUser.isAdmin();
+        UUID me = CurrentUser.principal().userId();
+
+        List<TradeItem> items = new ArrayList<>();
+        for (Vehicle v : vehicleRepository.findByTenantIdAndPurchaseDateBetween(tenantId, start, end)) {
+            items.add(item(v, Kind.BOUGHT, v.getPurchaseDate(), v.getBoughtBy()));
+        }
+        for (Vehicle v : vehicleRepository.findByTenantIdAndSaleDateBetween(tenantId, start, end)) {
+            items.add(item(v, Kind.SOLD, v.getSaleDate(), v.getSoldBy()));
+        }
+        if (!admin) items.removeIf(i -> !me.equals(i.staffId()));
+        items.sort(Comparator.comparing(TradeItem::date).thenComparing(TradeItem::plate));
+
+        List<StaffSummary> staff = new ArrayList<>();
+        if (admin) {
+            for (PanelUser u : panelUserRepository.findByTenant_IdOrderByFullName(tenantId)) {
+                if (u.isActive()) staff.add(new StaffSummary(u.getId(), u.getFullName()));
+            }
+            if (items.stream().anyMatch(i -> i.staffId() == null)) staff.add(new StaffSummary(null, UNSPECIFIED));
+        } else {
+            panelUserRepository.findById(me).ifPresent(u -> staff.add(new StaffSummary(u.getId(), u.getFullName())));
+        }
+        return new YearlyTrades(year, staff, items);
+    }
+
+    private static TradeItem item(Vehicle v, Kind kind, LocalDate date, PanelUser staff) {
+        return new TradeItem(v.getId(), v.getPlate(), v.getMake(), v.getModel(),
+                v.getModelYear() == null ? 0 : v.getModelYear(), v.getMileageKm() == null ? 0 : v.getMileageKm(),
+                kind, date, staff == null ? null : staff.getId(), staff == null ? UNSPECIFIED : staff.getFullName());
     }
 
     /**

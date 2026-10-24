@@ -1,9 +1,13 @@
-// Kasa ve banka: bakiyeler (hareketlerden hesaplanir) ve hareket listesi. Sadece ADMIN.
+// Kasa: nakit (kasa + bankalar), ortaklarin sermaye paylari, alacak / verecek ve hareket listesi. Sadece ADMIN.
+// Bakiyeler hareketlerden hesaplanir; ortak ve cari ozeti /api/dashboard'dan gelir.
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
-import { entryDirection, tl } from "../../shared/format";
+import { SplitBar } from "../../shared/charts/Donut";
+import { entryDirection, percent, SERIES, tl } from "../../shared/format";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, Empty, ErrorBox, inputClass } from "../../shared/ui/Common";
+import { BalancesCard } from "./BalancesCard";
+import { CapitalCard } from "./CapitalCard";
 import { ExpenseForm } from "./ExpenseForm";
 import { LedgerEntryList } from "./LedgerEntryList";
 
@@ -12,41 +16,64 @@ export function LedgerPage() {
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [bankOpen, setBankOpen] = useState(false);
   const accounts = useLoad(() => api.accounts(), []);
+  const summary = useLoad(() => api.dashboard(), []);
   const entries = useLoad(() => api.ledgerEntries(selected), [selected]);
 
-  const reload = () => { accounts.reload(); entries.reload(); };
-  const total = (accounts.data ?? []).reduce((t, a) => t + a.balanceCents, 0);
-  const selectedName = accounts.data?.find((a) => a.id === selected)?.name;
+  const reload = () => { accounts.reload(); entries.reload(); summary.reload(); };
+  const list = accounts.data ?? [];
+  const total = list.reduce((t, a) => t + a.balanceCents, 0);
+  const selectedName = list.find((a) => a.id === selected)?.name;
+  const colored = list.map((a, i) => ({ ...a, color: SERIES[i % SERIES.length] }));
 
   return (
-    <div>
-      <div className="flex items-end justify-between gap-3 mb-4">
+    <div className="space-y-5">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-cond font-bold text-[30px] leading-none tracking-tight">Kasa ve banka</h1>
-          <p className="text-murekkep-2 mt-1">Toplam <span className="font-cond font-semibold text-[18px] text-murekkep">{accounts.data ? tl(total) : "…"}</span></p>
+          <p className="etiket">Para defteri</p>
+          <h1 className="font-cond font-bold text-[30px] md:text-[34px] leading-tight tracking-tight">Kasa ve banka</h1>
         </div>
         <Button onClick={() => setExpenseOpen(true)}>Masraf ekle</Button>
-      </div>
+      </header>
 
-      <ErrorBox message={accounts.error} />
+      <ErrorBox message={accounts.error ?? summary.error} />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-5">
-        <AccountCard name="Tümü" balance={total} selected={selected === null} onClick={() => setSelected(null)} />
-        {(accounts.data ?? []).map((a) => (
-          <AccountCard key={a.id} name={a.name} balance={a.balanceCents} selected={selected === a.id} onClick={() => setSelected(a.id)} />
-        ))}
-        {bankOpen
-          ? <BankForm onClose={() => setBankOpen(false)} onAdded={() => { setBankOpen(false); accounts.reload(); }} />
-          : (
-            <button type="button" onClick={() => setBankOpen(true)}
-              className="basilir rounded-xl border border-dashed border-cizgi-2 text-murekkep-2 font-semibold text-[15px] min-h-[76px] hover:bg-yuzey">
-              + Banka hesabı
-            </button>
-          )}
-      </div>
+      {/* Nakit: toplam ve hesaplara dagilimi. Karta dokununca hareketler o hesaba suzulur. */}
+      <section className="kart p-4 md:p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="etiket">Toplam nakit</p>
+            <p className={`sayi font-bold text-[34px] md:text-[40px] leading-none tracking-tight mt-1.5 ${total < 0 ? "text-tehlike" : ""}`}>
+              {accounts.data ? tl(total) : "…"}
+            </p>
+          </div>
+          {bankOpen
+            ? <BankForm onClose={() => setBankOpen(false)} onAdded={() => { setBankOpen(false); accounts.reload(); }} />
+            : <Button variant="secondary" onClick={() => setBankOpen(true)}>+ Banka hesabı</Button>}
+        </div>
+        <div className="mt-4"><SplitBar height={10} parts={colored.map((a) => ({ key: a.id, value: a.balanceCents, color: a.color }))} /></div>
+        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+          <AccountButton name="Tümü" balance={total} share={null} color={null} selected={selected === null} onClick={() => setSelected(null)} />
+          {colored.map((a) => (
+            <AccountButton key={a.id} name={a.name} balance={a.balanceCents} color={a.color}
+              share={total > 0 && a.balanceCents > 0 ? Math.round((a.balanceCents * 10000) / total) : null}
+              selected={selected === a.id} onClick={() => setSelected(a.id)} />
+          ))}
+        </div>
+      </section>
 
-      <section className="bg-yuzey rounded-xl border border-cizgi p-4 md:p-5">
-        <h2 className="font-cond font-semibold text-[20px] mb-3">{selectedName ? `${selectedName} hareketleri` : "Son hareketler"}</h2>
+      {summary.data && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <CapitalCard partners={summary.data.partners} totalCents={summary.data.capitalCents} />
+          <BalancesCard receivableCents={summary.data.receivableCents} payableCents={summary.data.payableCents}
+            receivables={summary.data.receivables} payables={summary.data.payables} />
+        </div>
+      )}
+
+      <section className="kart p-4 md:p-5">
+        <div className="flex items-baseline justify-between gap-3 mb-3">
+          <h2 className="font-cond font-bold text-[22px]">{selectedName ? `${selectedName} hareketleri` : "Son hareketler"}</h2>
+          {entries.data && <span className="text-[13px] text-murekkep-2">{entries.data.length} kayıt</span>}
+        </div>
         <ErrorBox message={entries.error} />
         {entries.data && entries.data.length === 0 && (
           <Empty title="Henüz hareket yok" description="Masraf girdiğinde ya da kasadan araç aldığında burada görünür." />
@@ -61,12 +88,18 @@ export function LedgerPage() {
   );
 }
 
-function AccountCard({ name, balance, selected, onClick }: { name: string; balance: number; selected: boolean; onClick: () => void }) {
+function AccountButton({ name, balance, share, color, selected, onClick }: {
+  name: string; balance: number; share: number | null; color: string | null; selected: boolean; onClick: () => void;
+}) {
   return (
     <button type="button" onClick={onClick} aria-pressed={selected}
-      className={`basilir text-left rounded-xl border px-4 py-3 min-h-[76px] ${selected ? "bg-plaka-acik border-plaka" : "bg-yuzey border-cizgi hover:bg-yuzey-2"}`}>
-      <span className={`block text-[14px] font-semibold truncate ${selected ? "text-plaka-koyu" : "text-murekkep-2"}`}>{name}</span>
-      <span className={`block font-cond font-bold text-[22px] leading-tight ${balance < 0 ? "text-tehlike" : "text-murekkep"}`}>{tl(balance)}</span>
+      className={`basilir text-left rounded-[12px] border px-3.5 py-2.5 ${selected ? "bg-plaka-acik border-plaka" : "bg-yuzey border-cizgi hover:bg-yuzey-2"}`}>
+      <span className="flex items-center gap-1.5 text-[13px] font-semibold truncate text-murekkep-2">
+        {color && <span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ background: color }} />}
+        <span className="truncate">{name}</span>
+        {share != null && <span className="ml-auto text-murekkep-3 font-medium">{percent(share, 0)}</span>}
+      </span>
+      <span className={`block sayi font-bold text-[20px] leading-tight mt-0.5 ${balance < 0 ? "text-tehlike" : selected ? "text-plaka-koyu" : "text-murekkep"}`}>{tl(balance)}</span>
     </button>
   );
 }
@@ -85,13 +118,11 @@ function BankForm({ onClose, onAdded }: { onClose: () => void; onAdded: () => vo
     }
   };
   return (
-    <form onSubmit={submit} className="rounded-xl border border-cizgi bg-yuzey p-2 space-y-1.5 col-span-2 md:col-span-1">
-      <input className={`${inputClass} h-9`} value={name} onChange={(e) => setName(e.target.value)} placeholder="Banka adı" autoFocus />
-      <div className="flex gap-1.5">
-        <Button type="button" variant="quiet" className="h-8 grow" onClick={onClose}>Vazgeç</Button>
-        <Button type="submit" className="h-8 grow">Ekle</Button>
-      </div>
-      {error && <p className="text-[13px] text-tehlike">{error}</p>}
+    <form onSubmit={submit} className="flex flex-wrap items-center gap-1.5">
+      <input className={`${inputClass} h-10 w-48`} value={name} onChange={(e) => setName(e.target.value)} placeholder="Banka adı" autoFocus />
+      <Button type="button" variant="quiet" onClick={onClose}>Vazgeç</Button>
+      <Button type="submit">Ekle</Button>
+      {error && <p className="w-full text-[13px] text-tehlike">{error}</p>}
     </form>
   );
 }
