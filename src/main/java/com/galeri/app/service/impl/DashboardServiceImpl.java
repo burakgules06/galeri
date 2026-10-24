@@ -4,6 +4,10 @@ import com.galeri.app.model.entity.Account;
 import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.AccountType;
+import com.galeri.app.model.enums.InstallmentStatus;
+import com.galeri.app.model.enums.PlanDirection;
+import com.galeri.app.model.response.InstallmentResponse;
+import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.model.enums.LedgerEntryType;
 import com.galeri.app.model.enums.VehicleStatus;
 import com.galeri.app.model.response.DashboardResponse;
@@ -38,11 +42,13 @@ public class DashboardServiceImpl implements DashboardService {
 
     static final int MONTH_COUNT = 6;
     static final int TOP_BALANCES = 5;
+    static final int WEEK_DAYS = 7;
 
     private final AccountRepository accountRepository;
     private final LedgerEntryRepository entryRepository;
     private final ContactRepository contactRepository;
     private final VehicleRepository vehicleRepository;
+    private final PaymentPlanService paymentPlanService;
     private final Clock clock;
 
     @Override
@@ -105,9 +111,24 @@ public class DashboardServiceImpl implements DashboardService {
         long averageDays = inStock.isEmpty() ? 0
                 : Math.round(inStock.stream().mapToLong(v -> VehicleServiceImpl.daysInStock(v, today)).average().orElse(0));
 
+        // ---- taksitler: geciken tahsilatlar ve bu hafta (bugun + 6 gun)
+        List<InstallmentResponse> open = paymentPlanService.list(null, null, null, null).stream()
+                .filter(i -> i.status() != InstallmentStatus.PAID).toList();
+        List<InstallmentResponse> overdue = open.stream()
+                .filter(i -> i.status() == InstallmentStatus.OVERDUE && i.direction() == PlanDirection.SALE).toList();
+        LocalDate weekEnd = today.plusDays(WEEK_DAYS - 1);
+        List<InstallmentResponse> week = open.stream()
+                .filter(i -> !i.dueDate().isBefore(today) && !i.dueDate().isAfter(weekEnd)).toList();
+
         return new DashboardResponse(cash, bank, capital, receivable, payable, shares,
                 top(receivables), top(payables), inStock.size(), stockCost, averageDays,
-                months(tenantId, YearMonth.from(today), expenses));
+                months(tenantId, YearMonth.from(today), expenses),
+                overdue.size(), sum(overdue, null), week, sum(week, PlanDirection.SALE), sum(week, PlanDirection.PURCHASE));
+    }
+
+    private static long sum(List<InstallmentResponse> list, PlanDirection direction) {
+        return list.stream().filter(i -> direction == null || i.direction() == direction)
+                .mapToLong(InstallmentResponse::amountCents).sum();
     }
 
     private List<MonthStat> months(UUID tenantId, YearMonth current, Map<UUID, Long> expenses) {

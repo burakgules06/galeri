@@ -2,10 +2,13 @@
 import { useState } from "react";
 import { api } from "../../api/galeri";
 import { ENTRY_TYPE, shortDate, tl } from "../../shared/format";
-import type { LedgerEntryResponse } from "../../shared/types";
+import type { LedgerEntryResponse, LedgerEntryType } from "../../shared/types";
 import { errorMessage } from "../../shared/useLoad";
 import { Plate } from "../../shared/ui/Plate";
 import { Button, ErrorBox } from "../../shared/ui/Common";
+
+// Satis ve taksit hareketleri plana bagli: arac detayindan / odemeler ekranindan geri alinir, burada duzeltilmez.
+const LINKED: LedgerEntryType[] = ["VEHICLE_SALE", "COLLECTION", "PAYMENT"];
 
 export function LedgerEntryList({ entries, direction, onChange, showVehicle = true }: {
   entries: LedgerEntryResponse[];
@@ -70,7 +73,8 @@ function Row({ e, direction, onChange, showVehicle }: { e: LedgerEntryResponse; 
           <p className={`font-cond font-semibold text-[19px] whitespace-nowrap ${amountColor} ${cancelled ? "line-through" : ""}`}>
             {sign}{sign && " "}{tl(e.amountCents)}
           </p>
-          {!isReversal && !cancelled && !confirming && (
+          {!isReversal && !cancelled && !confirming && !LINKED.includes(e.type)
+            && !(e.type === "VEHICLE_PURCHASE" && e.source.type === "BALANCE") && (
             <button type="button" onClick={() => setConfirming(true)} className="text-[13px] font-semibold text-murekkep-2 hover:text-murekkep">
               Düzelt
             </button>

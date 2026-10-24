@@ -1,7 +1,7 @@
 import { apiFetch } from "./client";
 import type {
   AccountResponse, BodyPart, CategoryResponse, ContactRequest, ContactResponse, DashboardResponse, ExpenseRequest, ExpenseRoot,
-  YearlyTrades,
+  YearlyTrades, PaymentPlanResponse, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
   LedgerEntryResponse, MonthlyTrades, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
   VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary,
 } from "../shared/types";
@@ -21,6 +21,20 @@ export const api = {
   updateParts: (id: string, parts: Partial<Record<BodyPart, PartCondition>>) =>
     apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}/parts`, json({ parts }, "PUT")),
   sell: (id: string, request: SaleRequest) => apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}/sale`, json(request)),
+  undoSale: (id: string) => apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}/sale`, { method: "DELETE" }),
+  paymentPlans: (id: string) => apiFetch<PaymentPlanResponse[]>(`/api/vehicles/${id}/payment-plans`),
+  installments: (f: { status?: InstallmentStatus; direction?: PlanDirection; from?: string; to?: string } = {}) => {
+    const p = new URLSearchParams();
+    Object.entries(f).forEach(([k, v]) => { if (v) p.set(k, v); });
+    const qs = p.toString();
+    return apiFetch<InstallmentResponse[]>(`/api/installments${qs ? `?${qs}` : ""}`);
+  },
+  collect: (id: string, accountId: string, date: string) =>
+    apiFetch<InstallmentResponse>(`/api/installments/${id}/collect`, json({ accountId, date })),
+  undoInstallment: (id: string) => apiFetch<InstallmentResponse>(`/api/installments/${id}/undo`, { method: "POST" }),
+  updateInstallment: (id: string, dueDate: string, noteNo: string | null) =>
+    apiFetch<InstallmentResponse>(`/api/installments/${id}`, json({ dueDate, noteNo }, "PATCH")),
+  statement: (contactId: string) => apiFetch<ContactStatement>(`/api/contacts/${contactId}/statement`),
   contacts: (q = "") => apiFetch<ContactResponse[]>(`/api/contacts${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`),
   addContact: (request: ContactRequest) => apiFetch<ContactResponse>("/api/contacts", json(request)),
   updateContact: (id: string, request: ContactRequest) => apiFetch<ContactResponse>(`/api/contacts/${id}`, json(request, "PUT")),

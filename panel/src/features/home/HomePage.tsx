@@ -4,8 +4,9 @@ import { api } from "../../api/galeri";
 import { useAuth } from "../../auth/useAuth";
 import { BarChart, Legend } from "../../shared/charts/BarChart";
 import { SplitBar } from "../../shared/charts/Donut";
-import { SHORT_MONTHS, tl, tlShort } from "../../shared/format";
-import type { VehicleSummary } from "../../shared/types";
+import { dueLabel, SHORT_MONTHS, tl, tlShort } from "../../shared/format";
+import type { DashboardResponse, VehicleSummary } from "../../shared/types";
+import { Plate } from "../../shared/ui/Plate";
 import { useLoad } from "../../shared/useLoad";
 import { ErrorBox } from "../../shared/ui/Common";
 import { StatTile } from "../../shared/ui/StatTile";
@@ -80,6 +81,8 @@ function AdminSummary() {
         <StatTile label="Verecek" value={tlShort(data.payableCents)} tone="negative" sub={`${data.payables.length} kişiye ödenecek`} />
       </div>
 
+      <PaymentsStrip data={data} />
+
       <div className="grid gap-4 lg:grid-cols-2">
         <CapitalCard partners={data.partners} totalCents={data.capitalCents} />
         <BalancesCard receivableCents={data.receivableCents} payableCents={data.payableCents}
@@ -113,6 +116,50 @@ function AdminSummary() {
         </section>
       </div>
     </>
+  );
+}
+
+// Geciken tahsilat karti (kirmizi) + bu haftanin ilk 4 taksiti. Dokununca odemeler ekrani acilir.
+function PaymentsStrip({ data }: { data: DashboardResponse }) {
+  const week = data.week.slice(0, 4);
+  return (
+    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+      <a href="#/payments" className={`kart basilir block p-4 md:p-5 hover:shadow-md transition-shadow ${data.overdueCount ? "border-tehlike/40 bg-tehlike-zemin" : ""}`}>
+        <p className="etiket flex items-center gap-1.5">
+          <span className={`w-1.5 h-1.5 rounded-full ${data.overdueCount ? "bg-tehlike-canli" : "bg-basari-canli"}`} />Geciken tahsilat
+        </p>
+        <p className={`sayi font-bold text-[30px] leading-none tracking-tight mt-2.5 ${data.overdueCount ? "text-tehlike" : "text-basari"}`}>
+          {data.overdueCount ? tl(data.overdueCents) : "Yok"}
+        </p>
+        <p className="text-[13px] text-murekkep-2 mt-1.5">
+          {data.overdueCount ? `${data.overdueCount} taksit vadesini geçti` : "Bütün tahsilatlar zamanında"} <span className="font-semibold text-plaka">→</span>
+        </p>
+      </a>
+      <a href="#/payments" className="kart basilir block p-4 md:p-5 hover:shadow-md transition-shadow min-w-0">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="etiket">Bu hafta</p>
+          <p className="text-[13px] text-murekkep-2">
+            Tahsilat <b className="sayi text-[15px] text-basari">{tl(data.weekCollectCents)}</b>
+            {data.weekPayCents > 0 && <> · Ödeme <b className="sayi text-[15px] text-tehlike">{tl(data.weekPayCents)}</b></>}
+          </p>
+        </div>
+        {week.length === 0
+          ? <p className="text-[14px] text-murekkep-3 mt-3">7 gün içinde vadesi gelen ödeme yok.</p>
+          : (
+            <ul className="mt-2 divide-y divide-cizgi">
+              {week.map((i) => (
+                <li key={i.id} className="flex items-center gap-3 py-2">
+                  <span className={`w-1.5 h-6 rounded-full shrink-0 ${i.direction === "SALE" ? "bg-basari-canli" : "bg-tehlike-canli"}`} />
+                  {i.vehicle && <Plate plate={i.vehicle.plate} size="sm" />}
+                  <span className="min-w-0 grow truncate text-[14px]"><b className="font-semibold">{i.payer.name}</b>
+                    <span className="text-murekkep-2"> · {dueLabel(i)}</span></span>
+                  <span className="sayi font-semibold text-[16px] shrink-0">{tl(i.amountCents)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+      </a>
+    </div>
   );
 }
 

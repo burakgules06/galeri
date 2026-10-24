@@ -4,13 +4,17 @@ import com.galeri.app.exception.runtime.InvalidDateException;
 import com.galeri.app.exception.runtime.PlateAlreadyInStockException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.exception.runtime.VehicleAlreadySoldException;
+import com.galeri.app.exception.runtime.VehicleNotSoldException;
+import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.entity.VehiclePart;
 import com.galeri.app.model.enums.BodyPart;
 import com.galeri.app.model.enums.Fuel;
 import com.galeri.app.model.enums.PartCondition;
+import com.galeri.app.model.enums.PaymentMethod;
 import com.galeri.app.model.enums.Transmission;
 import com.galeri.app.model.enums.VehicleStatus;
+import com.galeri.app.model.request.InstallmentRequest;
 import com.galeri.app.model.request.VehiclePartsRequest;
 import com.galeri.app.model.request.VehicleRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
@@ -22,6 +26,7 @@ import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehiclePartRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.service.LedgerService;
+import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.support.TestSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,6 +61,7 @@ class VehicleServiceImplTest {
     @Mock private ContactRepository contactRepository;
     @Mock private PanelUserRepository panelUserRepository;
     @Mock private LedgerService ledgerService;
+    @Mock private PaymentPlanService paymentPlanService;
 
     // "Su an": 1 Temmuz 2026, 09:00 Istanbul (06:00 UTC)
     private final Clock clock = Clock.fixed(Instant.parse("2026-07-01T06:00:00Z"), ZoneOffset.UTC);
@@ -64,10 +70,16 @@ class VehicleServiceImplTest {
     private final UUID userId = UUID.randomUUID();
     private final UUID cashId = UUID.randomUUID();
     private VehicleServiceImpl service;
+    private Contact buyer;
 
     @BeforeEach
     void setUp() {
-        service = new VehicleServiceImpl(vehicleRepository, vehiclePartRepository, contactRepository, panelUserRepository, ledgerService, clock);
+        service = new VehicleServiceImpl(vehicleRepository, vehiclePartRepository, contactRepository, panelUserRepository,
+                ledgerService, paymentPlanService, clock);
+        buyer = new Contact();
+        buyer.setId(UUID.randomUUID());
+        buyer.setTenantId(tenantId);
+        buyer.setName("Ayse Demir");
         TestSession.open(userId, tenantId, "ADMIN");
     }
 
@@ -78,7 +90,7 @@ class VehicleServiceImplTest {
 
     private VehicleRequest request(String plate) {
         return new VehicleRequest(plate, "Renault", "Clio", (short) 2022, Fuel.GASOLINE, Transmission.MANUAL, 31000,
-                "Kırmızı", null, null, LocalDate.of(2026, 6, 1), null, null, 72000000L, 60000000L, cashId);
+                "Kırmızı", null, null, LocalDate.of(2026, 6, 1), null, null, 72000000L, 60000000L, cashId, null);
     }
 
     private Vehicle inStockVehicle(UUID id, UUID tenant) {
@@ -114,7 +126,7 @@ class VehicleServiceImplTest {
         assertThat(saved.getValue().getTenantId()).isEqualTo(tenantId);
         assertThat(result.vehicle().daysInStock()).isEqualTo(30);
         assertThat(result.actualPurchaseCents()).isEqualTo(72000000L);
-        verify(ledgerService).syncVehiclePurchase(saved.getValue(), cashId);
+        verify(paymentPlanService).syncPurchase(saved.getValue(), cashId, null);
     }
 
     @Test
@@ -125,7 +137,7 @@ class VehicleServiceImplTest {
 
         service.update(id, request("34 KLM 4521"));
 
-        verify(ledgerService).syncVehiclePurchase(vehicle, cashId);
+        verify(paymentPlanService).syncPurchase(vehicle, cashId, null);
     }
 
     @Test
@@ -136,18 +148,27 @@ class VehicleServiceImplTest {
         verify(vehicleRepository, never()).save(any());
     }
 
+    private VehicleSaleRequest sale(LocalDate date, long price) {
+        return new VehicleSaleRequest(date, buyer.getId(), null, price,
+                List.of(new InstallmentRequest(date, price, PaymentMethod.CASH, null, null, true, cashId)));
+    }
+
     @Test
-    void satis_araciSatildiYapar_ikinciSatis_reddedilir() {
+    void satis_araciSatildiYapar_planKurulur_ikinciSatis_reddedilir() {
         UUID id = UUID.randomUUID();
         Vehicle vehicle = inStockVehicle(id, tenantId);
         when(vehicleRepository.findById(id)).thenReturn(Optional.of(vehicle));
+        when(contactRepository.findById(buyer.getId())).thenReturn(Optional.of(buyer));
 
-        VehicleDetailAdmin result = service.sell(id, new VehicleSaleRequest(LocalDate.of(2026, 6, 20), null, null, 80000000L));
+        VehicleSaleRequest request = sale(LocalDate.of(2026, 6, 20), 80000000L);
+        VehicleDetailAdmin result = service.sell(id, request);
 
         assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.SOLD);
+        assertThat(vehicle.getBuyer()).isSameAs(buyer);
         assertThat(result.salePriceCents()).isEqualTo(80000000L);
         assertThat(result.vehicle().daysInStock()).isEqualTo(19);
-        assertThatThrownBy(() -> service.sell(id, new VehicleSaleRequest(LocalDate.of(2026, 6, 21), null, null, 1L)))
+        verify(paymentPlanService).recordSale(vehicle, buyer, request);
+        assertThatThrownBy(() -> service.sell(id, sale(LocalDate.of(2026, 6, 21), 1L)))
                 .isInstanceOf(VehicleAlreadySoldException.class);
     }
 
@@ -156,8 +177,36 @@ class VehicleServiceImplTest {
         UUID id = UUID.randomUUID();
         when(vehicleRepository.findById(id)).thenReturn(Optional.of(inStockVehicle(id, tenantId)));
 
-        assertThatThrownBy(() -> service.sell(id, new VehicleSaleRequest(LocalDate.of(2026, 5, 31), null, null, 1L)))
+        assertThatThrownBy(() -> service.sell(id, sale(LocalDate.of(2026, 5, 31), 1L)))
                 .isInstanceOf(InvalidDateException.class);
+        verify(paymentPlanService, never()).recordSale(any(), any(), any());
+    }
+
+    @Test
+    void satisGeriAlininca_aracStokaDoner_satisAlanlariTemizlenir() {
+        UUID id = UUID.randomUUID();
+        Vehicle vehicle = inStockVehicle(id, tenantId);
+        vehicle.setStatus(VehicleStatus.SOLD);
+        vehicle.setSaleDate(LocalDate.of(2026, 6, 20));
+        vehicle.setBuyer(buyer);
+        vehicle.setSalePriceCents(80000000L);
+        when(vehicleRepository.findById(id)).thenReturn(Optional.of(vehicle));
+
+        service.undoSale(id);
+
+        verify(paymentPlanService).undoSale(vehicle);
+        assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.IN_STOCK);
+        assertThat(vehicle.getSaleDate()).isNull();
+        assertThat(vehicle.getBuyer()).isNull();
+        assertThat(vehicle.getSalePriceCents()).isNull();
+    }
+
+    @Test
+    void stoktakiAracinSatisi_geriAlinamaz() {
+        UUID id = UUID.randomUUID();
+        when(vehicleRepository.findById(id)).thenReturn(Optional.of(inStockVehicle(id, tenantId)));
+
+        assertThatThrownBy(() -> service.undoSale(id)).isInstanceOf(VehicleNotSoldException.class);
     }
 
     @Test

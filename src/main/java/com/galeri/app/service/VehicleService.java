@@ -22,5 +22,9 @@ public interface VehicleService {
 
     VehicleDetailAdmin updateParts(UUID id, VehiclePartsRequest request);
 
+    /** Satis + odeme plani; satis deftere odeyen basina yazilir (bkz. PaymentPlanService.recordSale). */
     VehicleDetailAdmin sell(UUID id, VehicleSaleRequest request);
+
+    /** Satisi geri alir: hic taksit odenmemis olmali; arac stoka doner. */
+    VehicleDetailAdmin undoSale(UUID id);
 }

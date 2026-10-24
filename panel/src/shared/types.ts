@@ -112,6 +112,11 @@ export interface DashboardResponse {
   stockCostCents: number;
   averageDaysInStock: number;
   months: MonthStat[];
+  overdueCount: number;            // geciken tahsilat adedi
+  overdueCents: number;
+  week: InstallmentResponse[];     // bugun + 6 gun, odenmemis (tahsilat ve odeme)
+  weekCollectCents: number;
+  weekPayCents: number;
 }
 
 export interface VehicleRequest {
@@ -130,10 +135,81 @@ export interface VehicleRequest {
   boughtById: string | null;
   actualPurchaseCents: number | null;
   officialPurchaseCents: number | null;
-  purchaseAccountId: string | null;
+  purchaseAccountId: string | null;                // pesin alis
+  purchasePlan: InstallmentRequest[] | null;       // senetli / taksitli alis (odenmis taksitler haric)
 }
 
-export interface SaleRequest { saleDate: string; buyerId: string | null; soldById: string | null; salePriceCents: number | null }
+export interface SaleRequest {
+  saleDate: string;
+  buyerId: string;
+  soldById: string | null;
+  salePriceCents: number;
+  installments: InstallmentRequest[];   // toplami salePriceCents'e kurusu kurusuna esit
+}
+
+// ---- Odeme plani ve taksitler (sadece ADMIN). Tutarlar kurus. ----
+export type PlanDirection = "SALE" | "PURCHASE";
+export type PaymentMethod = "CASH" | "TRANSFER" | "PROMISSORY_NOTE" | "INSTITUTION";
+export type InstallmentStatus = "PAID" | "OVERDUE" | "UPCOMING";
+export interface VehicleRef { id: string; plate: string; make: string; model: string }
+
+export interface InstallmentRequest {
+  dueDate: string;
+  amountCents: number;
+  method: PaymentMethod;
+  noteNo: string | null;
+  payerId: string | null;   // bos: alici; INSTITUTION'da kurum zorunlu
+  paidNow: boolean;         // pesinat: ayni islemde accountId'ye tahsil edilir
+  accountId: string | null;
+}
+
+export interface InstallmentResponse {
+  id: string;
+  planId: string;
+  direction: PlanDirection;
+  vehicle: VehicleRef | null;
+  seq: number;
+  count: number;
+  dueDate: string;
+  amountCents: number;
+  method: PaymentMethod;
+  noteNo: string | null;
+  payer: ContactSummary;
+  counterparty: ContactSummary;
+  status: InstallmentStatus;
+  daysLate: number;
+  paidEntryId: string | null;
+  paidAt: string | null;
+}
+
+export interface PaymentPlanResponse {
+  id: string;
+  direction: PlanDirection;
+  vehicleId: string;
+  counterparty: ContactSummary;
+  totalCents: number;
+  paidCents: number;
+  remainingCents: number;
+  overdueCents: number;
+  installments: InstallmentResponse[];
+}
+
+export interface StatementLine {
+  entryId: string;
+  date: string;
+  type: LedgerEntryType;
+  description: string | null;
+  vehicle: VehicleRef | null;
+  amountCents: number;    // arti: cariye giren (bize borclandi), eksi: cariden cikan
+  runningCents: number;
+  reversal: boolean;
+}
+export interface ContactStatement {
+  contact: ContactResponse;
+  balanceCents: number;   // arti: alacak, eksi: verecek
+  lines: StatementLine[];
+  openInstallments: InstallmentResponse[];
+}
 export interface ContactRequest { name: string; phone: string | null; type: ContactType; notes: string | null }
 
 // ---- Para defteri (sadece ADMIN). Tutarlar kurus. ----

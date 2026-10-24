@@ -1,6 +1,7 @@
 // Ara-sec kutusu: yazdikca kisileri suzer; listede yoksa "<ad> yeni kisi olarak ekle" ile aninda olusturur.
 import { useMemo, useState } from "react";
 import { api } from "../../api/galeri";
+import { formatPhone } from "../../shared/format";
 import type { ContactResponse, ContactSummary } from "../../shared/types";
 import { inputClass } from "../../shared/ui/Common";
 
@@ -64,7 +65,7 @@ export function ContactPicker({ contacts, selected, onSelect, onCreated, placeho
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => { onSelect({ id: c.id, name: c.name, phone: c.phone }); setText(""); setOpen(false); }}>
                 <span className="font-medium">{c.name}</span>
-                {c.phone && <span className="text-murekkep-3 text-[14px] ml-2">{c.phone}</span>}
+                {c.phone && <span className="text-murekkep-3 text-[14px] ml-2">{formatPhone(c.phone)}</span>}
               </button>
             </li>
           ))}

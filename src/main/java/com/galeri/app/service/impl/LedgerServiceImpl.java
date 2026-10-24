@@ -5,15 +5,18 @@ import com.galeri.app.exception.runtime.CorrectionNotCorrectableException;
 import com.galeri.app.exception.runtime.EntryAlreadyCorrectedException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidCategoryException;
+import com.galeri.app.exception.runtime.LinkedEntryException;
 import com.galeri.app.exception.runtime.RecordNotFoundException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.model.entity.Account;
+import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.ExpenseCategory;
 import com.galeri.app.model.entity.LedgerEntry;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.AccountType;
 import com.galeri.app.model.enums.ExpenseRoot;
 import com.galeri.app.model.enums.LedgerEntryType;
+import com.galeri.app.model.enums.PlanDirection;
 import com.galeri.app.model.enums.VehicleStatus;
 import com.galeri.app.model.request.AccountRequest;
 import com.galeri.app.model.request.ExpenseRequest;
@@ -25,6 +28,7 @@ import com.galeri.app.model.response.VehicleCost;
 import com.galeri.app.model.response.VehicleRef;
 import com.galeri.app.repository.AccountRepository;
 import com.galeri.app.repository.ExpenseCategoryRepository;
+import com.galeri.app.repository.InstallmentRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehicleRepository;
@@ -58,6 +62,7 @@ public class LedgerServiceImpl implements LedgerService {
     private final ExpenseCategoryRepository categoryRepository;
     private final VehicleRepository vehicleRepository;
     private final PanelUserRepository panelUserRepository;
+    private final InstallmentRepository installmentRepository;
 
     // ------------------------------------------------------------------ hesaplar
 
@@ -134,11 +139,81 @@ public class LedgerServiceImpl implements LedgerService {
     @Override
     @Transactional
     public LedgerEntryResponse correct(UUID entryId) {
+        LedgerEntry original = reversible(entryId);
+        // Satis, planli alis (saticinin carisinden) ve taksit hareketleri plana bagli: kasa ekranindan terslenirse
+        // plan ile defter ayrisir.
+        boolean plannedPurchase = original.getType() == LedgerEntryType.VEHICLE_PURCHASE
+                && original.getSourceAccount().getType() == AccountType.BALANCE;
+        if (original.getType() == LedgerEntryType.VEHICLE_SALE || plannedPurchase
+                || installmentRepository.existsByPaidEntryId(original.getId())) {
+            throw new LinkedEntryException();
+        }
+        return toResponse(writeReversal(original), false);
+    }
+
+    // ------------------------------------------------------------------ odeme plani
+
+    @Override
+    @Transactional
+    public LedgerEntry writeSale(Vehicle vehicle, Contact payer, long amountCents, LocalDate date) {
+        Account income = systemAccount(vehicle.getTenantId(), AccountType.INCOME);
+        LedgerEntry e = newEntry(vehicle.getTenantId(), LedgerEntryType.VEHICLE_SALE, income, balanceAccount(payer), amountCents, date);
+        e.setVehicle(vehicle);
+        e.setDescription("Satış");
+        return entryRepository.save(e);
+    }
+
+    @Override
+    @Transactional
+    public LedgerEntry writeSettlement(PlanDirection direction, Vehicle vehicle, Contact payer, UUID accountId,
+                                       long amountCents, LocalDate date, String description) {
+        Account money = getMoneyAccount(accountId);
+        Account balance = balanceAccount(payer);
+        LedgerEntry e = direction == PlanDirection.SALE
+                ? newEntry(vehicle.getTenantId(), LedgerEntryType.COLLECTION, balance, money, amountCents, date)
+                : newEntry(vehicle.getTenantId(), LedgerEntryType.PAYMENT, money, balance, amountCents, date);
+        e.setVehicle(vehicle);
+        e.setDescription(description);
+        return entryRepository.save(e);
+    }
+
+    @Override
+    @Transactional
+    public void reverse(UUID entryId) {
+        writeReversal(reversible(entryId));
+    }
+
+    @Override
+    @Transactional
+    public void reverseVehicleSales(UUID vehicleId) {
+        List<LedgerEntry> sales = entryRepository.findByVehicle_IdAndType(vehicleId, LedgerEntryType.VEHICLE_SALE).stream()
+                .filter(e -> e.getCorrectedEntryId() == null)
+                .toList();
+        if (sales.isEmpty()) return;
+        Set<UUID> corrected = new HashSet<>(entryRepository.correctedIds(sales.stream().map(LedgerEntry::getId).toList()));
+        sales.stream().filter(e -> !corrected.contains(e.getId())).forEach(this::writeReversal);
+    }
+
+    /** Tersi yazilabilecek hareket: bu galerinin, kendisi duzeltme degil, daha once duzeltilmemis. */
+    private LedgerEntry reversible(UUID entryId) {
         LedgerEntry original = entryRepository.findById(entryId).orElseThrow(RecordNotFoundException::new);
         if (!original.getTenantId().equals(CurrentUser.tenantId())) throw new SourceNotBelongToTenantException();
         if (original.getCorrectedEntryId() != null) throw new CorrectionNotCorrectableException();
         if (entryRepository.existsByCorrectedEntryId(original.getId())) throw new EntryAlreadyCorrectedException();
-        return toResponse(writeReversal(original), false);
+        return original;
+    }
+
+    /** Kisinin carisi (BALANCE); yoksa ilk ihtiyacta acilir. */
+    private Account balanceAccount(Contact contact) {
+        return accountRepository.findFirstByTenantIdAndTypeAndContactId(contact.getTenantId(), AccountType.BALANCE, contact.getId())
+                .orElseGet(() -> {
+                    Account a = new Account();
+                    a.setTenantId(contact.getTenantId());
+                    a.setType(AccountType.BALANCE);
+                    a.setContactId(contact.getId());
+                    a.setName(contact.getName());
+                    return accountRepository.save(a);
+                });
     }
 
     // ------------------------------------------------------------------ kategoriler
@@ -212,20 +287,45 @@ public class LedgerServiceImpl implements LedgerService {
     @Transactional(readOnly = true)
     public UUID purchaseAccountId(UUID vehicleId) {
         if (vehicleId == null) return null;
-        LedgerEntry active = activePurchase(vehicleId);
-        return active == null ? null : active.getSourceAccount().getId();
+        // Sadece pesin alis (kasa / bankadan); planli alis saticinin carisinden yazilir, hesap secimi yoktur.
+        return activeVehiclePurchases(vehicleId).stream()
+                .filter(e -> e.getSourceAccount().getType().isMoneyAccount())
+                .map(e -> e.getSourceAccount().getId())
+                .findFirst().orElse(null);
+    }
+
+    @Override
+    @Transactional
+    public LedgerEntry writePlannedPurchase(Vehicle vehicle, Contact payee, long amountCents, LocalDate date) {
+        LedgerEntry e = newEntry(vehicle.getTenantId(), LedgerEntryType.VEHICLE_PURCHASE, balanceAccount(payee),
+                vehicleAccount(vehicle), amountCents, date);
+        e.setVehicle(vehicle);
+        e.setDescription("Planlı alış");
+        return entryRepository.save(e);
+    }
+
+    @Override
+    @Transactional
+    public void reverseVehiclePurchases(UUID vehicleId) {
+        activeVehiclePurchases(vehicleId).forEach(this::writeReversal);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<LedgerEntry> activeVehiclePurchases(UUID vehicleId) {
+        List<LedgerEntry> purchases = entryRepository.findByVehicle_IdAndType(vehicleId, LedgerEntryType.VEHICLE_PURCHASE).stream()
+                .filter(e -> e.getCorrectedEntryId() == null)
+                .toList();
+        if (purchases.isEmpty()) return List.of();
+        Set<UUID> corrected = new HashSet<>(entryRepository.correctedIds(purchases.stream().map(LedgerEntry::getId).toList()));
+        return purchases.stream().filter(e -> !corrected.contains(e.getId())).toList();
     }
 
     // ------------------------------------------------------------------ yardimcilar
 
-    /** Duzeltilmemis tek VEHICLE_PURCHASE hareketi (duzeltme hareketleri haric). */
+    /** Duzeltilmemis ilk VEHICLE_PURCHASE hareketi (pesin alista tektir). */
     private LedgerEntry activePurchase(UUID vehicleId) {
-        List<LedgerEntry> purchases = entryRepository.findByVehicle_IdAndType(vehicleId, LedgerEntryType.VEHICLE_PURCHASE).stream()
-                .filter(e -> e.getCorrectedEntryId() == null)
-                .toList();
-        if (purchases.isEmpty()) return null;
-        Set<UUID> corrected = new HashSet<>(entryRepository.correctedIds(purchases.stream().map(LedgerEntry::getId).toList()));
-        return purchases.stream().filter(e -> !corrected.contains(e.getId())).findFirst().orElse(null);
+        return activeVehiclePurchases(vehicleId).stream().findFirst().orElse(null);
     }
 
     private LedgerEntry writeReversal(LedgerEntry original) {

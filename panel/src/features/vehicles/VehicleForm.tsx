@@ -1,11 +1,15 @@
 // Arac ekleme / duzenleme. Sadece ADMIN acar. Tutarlar TL girilir, kurus gonderilir.
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
-import { centsToInput, formatPlate, FUEL, tlToCents, todayIso, TRANSMISSION } from "../../shared/format";
-import type { ContactResponse, ContactSummary, Fuel, Transmission, VehicleDetailAdmin, VehicleRequest } from "../../shared/types";
+import { centsToInput, formatDate, formatPlate, FUEL, METHOD, tl, tlToCents, todayIso, TRANSMISSION } from "../../shared/format";
+import type {
+  ContactResponse, ContactSummary, Fuel, PaymentPlanResponse, Transmission, VehicleDetailAdmin, VehicleRequest,
+} from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
 import { ContactPicker } from "../contacts/ContactPicker";
+import { row, rowProblem, toRequest, type PlanMode, type PlanRow } from "../payments/plan";
+import { PlanBuilder, PlanSummary } from "../payments/PlanBuilder";
 
 interface Props {
   open: boolean;
@@ -15,11 +19,29 @@ interface Props {
 }
 
 export function VehicleForm(props: Props) {
-  return props.open ? <VehicleFormContent {...props} /> : null;
+  return props.open ? <VehicleFormLoader {...props} /> : null;
 }
 
-function VehicleFormContent({ onClose, onSaved, existing }: Props) {
+// Duzenlemede once mevcut alis plani yuklenir: formun baslangic odeme sekli ona gore kurulur.
+function VehicleFormLoader(props: Props) {
+  const id = props.existing?.vehicle.id;
+  const plans = useLoad(() => (id ? api.paymentPlans(id) : Promise.resolve([])), [id]);
+  if (!plans.data && !plans.error) return null;
+  return <VehicleFormContent {...props} purchasePlan={plans.data?.find((p) => p.direction === "PURCHASE") ?? null} />;
+}
+
+function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props & { purchasePlan: PaymentPlanResponse | null }) {
   const v = existing?.vehicle;
+  const locked = (purchasePlan?.installments ?? []).filter((i) => i.status === "PAID");
+  const lockedCents = locked.reduce((t, i) => t + i.amountCents, 0);
+  const [payMode, setPayMode] = useState<"CASH" | "PLAN">(purchasePlan ? "PLAN" : "CASH");
+  const [planMode, setPlanMode] = useState<PlanMode | null>(purchasePlan ? "MIXED" : null);
+  const [rows, setRows] = useState<PlanRow[]>(() => (purchasePlan?.installments ?? [])
+    .filter((i) => i.status !== "PAID")
+    .map((i) => row({
+      dueDate: i.dueDate, amountCents: i.amountCents, method: i.method, noteNo: i.noteNo ?? "",
+      payer: i.payer.id !== i.counterparty.id ? i.payer : null,
+    })));
   const [plate, setPlate] = useState(v?.plate ?? "");
   const [make, setMake] = useState(v?.make ?? "");
   const [model, setModel] = useState(v?.model ?? "");
@@ -47,6 +69,11 @@ function VehicleFormContent({ onClose, onSaved, existing }: Props) {
   const [extraContacts, setExtraContacts] = useState<ContactResponse[]>([]);
   const allContacts = [...extraContacts, ...(contacts.data ?? [])];
 
+  const actualCents = tlToCents(actual);
+  const price = actualCents != null && !Number.isNaN(actualCents) ? actualCents : 0;
+  const planned = lockedCents + rows.reduce((t, r) => t + (r.amountCents > 0 ? r.amountCents : 0), 0);
+  const remaining = price - planned;
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const amounts = [tlToCents(tramer), tlToCents(actual), tlToCents(official)];
@@ -54,12 +81,19 @@ function VehicleFormContent({ onClose, onSaved, existing }: Props) {
     const yearNumber = Number(year), mileageNumber = Number(mileage.replace(/\./g, ""));
     if (!Number.isInteger(yearNumber) || yearNumber < 1950 || yearNumber > 2100) return setError("Model yılını kontrol et.");
     if (!Number.isInteger(mileageNumber) || mileageNumber < 0) return setError("Kilometreyi kontrol et.");
+    if (payMode === "PLAN") {
+      if (!seller) return setError("Senetli alışta kimden alındığını seç.");
+      if (price <= 0 || remaining !== 0) return setError("Ödeme planının toplamı gerçek alış bedeline eşit olmalı.");
+      if (rows.some((r) => rowProblem(r) != null)) return setError("Plan satırlarını tamamla.");
+    }
 
     const request: VehicleRequest = {
       plate, make, model, modelYear: yearNumber, fuel, transmission, mileageKm: mileageNumber,
       color: color.trim() || null, tramerCents: amounts[0], notes: notes.trim() || null,
       purchaseDate, sellerId: seller?.id ?? null, boughtById: boughtBy || null,
-      actualPurchaseCents: amounts[1], officialPurchaseCents: amounts[2], purchaseAccountId: purchaseAccountId || null,
+      actualPurchaseCents: amounts[1], officialPurchaseCents: amounts[2],
+      purchaseAccountId: payMode === "CASH" ? purchaseAccountId || null : null,
+      purchasePlan: payMode === "PLAN" ? rows.map(toRequest) : null,
     };
     setSaving(true);
     setError(null);
@@ -76,6 +110,7 @@ function VehicleFormContent({ onClose, onSaved, existing }: Props) {
     <Modal
       title={v ? "Aracı düzenle" : "Araç ekle"}
       open
+      wide={payMode === "PLAN"}
       onClose={onClose}
       footer={<>
         <Button variant="secondary" type="button" onClick={onClose}>Vazgeç</Button>
@@ -134,12 +169,41 @@ function VehicleFormContent({ onClose, onSaved, existing }: Props) {
               <input className={inputClass} value={official} onChange={(e) => setOfficial(e.target.value)} inputMode="decimal" placeholder="980.000" />
             </Field>
           </div>
-          <Field label="Ödeme nereden" hint="Peşin alışta gerçek alış bedeli bu hesaptan düşülür. Değiştirirsen eski kayıt ters hareketle düzeltilir.">
-            <select className={inputClass} value={purchaseAccountId} onChange={(e) => setPurchaseAccount(e.target.value)}>
-              {(accounts.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              <option value="">Kasaya işleme (senetli vb.)</option>
-            </select>
-          </Field>
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="font-cond font-semibold text-[18px]">Ödeme</h3>
+          <Segment<"CASH" | "PLAN"> value={payMode} onChange={setPayMode}
+            options={[{ value: "CASH", label: "Peşin" }, { value: "PLAN", label: "Senetli / taksitli" }]} />
+          {payMode === "CASH" && (
+            <Field label="Ödeme nereden" hint="Gerçek alış bedeli bu hesaptan düşülür. Değiştirirsen eski kayıt ters hareketle düzeltilir.">
+              <select className={inputClass} value={purchaseAccountId} onChange={(e) => setPurchaseAccount(e.target.value)}>
+                {(accounts.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                <option value="">Kasaya işleme</option>
+              </select>
+            </Field>
+          )}
+          {payMode === "PLAN" && (
+            <>
+              <p className="text-[13px] text-murekkep-2">
+                Bedel satıcının carisine borç yazılır; her taksit ödendiğinde kasadan ya da bankadan düşülür.
+                {!seller && <b className="text-uyari"> Kimden alındığını seç.</b>}
+              </p>
+              {locked.length > 0 && (
+                <div className="rounded-[12px] border border-basari/30 bg-basari-zemin/50 px-3 py-2">
+                  <p className="text-[13px] font-semibold text-basari">Ödenmiş taksitler (değiştirilemez): {tl(lockedCents)}</p>
+                  <ul className="text-[13px] text-murekkep-2 mt-1 space-y-0.5">
+                    {locked.map((i) => <li key={i.id}>{formatDate(i.dueDate)} · {METHOD[i.method]} · <span className="sayi text-[14px]">{tl(i.amountCents)}</span></li>)}
+                  </ul>
+                </div>
+              )}
+              <PlanBuilder baseCents={Math.max(0, price - lockedCents)} date={purchaseDate} mode={planMode} onMode={setPlanMode}
+                rows={rows} onRows={setRows} remaining={remaining} accounts={accounts.data ?? []} organizations={[]}
+                modes={["INSTALLMENTS", "MIXED"]} methods={["CASH", "TRANSFER", "PROMISSORY_NOTE"]}
+                paidNowLabel="Şimdi ödendi" downHint="Şimdi ödenir" />
+              <PlanSummary planned={planned} remaining={remaining} ready={price > 0} />
+            </>
+          )}
         </section>
 
         <Field label="Notlar">

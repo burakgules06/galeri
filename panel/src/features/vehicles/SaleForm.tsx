@@ -1,4 +1,5 @@
-// Araci satildi olarak isaretler. Odeme plani ve tahsilat 3. adimda gelecek.
+// Satis: alici, bedel ve odeme plani (PlanBuilder). Altta her zaman "Planlanan / Kalan"; kalan 0 olmadan kaydedilmez.
+// Pesinat ("simdi alindi") ayni islemde kasaya girer.
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
 import { tlToCents, todayIso } from "../../shared/format";
@@ -6,6 +7,8 @@ import type { ContactResponse, ContactSummary, VehicleDetailAdmin } from "../../
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal } from "../../shared/ui/Common";
 import { ContactPicker } from "../contacts/ContactPicker";
+import { cashPlan, rowProblem, toRequest, type PlanMode, type PlanRow } from "../payments/plan";
+import { PlanBuilder, PlanSummary } from "../payments/PlanBuilder";
 
 interface Props { open: boolean; onClose: () => void; vehicle: VehicleDetailAdmin; onSaved: (d: VehicleDetailAdmin) => void }
 
@@ -17,21 +20,42 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
   const [date, setDate] = useState(todayIso());
   const [buyer, setBuyer] = useState<ContactSummary | null>(null);
   const [soldBy, setSoldBy] = useState("");
-  const [price, setPrice] = useState("");
+  const [priceText, setPriceText] = useState("");
+  const [mode, setMode] = useState<PlanMode | null>(null);
+  const [rows, setRows] = useState<PlanRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const contacts = useLoad(() => api.contacts(), []);
   const staff = useLoad(() => api.staff(), []);
+  const accounts = useLoad(() => api.accounts(), []);
   const [extraContacts, setExtraContacts] = useState<ContactResponse[]>([]);
+  const allContacts = [...extraContacts, ...(contacts.data ?? [])];
+
+  const parsed = tlToCents(priceText);
+  const price = parsed != null && !Number.isNaN(parsed) ? parsed : 0;
+  const planned = rows.reduce((t, r) => t + (r.amountCents > 0 ? r.amountCents : 0), 0);
+  const remaining = price - planned;
+  const canSave = !!buyer && price > 0 && rows.length > 0 && remaining === 0 && rows.every((r) => rowProblem(r) == null);
+
+  const changePrice = (text: string) => {
+    setPriceText(text);
+    // Pesin planda bedel degisince tek satir da degissin (elle duzenlenen planlara dokunulmaz)
+    const cents = tlToCents(text);
+    if (mode === "CASH" && cents != null && !Number.isNaN(cents)) {
+      setRows(cashPlan(cents, date, rows[0]?.accountId || accounts.data?.[0]?.id || ""));
+    }
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const cents = tlToCents(price);
-    if (Number.isNaN(cents)) return setError("Satış bedelini 1.400.000 gibi yaz.");
+    if (!buyer) return setError("Alıcıyı seç.");
+    if (!canSave) return setError("Planı tamamla: kalan 0 olmalı ve her satır dolu olmalı.");
     setSaving(true);
     setError(null);
     try {
-      onSaved(await api.sell(vehicle.vehicle.id, { saleDate: date, buyerId: buyer?.id ?? null, soldById: soldBy || null, salePriceCents: cents }));
+      onSaved(await api.sell(vehicle.vehicle.id, {
+        saleDate: date, buyerId: buyer.id, soldById: soldBy || null, salePriceCents: price, installments: rows.map(toRequest),
+      }));
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -40,29 +64,46 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
   };
 
   return (
-    <Modal title="Satıldı olarak işaretle" open onClose={onClose}
-      footer={<>
-        <Button variant="secondary" type="button" onClick={onClose}>Vazgeç</Button>
-        <Button type="submit" form="sale-form" disabled={saving}>{saving ? "Kaydediliyor…" : "Satışı kaydet"}</Button>
-      </>}>
-      <form id="sale-form" onSubmit={submit} className="space-y-3">
+    <Modal title="Satışı kaydet" open onClose={onClose} wide
+      footer={
+        <div className="w-full flex flex-wrap items-center justify-between gap-3">
+          <PlanSummary planned={planned} remaining={remaining} ready={price > 0} />
+          <div className="flex gap-2">
+            <Button variant="secondary" type="button" onClick={onClose}>Vazgeç</Button>
+            <Button type="submit" form="sale-form" disabled={saving || !canSave}>{saving ? "Kaydediliyor…" : "Satışı kaydet"}</Button>
+          </div>
+        </div>
+      }>
+      <form id="sale-form" onSubmit={submit} className="space-y-5">
         <ErrorBox message={error} />
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Satış tarihi"><input type="date" className={inputClass} value={date} min={vehicle.vehicle.purchaseDate} onChange={(e) => setDate(e.target.value)} required /></Field>
+
+        <section className="grid gap-3 sm:grid-cols-2">
+          <Field label="Alıcı" hint="Zorunlu">
+            <ContactPicker contacts={allContacts} selected={buyer} onSelect={setBuyer}
+              onCreated={(c) => setExtraContacts((l) => [c, ...l])} placeholder="İsim yaz ya da seç" />
+          </Field>
+          <Field label="Satış bedeli" hint="TL">
+            <input className={`${inputClass} sayi text-[19px] font-semibold`} value={priceText} onChange={(e) => changePrice(e.target.value)}
+              inputMode="decimal" placeholder="1.400.000" />
+          </Field>
+          <Field label="Satış tarihi">
+            <input type="date" className={inputClass} value={date} min={vehicle.vehicle.purchaseDate} onChange={(e) => setDate(e.target.value)} required />
+          </Field>
           <Field label="Satan çalışan">
             <select className={inputClass} value={soldBy} onChange={(e) => setSoldBy(e.target.value)}>
               <option value="">Seçilmedi</option>
               {(staff.data ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </Field>
-        </div>
-        <Field label="Alıcı">
-          <ContactPicker contacts={[...extraContacts, ...(contacts.data ?? [])]} selected={buyer} onSelect={setBuyer}
-            onCreated={(c) => setExtraContacts((l) => [c, ...l])} placeholder="İsim yaz ya da seç" />
-        </Field>
-        <Field label="Satış bedeli" hint="TL. Ödeme planı ve taksitler bir sonraki sürümde.">
-          <input className={inputClass} value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" placeholder="1.400.000" />
-        </Field>
+        </section>
+
+        <section className="space-y-3">
+          <p className="etiket">Ödeme planı</p>
+          <PlanBuilder baseCents={price} date={date} mode={mode} onMode={setMode} rows={rows} onRows={setRows} remaining={remaining}
+            accounts={accounts.data ?? []} organizations={allContacts.filter((c) => c.type === "ORGANIZATION")}
+            modes={["CASH", "INSTALLMENTS", "INSTITUTION", "MIXED"]} methods={["CASH", "TRANSFER", "PROMISSORY_NOTE", "INSTITUTION"]}
+            paidNowLabel="Şimdi alındı" downHint="Şimdi alınır" />
+        </section>
       </form>
     </Modal>
   );

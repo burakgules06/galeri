@@ -7,6 +7,7 @@ import { Plate } from "../../shared/ui/Plate";
 import { Button, ErrorBox } from "../../shared/ui/Common";
 import { DamageMap } from "./DamageMap";
 import { DaysInStock } from "./DaysInStock";
+import { PaymentPlanCard } from "./PaymentPlanCard";
 import { SaleForm } from "./SaleForm";
 import { VehicleForm } from "./VehicleForm";
 import { ExpenseForm } from "../ledger/ExpenseForm";
@@ -20,7 +21,7 @@ const STATUS_PILL: Record<VehicleStatus, string> = {
 };
 
 export function VehicleDetailPage({ id }: { id: string }) {
-  const { data, setData, error } = useLoad(() => api.vehicle(id), [id]);
+  const { data, setData, error, reload } = useLoad(() => api.vehicle(id), [id]);
   const [form, setForm] = useState<"edit" | "sell" | null>(null);
 
   if (error) return <ErrorBox message={error} />;
@@ -89,6 +90,16 @@ export function VehicleDetailPage({ id }: { id: string }) {
 
           {admin && (
             <CostCard key={`${admin.actualPurchaseCents}-${admin.salePriceCents}-${admin.purchaseAccountId}`} vehicle={v} />
+          )}
+
+          {admin && (
+            <PaymentPlanCard key={`purchase-${admin.actualPurchaseCents}-${admin.seller?.id}-${v.purchaseDate}`} vehicleId={v.id}
+              direction="PURCHASE" onChanged={reload} />
+          )}
+
+          {admin && v.status !== "IN_STOCK" && (
+            <PaymentPlanCard key={`${v.status}-${admin.salePriceCents}`} vehicleId={v.id} onChanged={reload}
+              onUndone={(d) => setData(d)} />
           )}
         </div>
 

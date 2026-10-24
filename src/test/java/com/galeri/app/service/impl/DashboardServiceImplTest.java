@@ -4,7 +4,12 @@ import com.galeri.app.model.entity.Account;
 import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.AccountType;
+import com.galeri.app.model.enums.InstallmentStatus;
 import com.galeri.app.model.enums.LedgerEntryType;
+import com.galeri.app.model.enums.PaymentMethod;
+import com.galeri.app.model.enums.PlanDirection;
+import com.galeri.app.model.response.InstallmentResponse;
+import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.model.enums.VehicleStatus;
 import com.galeri.app.model.response.DashboardResponse;
 import com.galeri.app.model.response.DashboardResponse.MonthStat;
@@ -44,6 +49,7 @@ class DashboardServiceImplTest {
     @Mock private LedgerEntryRepository entryRepository;
     @Mock private ContactRepository contactRepository;
     @Mock private VehicleRepository vehicleRepository;
+    @Mock private PaymentPlanService paymentPlanService;
 
     // "Su an": 1 Temmuz 2026, Istanbul
     private final Clock clock = Clock.fixed(Instant.parse("2026-07-01T06:00:00Z"), ZoneOffset.UTC);
@@ -63,7 +69,9 @@ class DashboardServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new DashboardServiceImpl(accountRepository, entryRepository, contactRepository, vehicleRepository, clock);
+        service = new DashboardServiceImpl(accountRepository, entryRepository, contactRepository, vehicleRepository,
+                paymentPlanService, clock);
+        when(paymentPlanService.list(null, null, null, null)).thenReturn(List.of());
         TestSession.open(UUID.randomUUID(), tenantId, "ADMIN");
 
         when(accountRepository.findByTenantIdAndTypeInOrderByCreatedAtAsc(eq(tenantId), anyCollection()))
@@ -129,6 +137,30 @@ class DashboardServiceImplTest {
         assertThat(june.sold()).isEqualTo(1);
         assertThat(june.revenueCents()).isEqualTo(130000L);
         assertThat(june.profitCents()).isEqualTo(25000L);
+    }
+
+    @Test
+    void gecikenTahsilatlar_veBuHaftaninTaksitleri_ayrilir() {
+        // Bugun 1 Temmuz: gecikmis satis taksiti, bugunku tahsilat, 6 gun sonraki odeme, 7 gun sonraki (hafta disi), odenmis
+        when(paymentPlanService.list(null, null, null, null)).thenReturn(List.of(
+                installment(PlanDirection.SALE, LocalDate.of(2026, 6, 25), 1000L, InstallmentStatus.OVERDUE),
+                installment(PlanDirection.SALE, LocalDate.of(2026, 7, 1), 2000L, InstallmentStatus.UPCOMING),
+                installment(PlanDirection.PURCHASE, LocalDate.of(2026, 7, 7), 3000L, InstallmentStatus.UPCOMING),
+                installment(PlanDirection.SALE, LocalDate.of(2026, 7, 8), 4000L, InstallmentStatus.UPCOMING),
+                installment(PlanDirection.SALE, LocalDate.of(2026, 6, 20), 5000L, InstallmentStatus.PAID)));
+
+        DashboardResponse r = service.summary();
+
+        assertThat(r.overdueCount()).isEqualTo(1);
+        assertThat(r.overdueCents()).isEqualTo(1000L);
+        assertThat(r.week()).extracting(InstallmentResponse::amountCents).containsExactly(2000L, 3000L);
+        assertThat(r.weekCollectCents()).isEqualTo(2000L);
+        assertThat(r.weekPayCents()).isEqualTo(3000L);
+    }
+
+    private static InstallmentResponse installment(PlanDirection direction, LocalDate due, long amount, InstallmentStatus status) {
+        return new InstallmentResponse(UUID.randomUUID(), UUID.randomUUID(), direction, null, 1, 1, due, amount,
+                PaymentMethod.PROMISSORY_NOTE, null, null, null, status, 0, null, null);
     }
 
     private Contact contact(String name, boolean isOwner) {
