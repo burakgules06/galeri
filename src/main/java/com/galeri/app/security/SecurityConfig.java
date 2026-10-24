@@ -61,7 +61,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(allowedOrigins);   // CORS_ALLOWED_ORIGINS ile ayarlanir
+        // CORS_ALLOWED_ORIGINS ile ayarlanir. Desen destekli: dev'de "http://localhost:*" (Vite 5173 doluysa
+        // 5174'e gecer), prod'da tam adres.
+        config.setAllowedOriginPatterns(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
