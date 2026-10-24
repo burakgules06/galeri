@@ -1,16 +1,19 @@
 package com.galeri.app.model.request;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Positive;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
-// 1. adimda satis sadece tarih + alici + satan calisan + bedel olarak kaydedilir.
-// Odeme plani ve tahsilat 3. adimda gelir.
+// Satis: alici zorunlu, bedel kurus. Taksitlerin toplami bedele kurusu kurusuna esit olmali (bkz. docs/MIMARI.md §6).
 public record VehicleSaleRequest(
         @NotNull LocalDate saleDate,
-        UUID buyerId,
+        @NotNull UUID buyerId,
         UUID soldById,
-        @PositiveOrZero Long salePriceCents
+        @NotNull @Positive Long salePriceCents,
+        @NotEmpty List<@Valid InstallmentRequest> installments
 ) {}

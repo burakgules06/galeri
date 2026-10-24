@@ -1,0 +1,43 @@
+package com.galeri.app.model.entity;
+
+import com.galeri.app.model.enums.PlanDirection;
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.util.UUID;
+
+// Aracin satis ya da alis odeme plani. Para hareketi burada degil defterde; plan sadece "ne zaman, kimden, ne kadar".
+@Entity
+@Table(name = "payment_plan")
+@Getter
+@Setter
+public class PaymentPlan extends BaseModel {
+
+    @Id
+    @GeneratedValue
+    @Column(columnDefinition = "uuid")
+    private UUID id;
+
+    @Column(name = "tenant_id", nullable = false, updatable = false)
+    private UUID tenantId;
+
+    @Column(name = "vehicle_id", nullable = false, updatable = false)
+    private UUID vehicleId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10, updatable = false)
+    private PlanDirection direction;
+
+    // Karsi taraf: satista alici, alista satici
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "contact_id")
+    private Contact contact;
+
+    @Column(name = "total_cents", nullable = false)
+    private Long totalCents;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "created_by_id", updatable = false)
+    private PanelUser createdBy;
+}

@@ -20,4 +20,11 @@ public class ErrorMessageConstant {
     public static final int CATEGORY_DEPTH_LIMIT = 1014;
     public static final int ENTRY_ALREADY_CORRECTED = 1015;
     public static final int CORRECTION_NOT_CORRECTABLE = 1016;
+    public static final int SALE_TOTAL_MISMATCH = 1017;
+    public static final int SALE_HAS_PAYMENTS = 1018;
+    public static final int INSTALLMENT_ALREADY_PAID = 1019;
+    public static final int INSTALLMENT_NOT_PAID = 1020;
+    public static final int INVALID_PAYER = 1021;
+    public static final int VEHICLE_NOT_SOLD = 1022;
+    public static final int LINKED_ENTRY = 1023;
 }
