@@ -155,14 +155,15 @@ Akıllı Randevum'daki haftalık görünümün aylık karşılığı:
 - Ay seçilir (önceki/sonraki ay okları).
 - Her çalışan için o ay **kaç araç aldığı** ve **kaç araç sattığı** gösterilir.
 - Çalışana dokununca o ayın listesi açılır: alınanlar ve satılanlar ayrı, her satırda **marka-model ve plaka** (tarihle birlikte).
-- **Tutar ve kâr gösterilmez.** Bu yüzden ekran STAFF'a da açıktır.
+- **Tutar ve kâr gösterilmez.**
+- `ADMIN` bütün çalışanları görür. `STAFF` sadece **kendi** aldığı ve sattığı araçları görür (backend'de filtrelenir). Başlangıçta çalışanlara uygulama verilmeyecek, ama yetki şimdiden böyle yazılır.
 - Kaynağı: araçtaki `alan_calisan_id` + `alis_tarihi` ve `satan_calisan_id` + `satis_tarihi`.
 
 ## 9. Ödeme günü bildirimleri
 
 Galeri sahibine, vadesi gelen ödemeler için telefonuna bildirim gider (Akıllı Randevum'daki PWA web push altyapısı aynen kullanılır: tarayıcı/telefon "bildirimlere izin ver", VAPID anahtarları `.env`'de).
 
-- Her sabah (galerinin saat dilimine göre 09.00) bir zamanlanmış görev o gün vadesi gelen `taksit` satırlarını bulur.
+- Her sabah 09.00'da (galerinin saat dilimine göre; galericiyle kararlaştırıldı) bir zamanlanmış görev o gün vadesi gelen `taksit` satırlarını bulur.
 - **Tahsilat** (bize ödenecek): "Bugün Ali Yılmaz'dan 25.000 TL senet tahsilatı var (34 ABC 123)".
 - **Ödeme** (bizim ödeyeceğimiz, alıştaki taksit/senetler): "Bugün Mehmet Demir'e 40.000 TL senet ödemesi var".
 - Aynı gün birden fazla varsa tek bildirimde toplanır ("Bugün 3 tahsilat, 1 ödeme"), dokununca ilgili liste açılır.
@@ -175,7 +176,7 @@ Galeri sahibine, vadesi gelen ödemeler için telefonuna bildirim gider (Akıll�
 | Rol | Görür |
 |---|---|
 | `ADMIN` (galeri sahibi) | Her şey |
-| `STAFF` (çalışan) | Araç teknik bilgileri, hasar şeması ve çalışan bazında aylık alım-satım görünümü. **Hiçbir tutar yok** (alış, satış, masraf, cari, kasa, sermaye). |
+| `STAFF` (çalışan) | Araç teknik bilgileri, hasar şeması ve aylık alım-satım görünümünde sadece kendi kayıtları. **Hiçbir tutar yok** (alış, satış, masraf, cari, kasa, sermaye). |
 
 Bu kısıt **backend'de** uygulanır: STAFF'a dönen DTO'larda para alanları hiç yer almaz,
 para uç noktaları STAFF için 403 döner. Sadece arayüzde gizlemek yetmez.
@@ -215,5 +216,3 @@ Her adım ayrı bir PR; her biri bittiğinde galericiye gösterilebilir.
 - Konsinye araçlardan alınan komisyon sermaye havuzunun kârına giriyor mu? (Galerici "sonra konuşalım" dedi. Şimdilik GELIR'e yazılır ve dönem kârına dahil gösterilir; değişirse sadece rapor değişir.)
 - Takas yapılıyor mu? (Sorulmadı. Gerekirse: alıcının verdiği araç yeni bir STOKTA araç olur, değeri alıcının carisinden düşülür.)
 - Ana ekranda ne görünecek? (Galerici henüz düşünmedi; 6. adımda karar verilecek.)
-- Çalışan görünümünde STAFF herkesi mi, sadece kendini mi görsün? (Şimdilik herkesi; para içermiyor.)
-- Bildirim saati sabah 09.00 uygun mu, galerici başka saat ister mi?
