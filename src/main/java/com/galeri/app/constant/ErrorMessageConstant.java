@@ -9,4 +9,10 @@ public class ErrorMessageConstant {
     public static final int SUBSCRIPTION_END = 1003;
     public static final int TENANT_NOT_FOUND = 1004;
     public static final int INVALID_CREDENTIALS = 1005;
+    public static final int GECERSIZ_PLAKA = 1006;
+    public static final int PLAKA_STOKTA_VAR = 1007;
+    public static final int KAYIT_BULUNAMADI = 1008;
+    public static final int ARAC_ZATEN_SATILDI = 1009;
+    public static final int GECERSIZ_TARIH = 1010;
+    public static final int YETKISIZ = 1011;
 }

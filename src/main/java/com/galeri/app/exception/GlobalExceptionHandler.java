@@ -9,6 +9,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -38,6 +44,24 @@ public class GlobalExceptionHandler {
         log.warn("Validasyon hatasi: {}", errorMessage);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(genericResponseService.createResponseWithError(errorMessage, ErrorMessageConstant.VALIDATION_ERROR));
+    }
+
+    // @PreAuthorize reddi: genel Exception handler'a dusup 500 donmesin
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<GenericResponse<Object>> handleAccessDenied(AccessDeniedException ex) {
+        log.warn("Yetkisiz erisim denemesi: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(genericResponseService.createResponseWithError("Bu işlem için yetkiniz yok", ErrorMessageConstant.YETKISIZ));
+    }
+
+    // Bozuk JSON, bilinmeyen enum degeri, yanlis tipte path/query parametresi
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class,
+            MissingServletRequestParameterException.class, HandlerMethodValidationException.class,
+            ConstraintViolationException.class})
+    public ResponseEntity<GenericResponse<Object>> handleBadRequest(Exception ex) {
+        log.warn("Gecersiz istek: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(genericResponseService.createResponseWithError("Gönderilen bilgiler geçersiz", ErrorMessageConstant.VALIDATION_ERROR));
     }
 
     @ExceptionHandler(Exception.class)

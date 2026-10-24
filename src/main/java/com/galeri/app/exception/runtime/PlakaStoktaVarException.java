@@ -1,0 +1,10 @@
+package com.galeri.app.exception.runtime;
+
+import com.galeri.app.constant.ErrorMessageConstant;
+
+// Ayni galeride ayni plaka ayni anda iki kez STOKTA olamaz.
+public class PlakaStoktaVarException extends ApplicationRuntimeException {
+    public PlakaStoktaVarException() {
+        super("Bu plakayla stokta zaten bir araç var", ErrorMessageConstant.PLAKA_STOKTA_VAR);
+    }
+}
