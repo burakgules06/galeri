@@ -31,6 +31,9 @@ prod değerleri `/opt/galeri/.env`'den gelir (`.env.example`'a bak). `jwt.secret
 
 ## Mimari
 
+Alan modeli, para kuralları ve yol haritası: **[docs/MIMARI.md](docs/MIMARI.md)**. Yeni bir özelliğe başlamadan önce oku; oradaki kavramlara ve kurallara (hareket defteri, kuruş cinsinden tutar, silinmeyen hareketler, STAFF'a para alanı dönmemesi) uy.
+
+
 ```
 com.galeri.app
 ├── controller/        REST uçları (/api/auth/login açık, diğer /api/** JWT ister)
