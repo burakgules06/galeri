@@ -31,6 +31,7 @@ prod değerleri `/opt/galeri/.env`'den gelir (`.env.example`'a bak). `jwt.secret
 
 ## Mimari
 
+Nerede kaldığımız ve sıradaki iş: **[docs/DURUM.md](docs/DURUM.md)** (oturuma başlarken önce bunu oku).
 Alan modeli, para kuralları ve yol haritası: **[docs/MIMARI.md](docs/MIMARI.md)**. Yeni bir özelliğe başlamadan önce oku; oradaki kavramlara ve kurallara (hareket defteri, kuruş cinsinden tutar, silinmeyen hareketler, STAFF'a para alanı dönmemesi) uy.
 
 
