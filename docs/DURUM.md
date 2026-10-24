@@ -7,17 +7,29 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
 - **Adım 1: kişiler ve araçlar** (PR #2, merge edildi). Kişi, araç, 13 parçalı hasar şeması, alan/satan çalışan,
   araç listesi/detayı/formu, satış formu, çalışan bazında aylık alım-satım. STAFF para alanı görmez.
   Dev seed'de ADMIN `5550000000` ve STAFF `5551111111` (ikisi de `demo1234`), örnek kişi ve araçlar.
+- **Adım 2: para defteri** (`feat/para-defteri`). `V3__para_defteri.sql`: `hesap`, `masraf_kategori`, `hareket`.
+  - Bakiye saklanmaz, hareketlerden hesaplanır. Hareket UPDATE/DELETE'i DB trigger'ı reddeder; "Düzelt" ters hareket atar
+    (aynı tarihle, `duzeltilen_hareket_id` ile; bir hareket bir kez düzeltilir, düzeltme düzeltilmez).
+  - Hareket `tur`: `ARAC_ALIS`, `ARAC_MASRAF`, `GENEL_GIDER`, `SERMAYE` (yeni tür = yeni migration'da `hareket_tur_check`).
+  - KASA, GIDER, ARAC hesapları ilk ihtiyaçta kendiliğinden açılır. Banka hesabı panelden eklenir.
+  - Peşin araç alışı: araç formunda "Ödeme nereden" seçilir → KASA/BANKA → ARAC. Bedel/tarih/hesap değişirse eski hareket
+    terslenip yenisi yazılır (`DefterService.aracAlisiniEsitle`).
+  - Masraf: araca bağlı (aracın maliyetine) ya da genel gider. Kategori yazarken oluşur (ilk harfi büyütülür,
+    harf büyüklüğünden bağımsız tekil). En sık 5 kategori hızlı buton.
+  - Araç maliyeti = gerçek alış (araçtaki alan) + defterdeki araç masrafları; kâr sadece satılmış araçta.
+  - Panel: "Kasa" sekmesi (bakiyeler, hareketler, düzelt, banka ekle, masraf ekle), araç detayında "Maliyet" kartı.
+  - Uçlar: `/api/hesaplar`, `/api/hareketler`, `/api/hareketler/{id}/duzelt`, `/api/masraflar`,
+    `/api/masraf-kategorileri?kok=`, `/api/araclar/{id}/maliyet`. Hepsi sadece ADMIN.
 - Lokal not: panel `localhost:5173`'te açılmalı (backend dev'de sadece bunu kabul eder); 5173 başka projede doluysa onu kapat.
 
-## Sıradaki: Adım 2, para defteri
+## Sıradaki: Adım 3, satış ve tahsilat
 
-Kapsam `MIMARI.md` §3, §7 ve §12-2'de. Özet:
-- Hesaplar (KASA, BANKA ve diğer türler, §3 "Hesap türleri") ve hareket tablosu. Hareketler **silinmez**, düzeltme ters hareketle.
-- Tutarlar **kuruş, BIGINT**. Bakiye hareketlerden hesaplanır.
-- Araç alışı (peşin) deftere hareket olarak yazılır; araç maliyeti = gerçek alış + araca bağlı masraflar.
-- Masraf girişi: kategori ağacı, kategori **yazarken oluşur** (ayrı kategori ekranı yok).
-- Panel: kasa/banka bakiyeleri, hareket listesi, masraf ekleme, araç detayında maliyet. Sadece ADMIN.
-- Testler: Mockito + sabit `Clock` (`AracServiceImplTest` deseni). Yeni migration: `V3__...`.
+Kapsam `MIMARI.md` §6 ve §12-3: satış kaydı deftere (GELIR → CARI(alıcı)), ödeme planı (peşin, taksit, senet, Evim, kredi),
+tahsilat, geciken ödemeler, müşteri carisi. Satış şu an sadece araçtaki alanlara yazılıyor, deftere hareket atmıyor.
+
+Adım 2'den kalan küçükler (gerekirse):
+- Kasa ↔ banka aktarımı (virman) ve açılış bakiyesi yok; sermaye girişi 5. adımda (dev seed'de örnek SERMAYE hareketi var).
+- Alt kategori backend'de var (`ustKategoriId`, en fazla 3 seviye), panelde henüz seçilemiyor.
 
 ## Prod kurulumu (henüz yapılmadı)
 

@@ -27,6 +27,7 @@ import com.galeri.app.repository.KisiRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.security.CurrentUser;
 import com.galeri.app.service.AracService;
+import com.galeri.app.service.DefterService;
 import com.galeri.app.util.PlakaUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -54,6 +55,7 @@ public class AracServiceImpl implements AracService {
     private final AracParcaRepository aracParcaRepository;
     private final KisiRepository kisiRepository;
     private final PanelUserRepository panelUserRepository;
+    private final DefterService defterService;
     private final Clock clock;
 
     // ------------------------------------------------------------------ okuma
@@ -98,6 +100,7 @@ public class AracServiceImpl implements AracService {
         arac.setPlaka(plaka);
         uygula(arac, request);
         Arac kayitli = aracRepository.save(arac);
+        defterService.aracAlisiniEsitle(kayitli, request.alisHesapId());
         return toAdmin(kayitli, toDetay(kayitli));
     }
 
@@ -116,6 +119,7 @@ public class AracServiceImpl implements AracService {
         if (arac.getSatisTarihi() != null && arac.getSatisTarihi().isBefore(arac.getAlisTarihi())) {
             throw new GecersizTarihException();
         }
+        defterService.aracAlisiniEsitle(arac, request.alisHesapId());
         return toAdmin(arac, toDetay(arac));
     }
 
@@ -243,10 +247,11 @@ public class AracServiceImpl implements AracService {
                 a.getAlisTarihi(), a.getSatisTarihi(), stoktaGun(a, bugun()), parcalar);
     }
 
-    private static AracDetayAdmin toAdmin(Arac a, AracDetay detay) {
+    private AracDetayAdmin toAdmin(Arac a, AracDetay detay) {
         return new AracDetayAdmin(detay,
                 kisiOzet(a.getSatici()), calisanOzet(a.getAlanCalisan()), a.getGercekAlisKurus(), a.getResmiAlisKurus(),
-                kisiOzet(a.getAlici()), calisanOzet(a.getSatanCalisan()), a.getSatisKurus());
+                kisiOzet(a.getAlici()), calisanOzet(a.getSatanCalisan()), a.getSatisKurus(),
+                defterService.alisHesapId(a.getId()));
     }
 
     private static KisiOzet kisiOzet(Kisi k) {

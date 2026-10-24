@@ -15,4 +15,9 @@ public class ErrorMessageConstant {
     public static final int ARAC_ZATEN_SATILDI = 1009;
     public static final int GECERSIZ_TARIH = 1010;
     public static final int YETKISIZ = 1011;
+    public static final int GECERSIZ_HESAP = 1012;
+    public static final int GECERSIZ_KATEGORI = 1013;
+    public static final int KATEGORI_SEVIYE_SINIRI = 1014;
+    public static final int HAREKET_ZATEN_DUZELTILDI = 1015;
+    public static final int DUZELTME_DUZELTILEMEZ = 1016;
 }

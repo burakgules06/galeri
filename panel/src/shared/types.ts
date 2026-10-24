@@ -78,6 +78,7 @@ export interface AracDetayAdmin {
   alici: KisiOzet | null;
   satanCalisan: CalisanOzet | null;
   satisKurus: number | null;
+  alisHesapId: string | null;
 }
 
 export interface KisiResponse { id: string; ad: string; telefon: string | null; tur: KisiTur; notlar: string | null }
@@ -102,7 +103,55 @@ export interface AracIstek {
   alanCalisanId: string | null;
   gercekAlisKurus: number | null;
   resmiAlisKurus: number | null;
+  alisHesapId: string | null;
 }
 
 export interface SatisIstek { satisTarihi: string; aliciId: string | null; satanCalisanId: string | null; satisKurus: number | null }
 export interface KisiIstek { ad: string; telefon: string | null; tur: KisiTur; notlar: string | null }
+
+// ---- Para defteri (sadece ADMIN). Tutarlar kurus. ----
+export type HesapTur = "KASA" | "BANKA" | "CARI" | "SERMAYE" | "ARAC" | "GIDER" | "GELIR";
+export type HareketTur = "ARAC_ALIS" | "ARAC_MASRAF" | "GENEL_GIDER" | "SERMAYE";
+export type MasrafKok = "ARAC" | "GENEL";
+
+export interface HesapOzet { id: string; tur: HesapTur; ad: string }
+export interface HesapResponse extends HesapOzet { bakiyeKurus: number }
+
+export interface HareketResponse {
+  id: string;
+  tarih: string;
+  tur: HareketTur;
+  kaynak: HesapOzet;
+  hedef: HesapOzet;
+  tutarKurus: number;
+  arac: { id: string; plaka: string; marka: string; model: string } | null;
+  kategori: string | null;
+  aciklama: string | null;
+  duzeltilenHareketId: string | null;   // doluysa bu bir duzeltme hareketi
+  duzeltildi: boolean;                  // true ise bu hareket ters hareketle iptal edildi
+  olusturan: string | null;
+  createdAt: string;
+}
+
+export interface KategoriResponse { id: string; ad: string; kok: MasrafKok; ustId: string | null; kullanim: number }
+
+export interface AracMaliyet {
+  aracId: string;
+  alisKurus: number;
+  alisDefterde: boolean;
+  masrafKurus: number;
+  toplamKurus: number;
+  satisKurus: number | null;
+  karKurus: number | null;
+  hareketler: HareketResponse[];
+}
+
+export interface MasrafIstek {
+  tarih: string;
+  kaynakHesapId: string;
+  tutarKurus: number;
+  aracId: string | null;
+  kategoriId: string | null;
+  kategoriAd: string | null;
+  aciklama: string | null;
+}
