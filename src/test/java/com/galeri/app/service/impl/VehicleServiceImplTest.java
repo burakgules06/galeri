@@ -1,0 +1,240 @@
+package com.galeri.app.service.impl;
+
+import com.galeri.app.exception.runtime.InvalidDateException;
+import com.galeri.app.exception.runtime.PlateAlreadyInStockException;
+import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
+import com.galeri.app.exception.runtime.VehicleAlreadySoldException;
+import com.galeri.app.model.entity.Vehicle;
+import com.galeri.app.model.entity.VehiclePart;
+import com.galeri.app.model.enums.BodyPart;
+import com.galeri.app.model.enums.Fuel;
+import com.galeri.app.model.enums.PartCondition;
+import com.galeri.app.model.enums.Transmission;
+import com.galeri.app.model.enums.VehicleStatus;
+import com.galeri.app.model.request.VehiclePartsRequest;
+import com.galeri.app.model.request.VehicleRequest;
+import com.galeri.app.model.request.VehicleSaleRequest;
+import com.galeri.app.model.response.VehicleDetail;
+import com.galeri.app.model.response.VehicleDetailAdmin;
+import com.galeri.app.model.response.VehicleSummary;
+import com.galeri.app.repository.ContactRepository;
+import com.galeri.app.repository.PanelUserRepository;
+import com.galeri.app.repository.VehiclePartRepository;
+import com.galeri.app.repository.VehicleRepository;
+import com.galeri.app.service.LedgerService;
+import com.galeri.app.support.TestSession;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class VehicleServiceImplTest {
+
+    @Mock private VehicleRepository vehicleRepository;
+    @Mock private VehiclePartRepository vehiclePartRepository;
+    @Mock private ContactRepository contactRepository;
+    @Mock private PanelUserRepository panelUserRepository;
+    @Mock private LedgerService ledgerService;
+
+    // "Su an": 1 Temmuz 2026, 09:00 Istanbul (06:00 UTC)
+    private final Clock clock = Clock.fixed(Instant.parse("2026-07-01T06:00:00Z"), ZoneOffset.UTC);
+
+    private final UUID tenantId = UUID.randomUUID();
+    private final UUID userId = UUID.randomUUID();
+    private final UUID cashId = UUID.randomUUID();
+    private VehicleServiceImpl service;
+
+    @BeforeEach
+    void setUp() {
+        service = new VehicleServiceImpl(vehicleRepository, vehiclePartRepository, contactRepository, panelUserRepository, ledgerService, clock);
+        TestSession.open(userId, tenantId, "ADMIN");
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestSession.close();
+    }
+
+    private VehicleRequest request(String plate) {
+        return new VehicleRequest(plate, "Renault", "Clio", (short) 2022, Fuel.GASOLINE, Transmission.MANUAL, 31000,
+                "Kırmızı", null, null, LocalDate.of(2026, 6, 1), null, null, 72000000L, 60000000L, cashId);
+    }
+
+    private Vehicle inStockVehicle(UUID id, UUID tenant) {
+        Vehicle v = new Vehicle();
+        v.setId(id);
+        v.setTenantId(tenant);
+        v.setPlate("34 KLM 4521");
+        v.setMake("Renault");
+        v.setModel("Clio");
+        v.setModelYear((short) 2022);
+        v.setFuel(Fuel.GASOLINE);
+        v.setTransmission(Transmission.MANUAL);
+        v.setMileageKm(31000);
+        v.setPurchaseDate(LocalDate.of(2026, 6, 1));
+        v.setActualPurchaseCents(72000000L);
+        return v;
+    }
+
+    @Test
+    void yeniArac_plakaNormalizeEdilip_kaydedilir() {
+        when(vehicleRepository.existsByTenantIdAndPlateAndStatus(tenantId, "34 KLM 4521", VehicleStatus.IN_STOCK)).thenReturn(false);
+        when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(inv -> {
+            Vehicle v = inv.getArgument(0);
+            v.setId(UUID.randomUUID());
+            return v;
+        });
+
+        VehicleDetailAdmin result = service.create(request("34klm4521"));
+
+        ArgumentCaptor<Vehicle> saved = ArgumentCaptor.forClass(Vehicle.class);
+        verify(vehicleRepository).save(saved.capture());
+        assertThat(saved.getValue().getPlate()).isEqualTo("34 KLM 4521");
+        assertThat(saved.getValue().getTenantId()).isEqualTo(tenantId);
+        assertThat(result.vehicle().daysInStock()).isEqualTo(30);
+        assertThat(result.actualPurchaseCents()).isEqualTo(72000000L);
+        verify(ledgerService).syncVehiclePurchase(saved.getValue(), cashId);
+    }
+
+    @Test
+    void aracGuncellenince_alisHareketiDeftereEsitlenir() {
+        UUID id = UUID.randomUUID();
+        Vehicle vehicle = inStockVehicle(id, tenantId);
+        when(vehicleRepository.findById(id)).thenReturn(Optional.of(vehicle));
+
+        service.update(id, request("34 KLM 4521"));
+
+        verify(ledgerService).syncVehiclePurchase(vehicle, cashId);
+    }
+
+    @Test
+    void ayniPlakaStoktaVarsa_yeniArac_reddedilir() {
+        when(vehicleRepository.existsByTenantIdAndPlateAndStatus(tenantId, "34 KLM 4521", VehicleStatus.IN_STOCK)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.create(request("34 KLM 4521"))).isInstanceOf(PlateAlreadyInStockException.class);
+        verify(vehicleRepository, never()).save(any());
+    }
+
+    @Test
+    void satis_araciSatildiYapar_ikinciSatis_reddedilir() {
+        UUID id = UUID.randomUUID();
+        Vehicle vehicle = inStockVehicle(id, tenantId);
+        when(vehicleRepository.findById(id)).thenReturn(Optional.of(vehicle));
+
+        VehicleDetailAdmin result = service.sell(id, new VehicleSaleRequest(LocalDate.of(2026, 6, 20), null, null, 80000000L));
+
+        assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.SOLD);
+        assertThat(result.salePriceCents()).isEqualTo(80000000L);
+        assertThat(result.vehicle().daysInStock()).isEqualTo(19);
+        assertThatThrownBy(() -> service.sell(id, new VehicleSaleRequest(LocalDate.of(2026, 6, 21), null, null, 1L)))
+                .isInstanceOf(VehicleAlreadySoldException.class);
+    }
+
+    @Test
+    void satisTarihi_alistanOnceyse_reddedilir() {
+        UUID id = UUID.randomUUID();
+        when(vehicleRepository.findById(id)).thenReturn(Optional.of(inStockVehicle(id, tenantId)));
+
+        assertThatThrownBy(() -> service.sell(id, new VehicleSaleRequest(LocalDate.of(2026, 5, 31), null, null, 1L)))
+                .isInstanceOf(InvalidDateException.class);
+    }
+
+    @Test
+    void baskaGalerininAraci_bulunamadiGibiDavranir() {
+        UUID id = UUID.randomUUID();
+        when(vehicleRepository.findById(id)).thenReturn(Optional.of(inStockVehicle(id, UUID.randomUUID())));
+
+        assertThatThrownBy(() -> service.detail(id)).isInstanceOf(SourceNotBelongToTenantException.class);
+    }
+
+    @Test
+    void calisan_detaydaParaAlanlariniGormez() {
+        TestSession.open(userId, tenantId, "STAFF");
+        UUID id = UUID.randomUUID();
+        when(vehicleRepository.findById(id)).thenReturn(Optional.of(inStockVehicle(id, tenantId)));
+
+        Object result = service.detail(id);
+
+        assertThat(result).isInstanceOf(VehicleDetail.class).isNotInstanceOf(VehicleDetailAdmin.class);
+        assertThat(((VehicleDetail) result).parts()).hasSize(BodyPart.values().length)
+                .allSatisfy((p, c) -> assertThat(c).isEqualTo(PartCondition.ORIGINAL));
+    }
+
+    @Test
+    void yonetici_detaydaParaAlanlariniGorur() {
+        UUID id = UUID.randomUUID();
+        when(vehicleRepository.findById(id)).thenReturn(Optional.of(inStockVehicle(id, tenantId)));
+
+        assertThat(service.detail(id)).isInstanceOf(VehicleDetailAdmin.class);
+    }
+
+    @Test
+    void parcalar_orijinalOlanSilinir_digerleriEklenirYaDaGuncellenir() {
+        UUID id = UUID.randomUUID();
+        when(vehicleRepository.findById(id)).thenReturn(Optional.of(inStockVehicle(id, tenantId)));
+        VehiclePart paintedHood = part(id, BodyPart.HOOD, PartCondition.PAINTED);
+        VehiclePart replacedBumper = part(id, BodyPart.FRONT_BUMPER, PartCondition.REPLACED);
+        when(vehiclePartRepository.findByVehicleId(id)).thenReturn(List.of(paintedHood, replacedBumper));
+
+        Map<BodyPart, PartCondition> changes = new EnumMap<>(BodyPart.class);
+        changes.put(BodyPart.HOOD, PartCondition.REPLACED);             // guncelle
+        changes.put(BodyPart.FRONT_BUMPER, PartCondition.ORIGINAL);     // sil
+        changes.put(BodyPart.ROOF, PartCondition.LOCALLY_PAINTED);      // ekle
+        service.updateParts(id, new VehiclePartsRequest(changes));
+
+        assertThat(paintedHood.getCondition()).isEqualTo(PartCondition.REPLACED);
+        verify(vehiclePartRepository).delete(replacedBumper);
+        ArgumentCaptor<VehiclePart> added = ArgumentCaptor.forClass(VehiclePart.class);
+        verify(vehiclePartRepository).save(added.capture());
+        assertThat(added.getValue().getPart()).isEqualTo(BodyPart.ROOF);
+        assertThat(added.getValue().getTenantId()).isEqualTo(tenantId);
+    }
+
+    @Test
+    void liste_hasarOzetiVeStoktaGunHesaplanir() {
+        UUID id = UUID.randomUUID();
+        Vehicle vehicle = inStockVehicle(id, tenantId);
+        when(vehicleRepository.search(tenantId, null, "")).thenReturn(List.of(vehicle));
+        when(vehiclePartRepository.findByVehicleIdIn(List.of(id))).thenReturn(List.of(
+                part(id, BodyPart.FRONT_BUMPER, PartCondition.PAINTED),
+                part(id, BodyPart.ROOF, PartCondition.PAINTED),
+                part(id, BodyPart.HOOD, PartCondition.REPLACED)));
+
+        List<VehicleSummary> list = service.search(null, null);
+
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).damage().painted()).isEqualTo(2);
+        assertThat(list.get(0).damage().replaced()).isEqualTo(1);
+        assertThat(list.get(0).damage().locallyPainted()).isZero();
+        assertThat(list.get(0).daysInStock()).isEqualTo(30);
+    }
+
+    private static VehiclePart part(UUID vehicleId, BodyPart p, PartCondition c) {
+        VehiclePart vp = new VehiclePart();
+        vp.setVehicleId(vehicleId);
+        vp.setPart(p);
+        vp.setCondition(c);
+        return vp;
+    }
+}

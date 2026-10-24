@@ -58,7 +58,7 @@ Panel tarafında `apiFetch<T>()` doğrudan `data`'yı verir; hata olursa `ApiErr
 ## Kurallar (agent'lar dahil herkes için)
 
 ### Veritabanı
-- **Mevcut bir `V*__*.sql` dosyasını asla değiştirme.** Yeni migration bir sonraki numarayla (`V2__arac_tablosu.sql`).
+- **Mevcut bir `V*__*.sql` dosyasını asla değiştirme.** Yeni migration bir sonraki numarayla (`V4__payment_plan.sql`).
 - Her yeni iş tablosu `tenant_id UUID NOT NULL REFERENCES tenant(id)` taşır ve `tenant_id` üzerinde index'lenir.
 - Entity değişikliği ve migration aynı PR'da olmalı (Hibernate `validate`).
 - Veri silen ya da kolon daraltan migration için PR açıklamasında açıkça uyar; PR'a `migration` etiketi ekle.
@@ -73,6 +73,7 @@ Panel tarafında `apiFetch<T>()` doğrudan `data`'yı verir; hata olursa `ApiErr
 - Gizli bilgi koda ya da `application.properties` varsayılanına yazılmaz. Yeni ayar `${ENV_ADI}` olarak eklenir,
   `.env.example`'a da yazılır ve PR açıklamasında belirtilir.
 - Servis arayüzü + `impl/`, constructor injection (Lombok `@RequiredArgsConstructor`).
+- İsimlendirme İngilizce (kod, DB, API, JSON); sadece arayüz metinleri, yorumlar ve test adları Türkçe. Terimler için `docs/MIMARI.md` §14 sözlüğü.
 - Yorumlar ve log mesajları Türkçe ASCII ("Basarili giris"); kullanıcıya giden metinler düzgün Türkçe.
 - İş kuralı hataları `ApplicationRuntimeException`'dan türer; her birine `ErrorMessageConstant`'ta yeni bir kod verilir.
 
@@ -81,7 +82,7 @@ Panel tarafında `apiFetch<T>()` doğrudan `data`'yı verir; hata olursa `ApiErr
 - Test adları Türkçe ve davranışı anlatır: `yanlisSifre_401Doner`.
 
 ### Panel
-- Görsel dil `panel/src/index.css` içindeki `@theme` değişkenleridir (plaka mavisi, Barlow / Barlow Condensed, ekspertiz renkleri). Bileşenlerde sabit renk kodu yazma, yeni renk gerekiyorsa önce oraya ekle. Araç her yerde `Plaka` bileşeniyle gösterilir.
+- Görsel dil `panel/src/index.css` içindeki `@theme` değişkenleridir (plaka mavisi, Barlow / Barlow Condensed, ekspertiz renkleri). Bileşenlerde sabit renk kodu yazma, yeni renk gerekiyorsa önce oraya ekle. Araç her yerde `Plate` bileşeniyle gösterilir.
 - `npm run lint` ve `npm run build` temiz geçmeli (CI'da ikisi de zorunlu).
 - Component dosyası sadece component export eder; context/hook ayrı `.ts` dosyasında (`auth/useAuth.ts` gibi).
   Yeni dosya adı mevcut bir dosyayla sadece harf büyüklüğünde ayrışmasın (Windows).
