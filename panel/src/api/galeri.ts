@@ -1,40 +1,41 @@
 import { apiFetch } from "./client";
 import type {
-  AracDetay, AracDetayAdmin, AracDurum, AracIstek, AracMaliyet, AracOzet, AylikAlimSatim, CalisanOzet,
-  HareketResponse, HesapResponse, KategoriResponse, MasrafIstek, MasrafKok,
-  KisiIstek, KisiResponse, Parca, ParcaDurum, SatisIstek,
+  AccountResponse, BodyPart, CategoryResponse, ContactRequest, ContactResponse, ExpenseRequest, ExpenseRoot,
+  LedgerEntryResponse, MonthlyTrades, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
+  VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary,
 } from "../shared/types";
 
 const json = (body: unknown, method = "POST"): RequestInit => ({ method, body: JSON.stringify(body) });
 
 export const api = {
-  araclar: (q: string, durum: AracDurum | null) => {
+  vehicles: (q: string, status: VehicleStatus | null) => {
     const p = new URLSearchParams();
     if (q.trim()) p.set("q", q.trim());
-    if (durum) p.set("durum", durum);
-    return apiFetch<AracOzet[]>(`/api/araclar?${p}`);
+    if (status) p.set("status", status);
+    return apiFetch<VehicleSummary[]>(`/api/vehicles?${p}`);
   },
-  arac: (id: string) => apiFetch<AracDetay | AracDetayAdmin>(`/api/araclar/${id}`),
-  aracEkle: (istek: AracIstek) => apiFetch<AracDetayAdmin>("/api/araclar", json(istek)),
-  aracGuncelle: (id: string, istek: AracIstek) => apiFetch<AracDetayAdmin>(`/api/araclar/${id}`, json(istek, "PUT")),
-  parcalar: (id: string, parcalar: Partial<Record<Parca, ParcaDurum>>) =>
-    apiFetch<AracDetayAdmin>(`/api/araclar/${id}/parcalar`, json({ parcalar }, "PUT")),
-  sat: (id: string, istek: SatisIstek) => apiFetch<AracDetayAdmin>(`/api/araclar/${id}/satis`, json(istek)),
-  kisiler: (q = "") => apiFetch<KisiResponse[]>(`/api/kisiler${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`),
-  kisiEkle: (istek: KisiIstek) => apiFetch<KisiResponse>("/api/kisiler", json(istek)),
-  kisiGuncelle: (id: string, istek: KisiIstek) => apiFetch<KisiResponse>(`/api/kisiler/${id}`, json(istek, "PUT")),
-  calisanlar: () => apiFetch<CalisanOzet[]>("/api/calisanlar"),
-  aylik: (yil: number, ay: number) => apiFetch<AylikAlimSatim>(`/api/raporlar/aylik-alim-satim?yil=${yil}&ay=${ay}`),
+  vehicle: (id: string) => apiFetch<VehicleDetail | VehicleDetailAdmin>(`/api/vehicles/${id}`),
+  addVehicle: (request: VehicleRequest) => apiFetch<VehicleDetailAdmin>("/api/vehicles", json(request)),
+  updateVehicle: (id: string, request: VehicleRequest) => apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}`, json(request, "PUT")),
+  updateParts: (id: string, parts: Partial<Record<BodyPart, PartCondition>>) =>
+    apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}/parts`, json({ parts }, "PUT")),
+  sell: (id: string, request: SaleRequest) => apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}/sale`, json(request)),
+  contacts: (q = "") => apiFetch<ContactResponse[]>(`/api/contacts${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`),
+  addContact: (request: ContactRequest) => apiFetch<ContactResponse>("/api/contacts", json(request)),
+  updateContact: (id: string, request: ContactRequest) => apiFetch<ContactResponse>(`/api/contacts/${id}`, json(request, "PUT")),
+  staff: () => apiFetch<StaffSummary[]>("/api/staff"),
+  monthlyTrades: (year: number, month: number) => apiFetch<MonthlyTrades>(`/api/reports/monthly-trades?year=${year}&month=${month}`),
   // Para defteri (sadece ADMIN)
-  hesaplar: () => apiFetch<HesapResponse[]>("/api/hesaplar"),
-  bankaEkle: (ad: string) => apiFetch<HesapResponse>("/api/hesaplar", json({ ad })),
-  hareketler: (hesapId: string | null) => apiFetch<HareketResponse[]>(`/api/hareketler${hesapId ? `?hesapId=${hesapId}` : ""}`),
-  duzelt: (id: string) => apiFetch<HareketResponse>(`/api/hareketler/${id}/duzelt`, { method: "POST" }),
-  masrafEkle: (istek: MasrafIstek) => apiFetch<HareketResponse>("/api/masraflar", json(istek)),
-  kategoriler: (kok: MasrafKok) => apiFetch<KategoriResponse[]>(`/api/masraf-kategorileri?kok=${kok}`),
-  maliyet: (aracId: string) => apiFetch<AracMaliyet>(`/api/araclar/${aracId}/maliyet`),
+  accounts: () => apiFetch<AccountResponse[]>("/api/accounts"),
+  addBank: (name: string) => apiFetch<AccountResponse>("/api/accounts", json({ name })),
+  ledgerEntries: (accountId: string | null) =>
+    apiFetch<LedgerEntryResponse[]>(`/api/ledger-entries${accountId ? `?accountId=${accountId}` : ""}`),
+  correctEntry: (id: string) => apiFetch<LedgerEntryResponse>(`/api/ledger-entries/${id}/correct`, { method: "POST" }),
+  addExpense: (request: ExpenseRequest) => apiFetch<LedgerEntryResponse>("/api/expenses", json(request)),
+  categories: (root: ExpenseRoot) => apiFetch<CategoryResponse[]>(`/api/expense-categories?root=${root}`),
+  vehicleCost: (vehicleId: string) => apiFetch<VehicleCost>(`/api/vehicles/${vehicleId}/cost`),
 };
 
-export function adminMi(d: AracDetay | AracDetayAdmin): d is AracDetayAdmin {
-  return "arac" in d;
+export function isAdminDetail(d: VehicleDetail | VehicleDetailAdmin): d is VehicleDetailAdmin {
+  return "vehicle" in d;
 }

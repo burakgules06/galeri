@@ -1,40 +1,40 @@
 // Uygulama iskeleti: telefonda ust cubuk + alt sekmeler, genis ekranda sol menu.
 import type { ReactNode } from "react";
 import { useAuth } from "../auth/useAuth";
-import { AracDetaySayfasi } from "../features/araclar/AracDetaySayfasi";
-import { AracListesi } from "../features/araclar/AracListesi";
-import { AylikGorunum } from "../features/aylik/AylikGorunum";
-import { KisiListesi } from "../features/kisiler/KisiListesi";
-import { ParaSayfasi } from "../features/para/ParaSayfasi";
-import { useRota, type Rota } from "../shared/useRota";
+import { ContactList } from "../features/contacts/ContactList";
+import { LedgerPage } from "../features/ledger/LedgerPage";
+import { MonthlyView } from "../features/monthly/MonthlyView";
+import { VehicleDetailPage } from "../features/vehicles/VehicleDetailPage";
+import { VehicleList } from "../features/vehicles/VehicleList";
+import { useRoute, type Route } from "../shared/useRoute";
 
-type Bolum = "araclar" | "para" | "aylik" | "kisiler";
+type Section = "vehicles" | "ledger" | "monthly" | "contacts";
 
-const IKON: Record<Bolum, ReactNode> = {
-  araclar: <path d="M5 16l1.6-5.2A2 2 0 0 1 8.5 9.4h7a2 2 0 0 1 1.9 1.4L19 16M4 16h16v3a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1h-9v1a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM7.5 13.5h.01M16.5 13.5h.01" />,
-  aylik: <path d="M4 19V9M10 19V5M16 19v-7M3 19h18" />,
-  para: <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h15A1.5 1.5 0 0 1 21 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 16.5zM3 10h18M7 14.5h3" />,
-  kisiler: <path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.6c2 .7 3.2 2.6 3.6 5.4" />,
+const ICON: Record<Section, ReactNode> = {
+  vehicles: <path d="M5 16l1.6-5.2A2 2 0 0 1 8.5 9.4h7a2 2 0 0 1 1.9 1.4L19 16M4 16h16v3a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1h-9v1a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM7.5 13.5h.01M16.5 13.5h.01" />,
+  monthly: <path d="M4 19V9M10 19V5M16 19v-7M3 19h18" />,
+  ledger: <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h15A1.5 1.5 0 0 1 21 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 16.5zM3 10h18M7 14.5h3" />,
+  contacts: <path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.6c2 .7 3.2 2.6 3.6 5.4" />,
 };
 
-const ETIKET: Record<Bolum, string> = { araclar: "Araçlar", para: "Kasa", aylik: "Alım ve satım", kisiler: "Kişiler" };
+const LABEL: Record<Section, string> = { vehicles: "Araçlar", ledger: "Kasa", monthly: "Alım ve satım", contacts: "Kişiler" };
 
-function bolumu(rota: Rota): Bolum {
-  return rota.sayfa === "arac" ? "araclar" : rota.sayfa;
+function sectionOf(route: Route): Section {
+  return route.page === "vehicle" ? "vehicles" : route.page;
 }
 
 export function Dashboard() {
   const { auth, isAdmin, logout } = useAuth();
-  const rota = useRota();
-  const bolumler: Bolum[] = isAdmin ? ["araclar", "para", "aylik", "kisiler"] : ["araclar", "aylik"];
-  const aktif = bolumu(rota);
+  const route = useRoute();
+  const sections: Section[] = isAdmin ? ["vehicles", "ledger", "monthly", "contacts"] : ["vehicles", "monthly"];
+  const active = sectionOf(route);
 
-  const icerik =
-    rota.sayfa === "arac" ? <AracDetaySayfasi id={rota.id} />
-    : rota.sayfa === "aylik" ? <AylikGorunum />
-    : rota.sayfa === "kisiler" && isAdmin ? <KisiListesi />
-    : rota.sayfa === "para" && isAdmin ? <ParaSayfasi />
-    : <AracListesi />;
+  const content =
+    route.page === "vehicle" ? <VehicleDetailPage id={route.id} />
+    : route.page === "monthly" ? <MonthlyView />
+    : route.page === "contacts" && isAdmin ? <ContactList />
+    : route.page === "ledger" && isAdmin ? <LedgerPage />
+    : <VehicleList />;
 
   return (
     <div className="min-h-screen md:flex">
@@ -44,11 +44,11 @@ export function Dashboard() {
           <p className="font-cond font-bold text-[24px] leading-tight tracking-tight">{auth?.tenantName || "Galeri"}</p>
         </div>
         <nav className="px-3 space-y-0.5 grow">
-          {bolumler.map((b) => (
-            <a key={b} href={`#/${b}`} aria-current={aktif === b ? "page" : undefined}
+          {sections.map((s) => (
+            <a key={s} href={`#/${s}`} aria-current={active === s ? "page" : undefined}
               className={`flex items-center gap-3 h-10 px-3 rounded-lg font-semibold text-[15px] ${
-                aktif === b ? "bg-plaka-acik text-plaka-koyu" : "text-murekkep-2 hover:bg-yuzey-2 hover:text-murekkep"}`}>
-              <Ikon>{IKON[b]}</Ikon>{ETIKET[b]}
+                active === s ? "bg-plaka-acik text-plaka-koyu" : "text-murekkep-2 hover:bg-yuzey-2 hover:text-murekkep"}`}>
+              <Icon>{ICON[s]}</Icon>{LABEL[s]}
             </a>
           ))}
         </nav>
@@ -63,19 +63,19 @@ export function Dashboard() {
         <header className="md:hidden sticky top-0 z-20 bg-yuzey border-b border-cizgi h-14 px-4 flex items-center justify-between">
           <p className="font-cond font-bold text-[21px] tracking-tight truncate">{auth?.tenantName || "Galeri"}</p>
           <button onClick={logout} aria-label="Çıkış yap" className="basilir w-10 h-10 rounded-lg grid place-items-center text-murekkep-2 hover:bg-yuzey-2">
-            <Ikon><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" /></Ikon>
+            <Icon><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" /></Icon>
           </button>
         </header>
 
-        <main className="px-4 md:px-8 py-5 md:py-8 pb-28 md:pb-10 max-w-6xl">{icerik}</main>
+        <main className="px-4 md:px-8 py-5 md:py-8 pb-28 md:pb-10 max-w-6xl">{content}</main>
       </div>
 
       {/* Telefon: alt sekmeler */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-yuzey border-t border-cizgi flex pb-[env(safe-area-inset-bottom)]">
-        {bolumler.map((b) => (
-          <a key={b} href={`#/${b}`} aria-current={aktif === b ? "page" : undefined}
-            className={`grow flex flex-col items-center gap-0.5 pt-2.5 pb-2 text-[12px] font-semibold ${aktif === b ? "text-plaka" : "text-murekkep-3"}`}>
-            <Ikon>{IKON[b]}</Ikon>{ETIKET[b]}
+        {sections.map((s) => (
+          <a key={s} href={`#/${s}`} aria-current={active === s ? "page" : undefined}
+            className={`grow flex flex-col items-center gap-0.5 pt-2.5 pb-2 text-[12px] font-semibold ${active === s ? "text-plaka" : "text-murekkep-3"}`}>
+            <Icon>{ICON[s]}</Icon>{LABEL[s]}
           </a>
         ))}
       </nav>
@@ -83,7 +83,7 @@ export function Dashboard() {
   );
 }
 
-function Ikon({ children }: { children: ReactNode }) {
+function Icon({ children }: { children: ReactNode }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {children}

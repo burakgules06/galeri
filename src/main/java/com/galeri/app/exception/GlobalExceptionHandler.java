@@ -51,7 +51,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<GenericResponse<Object>> handleAccessDenied(AccessDeniedException ex) {
         log.warn("Yetkisiz erisim denemesi: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(genericResponseService.createResponseWithError("Bu işlem için yetkiniz yok", ErrorMessageConstant.YETKISIZ));
+                .body(genericResponseService.createResponseWithError("Bu işlem için yetkiniz yok", ErrorMessageConstant.FORBIDDEN));
     }
 
     // Bozuk JSON, bilinmeyen enum degeri, yanlis tipte path/query parametresi

@@ -32,18 +32,18 @@ Fotoğraf yok. Döviz yok (her şey TL; ileride gerekirse eklenir).
 ## 3. Temel kural: hareket defteri
 
 **Hiçbir bakiye tabloda saklanmaz.** Kasa, banka, müşteri borcu, ortak sermayesi, araç maliyeti:
-hepsi `hareket` tablosundaki kayıtların toplamıdır.
+hepsi `ledger_entry` (hareket) tablosundaki kayıtların toplamıdır.
 
 Her hareket "hangi hesaptan → hangi hesaba, ne kadar" bilgisini taşır.
 
 ```
-hareket: tarih | kaynak_hesap → hedef_hesap | tutar | arac (ops.) | masraf_kategorisi (ops.) | açıklama
+ledger_entry: entry_date | source_account → target_account | amount_cents | vehicle (ops.) | expense_category (ops.) | description
 ```
 
 Bir hesabın bakiyesi = hesaba giren hareketler − hesaptan çıkan hareketler.
 
 Kurallar:
-1. **Hareket silinmez ve değiştirilmez.** Yanlış girildiyse aynı tutarda ters yönde bir düzeltme hareketi atılır (`duzeltilen_hareket_id` ile bağlanır). Ekranda "düzelt" böyle çalışır.
+1. **Hareket silinmez ve değiştirilmez.** Yanlış girildiyse aynı tutarda ters yönde bir düzeltme hareketi atılır (`corrected_entry_id` ile bağlanır). Ekranda "düzelt" böyle çalışır.
 2. **Tutarlar kuruş cinsinden tam sayı** (`BIGINT`). 1.250.000,50 TL = `125000050`. `double`/`float` asla kullanılmaz.
 3. Her hareketi kimin, ne zaman girdiği tutulur.
 
@@ -51,32 +51,32 @@ Kurallar:
 
 | Tür | Kaç tane | Ne tutar |
 |---|---|---|
-| `KASA` | Galeri başına 1 | Nakit |
-| `BANKA` | Galeri başına 1 veya daha fazla | Banka hesapları |
-| `CARI` | Kişi başına 1 | O kişiyle aramızdaki alacak/borç |
-| `SERMAYE` | Ortak başına 1 | Ortağın galerideki sermayesi |
-| `ARAC` | Araç başına 1 | Aracın maliyeti (alış + araç masrafları) |
-| `GIDER` | 1 | Araca bağlı olmayan genel giderler |
-| `GELIR` | 1 | Satış gelirleri ve komisyonlar |
+| `CASH` (kasa) | Galeri başına 1 | Nakit |
+| `BANK` | Galeri başına 1 veya daha fazla | Banka hesapları |
+| `BALANCE` (cari) | Kişi başına 1 | O kişiyle aramızdaki alacak/borç |
+| `CAPITAL` (sermaye) | Ortak başına 1 | Ortağın galerideki sermayesi |
+| `VEHICLE` | Araç başına 1 | Aracın maliyeti (alış + araç masrafları) |
+| `EXPENSE` (gider) | 1 | Araca bağlı olmayan genel giderler |
+| `INCOME` (gelir) | 1 | Satış gelirleri ve komisyonlar |
 
-Gösterimde işaret hesap türüne göre çevrilir: `SERMAYE` hesabından 2 milyon çıkmışsa ekranda
+Gösterimde işaret hesap türüne göre çevrilir: `CAPITAL` hesabından 2 milyon çıkmışsa ekranda
 "Burak'ın sermayesi: 2.000.000 TL" yazar.
 
 ### Örnek akışlar
 
 | Olay | Hareket(ler) |
 |---|---|
-| Burak 2.000.000 TL sermaye koydu | SERMAYE(Burak) → KASA 2.000.000 |
-| Araç peşin alındı, 1.000.000 TL | KASA → ARAC(#12) 1.000.000 |
-| Araç senetle alındı | CARI(satıcı) → ARAC(#12) 1.000.000; her senet ödendiğinde KASA → CARI(satıcı) |
-| Araca boya masrafı, kasadan 5.000 TL | KASA → ARAC(#12) 5.000, kategori: Boya |
-| Masrafı Furkan kendi cebinden ödedi | CARI(Furkan) → ARAC(#12) 5.000 (galeri Furkan'a borçlu) |
-| Kira ödendi | KASA → GIDER 40.000, kategori: Kira |
-| Araç 1.300.000 TL'ye satıldı | GELIR → CARI(alıcı) 1.300.000; araç "satıldı" olur |
-| Alıcı 300.000 TL peşinat verdi | CARI(alıcı) → KASA 300.000 |
-| Evim şirketi kalan 1.000.000 TL'yi ödedi | CARI(Evim şirketi) → BANKA 1.000.000 (satışta bu tutar alıcının değil şirketin carisine yazılır) |
-| Konsinye araç satıldı, komisyon %3 | GELIR → CARI(alıcı) 1.300.000 ve CARI(araç sahibi) → GELIR 1.261.000 (galeri sahibine borçlu); GELIR'de net 39.000 komisyon kalır |
-| Ortaklar kâr payını sermayeye eklemeye karar verdi | GELIR → SERMAYE(Burak) X (elle girilir, bkz. 5) |
+| Burak 2.000.000 TL sermaye koydu | CAPITAL(Burak) → CASH 2.000.000 |
+| Araç peşin alındı, 1.000.000 TL | CASH → VEHICLE(#12) 1.000.000 |
+| Araç senetle alındı | BALANCE(satıcı) → VEHICLE(#12) 1.000.000; her senet ödendiğinde CASH → BALANCE(satıcı) |
+| Araca boya masrafı, kasadan 5.000 TL | CASH → VEHICLE(#12) 5.000, kategori: Boya |
+| Masrafı Furkan kendi cebinden ödedi | BALANCE(Furkan) → VEHICLE(#12) 5.000 (galeri Furkan'a borçlu) |
+| Kira ödendi | CASH → EXPENSE 40.000, kategori: Kira |
+| Araç 1.300.000 TL'ye satıldı | INCOME → BALANCE(alıcı) 1.300.000; araç "satıldı" olur |
+| Alıcı 300.000 TL peşinat verdi | BALANCE(alıcı) → CASH 300.000 |
+| Evim şirketi kalan 1.000.000 TL'yi ödedi | BALANCE(Evim şirketi) → BANK 1.000.000 (satışta bu tutar alıcının değil şirketin carisine yazılır) |
+| Konsinye araç satıldı, komisyon %3 | INCOME → BALANCE(alıcı) 1.300.000 ve BALANCE(araç sahibi) → INCOME 1.261.000 (galeri sahibine borçlu); INCOME'da net 39.000 komisyon kalır |
+| Ortaklar kâr payını sermayeye eklemeye karar verdi | INCOME → CAPITAL(Burak) X (elle girilir, bkz. 5) |
 
 ## 4. Araç
 
@@ -86,15 +86,15 @@ Plaka, marka, model, model yılı, yakıt tipi, vites, kilometre, renk, tramer (
 ### Hasar şeması (Sahibinden'deki gibi)
 Aracın çizimi üzerinde 13 parça, her biri dört durumdan biri:
 
-`ORIJINAL` · `LOKAL_BOYALI` · `BOYALI` · `DEGISEN`
+`ORIGINAL` (orijinal) · `LOCALLY_PAINTED` (lokal boyalı) · `PAINTED` (boyalı) · `REPLACED` (değişen)
 
 Parçalar: ön tampon, motor kaputu, tavan, bagaj kapağı, arka tampon, sol ön çamurluk, sol ön kapı,
 sol arka kapı, sol arka çamurluk, sağ ön çamurluk, sağ ön kapı, sağ arka kapı, sağ arka çamurluk.
 
 ### Sahiplik
-- `GALERI`: varsayılan. Maliyeti ARAC hesabında birikir, kârı galerinin kârıdır.
-- `KONSINYE`: sahibi bir kişidir, komisyon oranı ya da sabit tutarı tutulur. ARAC hesabına maliyet yazılmaz.
-- `OZEL_ORTAKLI`: havuz dışı; `arac_payi` tablosunda kişi + yüzde (toplam %100). Kârı bu oranlarla gösterilir.
+- `DEALER` (galeri): varsayılan. Maliyeti VEHICLE hesabında birikir, kârı galerinin kârıdır.
+- `CONSIGNMENT` (konsinye): sahibi bir kişidir, komisyon oranı ya da sabit tutarı tutulur. VEHICLE hesabına maliyet yazılmaz.
+- `CO_OWNED` (özel ortaklı): havuz dışı; `vehicle_share` tablosunda kişi + yüzde (toplam %100). Kârı bu oranlarla gösterilir.
 
 ### Alış bilgileri
 Alış tarihi, kimden alındı, **aracı alan çalışan**, **gerçek alış bedeli** ve **resmi (beyan edilen) alış bedeli**, ödeme şekli.
@@ -104,11 +104,11 @@ Kâr hesapları her zaman gerçek bedelle yapılır.
 Satış tarihi, alıcı, **aracı satan çalışan**, satış bedeli, ödeme şekli.
 
 ### Durum
-`STOKTA` → `SATILDI` → `KAPANDI` (satışın bütün tahsilatı tamamlandığında).
+`IN_STOCK` → `SOLD` → `CLOSED` (satışın bütün tahsilatı tamamlandığında).
 Stokta kaç gündür beklediği alış tarihinden hesaplanır.
 
 ### Kâr
-Kâr satış anında yazılır: satış bedeli − ARAC hesabının bakiyesi (alış + araç masrafları).
+Kâr satış anında yazılır: satış bedeli − VEHICLE hesabının bakiyesi (alış + araç masrafları).
 Stoktaki araç kâr/zarar sayılmaz. Tahsilat ayrı takip edilir.
 
 ## 5. Sermaye ve kâr
@@ -127,13 +127,13 @@ Ortaklar kendi aralarında konuşup karar verince, kâr payını sermayeye eklem
 Her alış ve satışın bir ödeme planı vardır:
 
 ```
-odeme_plani: arac | yon (ALIS/SATIS) | karsi_taraf (kişi) | toplam_tutar | sekil
-taksit:      plan | vade_tarihi | tutar | tur (NAKIT/HAVALE/SENET/KURUM) | senet_no | odeyen (kişi) | odendi_hareket_id
+payment_plan: vehicle | direction (PURCHASE/SALE) | counterparty (contact) | total_cents | method
+installment:  plan | due_date | amount_cents | type (CASH/TRANSFER/PROMISSORY_NOTE/INSTITUTION) | note_no | payer (contact) | paid_entry_id
 ```
 
 - **Peşin:** tek satır, vade bugün.
 - **Taksitli / senetli:** her taksit ya da senet bir satır.
-- **Evim sistemi / banka kredisi:** satır türü `KURUM`, `odeyen` = Evim şirketi ya da banka.
+- **Evim sistemi / banka kredisi:** satır türü `INSTITUTION`, `payer` = Evim şirketi ya da banka.
 - **Karma:** yukarıdakilerin karışımı.
 
 Ödeme alındığında ilgili satır bir harekete bağlanır. Vadesi geçmiş ve ödenmemiş satırlar
@@ -157,13 +157,13 @@ Akıllı Randevum'daki haftalık görünümün aylık karşılığı:
 - Çalışana dokununca o ayın listesi açılır: alınanlar ve satılanlar ayrı, her satırda **marka-model ve plaka** (tarihle birlikte).
 - **Tutar ve kâr gösterilmez.**
 - `ADMIN` bütün çalışanları görür. `STAFF` sadece **kendi** aldığı ve sattığı araçları görür (backend'de filtrelenir). Başlangıçta çalışanlara uygulama verilmeyecek, ama yetki şimdiden böyle yazılır.
-- Kaynağı: araçtaki `alan_calisan_id` + `alis_tarihi` ve `satan_calisan_id` + `satis_tarihi`.
+- Kaynağı: araçtaki `bought_by_id` + `purchase_date` ve `sold_by_id` + `sale_date`. Uç: `GET /api/reports/monthly-trades?year=&month=`.
 
 ## 9. Ödeme günü bildirimleri
 
 Galeri sahibine, vadesi gelen ödemeler için telefonuna bildirim gider (Akıllı Randevum'daki PWA web push altyapısı aynen kullanılır: tarayıcı/telefon "bildirimlere izin ver", VAPID anahtarları `.env`'de).
 
-- Her sabah 09.00'da (galerinin saat dilimine göre; galericiyle kararlaştırıldı) bir zamanlanmış görev o gün vadesi gelen `taksit` satırlarını bulur.
+- Her sabah 09.00'da (galerinin saat dilimine göre; galericiyle kararlaştırıldı) bir zamanlanmış görev o gün vadesi gelen `installment` satırlarını bulur.
 - **Tahsilat** (bize ödenecek): "Bugün Ali Yılmaz'dan 25.000 TL senet tahsilatı var (34 ABC 123)".
 - **Ödeme** (bizim ödeyeceğimiz, alıştaki taksit/senetler): "Bugün Mehmet Demir'e 40.000 TL senet ödemesi var".
 - Aynı gün birden fazla varsa tek bildirimde toplanır ("Bugün 3 tahsilat, 1 ödeme"), dokununca ilgili liste açılır.
@@ -185,18 +185,19 @@ para uç noktaları STAFF için 403 döner. Sadece arayüzde gizlemek yetmez.
 
 | Tablo | Önemli alanlar |
 |---|---|
-| `kisi` | ad, telefon, tur (KISI/KURUM), not |
-| `hesap` | tur, kisi_id (CARI/SERMAYE için), arac_id (ARAC için), ad |
-| `hareket` | tarih, kaynak_hesap_id, hedef_hesap_id, tutar_kurus, arac_id, masraf_kategori_id, aciklama, duzeltilen_hareket_id, olusturan_kullanici_id |
-| `masraf_kategori` | ust_id, ad, kok (ARAC/GENEL), arsivlendi |
-| `arac` | plaka, marka, model, model_yili, yakit, vites, km, renk, tramer_kurus, sahiplik, konsinye_sahibi_id, komisyon_orani / komisyon_kurus, alis_tarihi, gercek_alis_kurus, resmi_alis_kurus, satis_tarihi, satis_kurus, alici_id, alan_calisan_id, satan_calisan_id, durum |
-| `arac_parca` | arac_id, parca, durum |
-| `arac_payi` | arac_id, kisi_id, yuzde (sadece OZEL_ORTAKLI) |
-| `odeme_plani`, `taksit` | bkz. 6 |
-| `push_abonelik` | panel_user_id, endpoint, anahtarlar (Akıllı Randevum'daki gibi) |
-| `bildirim_kaydi` | taksit_id, tarih, gonderildi_at (aynı gün tekrarını önler) |
+| `contact` | name, phone, type (PERSON/ORGANIZATION), notes |
+| `account` | type, contact_id (BALANCE/CAPITAL için), vehicle_id (VEHICLE için), name |
+| `ledger_entry` | entry_date, type, source_account_id, target_account_id, amount_cents, vehicle_id, expense_category_id, description, corrected_entry_id, created_by_id |
+| `expense_category` | parent_id, name, root (VEHICLE/GENERAL), archived |
+| `vehicle` | plate, make, model, model_year, fuel, transmission, mileage_km, color, tramer_cents, notes, ownership, consignor_id, commission_rate / commission_cents, purchase_date, seller_id, bought_by_id, actual_purchase_cents, official_purchase_cents, sale_date, buyer_id, sold_by_id, sale_price_cents, status |
+| `vehicle_part` | vehicle_id, part (BodyPart), condition (PartCondition) |
+| `vehicle_share` | vehicle_id, contact_id, share_percent (sadece CO_OWNED) |
+| `payment_plan`, `installment` | bkz. 6 |
+| `push_subscription` | panel_user_id, endpoint, anahtarlar (Akıllı Randevum'daki gibi) |
+| `notification_log` | installment_id, date, sent_at (aynı gün tekrarını önler) |
 
-Hepsi `tenant_id` taşır ve tenant'a göre filtrelenir. Tablo/kolon adları Türkçe ASCII.
+Hepsi `tenant_id` taşır ve tenant'a göre filtrelenir. Tablo/kolon adları İngilizce (bkz. §14 sözlük);
+henüz yazılmamış tabloların (`vehicle_share`, `payment_plan` ...) adları plandır, migration'ı yazılırken kesinleşir.
 
 ## 12. Yol haritası
 
@@ -213,6 +214,47 @@ Her adım ayrı bir PR; her biri bittiğinde galericiye gösterilebilir.
 
 ## 13. Açık sorular
 
-- Konsinye araçlardan alınan komisyon sermaye havuzunun kârına giriyor mu? (Galerici "sonra konuşalım" dedi. Şimdilik GELIR'e yazılır ve dönem kârına dahil gösterilir; değişirse sadece rapor değişir.)
-- Takas yapılıyor mu? (Sorulmadı. Gerekirse: alıcının verdiği araç yeni bir STOKTA araç olur, değeri alıcının carisinden düşülür.)
+- Konsinye araçlardan alınan komisyon sermaye havuzunun kârına giriyor mu? (Galerici "sonra konuşalım" dedi. Şimdilik INCOME'a yazılır ve dönem kârına dahil gösterilir; değişirse sadece rapor değişir.)
+- Takas yapılıyor mu? (Sorulmadı. Gerekirse: alıcının verdiği araç yeni bir IN_STOCK araç olur, değeri alıcının carisinden düşülür.)
 - Ana ekranda ne görünecek? (Galerici henüz düşünmedi; 6. adımda karar verilecek.)
+
+## 14. İsimlendirme sözlüğü
+
+Kod, veritabanı, API ve JSON İngilizce; arayüz metinleri, yorumlar, loglar ve test adları Türkçe.
+Her yerde aynı terim kullanılır:
+
+| Türkçe | İngilizce |
+|---|---|
+| kişi (müşteri, satıcı, kurum) | `contact`; tür: `PERSON`, `ORGANIZATION` |
+| araç | `vehicle` |
+| araç parçası, hasar şeması | `vehicle_part`; enum `BodyPart`, `PartCondition` |
+| plaka / marka / model yılı | `plate` / `make` / `model_year` |
+| yakıt: benzin, dizel, LPG, benzin+LPG, hibrit, elektrik | `fuel`: `GASOLINE`, `DIESEL`, `LPG`, `GASOLINE_LPG`, `HYBRID`, `ELECTRIC` |
+| vites: manuel, otomatik, yarı otomatik | `transmission`: `MANUAL`, `AUTOMATIC`, `SEMI_AUTOMATIC` |
+| km / renk / notlar | `mileage_km` / `color` / `notes` |
+| tramer | `tramer` (özel ad) |
+| sahiplik: galeri, konsinye, özel ortaklı | `ownership`: `DEALER`, `CONSIGNMENT`, `CO_OWNED` |
+| durum: stokta, satıldı, kapandı | `status`: `IN_STOCK`, `SOLD`, `CLOSED` |
+| parça durumu: orijinal, lokal boyalı, boyalı, değişen | `ORIGINAL`, `LOCALLY_PAINTED`, `PAINTED`, `REPLACED` |
+| parçalar: ön tampon, motor kaputu, tavan, bagaj kapağı, arka tampon, sol/sağ ön/arka çamurluk ve kapı | `FRONT_BUMPER`, `HOOD`, `ROOF`, `TRUNK_LID`, `REAR_BUMPER`, `LEFT/RIGHT_FRONT/REAR_FENDER`, `LEFT/RIGHT_FRONT/REAR_DOOR` |
+| alış tarihi / satıcı / alan çalışan | `purchase_date` / `seller_id` / `bought_by_id` |
+| gerçek / resmi alış | `actual_purchase_cents` / `official_purchase_cents` |
+| satış tarihi / alıcı / satan çalışan / satış bedeli | `sale_date` / `buyer_id` / `sold_by_id` / `sale_price_cents` |
+| tutar (kuruş) | `*_cents` soneki, BIGINT |
+| stokta gün | `daysInStock` |
+| çalışan | `staff` (`/api/staff`) |
+| rapor, aylık alım-satım | `report`, `monthlyTrades` (`/api/reports/monthly-trades`); alınanlar `bought`, satılanlar `sold` |
+| hesap / hareket | `account` / `ledger_entry` |
+| kasa / banka | `CASH` / `BANK` |
+| gider / gelir (hesap türü) | `EXPENSE` / `INCOME` |
+| masraf / masraf kategorisi (kök, üst) | `expense` / `expense_category` (`root`: `VEHICLE`, `GENERAL`; `parent_id`) |
+| hareket türü: araç alışı, araç masrafı, genel gider, sermaye | `VEHICLE_PURCHASE`, `VEHICLE_EXPENSE`, `GENERAL_EXPENSE`, `CAPITAL` |
+| düzeltme (ters hareket) | `correct`, `corrected_entry_id` |
+| sermaye / ortak / pay | `capital` / `partner` / `share` |
+| cari | `balance` (hesap türü `BALANCE`; hesap özeti: `statement`) |
+| ödeme planı / taksit / senet / tahsilat | `payment_plan` / `installment` / `promissory_note` / `collection` |
+| konsinye / komisyon | `consignment` / `commission` |
+
+API: `/api/vehicles` (`/{id}/parts`, `/{id}/sale`, `/{id}/cost`), `/api/contacts`, `/api/staff`,
+`/api/reports/monthly-trades`, `/api/accounts`, `/api/ledger-entries` (`/{id}/correct`), `/api/expenses`,
+`/api/expense-categories?root=`.

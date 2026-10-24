@@ -17,141 +17,141 @@ export interface LoginResponse {
 }
 
 // ---- Arac (backend: model/response) ----
-export type Yakit = "BENZIN" | "DIZEL" | "LPG" | "BENZIN_LPG" | "HIBRIT" | "ELEKTRIK";
-export type Vites = "MANUEL" | "OTOMATIK" | "YARI_OTOMATIK";
-export type AracDurum = "STOKTA" | "SATILDI" | "KAPANDI";
-export type ParcaDurum = "ORIJINAL" | "LOKAL_BOYALI" | "BOYALI" | "DEGISEN";
-export type Parca =
-  | "ON_TAMPON" | "MOTOR_KAPUTU" | "TAVAN" | "BAGAJ_KAPAGI" | "ARKA_TAMPON"
-  | "SOL_ON_CAMURLUK" | "SOL_ON_KAPI" | "SOL_ARKA_KAPI" | "SOL_ARKA_CAMURLUK"
-  | "SAG_ON_CAMURLUK" | "SAG_ON_KAPI" | "SAG_ARKA_KAPI" | "SAG_ARKA_CAMURLUK";
-export type KisiTur = "KISI" | "KURUM";
+export type Fuel = "GASOLINE" | "DIESEL" | "LPG" | "GASOLINE_LPG" | "HYBRID" | "ELECTRIC";
+export type Transmission = "MANUAL" | "AUTOMATIC" | "SEMI_AUTOMATIC";
+export type VehicleStatus = "IN_STOCK" | "SOLD" | "CLOSED";
+export type PartCondition = "ORIGINAL" | "LOCALLY_PAINTED" | "PAINTED" | "REPLACED";
+export type BodyPart =
+  | "FRONT_BUMPER" | "HOOD" | "ROOF" | "TRUNK_LID" | "REAR_BUMPER"
+  | "LEFT_FRONT_FENDER" | "LEFT_FRONT_DOOR" | "LEFT_REAR_DOOR" | "LEFT_REAR_FENDER"
+  | "RIGHT_FRONT_FENDER" | "RIGHT_FRONT_DOOR" | "RIGHT_REAR_DOOR" | "RIGHT_REAR_FENDER";
+export type ContactType = "PERSON" | "ORGANIZATION";
 
-export interface HasarOzeti { lokalBoyali: number; boyali: number; degisen: number }
+export interface DamageSummary { locallyPainted: number; painted: number; replaced: number }
 
-export interface AracOzet {
+export interface VehicleSummary {
   id: string;
-  plaka: string;
-  marka: string;
+  plate: string;
+  make: string;
   model: string;
-  modelYili: number;
-  km: number;
-  yakit: Yakit;
-  vites: Vites;
-  renk: string | null;
-  durum: AracDurum;
-  alisTarihi: string;
-  satisTarihi: string | null;
-  stoktaGun: number;
-  hasar: HasarOzeti;
+  modelYear: number;
+  mileageKm: number;
+  fuel: Fuel;
+  transmission: Transmission;
+  color: string | null;
+  status: VehicleStatus;
+  purchaseDate: string;
+  saleDate: string | null;
+  daysInStock: number;
+  damage: DamageSummary;
 }
 
-export interface AracDetay {
+export interface VehicleDetail {
   id: string;
-  plaka: string;
-  marka: string;
+  plate: string;
+  make: string;
   model: string;
-  modelYili: number;
-  km: number;
-  yakit: Yakit;
-  vites: Vites;
-  renk: string | null;
-  tramerKurus: number | null;
-  notlar: string | null;
-  durum: AracDurum;
-  alisTarihi: string;
-  satisTarihi: string | null;
-  stoktaGun: number;
-  parcalar: Record<Parca, ParcaDurum>;
+  modelYear: number;
+  mileageKm: number;
+  fuel: Fuel;
+  transmission: Transmission;
+  color: string | null;
+  tramerCents: number | null;
+  notes: string | null;
+  status: VehicleStatus;
+  purchaseDate: string;
+  saleDate: string | null;
+  daysInStock: number;
+  parts: Record<BodyPart, PartCondition>;
 }
 
-export interface KisiOzet { id: string; ad: string; telefon: string | null }
-export interface CalisanOzet { id: string; ad: string | null }
+export interface ContactSummary { id: string; name: string; phone: string | null }
+export interface StaffSummary { id: string; name: string | null }
 
-// Sadece ADMIN'e gelir. STAFF'a dogrudan AracDetay gelir.
-export interface AracDetayAdmin {
-  arac: AracDetay;
-  satici: KisiOzet | null;
-  alanCalisan: CalisanOzet | null;
-  gercekAlisKurus: number | null;
-  resmiAlisKurus: number | null;
-  alici: KisiOzet | null;
-  satanCalisan: CalisanOzet | null;
-  satisKurus: number | null;
-  alisHesapId: string | null;
+// Sadece ADMIN'e gelir. STAFF'a dogrudan VehicleDetail gelir.
+export interface VehicleDetailAdmin {
+  vehicle: VehicleDetail;
+  seller: ContactSummary | null;
+  boughtBy: StaffSummary | null;
+  actualPurchaseCents: number | null;
+  officialPurchaseCents: number | null;
+  buyer: ContactSummary | null;
+  soldBy: StaffSummary | null;
+  salePriceCents: number | null;
+  purchaseAccountId: string | null;
 }
 
-export interface KisiResponse { id: string; ad: string; telefon: string | null; tur: KisiTur; notlar: string | null }
+export interface ContactResponse { id: string; name: string; phone: string | null; type: ContactType; notes: string | null }
 
-export interface AylikArac { aracId: string; plaka: string; marka: string; model: string; tarih: string }
-export interface CalisanAylik { calisanId: string | null; ad: string; alinanlar: AylikArac[]; satilanlar: AylikArac[] }
-export interface AylikAlimSatim { yil: number; ay: number; calisanlar: CalisanAylik[] }
+export interface MonthlyVehicle { vehicleId: string; plate: string; make: string; model: string; date: string }
+export interface StaffMonthly { staffId: string | null; name: string; bought: MonthlyVehicle[]; sold: MonthlyVehicle[] }
+export interface MonthlyTrades { year: number; month: number; staff: StaffMonthly[] }
 
-export interface AracIstek {
-  plaka: string;
-  marka: string;
+export interface VehicleRequest {
+  plate: string;
+  make: string;
   model: string;
-  modelYili: number;
-  yakit: Yakit;
-  vites: Vites;
-  km: number;
-  renk: string | null;
-  tramerKurus: number | null;
-  notlar: string | null;
-  alisTarihi: string;
-  saticiId: string | null;
-  alanCalisanId: string | null;
-  gercekAlisKurus: number | null;
-  resmiAlisKurus: number | null;
-  alisHesapId: string | null;
+  modelYear: number;
+  fuel: Fuel;
+  transmission: Transmission;
+  mileageKm: number;
+  color: string | null;
+  tramerCents: number | null;
+  notes: string | null;
+  purchaseDate: string;
+  sellerId: string | null;
+  boughtById: string | null;
+  actualPurchaseCents: number | null;
+  officialPurchaseCents: number | null;
+  purchaseAccountId: string | null;
 }
 
-export interface SatisIstek { satisTarihi: string; aliciId: string | null; satanCalisanId: string | null; satisKurus: number | null }
-export interface KisiIstek { ad: string; telefon: string | null; tur: KisiTur; notlar: string | null }
+export interface SaleRequest { saleDate: string; buyerId: string | null; soldById: string | null; salePriceCents: number | null }
+export interface ContactRequest { name: string; phone: string | null; type: ContactType; notes: string | null }
 
 // ---- Para defteri (sadece ADMIN). Tutarlar kurus. ----
-export type HesapTur = "KASA" | "BANKA" | "CARI" | "SERMAYE" | "ARAC" | "GIDER" | "GELIR";
-export type HareketTur = "ARAC_ALIS" | "ARAC_MASRAF" | "GENEL_GIDER" | "SERMAYE";
-export type MasrafKok = "ARAC" | "GENEL";
+export type AccountType = "CASH" | "BANK" | "BALANCE" | "CAPITAL" | "VEHICLE" | "EXPENSE" | "INCOME";
+export type LedgerEntryType = "VEHICLE_PURCHASE" | "VEHICLE_EXPENSE" | "GENERAL_EXPENSE" | "CAPITAL";
+export type ExpenseRoot = "VEHICLE" | "GENERAL";
 
-export interface HesapOzet { id: string; tur: HesapTur; ad: string }
-export interface HesapResponse extends HesapOzet { bakiyeKurus: number }
+export interface AccountSummary { id: string; type: AccountType; name: string }
+export interface AccountResponse extends AccountSummary { balanceCents: number }
 
-export interface HareketResponse {
+export interface LedgerEntryResponse {
   id: string;
-  tarih: string;
-  tur: HareketTur;
-  kaynak: HesapOzet;
-  hedef: HesapOzet;
-  tutarKurus: number;
-  arac: { id: string; plaka: string; marka: string; model: string } | null;
-  kategori: string | null;
-  aciklama: string | null;
-  duzeltilenHareketId: string | null;   // doluysa bu bir duzeltme hareketi
-  duzeltildi: boolean;                  // true ise bu hareket ters hareketle iptal edildi
-  olusturan: string | null;
+  date: string;
+  type: LedgerEntryType;
+  source: AccountSummary;
+  target: AccountSummary;
+  amountCents: number;
+  vehicle: { id: string; plate: string; make: string; model: string } | null;
+  category: string | null;
+  description: string | null;
+  correctedEntryId: string | null;   // doluysa bu bir duzeltme hareketi
+  corrected: boolean;                // true ise bu hareket ters hareketle iptal edildi
+  createdBy: string | null;
   createdAt: string;
 }
 
-export interface KategoriResponse { id: string; ad: string; kok: MasrafKok; ustId: string | null; kullanim: number }
+export interface CategoryResponse { id: string; name: string; root: ExpenseRoot; parentId: string | null; usage: number }
 
-export interface AracMaliyet {
-  aracId: string;
-  alisKurus: number;
-  alisDefterde: boolean;
-  masrafKurus: number;
-  toplamKurus: number;
-  satisKurus: number | null;
-  karKurus: number | null;
-  hareketler: HareketResponse[];
+export interface VehicleCost {
+  vehicleId: string;
+  purchaseCents: number;
+  purchaseInLedger: boolean;
+  expenseCents: number;
+  totalCents: number;
+  salePriceCents: number | null;
+  profitCents: number | null;
+  entries: LedgerEntryResponse[];
 }
 
-export interface MasrafIstek {
-  tarih: string;
-  kaynakHesapId: string;
-  tutarKurus: number;
-  aracId: string | null;
-  kategoriId: string | null;
-  kategoriAd: string | null;
-  aciklama: string | null;
+export interface ExpenseRequest {
+  date: string;
+  sourceAccountId: string;
+  amountCents: number;
+  vehicleId: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  description: string | null;
 }
