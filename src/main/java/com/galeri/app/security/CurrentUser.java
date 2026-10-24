@@ -21,6 +21,11 @@ public final class CurrentUser {
         return p;
     }
 
+    /** Galeri sahibi mi? Para bilgilerini sadece ADMIN gorur (bkz. docs/MIMARI.md, Yetki). */
+    public static boolean isAdmin() {
+        return "ADMIN".equals(principal().role());
+    }
+
     public static UUID tenantId() {
         UUID tenantId = principal().tenantId();
         if (tenantId == null) {

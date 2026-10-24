@@ -1,14 +1,70 @@
+@import "@fontsource/barlow/400.css";
+@import "@fontsource/barlow/500.css";
+@import "@fontsource/barlow/600.css";
+@import "@fontsource/barlow-condensed/500.css";
+@import "@fontsource/barlow-condensed/600.css";
+@import "@fontsource/barlow-condensed/700.css";
 @import "tailwindcss";
 
+/*
+  Galeri gorsel dili (kaynak: docs/MIMARI.md ve bu dosya; yeni renk eklemeden once buraya bak)
+  - Imza: Turk plakasi (beyaz zemin, siyah cerceve, mavi TR seridi)
+  - Yazi: Barlow (govde), Barlow Condensed (plaka, sayilar, basliklar)
+  - Ekspertiz renkleri arabam.com / Sahibinden alisikligiyla: gri, sari, turuncu, kirmizi
+*/
+@theme {
+  --font-sans: "Barlow", system-ui, sans-serif;
+  --font-cond: "Barlow Condensed", "Barlow", system-ui, sans-serif;
+
+  --color-zemin: #F3F4F6;       /* sayfa */
+  --color-yuzey: #FFFFFF;       /* kart, tablo */
+  --color-yuzey-2: #F8F9FA;     /* tablo baslik, hover */
+  --color-murekkep: #15181C;    /* ana yazi */
+  --color-murekkep-2: #5A626C;  /* ikincil yazi */
+  --color-murekkep-3: #8A929C;  /* pasif */
+  --color-cizgi: #E1E4E9;
+  --color-cizgi-2: #CDD2D9;
+
+  --color-plaka: #0B3B9E;       /* TR seridi mavisi = marka rengi */
+  --color-plaka-koyu: #082C77;
+  --color-plaka-acik: #E8EEFB;
+
+  --color-orijinal: #DCE0E5;
+  --color-lokal: #F6CE46;
+  --color-boyali: #F28C28;
+  --color-degisen: #DE3B40;
+
+  --color-uyari: #B45309;       /* 30-59 gun stokta */
+  --color-uyari-zemin: #FEF3C7;
+  --color-tehlike: #B42318;     /* 60+ gun stokta, hata */
+  --color-tehlike-zemin: #FDECEC;
+  --color-basari: #157347;
+  --color-basari-zemin: #E3F4EA;
+}
+
 :root {
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  color: #0f172a;
-  background-color: #f8fafc;
+  font-family: var(--font-sans);
+  color: var(--color-murekkep);
+  background: var(--color-zemin);
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum" 1;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
 }
+
+/* Katmanli olmali: katmansiz kural Tailwind yardimci siniflarini (text-white vb.) ezer */
+@layer base {
+  button, input, select, textarea { font: inherit; color: inherit; }
+}
+
+/* Sadece dokunmaya cevap veren kisa hareket */
+.basilir { transition: transform 120ms ease-out, background-color 120ms ease-out; }
+.basilir:active { transform: scale(0.98); }
+@media (prefers-reduced-motion: reduce) {
+  .basilir, .basilir:active { transition: none; transform: none; }
+}
+
+:focus-visible { outline: 2px solid var(--color-plaka); outline-offset: 2px; }
