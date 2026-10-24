@@ -39,12 +39,33 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
     alacak (Ayşe, Emre, Eminevim) ve verecek (Mehmet, senetli alış). Seed değiştiği için lokal DB'yi yine sıfırla.
 - Lokal not: panel `localhost:5173`'te açılmalı (backend dev'de sadece bunu kabul eder); 5173 başka projede doluysa onu kapat.
 
-## Sıradaki: Adım 3, satış ve tahsilat
+- **Adım 3A: satış deftere, ödeme planı, tahsilat** (`feat/sale-payment-plan`). Kurallar `MIMARI.md` §6.
+  - `V5__payment_plan.sql`: `payment_plan`, `installment`. Satış artık alıcı + plan ister, deftere ödeyen başına `VEHICLE_SALE`
+    yazılır (Evim kısmı kurumun carisine), "şimdi alındı" satırlar aynı işlemde `COLLECTION` ile kapanır.
+  - Uçlar: `POST/DELETE /api/vehicles/{id}/sale`, `GET /api/vehicles/{id}/payment-plans`,
+    `GET /api/installments?status=OVERDUE|UPCOMING|PAID&direction=&from=&to=`, `POST /api/installments/{id}/collect|undo`,
+    `PATCH /api/installments/{id}` (vade, senet no), `GET /api/contacts/{id}/statement`. `/api/dashboard`'a geciken tahsilat
+    ve bu hafta (bugün + 6 gün) eklendi. Hepsi sadece ADMIN.
+  - Hata kodları: 1017 toplam tutmuyor, 1018 ödenmiş taksitli satış geri alınamaz, 1019/1020 taksit zaten ödenmiş / ödenmemiş,
+    1021 kurum taksitinde kurum yok, 1022 araç satılmamış, 1023 bağlı hareket kasadan düzeltilemez.
+  - Panel: plan kurucu satış formu (peşin, taksit/senet, Evim/kredi, karma), `#/payments` (Geciken / Bu hafta / Tümü),
+    araç detayında "Ödeme planı" + "Satışı geri al", `#/contacts/<id>` kişi detayı ve cari özeti, ana ekranda geciken + bu hafta.
+  - Dev seed: satışlar plana bağlandı (peşin: 206, 207, 208, 210; senetli: 211 Emre, 5 gün gecikmiş / bugün / gelecek ay;
+    havale taksitli: 203 Ayşe, dün gecikmiş; Evim: 209 Hakan + Eminevim). **Seed değişti: `docker compose down -v`, `docker compose up -d`.**
 
-Kapsam `MIMARI.md` §6 ve §12-3: satış kaydı deftere (INCOME → BALANCE(alıcı)), ödeme planı (peşin, taksit, senet, Evim, kredi),
-tahsilat, geciken ödemeler, müşteri carisi. Satış şu an sadece araçtaki alanlara yazılıyor, deftere hareket atmıyor.
-Hareket türleri (`VEHICLE_SALE`, `COLLECTION`, `PAYMENT`) ve ana ekrandaki alacak/verecek gösterimi hazır; satış formu
-bunları yazmaya başlayınca ana ekran kendiliğinden dolar. Dükkân sahibini ve ortak sermayesini panelden girmek Adım 5'te.
+## Sıradaki: Adım 3B, senetli ve taksitli alış (`feat/purchase-payment-plan`)
+
+Araç formunda "Ödeme": peşin (bugünkü akış) ya da plan (`direction = PURCHASE`, aynı plan kurucu). Planlı alış
+`VEHICLE_PURCHASE` BALANCE(satıcı) → VEHICLE; her taksit `PAYMENT` CASH/BANK → BALANCE(satıcı) (tahsil/öde ucu ve servis
+yönü zaten destekliyor). Ödemeler ekranına "Ödenecekler" sekmesi. Seed'deki "Mehmet, senetli alış" gerçek plana çevrilecek.
+Sonra 3C: ödeme günü bildirimleri (web push). Dükkân sahibini ve ortak sermayesini panelden girmek Adım 5'te.
+
+Adım 3A'dan açık sorular:
+- **Kısmi tahsilat** yok: taksit tek seferde tahsil edilir. Müşteri senedin bir kısmını öderse ne olacak (taksiti bölmek mi,
+  kısmi ödeme kaydı mı)? Galericiye sorulacak.
+- Bütün taksitler ödenince araç `CLOSED` olmuyor (MIMARI §4'te var); listeler `SOLD`'a göre süzdüğü için ayrı ele alınmalı.
+- 3A öncesi girilmiş (planı olmayan) satışlarda "Satışı geri al" sadece satış hareketlerini tersler; o satışlara bağlı
+  elle girilmiş tahsilat varsa cari bozulur. Prod'da eski satış olmadığı için sadece dev için geçerli.
 
 Adım 2'den kalan küçükler (gerekirse):
 - Kasa ↔ banka aktarımı (virman) ve açılış bakiyesi yok; sermaye girişi 5. adımda (dev seed'de örnek CAPITAL hareketi var).

@@ -2,7 +2,9 @@
 // tercih tarayicida hatirlanir. Telefon: ust cubuk + alt sekmeler.
 import { useState, type ReactNode } from "react";
 import { useAuth } from "../auth/useAuth";
+import { ContactDetailPage } from "../features/contacts/ContactDetailPage";
 import { ContactList } from "../features/contacts/ContactList";
+import { PaymentsPage } from "../features/payments/PaymentsPage";
 import { HomePage } from "../features/home/HomePage";
 import { LedgerPage } from "../features/ledger/LedgerPage";
 import { MonthlyView } from "../features/monthly/MonthlyView";
@@ -10,23 +12,28 @@ import { VehicleDetailPage } from "../features/vehicles/VehicleDetailPage";
 import { VehicleList } from "../features/vehicles/VehicleList";
 import { useRoute, type Route } from "../shared/useRoute";
 
-type Section = "home" | "vehicles" | "ledger" | "monthly" | "contacts";
+type Section = "home" | "vehicles" | "payments" | "ledger" | "monthly" | "contacts";
 
 const ICON: Record<Section, ReactNode> = {
   home: <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" />,
   vehicles: <path d="M5 16l1.6-5.2A2 2 0 0 1 8.5 9.4h7a2 2 0 0 1 1.9 1.4L19 16M4 16h16v3a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1h-9v1a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM7.5 13.5h.01M16.5 13.5h.01" />,
+  payments: <path d="M7 3.5h10a1 1 0 0 1 1 1V21l-3-2-3 2-3-2-3 2V4.5a1 1 0 0 1 1-1zM9 8.5h6M9 12h6M9 15.5h3" />,
   monthly: <path d="M4 19V9M10 19V5M16 19v-7M3 19h18" />,
   ledger: <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h15A1.5 1.5 0 0 1 21 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 16.5zM3 10h18M7 14.5h3" />,
   contacts: <path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.6c2 .7 3.2 2.6 3.6 5.4" />,
 };
 
-const LABEL: Record<Section, string> = { home: "Ana sayfa", vehicles: "Araçlar", ledger: "Kasa", monthly: "Alım ve satım", contacts: "Kişiler" };
-const SHORT_LABEL: Record<Section, string> = { home: "Ana sayfa", vehicles: "Araçlar", ledger: "Kasa", monthly: "Alım-satım", contacts: "Kişiler" };
+const LABEL: Record<Section, string> = {
+  home: "Ana sayfa", vehicles: "Araçlar", payments: "Ödemeler", ledger: "Kasa", monthly: "Alım ve satım", contacts: "Kişiler",
+};
+const SHORT_LABEL: Record<Section, string> = {
+  home: "Ana sayfa", vehicles: "Araçlar", payments: "Ödemeler", ledger: "Kasa", monthly: "Alım-satım", contacts: "Kişiler",
+};
 
 const MENU_KEY = "galeri_menu_open";
 
 function sectionOf(route: Route): Section {
-  return route.page === "vehicle" ? "vehicles" : route.page;
+  return route.page === "vehicle" ? "vehicles" : route.page === "contact" ? "contacts" : route.page;
 }
 
 function readMenuOpen(): boolean {
@@ -37,7 +44,7 @@ export function Dashboard() {
   const { auth, isAdmin, logout } = useAuth();
   const route = useRoute();
   const [open, setOpen] = useState(readMenuOpen);
-  const sections: Section[] = isAdmin ? ["home", "vehicles", "ledger", "monthly", "contacts"] : ["home", "vehicles", "monthly"];
+  const sections: Section[] = isAdmin ? ["home", "vehicles", "payments", "ledger", "monthly", "contacts"] : ["home", "vehicles", "monthly"];
   const active = sectionOf(route);
   const initials = (auth?.tenantName || "Galeri").split(" ").map((w) => w[0]).slice(0, 2).join("").toLocaleUpperCase("tr-TR");
 
@@ -50,6 +57,8 @@ export function Dashboard() {
     route.page === "vehicle" ? <VehicleDetailPage id={route.id} />
     : route.page === "vehicles" ? <VehicleList />
     : route.page === "monthly" ? <MonthlyView />
+    : route.page === "payments" && isAdmin ? <PaymentsPage />
+    : route.page === "contact" && isAdmin ? <ContactDetailPage id={route.id} />
     : route.page === "contacts" && isAdmin ? <ContactList />
     : route.page === "ledger" && isAdmin ? <LedgerPage />
     : <HomePage />;
@@ -113,7 +122,7 @@ export function Dashboard() {
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-yuzey border-t border-cizgi flex pb-[env(safe-area-inset-bottom)]">
         {sections.map((s) => (
           <a key={s} href={`#/${s === "home" ? "" : s}`} aria-current={active === s ? "page" : undefined}
-            className={`relative grow basis-0 flex flex-col items-center gap-0.5 pt-2.5 pb-2 text-[11px] font-semibold ${active === s ? "text-plaka" : "text-murekkep-3"}`}>
+            className={`relative grow basis-0 min-w-0 flex flex-col items-center gap-0.5 pt-2.5 pb-2 text-[10.5px] font-semibold whitespace-nowrap ${active === s ? "text-plaka" : "text-murekkep-3"}`}>
             {active === s && <span className="absolute top-0 inset-x-4 h-[3px] rounded-b bg-plaka" />}
             <Icon>{ICON[s]}</Icon>{SHORT_LABEL[s]}
           </a>

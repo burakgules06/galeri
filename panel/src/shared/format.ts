@@ -1,5 +1,7 @@
 // Gosterim yardimcilari. Tutarlar backend'de kurus (tam sayi); arayuzde TL.
-import type { BodyPart, Fuel, LedgerEntryResponse, LedgerEntryType, PartCondition, Transmission, VehicleStatus } from "./types";
+import type {
+  BodyPart, Fuel, InstallmentResponse, LedgerEntryResponse, LedgerEntryType, PartCondition, PaymentMethod, Transmission, VehicleStatus,
+} from "./types";
 
 const tlFormat = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2, minimumFractionDigits: 0 });
 const numberFormat = new Intl.NumberFormat("tr-TR");
@@ -101,7 +103,40 @@ export function formatPhone(phone: string | null | undefined): string {
 /** Grafik serileri: sabit sira, tekrar yok (index.css --color-seri-*). */
 export const SERIES = ["var(--color-seri-1)", "var(--color-seri-2)", "var(--color-seri-3)", "var(--color-seri-4)", "var(--color-seri-5)", "var(--color-seri-6)"];
 
-export const SHORT_MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+export const METHOD: Record<PaymentMethod, string> = {
+  CASH: "Nakit", TRANSFER: "Havale", PROMISSORY_NOTE: "Senet", INSTITUTION: "Evim / kredi",
+};
+
+/** ISO tarihe ay ekler; ayin son gunu tasarsa ay sonuna yaslar (31 Ocak + 1 ay -> 28/29 Subat). */
+export function addMonthsIso(iso: string, months: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const last = new Date(y, m - 1 + months + 1, 0).getDate();
+  const t = new Date(y, m - 1 + months, Math.min(d, last));
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
+
+export function addDaysIso(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(y, m - 1, d + days);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
+
+/** Iki ISO tarih arasindaki gun farki (b - a). */
+export function daysBetween(a: string, b: string): number {
+  const [y1, m1, d1] = a.split("-").map(Number);
+  const [y2, m2, d2] = b.split("-").map(Number);
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86_400_000);
+}
+
+/** Taksitin vadesine gore kisa durum metni: "3 gün gecikti", "Bugün", "5 gün kaldı", "Ödendi". */
+export function dueLabel(i: InstallmentResponse): string {
+  if (i.status === "PAID") return "Ödendi";
+  if (i.status === "OVERDUE") return `${i.daysLate} gün gecikti`;
+  const left = daysBetween(todayIso(), i.dueDate);
+  return left <= 0 ? "Bugün" : left === 1 ? "Yarın" : `${left} gün kaldı`;
+}
+
+export const SHORT_MONTHS =["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 
 /**
  * Hareketin bir hesaba gore yonu: +1 giris, -1 cikis, 0 ilgisiz.

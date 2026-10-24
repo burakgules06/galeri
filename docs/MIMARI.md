@@ -127,17 +127,28 @@ Ortaklar kendi aralarında konuşup karar verince, kâr payını sermayeye eklem
 Her alış ve satışın bir ödeme planı vardır:
 
 ```
-payment_plan: vehicle | direction (PURCHASE/SALE) | counterparty (contact) | total_cents | method
-installment:  plan | due_date | amount_cents | type (CASH/TRANSFER/PROMISSORY_NOTE/INSTITUTION) | note_no | payer (contact) | paid_entry_id
+payment_plan: vehicle_id | direction (SALE/PURCHASE) | contact_id (karşı taraf) | total_cents | created_by_id
+              unique (vehicle_id, direction): aracın her yönde en fazla bir planı
+installment:  plan_id | seq | due_date | amount_cents | method (CASH/TRANSFER/PROMISSORY_NOTE/INSTITUTION)
+              | note_no | payer_contact_id | paid_entry_id (→ ledger_entry) | paid_at
 ```
 
-- **Peşin:** tek satır, vade bugün.
-- **Taksitli / senetli:** her taksit ya da senet bir satır.
-- **Evim sistemi / banka kredisi:** satır türü `INSTITUTION`, `payer` = Evim şirketi ya da banka.
-- **Karma:** yukarıdakilerin karışımı.
+- **Peşin:** tek satır, vade satış günü, "şimdi alındı".
+- **Taksitli / senetli:** peşinat (şimdi alındı) + kalan eşit bölünür, kuruş farkı son taksite; her taksit ya da senet bir satır.
+- **Evim sistemi / banka kredisi:** satır yöntemi `INSTITUTION`, ödeyen (`payer`) Evim şirketi ya da banka (ORGANIZATION, zorunlu).
+- **Karma:** yukarıdakilerin karışımı; satırlar elle eklenir.
 
-Ödeme alındığında ilgili satır bir harekete bağlanır. Vadesi geçmiş ve ödenmemiş satırlar
-"geciken ödemeler" listesini oluşturur.
+Satış kuralları (3A ile kesinleşti):
+- Alıcı zorunlu; taksitlerin toplamı satış bedeline kuruşu kuruşuna eşit (değilse hata 1017).
+- Deftere ödeyen başına `VEHICLE_SALE` INCOME → BALANCE(ödeyen) yazılır: Evim/kredi kısmı kurumun carisine gider.
+- "Şimdi alındı" satırlar aynı işlemde `COLLECTION` BALANCE(ödeyen) → CASH/BANK ile kapanır.
+- Tahsilat taksitin tamamı tek seferde (kısmi tahsilat yok); geri alma bağlı hareketi tersler, taksit bekliyora döner.
+- Satışı geri al: sadece hiç taksit ödenmemişse; satış hareketleri terslenir, plan silinir, araç `IN_STOCK`'a döner.
+- Ödenmemiş taksitte sadece vade ve senet no değişir; tutar/ödeyen değişecekse satış geri alınıp yeniden girilir.
+- Satışa ya da taksite bağlı hareket kasa ekranından düzeltilmez (hata 1023).
+
+Durum (saklanmaz, bugüne göre hesaplanır): `PAID` (ödendi, yeşil), `UPCOMING` (bekliyor, turuncu; vadesi bugün dahil),
+`OVERDUE` (gecikti, kırmızı). Geciken ve bu haftanın ödemeleri ana ekranda ve `#/payments`'ta görünür.
 
 ## 7. Masraf kategorileri
 
@@ -210,12 +221,13 @@ para uç noktaları STAFF için 403 döner. Sadece arayüzde gizlemek yetmez.
 | `vehicle` | plate, make, model, model_year, fuel, transmission, mileage_km, color, tramer_cents, notes, ownership, consignor_id, commission_rate / commission_cents, purchase_date, seller_id, bought_by_id, actual_purchase_cents, official_purchase_cents, sale_date, buyer_id, sold_by_id, sale_price_cents, status |
 | `vehicle_part` | vehicle_id, part (BodyPart), condition (PartCondition) |
 | `vehicle_share` | vehicle_id, contact_id, share_percent (sadece CO_OWNED) |
-| `payment_plan`, `installment` | bkz. 6 |
+| `payment_plan` | vehicle_id, direction (SALE/PURCHASE), contact_id, total_cents, created_by_id; unique (vehicle_id, direction) |
+| `installment` | plan_id, seq, due_date, amount_cents, method, note_no, payer_contact_id, paid_entry_id, paid_at; index (tenant_id, due_date) ödenmemişler için |
 | `push_subscription` | panel_user_id, endpoint, anahtarlar (Akıllı Randevum'daki gibi) |
 | `notification_log` | installment_id, date, sent_at (aynı gün tekrarını önler) |
 
 Hepsi `tenant_id` taşır ve tenant'a göre filtrelenir. Tablo/kolon adları İngilizce (bkz. §14 sözlük);
-henüz yazılmamış tabloların (`vehicle_share`, `payment_plan` ...) adları plandır, migration'ı yazılırken kesinleşir.
+henüz yazılmamış tabloların (`vehicle_share`, `push_subscription` ...) adları plandır, migration'ı yazılırken kesinleşir.
 
 ## 12. Yol haritası
 
