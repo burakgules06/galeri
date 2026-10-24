@@ -90,7 +90,7 @@ class VehicleServiceImplTest {
 
     private VehicleRequest request(String plate) {
         return new VehicleRequest(plate, "Renault", "Clio", (short) 2022, Fuel.GASOLINE, Transmission.MANUAL, 31000,
-                "Kırmızı", null, null, LocalDate.of(2026, 6, 1), null, null, 72000000L, 60000000L, cashId);
+                "Kırmızı", null, null, LocalDate.of(2026, 6, 1), null, null, 72000000L, 60000000L, cashId, null);
     }
 
     private Vehicle inStockVehicle(UUID id, UUID tenant) {
@@ -126,7 +126,7 @@ class VehicleServiceImplTest {
         assertThat(saved.getValue().getTenantId()).isEqualTo(tenantId);
         assertThat(result.vehicle().daysInStock()).isEqualTo(30);
         assertThat(result.actualPurchaseCents()).isEqualTo(72000000L);
-        verify(ledgerService).syncVehiclePurchase(saved.getValue(), cashId);
+        verify(paymentPlanService).syncPurchase(saved.getValue(), cashId, null);
     }
 
     @Test
@@ -137,7 +137,7 @@ class VehicleServiceImplTest {
 
         service.update(id, request("34 KLM 4521"));
 
-        verify(ledgerService).syncVehiclePurchase(vehicle, cashId);
+        verify(paymentPlanService).syncPurchase(vehicle, cashId, null);
     }
 
     @Test

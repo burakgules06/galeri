@@ -62,4 +62,13 @@ public interface LedgerService {
 
     /** Aracin duzeltilmemis tum satis hareketlerini terser (satisi geri al). */
     void reverseVehicleSales(UUID vehicleId);
+
+    /** Planli alis: BALANCE(odenecek kisi) -> VEHICLE. Odenecek kisinin carisi yoksa acilir. */
+    LedgerEntry writePlannedPurchase(Vehicle vehicle, Contact payee, long amountCents, LocalDate date);
+
+    /** Aracin gecerli (duzeltilmemis) tum alis hareketlerini terser: pesin ya da planli. */
+    void reverseVehiclePurchases(UUID vehicleId);
+
+    /** Aracin gecerli alis hareketleri (duzeltme ve duzeltilmis olanlar haric). */
+    List<LedgerEntry> activeVehiclePurchases(UUID vehicleId);
 }

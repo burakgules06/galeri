@@ -275,6 +275,30 @@ class LedgerServiceImplTest {
     }
 
     @Test
+    void planliAlisHareketi_kasaEkranindanDuzeltilemez() {
+        Account sellerBalance = account(AccountType.BALANCE, tenantId);
+        LedgerEntry purchase = entry(LedgerEntryType.VEHICLE_PURCHASE, sellerBalance, cash, 100L);
+        when(entryRepository.findById(purchase.getId())).thenReturn(Optional.of(purchase));
+
+        assertThatThrownBy(() -> service.correct(purchase.getId())).isInstanceOf(LinkedEntryException.class);
+    }
+
+    @Test
+    void planliAlistaHesapSecimiDonmez_pesinAlistaKasaDoner() {
+        Vehicle vehicle = vehicle();
+        Account sellerBalance = account(AccountType.BALANCE, tenantId);
+        LedgerEntry planned = entry(LedgerEntryType.VEHICLE_PURCHASE, sellerBalance, vehicleAccount(vehicle), 100L);
+        when(entryRepository.findByVehicle_IdAndType(vehicle.getId(), LedgerEntryType.VEHICLE_PURCHASE)).thenReturn(List.of(planned));
+        when(entryRepository.correctedIds(anyCollection())).thenReturn(List.of());
+
+        assertThat(service.purchaseAccountId(vehicle.getId())).isNull();
+
+        LedgerEntry cashPurchase = entry(LedgerEntryType.VEHICLE_PURCHASE, cash, vehicleAccount(vehicle), 100L);
+        when(entryRepository.findByVehicle_IdAndType(vehicle.getId(), LedgerEntryType.VEHICLE_PURCHASE)).thenReturn(List.of(cashPurchase));
+        assertThat(service.purchaseAccountId(vehicle.getId())).isEqualTo(cash.getId());
+    }
+
+    @Test
     void satisGelirdenOdeyeninCarisineYazilir_cariYoksaAcilir() {
         Vehicle vehicle = vehicle();
         Account income = account(AccountType.INCOME, tenantId);

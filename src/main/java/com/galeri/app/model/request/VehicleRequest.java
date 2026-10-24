@@ -2,6 +2,7 @@ package com.galeri.app.model.request;
 
 import com.galeri.app.model.enums.Fuel;
 import com.galeri.app.model.enums.Transmission;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -10,6 +11,7 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 // Tutarlar kurus cinsinden (1.250.000,50 TL = 125000050).
@@ -30,5 +32,8 @@ public record VehicleRequest(
         UUID boughtById,
         @PositiveOrZero Long actualPurchaseCents,
         @PositiveOrZero Long officialPurchaseCents,
-        UUID purchaseAccountId    // pesin alis: gercek alis bedeli bu kasa/banka hesabindan deftere yazilir
+        UUID purchaseAccountId,   // pesin alis: gercek alis bedeli bu kasa/banka hesabindan deftere yazilir
+        // Planli (senetli / taksitli) alis: doluysa purchaseAccountId yok sayilir. Odenmis taksit varsa sadece
+        // odenmemis satirlar gonderilir; odenmisler + bunlar gercek alis bedeline esit olmali.
+        List<@Valid InstallmentRequest> purchasePlan
 ) {}

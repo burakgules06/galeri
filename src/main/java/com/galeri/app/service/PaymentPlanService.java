@@ -5,6 +5,7 @@ import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.InstallmentStatus;
 import com.galeri.app.model.enums.PlanDirection;
 import com.galeri.app.model.request.CollectRequest;
+import com.galeri.app.model.request.InstallmentRequest;
 import com.galeri.app.model.request.InstallmentUpdateRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
 import com.galeri.app.model.response.ContactStatement;
@@ -26,6 +27,14 @@ public interface PaymentPlanService {
 
     /** Satisi geri alir: hic taksit odenmemis olmali; satis hareketleri terslenir, plan silinir. */
     void undoSale(Vehicle vehicle);
+
+    /**
+     * Aracin alis odemesini esitler (VehicleService create / update cagirir, ayni transaction).
+     * plan bossa pesin akis: varsa alis plani kaldirilir (odenmis taksit yoksa) ve LedgerService.syncVehiclePurchase calisir.
+     * plan doluysa planli alis: VEHICLE_PURCHASE BALANCE(satici) -> VEHICLE, "simdi odendi" satirlar PAYMENT ile kapanir.
+     * Odenmis taksit varsa bedel ve satici degistirilemez; sadece odenmemis kisim yeniden yazilir.
+     */
+    void syncPurchase(Vehicle vehicle, UUID purchaseAccountId, List<InstallmentRequest> plan);
 
     List<PaymentPlanResponse> plans(UUID vehicleId);
 

@@ -4,9 +4,12 @@ import com.galeri.app.exception.runtime.InstallmentAlreadyPaidException;
 import com.galeri.app.exception.runtime.InstallmentNotPaidException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidPayerException;
+import com.galeri.app.exception.runtime.PurchaseHasPaymentsException;
+import com.galeri.app.exception.runtime.PurchaseTotalMismatchException;
 import com.galeri.app.exception.runtime.RecordNotFoundException;
 import com.galeri.app.exception.runtime.SaleHasPaymentsException;
 import com.galeri.app.exception.runtime.SaleTotalMismatchException;
+import com.galeri.app.exception.runtime.SellerRequiredException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.model.entity.Account;
 import com.galeri.app.model.entity.Contact;
@@ -53,6 +56,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -139,6 +143,127 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             planRepository.delete(plan);
         });
         ledgerService.reverseVehicleSales(vehicle.getId());
+    }
+
+    // ------------------------------------------------------------------ alis
+
+    @Override
+    @Transactional
+    public void syncPurchase(Vehicle vehicle, UUID purchaseAccountId, List<InstallmentRequest> rows) {
+        Optional<PaymentPlan> existing = planRepository.findByVehicleIdAndDirection(vehicle.getId(), PlanDirection.PURCHASE);
+        List<Installment> current = existing.map(p -> installmentRepository.findByPlanIds(List.of(p.getId()))).orElse(List.of());
+        List<Installment> paid = current.stream().filter(Installment::isPaid).toList();
+
+        // ---- pesin alis: plan varsa kaldir (odeme yapilmadiysa), sonra bugunku akis
+        if (rows == null || rows.isEmpty()) {
+            if (existing.isPresent()) {
+                if (!paid.isEmpty()) throw new PurchaseHasPaymentsException();
+                installmentRepository.deleteAll(current);
+                planRepository.delete(existing.get());
+                ledgerService.reverseVehiclePurchases(vehicle.getId());
+            }
+            ledgerService.syncVehiclePurchase(vehicle, purchaseAccountId);
+            return;
+        }
+
+        // ---- planli alis: dogrulama
+        Contact seller = vehicle.getSeller();
+        if (seller == null) throw new SellerRequiredException();
+        long price = vehicle.getActualPurchaseCents() == null ? 0 : vehicle.getActualPurchaseCents();
+        long paidSum = paid.stream().mapToLong(Installment::getAmountCents).sum();
+        long rowSum = rows.stream().mapToLong(InstallmentRequest::amountCents).sum();
+        if (paidSum + rowSum != price) throw new PurchaseTotalMismatchException();
+        if (!paid.isEmpty() && (existing.get().getTotalCents() != price || !existing.get().getContact().getId().equals(seller.getId()))) {
+            throw new PurchaseHasPaymentsException();
+        }
+        List<InstallmentRequest> sorted = new ArrayList<>(rows);
+        sorted.sort(Comparator.comparing(InstallmentRequest::dueDate));
+        List<Contact> payees = new ArrayList<>();
+        for (InstallmentRequest row : sorted) {
+            payees.add(payer(row, seller, vehicle.getTenantId()));
+            if (row.paidNow() && row.accountId() == null) throw new InvalidAccountException();
+        }
+
+        // ---- defter: odenecek kisi basina toplam, alis tarihinde. Ayniysa dokunma.
+        Map<UUID, Long> wanted = new LinkedHashMap<>();
+        Map<UUID, Contact> payeeById = new LinkedHashMap<>();
+        for (Installment i : paid) {
+            wanted.merge(i.getPayer().getId(), i.getAmountCents(), Long::sum);
+            payeeById.putIfAbsent(i.getPayer().getId(), i.getPayer());
+        }
+        for (int k = 0; k < sorted.size(); k++) {
+            wanted.merge(payees.get(k).getId(), sorted.get(k).amountCents(), Long::sum);
+            payeeById.putIfAbsent(payees.get(k).getId(), payees.get(k));
+        }
+        if (!ledgerMatches(ledgerService.activeVehiclePurchases(vehicle.getId()), wanted, vehicle.getPurchaseDate())) {
+            ledgerService.reverseVehiclePurchases(vehicle.getId());
+            wanted.forEach((id, amount) -> ledgerService.writePlannedPurchase(vehicle, payeeById.get(id), amount, vehicle.getPurchaseDate()));
+        }
+
+        // ---- plan ve odenmemis taksitler: ayniysa dokunma, degilse odenmemisleri yeniden yaz
+        List<Installment> unpaid = current.stream().filter(i -> !i.isPaid()).toList();
+        if (existing.isPresent() && sameRows(unpaid, sorted, payees)) return;
+
+        PaymentPlan plan = existing.orElseGet(() -> {
+            PaymentPlan p = new PaymentPlan();
+            p.setTenantId(vehicle.getTenantId());
+            p.setVehicleId(vehicle.getId());
+            p.setDirection(PlanDirection.PURCHASE);
+            p.setCreatedBy(panelUserRepository.getReferenceById(CurrentUser.principal().userId()));
+            return p;
+        });
+        plan.setContact(seller);
+        plan.setTotalCents(price);
+        plan = planRepository.save(plan);
+        installmentRepository.deleteAll(unpaid);
+        installmentRepository.flush();   // (plan_id, seq) tekilligi: silmeler eklemelerden once calissin
+
+        int seq = paid.stream().mapToInt(Installment::getSeq).max().orElse(0);
+        for (int k = 0; k < sorted.size(); k++) {
+            InstallmentRequest row = sorted.get(k);
+            Installment i = new Installment();
+            i.setTenantId(vehicle.getTenantId());
+            i.setPlan(plan);
+            i.setSeq((short) ++seq);
+            i.setDueDate(row.dueDate());
+            i.setAmountCents(row.amountCents());
+            i.setMethod(row.method());
+            i.setNoteNo(blankToNull(row.noteNo()));
+            i.setPayer(payees.get(k));
+            if (row.paidNow()) {
+                LedgerEntry e = ledgerService.writeSettlement(PlanDirection.PURCHASE, vehicle, payees.get(k), row.accountId(),
+                        row.amountCents(), vehicle.getPurchaseDate(), sorted.size() == 1 && paid.isEmpty() ? "Peşin ödeme" : "Peşinat");
+                i.setPaidEntryId(e.getId());
+                i.setPaidAt(now());
+            }
+            installmentRepository.save(i);
+        }
+    }
+
+    /** Gecerli alis hareketleri istenenle ayni mi: hepsi saticinin carisinden, alis tarihinde, kisi basina ayni tutar. */
+    private static boolean ledgerMatches(List<LedgerEntry> active, Map<UUID, Long> wanted, LocalDate date) {
+        Map<UUID, Long> actual = new LinkedHashMap<>();
+        for (LedgerEntry e : active) {
+            if (e.getSourceAccount().getType() != AccountType.BALANCE || e.getSourceAccount().getContactId() == null
+                    || !e.getEntryDate().equals(date)) return false;
+            actual.merge(e.getSourceAccount().getContactId(), e.getAmountCents(), Long::sum);
+        }
+        return actual.equals(wanted);
+    }
+
+    /** Odenmemis taksitler istenen satirlarla ayni mi (siraya gore vade, tutar, yontem, senet no, odenecek kisi). */
+    private static boolean sameRows(List<Installment> unpaid, List<InstallmentRequest> rows, List<Contact> payees) {
+        if (unpaid.size() != rows.size() || rows.stream().anyMatch(InstallmentRequest::paidNow)) return false;
+        List<Installment> ordered = unpaid.stream()
+                .sorted(Comparator.comparing(Installment::getDueDate).thenComparing(Installment::getSeq)).toList();
+        for (int k = 0; k < rows.size(); k++) {
+            Installment i = ordered.get(k);
+            InstallmentRequest r = rows.get(k);
+            if (!i.getDueDate().equals(r.dueDate()) || i.getAmountCents() != r.amountCents().longValue() || i.getMethod() != r.method()
+                    || !Objects.equals(i.getNoteNo(), blankToNull(r.noteNo()))
+                    || !i.getPayer().getId().equals(payees.get(k).getId())) return false;
+        }
+        return true;
     }
 
     // ------------------------------------------------------------------ okuma

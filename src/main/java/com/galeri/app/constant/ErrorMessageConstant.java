@@ -27,4 +27,7 @@ public class ErrorMessageConstant {
     public static final int INVALID_PAYER = 1021;
     public static final int VEHICLE_NOT_SOLD = 1022;
     public static final int LINKED_ENTRY = 1023;
+    public static final int PURCHASE_TOTAL_MISMATCH = 1024;
+    public static final int SELLER_REQUIRED = 1025;
+    public static final int PURCHASE_HAS_PAYMENTS = 1026;
 }

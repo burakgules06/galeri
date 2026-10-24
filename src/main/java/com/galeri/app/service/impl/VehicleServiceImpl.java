@@ -114,7 +114,7 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setPlate(plate);
         apply(vehicle, request);
         Vehicle saved = vehicleRepository.save(vehicle);
-        ledgerService.syncVehiclePurchase(saved, request.purchaseAccountId());
+        paymentPlanService.syncPurchase(saved, request.purchaseAccountId(), request.purchasePlan());
         return toAdmin(saved, toDetail(saved));
     }
 
@@ -133,7 +133,7 @@ public class VehicleServiceImpl implements VehicleService {
         if (vehicle.getSaleDate() != null && vehicle.getSaleDate().isBefore(vehicle.getPurchaseDate())) {
             throw new InvalidDateException();
         }
-        ledgerService.syncVehiclePurchase(vehicle, request.purchaseAccountId());
+        paymentPlanService.syncPurchase(vehicle, request.purchaseAccountId(), request.purchasePlan());
         return toAdmin(vehicle, toDetail(vehicle));
     }
 
