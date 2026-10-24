@@ -7,7 +7,7 @@ import com.galeri.app.model.enums.VehicleStatus;
 import java.time.LocalDate;
 import java.util.UUID;
 
-// Liste satiri. Para alani YOK; hem ADMIN hem STAFF'a ayni doner.
+// Liste satiri. Para alani YOK; hem ADMIN hem STAFF'a doner. buyer sadece ADMIN'de dolu (kisi bilgisi), STAFF'ta null.
 public record VehicleSummary(
         UUID id,
         String plate,
@@ -22,5 +22,6 @@ public record VehicleSummary(
         LocalDate purchaseDate,
         LocalDate saleDate,
         long daysInStock,
-        DamageSummary damage
+        DamageSummary damage,
+        ContactSummary buyer
 ) {}

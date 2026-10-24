@@ -44,6 +44,7 @@ export interface VehicleSummary {
   saleDate: string | null;
   daysInStock: number;
   damage: DamageSummary;
+  buyer: ContactSummary | null;   // sadece ADMIN'de dolu
 }
 
 export interface VehicleDetail {
@@ -87,6 +88,32 @@ export interface MonthlyVehicle { vehicleId: string; plate: string; make: string
 export interface StaffMonthly { staffId: string | null; name: string; bought: MonthlyVehicle[]; sold: MonthlyVehicle[] }
 export interface MonthlyTrades { year: number; month: number; staff: StaffMonthly[] }
 
+export type TradeKind = "BOUGHT" | "SOLD";
+export interface TradeItem {
+  vehicleId: string; plate: string; make: string; model: string; modelYear: number; mileageKm: number;
+  kind: TradeKind; date: string; staffId: string | null; staffName: string;
+}
+export interface YearlyTrades { year: number; staff: StaffSummary[]; items: TradeItem[] }
+
+// ---- Ana ekran (sadece ADMIN). Tutarlar kurus, paylar baz puan (10000 = %100). ----
+export interface PartnerShare { contactId: string; name: string; owner: boolean; capitalCents: number; shareBasisPoints: number }
+export interface ContactBalance { contactId: string; name: string; phone: string | null; amountCents: number }
+export interface MonthStat { year: number; month: number; bought: number; sold: number; revenueCents: number; profitCents: number }
+export interface DashboardResponse {
+  cashCents: number;
+  bankCents: number;
+  capitalCents: number;
+  receivableCents: number;
+  payableCents: number;
+  partners: PartnerShare[];
+  receivables: ContactBalance[];
+  payables: ContactBalance[];
+  inStockCount: number;
+  stockCostCents: number;
+  averageDaysInStock: number;
+  months: MonthStat[];
+}
+
 export interface VehicleRequest {
   plate: string;
   make: string;
@@ -111,7 +138,8 @@ export interface ContactRequest { name: string; phone: string | null; type: Cont
 
 // ---- Para defteri (sadece ADMIN). Tutarlar kurus. ----
 export type AccountType = "CASH" | "BANK" | "BALANCE" | "CAPITAL" | "VEHICLE" | "EXPENSE" | "INCOME";
-export type LedgerEntryType = "VEHICLE_PURCHASE" | "VEHICLE_EXPENSE" | "GENERAL_EXPENSE" | "CAPITAL";
+export type LedgerEntryType =
+  | "VEHICLE_PURCHASE" | "VEHICLE_EXPENSE" | "GENERAL_EXPENSE" | "CAPITAL" | "VEHICLE_SALE" | "COLLECTION" | "PAYMENT";
 export type ExpenseRoot = "VEHICLE" | "GENERAL";
 
 export interface AccountSummary { id: string; type: AccountType; name: string }

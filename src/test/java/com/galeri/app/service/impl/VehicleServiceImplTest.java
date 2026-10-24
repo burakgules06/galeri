@@ -215,7 +215,7 @@ class VehicleServiceImplTest {
     void liste_hasarOzetiVeStoktaGunHesaplanir() {
         UUID id = UUID.randomUUID();
         Vehicle vehicle = inStockVehicle(id, tenantId);
-        when(vehicleRepository.search(tenantId, null, "")).thenReturn(List.of(vehicle));
+        when(vehicleRepository.search(tenantId, null, "", true, "")).thenReturn(List.of(vehicle));
         when(vehiclePartRepository.findByVehicleIdIn(List.of(id))).thenReturn(List.of(
                 part(id, BodyPart.FRONT_BUMPER, PartCondition.PAINTED),
                 part(id, BodyPart.ROOF, PartCondition.PAINTED),
@@ -228,6 +228,32 @@ class VehicleServiceImplTest {
         assertThat(list.get(0).damage().replaced()).isEqualTo(1);
         assertThat(list.get(0).damage().locallyPainted()).isZero();
         assertThat(list.get(0).daysInStock()).isEqualTo(30);
+    }
+
+    @Test
+    void yonetici_aliciAdiVeTelefonuylaArar_telefonBicimiNormalizeEdilir() {
+        when(vehicleRepository.search(tenantId, VehicleStatus.SOLD, "0530 111 22 33", true, "5301112233")).thenReturn(List.of());
+
+        service.search("0530 111 22 33", VehicleStatus.SOLD);
+
+        verify(vehicleRepository).search(tenantId, VehicleStatus.SOLD, "0530 111 22 33", true, "5301112233");
+    }
+
+    @Test
+    void calisan_kisiBilgisiyleAramaz() {
+        TestSession.open(userId, tenantId, "STAFF");
+        when(vehicleRepository.search(tenantId, null, "Ayse", false, "")).thenReturn(List.of());
+
+        service.search("Ayse", null);
+
+        verify(vehicleRepository).search(tenantId, null, "Ayse", false, "");
+    }
+
+    @Test
+    void telefonAramasi_ucRakamdanKisaysaKapali() {
+        assertThat(VehicleServiceImpl.phoneQuery("34 AB")).isEmpty();
+        assertThat(VehicleServiceImpl.phoneQuery("passat 2021")).isEqualTo("2021");
+        assertThat(VehicleServiceImpl.phoneQuery("+90 532 444")).isEqualTo("90532444");
     }
 
     private static VehiclePart part(UUID vehicleId, BodyPart p, PartCondition c) {

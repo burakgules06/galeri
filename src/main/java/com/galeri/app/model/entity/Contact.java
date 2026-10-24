@@ -34,4 +34,8 @@ public class Contact extends BaseModel {
 
     @Column(columnDefinition = "text")
     private String notes;
+
+    // Sermaye ortaklari arasinda dukkan sahibi (galeri basina en fazla bir)
+    @Column(name = "is_owner", nullable = false)
+    private boolean owner = false;
 }

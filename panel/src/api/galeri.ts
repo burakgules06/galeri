@@ -1,6 +1,7 @@
 import { apiFetch } from "./client";
 import type {
-  AccountResponse, BodyPart, CategoryResponse, ContactRequest, ContactResponse, ExpenseRequest, ExpenseRoot,
+  AccountResponse, BodyPart, CategoryResponse, ContactRequest, ContactResponse, DashboardResponse, ExpenseRequest, ExpenseRoot,
+  YearlyTrades,
   LedgerEntryResponse, MonthlyTrades, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
   VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary,
 } from "../shared/types";
@@ -25,6 +26,8 @@ export const api = {
   updateContact: (id: string, request: ContactRequest) => apiFetch<ContactResponse>(`/api/contacts/${id}`, json(request, "PUT")),
   staff: () => apiFetch<StaffSummary[]>("/api/staff"),
   monthlyTrades: (year: number, month: number) => apiFetch<MonthlyTrades>(`/api/reports/monthly-trades?year=${year}&month=${month}`),
+  yearlyTrades: (year: number) => apiFetch<YearlyTrades>(`/api/reports/yearly-trades?year=${year}`),
+  dashboard: () => apiFetch<DashboardResponse>("/api/dashboard"),
   // Para defteri (sadece ADMIN)
   accounts: () => apiFetch<AccountResponse[]>("/api/accounts"),
   addBank: (name: string) => apiFetch<AccountResponse>("/api/accounts", json({ name })),

@@ -1,81 +1,121 @@
-// Uygulama iskeleti: telefonda ust cubuk + alt sekmeler, genis ekranda sol menu.
-import type { ReactNode } from "react";
+// Uygulama iskeleti. Genis ekran: koyu sol menu, varsayilan olarak dar (sadece ikonlar); dugmeyle acilir,
+// tercih tarayicida hatirlanir. Telefon: ust cubuk + alt sekmeler.
+import { useState, type ReactNode } from "react";
 import { useAuth } from "../auth/useAuth";
 import { ContactList } from "../features/contacts/ContactList";
+import { HomePage } from "../features/home/HomePage";
 import { LedgerPage } from "../features/ledger/LedgerPage";
 import { MonthlyView } from "../features/monthly/MonthlyView";
 import { VehicleDetailPage } from "../features/vehicles/VehicleDetailPage";
 import { VehicleList } from "../features/vehicles/VehicleList";
 import { useRoute, type Route } from "../shared/useRoute";
 
-type Section = "vehicles" | "ledger" | "monthly" | "contacts";
+type Section = "home" | "vehicles" | "ledger" | "monthly" | "contacts";
 
 const ICON: Record<Section, ReactNode> = {
+  home: <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" />,
   vehicles: <path d="M5 16l1.6-5.2A2 2 0 0 1 8.5 9.4h7a2 2 0 0 1 1.9 1.4L19 16M4 16h16v3a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1h-9v1a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM7.5 13.5h.01M16.5 13.5h.01" />,
   monthly: <path d="M4 19V9M10 19V5M16 19v-7M3 19h18" />,
   ledger: <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h15A1.5 1.5 0 0 1 21 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 16.5zM3 10h18M7 14.5h3" />,
   contacts: <path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.6c2 .7 3.2 2.6 3.6 5.4" />,
 };
 
-const LABEL: Record<Section, string> = { vehicles: "Araçlar", ledger: "Kasa", monthly: "Alım ve satım", contacts: "Kişiler" };
+const LABEL: Record<Section, string> = { home: "Ana sayfa", vehicles: "Araçlar", ledger: "Kasa", monthly: "Alım ve satım", contacts: "Kişiler" };
+const SHORT_LABEL: Record<Section, string> = { home: "Ana sayfa", vehicles: "Araçlar", ledger: "Kasa", monthly: "Alım-satım", contacts: "Kişiler" };
+
+const MENU_KEY = "galeri_menu_open";
 
 function sectionOf(route: Route): Section {
   return route.page === "vehicle" ? "vehicles" : route.page;
 }
 
+function readMenuOpen(): boolean {
+  try { return localStorage.getItem(MENU_KEY) === "1"; } catch { return false; }
+}
+
 export function Dashboard() {
   const { auth, isAdmin, logout } = useAuth();
   const route = useRoute();
-  const sections: Section[] = isAdmin ? ["vehicles", "ledger", "monthly", "contacts"] : ["vehicles", "monthly"];
+  const [open, setOpen] = useState(readMenuOpen);
+  const sections: Section[] = isAdmin ? ["home", "vehicles", "ledger", "monthly", "contacts"] : ["home", "vehicles", "monthly"];
   const active = sectionOf(route);
+  const initials = (auth?.tenantName || "Galeri").split(" ").map((w) => w[0]).slice(0, 2).join("").toLocaleUpperCase("tr-TR");
+
+  const toggle = () => setOpen((o) => {
+    try { localStorage.setItem(MENU_KEY, o ? "0" : "1"); } catch { /* tarayici depolamasi kapali olabilir */ }
+    return !o;
+  });
 
   const content =
     route.page === "vehicle" ? <VehicleDetailPage id={route.id} />
+    : route.page === "vehicles" ? <VehicleList />
     : route.page === "monthly" ? <MonthlyView />
     : route.page === "contacts" && isAdmin ? <ContactList />
     : route.page === "ledger" && isAdmin ? <LedgerPage />
-    : <VehicleList />;
+    : <HomePage />;
 
   return (
     <div className="min-h-screen md:flex">
-      {/* Genis ekran: sol menu */}
-      <aside className="hidden md:flex md:flex-col w-60 shrink-0 bg-yuzey border-r border-cizgi h-screen sticky top-0">
-        <div className="px-5 pt-6 pb-5">
-          <p className="font-cond font-bold text-[24px] leading-tight tracking-tight">{auth?.tenantName || "Galeri"}</p>
+      {/* Genis ekran: koyu sol menu */}
+      <aside className={`hidden md:flex md:flex-col shrink-0 bg-gece text-gece-yazi h-screen sticky top-0 transition-[width] duration-200 ${open ? "w-60" : "w-[76px]"}`}>
+        <div className={`flex items-center gap-3 h-[72px] border-b border-gece-cizgi ${open ? "px-5" : "justify-center"}`}>
+          <span className="w-10 h-10 rounded-[10px] bg-seri-1 text-white grid place-items-center font-cond font-bold text-[17px] shrink-0">{initials}</span>
+          {open && <p className="font-cond font-bold text-[20px] leading-tight tracking-tight text-white truncate">{auth?.tenantName || "Galeri"}</p>}
         </div>
-        <nav className="px-3 space-y-0.5 grow">
+
+        <nav className="px-3 pt-4 space-y-1 grow">
           {sections.map((s) => (
-            <a key={s} href={`#/${s}`} aria-current={active === s ? "page" : undefined}
-              className={`flex items-center gap-3 h-10 px-3 rounded-lg font-semibold text-[15px] ${
-                active === s ? "bg-plaka-acik text-plaka-koyu" : "text-murekkep-2 hover:bg-yuzey-2 hover:text-murekkep"}`}>
-              <Icon>{ICON[s]}</Icon>{LABEL[s]}
+            <a key={s} href={`#/${s === "home" ? "" : s}`} aria-current={active === s ? "page" : undefined} title={open ? undefined : LABEL[s]}
+              className={`relative flex items-center gap-3 h-11 rounded-[10px] font-semibold text-[15px] transition-colors ${open ? "px-3" : "justify-center"} ${
+                active === s ? "bg-gece-2 text-white" : "hover:bg-gece-2/60 hover:text-white"}`}>
+              {active === s && <span className="absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-r bg-seri-1" />}
+              <Icon>{ICON[s]}</Icon>{open && LABEL[s]}
             </a>
           ))}
         </nav>
-        <div className="px-5 py-4 border-t border-cizgi">
-          <p className="font-semibold text-[15px] truncate">{auth?.fullName}</p>
-          <button onClick={logout} className="text-[14px] text-murekkep-2 hover:text-murekkep">Çıkış yap</button>
+
+        <div className={`border-t border-gece-cizgi py-3 ${open ? "px-4" : "px-3"}`}>
+          {open && (
+            <div className="mb-2 px-1">
+              <p className="font-semibold text-[14px] text-white truncate">{auth?.fullName}</p>
+              <p className="text-[12px]">{isAdmin ? "Yönetici" : "Çalışan"}</p>
+            </div>
+          )}
+          <div className={`flex gap-1 ${open ? "" : "flex-col items-center"}`}>
+            <button onClick={toggle} aria-label={open ? "Menüyü daralt" : "Menüyü genişlet"} title={open ? "Menüyü daralt" : "Menüyü genişlet"}
+              className="basilir w-10 h-10 rounded-[10px] grid place-items-center hover:bg-gece-2 hover:text-white">
+              <Icon><path d={open ? "M15 6l-6 6 6 6" : "M9 6l6 6-6 6"} /></Icon>
+            </button>
+            <button onClick={logout} aria-label="Çıkış yap" title="Çıkış yap"
+              className={`basilir h-10 rounded-[10px] flex items-center gap-2 hover:bg-gece-2 hover:text-white ${open ? "px-3 grow text-[14px] font-semibold" : "w-10 justify-center"}`}>
+              <Icon><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" /></Icon>{open && "Çıkış"}
+            </button>
+          </div>
         </div>
       </aside>
 
       <div className="grow min-w-0">
         {/* Telefon: ust cubuk */}
-        <header className="md:hidden sticky top-0 z-20 bg-yuzey border-b border-cizgi h-14 px-4 flex items-center justify-between">
-          <p className="font-cond font-bold text-[21px] tracking-tight truncate">{auth?.tenantName || "Galeri"}</p>
-          <button onClick={logout} aria-label="Çıkış yap" className="basilir w-10 h-10 rounded-lg grid place-items-center text-murekkep-2 hover:bg-yuzey-2">
+        <header className="md:hidden sticky top-0 z-20 bg-gece text-white h-14 px-4 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-8 h-8 rounded-lg bg-seri-1 grid place-items-center font-cond font-bold text-[14px] shrink-0">{initials}</span>
+            <p className="font-cond font-bold text-[19px] tracking-tight truncate">{auth?.tenantName || "Galeri"}</p>
+          </div>
+          <button onClick={logout} aria-label="Çıkış yap" className="basilir w-10 h-10 rounded-lg grid place-items-center text-gece-yazi hover:bg-gece-2">
             <Icon><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" /></Icon>
           </button>
         </header>
 
-        <main className="px-4 md:px-8 py-5 md:py-8 pb-28 md:pb-10 max-w-6xl">{content}</main>
+        <main className="px-4 md:px-8 py-5 md:py-8 pb-28 md:pb-10 max-w-[1240px] mx-auto">{content}</main>
       </div>
 
       {/* Telefon: alt sekmeler */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-yuzey border-t border-cizgi flex pb-[env(safe-area-inset-bottom)]">
         {sections.map((s) => (
-          <a key={s} href={`#/${s}`} aria-current={active === s ? "page" : undefined}
-            className={`grow flex flex-col items-center gap-0.5 pt-2.5 pb-2 text-[12px] font-semibold ${active === s ? "text-plaka" : "text-murekkep-3"}`}>
-            <Icon>{ICON[s]}</Icon>{LABEL[s]}
+          <a key={s} href={`#/${s === "home" ? "" : s}`} aria-current={active === s ? "page" : undefined}
+            className={`relative grow basis-0 flex flex-col items-center gap-0.5 pt-2.5 pb-2 text-[11px] font-semibold ${active === s ? "text-plaka" : "text-murekkep-3"}`}>
+            {active === s && <span className="absolute top-0 inset-x-4 h-[3px] rounded-b bg-plaka" />}
+            <Icon>{ICON[s]}</Icon>{SHORT_LABEL[s]}
           </a>
         ))}
       </nav>
@@ -85,7 +125,7 @@ export function Dashboard() {
 
 function Icon({ children }: { children: ReactNode }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
       {children}
     </svg>
   );

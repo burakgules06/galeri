@@ -1,6 +1,7 @@
 @import "@fontsource/barlow/400.css";
 @import "@fontsource/barlow/500.css";
 @import "@fontsource/barlow/600.css";
+@import "@fontsource/barlow/700.css";
 @import "@fontsource/barlow-condensed/500.css";
 @import "@fontsource/barlow-condensed/600.css";
 @import "@fontsource/barlow-condensed/700.css";
@@ -40,6 +41,25 @@
   --color-tehlike-zemin: #FDECEC;
   --color-basari: #157347;
   --color-basari-zemin: #E3F4EA;
+  --color-basari-canli: #1E9E5A;  /* alacak / giris cubuklari */
+  --color-tehlike-canli: #D9423B; /* verecek / cikis cubuklari */
+
+  /* Menu: gece mavisi. Plaka mavisinin koyusu, metin icin acik gri-mavi */
+  --color-gece: #0E1726;
+  --color-gece-2: #18243A;
+  --color-gece-cizgi: #243250;
+  --color-gece-yazi: #AEB9CC;
+
+  /* Grafik serileri: sabit sira, dongu yok (bkz. design/README.md). Validator: CVD ve lightness gecer;
+     seri-3 ve seri-4 beyaz zeminde 3:1 altinda, bu yuzden grafiklerde deger etiketi her zaman gorunur. */
+  --color-seri-1: #1F5FD1;      /* plaka mavisinin parlak tonu */
+  --color-seri-2: #EB6834;      /* turuncu */
+  --color-seri-3: #1BAF7A;      /* deniz yesili */
+  --color-seri-4: #EDA100;      /* hardal */
+  --color-seri-5: #D6457F;      /* frambuaz */
+  --color-seri-6: #6250D6;      /* mor */
+  --color-izgara: #EBEDF0;      /* grafik izgara cizgisi */
+  --color-eksen: #CDD2D9;       /* grafik taban cizgisi */
 }
 
 :root {
@@ -68,3 +88,20 @@ body {
 }
 
 :focus-visible { outline: 2px solid var(--color-plaka); outline-offset: 2px; }
+
+/* Bolum ust etiketi: kucuk, buyuk harf, aralikli (kartlarin ve KPI'larin basligi) */
+.etiket { font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-murekkep-3); }
+
+/* Sayilar sutunlarda hizali dursun */
+.sayi { font-family: var(--font-cond); font-variant-numeric: tabular-nums; }
+
+/* Kartlarin yumusak gorunmesi: tek ince golge, kenar cizgisiyle birlikte */
+.kart { background: var(--color-yuzey); border: 1px solid var(--color-cizgi); border-radius: 14px; box-shadow: 0 1px 2px rgb(21 24 28 / 0.04); }
+
+/* Grafik gecisleri: sadece opaklik, hareketi azaltan kullaniciya hic */
+.grafik-isaret { transition: opacity 140ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .grafik-isaret { transition: none; } }
+
+/* Yatay kaydirma seritlerinde kaydirma cubugunu gizle */
+.kaydir { scrollbar-width: none; }
+.kaydir::-webkit-scrollbar { display: none; }

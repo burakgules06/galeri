@@ -64,7 +64,9 @@ public class VehicleServiceImpl implements VehicleService {
     @Transactional(readOnly = true)
     public List<VehicleSummary> search(String q, VehicleStatus status) {
         String query = q == null ? "" : q.trim();
-        List<Vehicle> vehicles = vehicleRepository.search(CurrentUser.tenantId(), status, query);
+        boolean admin = CurrentUser.isAdmin();
+        List<Vehicle> vehicles = vehicleRepository.search(CurrentUser.tenantId(), status, query, admin,
+                admin ? phoneQuery(query) : "");
         if (vehicles.isEmpty()) return List.of();
 
         Map<UUID, List<VehiclePart>> parts = vehiclePartRepository
@@ -73,8 +75,17 @@ public class VehicleServiceImpl implements VehicleService {
 
         LocalDate today = today();
         return vehicles.stream()
-                .map(v -> toSummary(v, parts.getOrDefault(v.getId(), List.of()), today))
+                .map(v -> toSummary(v, parts.getOrDefault(v.getId(), List.of()), today, admin))
                 .toList();
+    }
+
+    /**
+     * Telefonla arama icin rakamlar: "0530 111 22 33" -> "5301112233" (kayitli bicim 90XXXXXXXXXX'in parcasi).
+     * 3 rakamdan kisaysa telefonla aranmaz (plaka ve model yilindaki rakamlarla karismasin).
+     */
+    static String phoneQuery(String q) {
+        String digits = q.replaceAll("\\D", "").replaceFirst("^0+", "");
+        return digits.length() >= 3 ? digits : "";
     }
 
     @Override
@@ -221,7 +232,7 @@ public class VehicleServiceImpl implements VehicleService {
         return s == null || s.isBlank() ? null : s.trim();
     }
 
-    private VehicleSummary toSummary(Vehicle v, List<VehiclePart> parts, LocalDate today) {
+    private VehicleSummary toSummary(Vehicle v, List<VehiclePart> parts, LocalDate today, boolean admin) {
         int locallyPainted = 0, painted = 0, replaced = 0;
         for (VehiclePart p : parts) {
             switch (p.getCondition()) {
@@ -233,7 +244,8 @@ public class VehicleServiceImpl implements VehicleService {
         }
         return new VehicleSummary(v.getId(), v.getPlate(), v.getMake(), v.getModel(), v.getModelYear(), v.getMileageKm(),
                 v.getFuel(), v.getTransmission(), v.getColor(), v.getStatus(), v.getPurchaseDate(), v.getSaleDate(),
-                daysInStock(v, today), new DamageSummary(locallyPainted, painted, replaced));
+                daysInStock(v, today), new DamageSummary(locallyPainted, painted, replaced),
+                admin ? contactSummary(v.getBuyer()) : null);
     }
 
     private VehicleDetail toDetail(Vehicle v) {

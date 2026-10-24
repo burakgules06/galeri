@@ -159,6 +159,24 @@ Akıllı Randevum'daki haftalık görünümün aylık karşılığı:
 - `ADMIN` bütün çalışanları görür. `STAFF` sadece **kendi** aldığı ve sattığı araçları görür (backend'de filtrelenir). Başlangıçta çalışanlara uygulama verilmeyecek, ama yetki şimdiden böyle yazılır.
 - Kaynağı: araçtaki `bought_by_id` + `purchase_date` ve `sold_by_id` + `sale_date`. Uç: `GET /api/reports/monthly-trades?year=&month=`.
 
+### Alım ve satım ekranı (panel)
+
+Ekranın üstünde kişi seçilir (Tüm galeri / çalışanlar / Belirtilmemiş; STAFF'ta sadece kendisi). Yıl seçilir.
+Grafik: 12 ay, alınan (mavi) ve satılan (turuncu) adet; solda adet ekseni, çubukların üstünde o ayın
+seçili kişinin yıllık işlemleri içindeki payı (%). Aya dokununca altta o ayın alınan/satılan araçları listelenir.
+Kaynak: `GET /api/reports/yearly-trades?year=` (gruplama panelde).
+
+## 8b. Ana ekran
+
+- **ADMIN:** kasa + banka (dağılım şeridiyle), stok (adet, maliyet, ortalama gün), alacak (yeşil), verecek (kırmızı);
+  sermaye ve ortaklar (halka grafik, sahip ilk sırada; her ortağın toplamdaki payı ve sahibin sermayesine oranı);
+  alacak/verecek kişileri (en büyük 5); son 6 ay alım-satım adedi ve satış kârı; altta stoktaki araç kartları (tıklayınca detay).
+  Kaynak: `GET /api/dashboard`.
+- **STAFF:** tutar yok. Stok sayısı, ortalama stok günü, bu ay kendi aldığı/sattığı; araç kartları.
+- Hesaplar: ortağın sermayesi = CAPITAL hesabının eksi bakiyesi; kişinin carisi (BALANCE) artıysa **alacak**, eksiyse **verecek**.
+- Dükkân sahibi `contact.is_owner` ile işaretlenir (galeri başına en fazla bir).
+- Görsel kurallar: `design/README.md`.
+
 ## 9. Ödeme günü bildirimleri
 
 Galeri sahibine, vadesi gelen ödemeler için telefonuna bildirim gider (Akıllı Randevum'daki PWA web push altyapısı aynen kullanılır: tarayıcı/telefon "bildirimlere izin ver", VAPID anahtarları `.env`'de).
@@ -185,7 +203,7 @@ para uç noktaları STAFF için 403 döner. Sadece arayüzde gizlemek yetmez.
 
 | Tablo | Önemli alanlar |
 |---|---|
-| `contact` | name, phone, type (PERSON/ORGANIZATION), notes |
+| `contact` | name, phone, type (PERSON/ORGANIZATION), notes, is_owner (dükkân sahibi) |
 | `account` | type, contact_id (BALANCE/CAPITAL için), vehicle_id (VEHICLE için), name |
 | `ledger_entry` | entry_date, type, source_account_id, target_account_id, amount_cents, vehicle_id, expense_category_id, description, corrected_entry_id, created_by_id |
 | `expense_category` | parent_id, name, root (VEHICLE/GENERAL), archived |
@@ -216,7 +234,7 @@ Her adım ayrı bir PR; her biri bittiğinde galericiye gösterilebilir.
 
 - Konsinye araçlardan alınan komisyon sermaye havuzunun kârına giriyor mu? (Galerici "sonra konuşalım" dedi. Şimdilik INCOME'a yazılır ve dönem kârına dahil gösterilir; değişirse sadece rapor değişir.)
 - Takas yapılıyor mu? (Sorulmadı. Gerekirse: alıcının verdiği araç yeni bir IN_STOCK araç olur, değeri alıcının carisinden düşülür.)
-- Ana ekranda ne görünecek? (Galerici henüz düşünmedi; 6. adımda karar verilecek.)
+- Ana ekranda ne görünecek? (İlk hali yapıldı, bkz. §8b; galericiye gösterilip geri bildirimle şekillenecek.)
 
 ## 14. İsimlendirme sözlüğü
 
@@ -248,7 +266,10 @@ Her yerde aynı terim kullanılır:
 | kasa / banka | `CASH` / `BANK` |
 | gider / gelir (hesap türü) | `EXPENSE` / `INCOME` |
 | masraf / masraf kategorisi (kök, üst) | `expense` / `expense_category` (`root`: `VEHICLE`, `GENERAL`; `parent_id`) |
-| hareket türü: araç alışı, araç masrafı, genel gider, sermaye | `VEHICLE_PURCHASE`, `VEHICLE_EXPENSE`, `GENERAL_EXPENSE`, `CAPITAL` |
+| hareket türü: araç alışı, araç masrafı, genel gider, sermaye, araç satışı, tahsilat, ödeme | `VEHICLE_PURCHASE`, `VEHICLE_EXPENSE`, `GENERAL_EXPENSE`, `CAPITAL`, `VEHICLE_SALE`, `COLLECTION`, `PAYMENT` |
+| alacak / verecek | `receivable` / `payable` |
+| dükkân sahibi | `owner` (`contact.is_owner`) |
+| ana ekran | `dashboard` (`/api/dashboard`) |
 | düzeltme (ters hareket) | `correct`, `corrected_entry_id` |
 | sermaye / ortak / pay | `capital` / `partner` / `share` |
 | cari | `balance` (hesap türü `BALANCE`; hesap özeti: `statement`) |
@@ -256,5 +277,5 @@ Her yerde aynı terim kullanılır:
 | konsinye / komisyon | `consignment` / `commission` |
 
 API: `/api/vehicles` (`/{id}/parts`, `/{id}/sale`, `/{id}/cost`), `/api/contacts`, `/api/staff`,
-`/api/reports/monthly-trades`, `/api/accounts`, `/api/ledger-entries` (`/{id}/correct`), `/api/expenses`,
+`/api/reports/monthly-trades`, `/api/reports/yearly-trades`, `/api/dashboard`, `/api/accounts`, `/api/ledger-entries` (`/{id}/correct`), `/api/expenses`,
 `/api/expense-categories?root=`.

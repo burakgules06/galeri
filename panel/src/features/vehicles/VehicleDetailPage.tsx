@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { api, isAdminDetail } from "../../api/galeri";
 import { formatDate, formatNumber, FUEL, STATUS, tl, TRANSMISSION } from "../../shared/format";
-import type { BodyPart, PartCondition, VehicleDetail, VehicleDetailAdmin } from "../../shared/types";
+import type { BodyPart, PartCondition, VehicleDetail, VehicleDetailAdmin, VehicleStatus } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Plate } from "../../shared/ui/Plate";
 import { Button, ErrorBox } from "../../shared/ui/Common";
@@ -11,6 +11,13 @@ import { SaleForm } from "./SaleForm";
 import { VehicleForm } from "./VehicleForm";
 import { ExpenseForm } from "../ledger/ExpenseForm";
 import { LedgerEntryList } from "../ledger/LedgerEntryList";
+
+// Durum renkleri: stokta (onayli, mavi), satildi (olumlu, yesil), kapandi (gri)
+const STATUS_PILL: Record<VehicleStatus, string> = {
+  IN_STOCK: "bg-plaka-acik text-plaka-koyu",
+  SOLD: "bg-basari-zemin text-basari",
+  CLOSED: "bg-yuzey-2 text-murekkep-2 border border-cizgi",
+};
 
 export function VehicleDetailPage({ id }: { id: string }) {
   const { data, setData, error } = useLoad(() => api.vehicle(id), [id]);
@@ -32,10 +39,12 @@ export function VehicleDetailPage({ id }: { id: string }) {
       <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-5">
         <div>
           <Plate plate={v.plate} size="lg" />
-          <h1 className="font-cond font-bold text-[30px] leading-tight tracking-tight mt-3">{v.make} {v.model}</h1>
-          <div className="flex items-center gap-3 mt-1 text-murekkep-2">
-            <span>{v.modelYear}</span>
-            <span className="font-semibold text-murekkep">{STATUS[v.status]}</span>
+          <h1 className="font-cond text-[32px] md:text-[36px] leading-tight tracking-tight mt-3">
+            <span className="font-bold">{v.make}</span> <span className="font-medium text-murekkep-2">{v.model}</span>
+          </h1>
+          <div className="flex flex-wrap items-center gap-2.5 mt-1.5">
+            <span className="sayi font-semibold text-[18px]">{v.modelYear}</span>
+            <span className={`text-[12.5px] font-semibold rounded-full px-2.5 py-1 ${STATUS_PILL[v.status]}`}>{STATUS[v.status]}</span>
             <DaysInStock days={v.daysInStock} status={v.status} />
           </div>
         </div>
@@ -186,8 +195,8 @@ function DamageEditor({ vehicleId, parts, editable, onSaved }: {
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="bg-yuzey rounded-xl border border-cizgi p-4 md:p-5">
-      <h2 className="font-cond font-semibold text-[20px] mb-3">{title}</h2>
+    <section className="kart p-4 md:p-5">
+      <h2 className="font-cond font-bold text-[21px] tracking-tight pb-3 mb-4 border-b border-cizgi">{title}</h2>
       {children}
     </section>
   );
@@ -195,9 +204,9 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 
 function Info({ label, value, numeric = false, strong = false }: { label: string; value: string; numeric?: boolean; strong?: boolean }) {
   return (
-    <div>
-      <dt className="text-[13px] text-murekkep-2">{label}</dt>
-      <dd className={`${numeric ? "font-cond text-[19px]" : "text-[16px]"} ${strong ? "font-bold" : "font-medium"}`}>{value}</dd>
+    <div className="min-w-0">
+      <dt className="etiket">{label}</dt>
+      <dd className={`mt-1 truncate ${numeric ? "sayi text-[21px] leading-tight" : "text-[16px] text-murekkep"} ${strong ? "font-bold" : numeric ? "font-medium" : "font-semibold"}`}>{value}</dd>
     </div>
   );
 }

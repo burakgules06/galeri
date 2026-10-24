@@ -2,6 +2,7 @@ package com.galeri.app.controller;
 
 import com.galeri.app.model.GenericResponse;
 import com.galeri.app.model.response.MonthlyTrades;
+import com.galeri.app.model.response.YearlyTrades;
 import com.galeri.app.service.ReportService;
 import com.galeri.app.service.impl.GenericResponseService;
 import jakarta.validation.constraints.Max;
@@ -22,5 +23,11 @@ public class ReportController {
     public GenericResponse<MonthlyTrades> monthlyTrades(@RequestParam @Min(2000) @Max(2100) int year,
                                                        @RequestParam @Min(1) @Max(12) int month) {
         return responseService.success(reportService.monthlyTrades(year, month));
+    }
+
+    // Alim ve satim ekraninin grafigi ve listesi: yilin tum kayitlari, panel aya / calisana gore gruplar.
+    @GetMapping("/yearly-trades")
+    public GenericResponse<YearlyTrades> yearlyTrades(@RequestParam @Min(2000) @Max(2100) int year) {
+        return responseService.success(reportService.yearlyTrades(year));
     }
 }
