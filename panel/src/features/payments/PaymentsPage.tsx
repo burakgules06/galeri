@@ -1,5 +1,6 @@
-// Odemeler: satis taksitleri. Sekmeler: Geciken, Bu hafta (bugun + 6 gun), Tumu. Sadece ADMIN.
-// Satirda kisi, plaka, vade, tutar ve yontem; "Tahsil et" hesap ve tarih sorar. Geciken satirlar kirmizi.
+// Odemeler. Sekmeler: Geciken, Bu hafta (bugun + 6 gun), Tumu (satis taksitleri, "Tahsil et") ve
+// Odenecekler (senetli / taksitli alis taksitleri, "Ode"). Sadece ADMIN.
+// Satirda kisi, plaka, vade, tutar ve yontem; tahsil / ode hesap ve tarih sorar. Geciken satirlar kirmizi.
 import { useMemo, useState } from "react";
 import { api } from "../../api/galeri";
 import { addDaysIso, tl, todayIso } from "../../shared/format";
@@ -9,30 +10,36 @@ import { Empty, ErrorBox, inputClass } from "../../shared/ui/Common";
 import { StatTile } from "../../shared/ui/StatTile";
 import { InstallmentRow } from "./InstallmentRow";
 
-type Tab = "overdue" | "week" | "all";
+type Tab = "overdue" | "week" | "all" | "payables";
 
 const TABS: { value: Tab; label: string }[] = [
   { value: "overdue", label: "Geciken" },
   { value: "week", label: "Bu hafta" },
   { value: "all", label: "Tümü" },
+  { value: "payables", label: "Ödenecekler" },
 ];
 
 export function PaymentsPage() {
-  const { data, error, reload } = useLoad(() => api.installments({ direction: "SALE" }), []);
+  const { data, error, reload } = useLoad(() => api.installments(), []);
   const [tab, setTab] = useState<Tab>("overdue");
   const [q, setQ] = useState("");
   const today = todayIso();
   const weekEnd = addDaysIso(today, 6);
 
-  const all = useMemo(() => data ?? [], [data]);
+  const all = useMemo(() => (data ?? []).filter((i) => i.direction === "SALE"), [data]);
+  const purchases = useMemo(() => (data ?? []).filter((i) => i.direction === "PURCHASE"), [data]);
   const overdue = all.filter((i) => i.status === "OVERDUE");
   const week = all.filter((i) => i.status !== "PAID" && i.dueDate >= today && i.dueDate <= weekEnd);
   const open = all.filter((i) => i.status !== "PAID");
+  const payable = purchases.filter((i) => i.status !== "PAID");
   const sum = (list: InstallmentResponse[]) => list.reduce((t, i) => t + i.amountCents, 0);
+  const openFirst = (list: InstallmentResponse[]) =>
+    [...list.filter((i) => i.status !== "PAID"), ...list.filter((i) => i.status === "PAID").reverse()];
 
   const base = tab === "overdue" ? [...overdue].sort((a, b) => b.daysLate - a.daysLate)
     : tab === "week" ? week
-    : [...open, ...all.filter((i) => i.status === "PAID").reverse()];
+    : tab === "payables" ? openFirst(purchases)
+    : openFirst(all);
   const needle = q.trim().toLocaleLowerCase("tr-TR");
   const digits = q.replace(/\D/g, "").replace(/^0+/, "");
   const rows = needle ? base.filter((i) =>
@@ -40,7 +47,8 @@ export function PaymentsPage() {
     || (i.vehicle?.plate ?? "").toLocaleLowerCase("tr-TR").replace(/\s/g, "").includes(needle.replace(/\s/g, ""))
     || (digits.length >= 3 && (i.payer.phone ?? "").includes(digits))) : base;
 
-  const counts: Record<Tab, number> = { overdue: overdue.length, week: week.length, all: all.length };
+  const counts: Record<Tab, number> = { overdue: overdue.length, week: week.length, all: all.length, payables: payable.length };
+  const paidSales = all.filter((i) => i.status === "PAID");
 
   return (
     <div className="space-y-5">
@@ -54,9 +62,10 @@ export function PaymentsPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatTile label="Geciken" value={tl(sum(overdue))} tone="negative" sub={`${overdue.length} taksit`} />
         <StatTile label="Bu hafta" value={tl(sum(week))} tone="brand" sub={`${week.length} taksit, 7 gün içinde`} />
-        <StatTile label="Bekleyen toplam" value={tl(sum(open))} sub={`${open.length} taksit`} />
-        <StatTile label="Tahsil edilen" value={tl(sum(all.filter((i) => i.status === "PAID")))} tone="positive"
-          sub={`${all.filter((i) => i.status === "PAID").length} taksit`} />
+        <StatTile label="Bekleyen tahsilat" value={tl(sum(open))} tone="positive"
+          sub={`${open.length} taksit · tahsil edilen ${tl(sum(paidSales))}`} />
+        <StatTile label="Ödenecek" value={tl(sum(payable))} tone={payable.length ? "negative" : "neutral"}
+          sub={`${payable.length} taksit · senetli alışlar`} />
       </div>
 
       <section className="kart overflow-hidden">
@@ -77,7 +86,8 @@ export function PaymentsPage() {
         </div>
 
         {data && rows.length === 0 && (
-          <Empty title={tab === "overdue" ? "Geciken ödeme yok" : tab === "week" ? "Bu hafta vadesi gelen yok" : "Kayıt yok"}
+          <Empty title={tab === "overdue" ? "Geciken ödeme yok" : tab === "week" ? "Bu hafta vadesi gelen yok"
+            : tab === "payables" ? "Ödenecek senet ya da taksit yok" : "Kayıt yok"}
             description={tab === "overdue" && !q ? "Bütün tahsilatlar zamanında." : undefined} />
         )}
         {rows.length > 0 && (

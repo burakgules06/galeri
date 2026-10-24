@@ -1,32 +1,38 @@
-// Satilmis aracin odeme plani: toplam / tahsil edilen / kalan / geciken, ilerleme seridi ve taksitler.
-// "Satisi geri al" sadece hic taksit odenmemisse yapilabilir (backend de reddeder). Sadece ADMIN.
+// Aracin odeme plani: toplam / odenen / kalan / geciken, ilerleme seridi ve taksitler. Sadece ADMIN.
+// SALE: satisin tahsilati, altta "Satisi geri al" (hic taksit odenmemisse; backend de reddeder).
+// PURCHASE: senetli / taksitli alisin odenecekleri; plan yoksa kart hic gorunmez (pesin alis).
 import { useState } from "react";
 import { api } from "../../api/galeri";
 import { SplitBar } from "../../shared/charts/Donut";
 import { tl } from "../../shared/format";
-import type { VehicleDetailAdmin } from "../../shared/types";
+import type { PlanDirection, VehicleDetailAdmin } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox } from "../../shared/ui/Common";
 import { InstallmentRow } from "../payments/InstallmentRow";
 
-export function PaymentPlanCard({ vehicleId, onChanged, onUndone }: {
+export function PaymentPlanCard({ vehicleId, direction = "SALE", onChanged, onUndone }: {
   vehicleId: string;
+  direction?: PlanDirection;
   onChanged: () => void;
-  onUndone: (d: VehicleDetailAdmin) => void;
+  onUndone?: (d: VehicleDetailAdmin) => void;
 }) {
   const { data, error, reload } = useLoad(() => api.paymentPlans(vehicleId), [vehicleId]);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [undoError, setUndoError] = useState<string | null>(null);
-  const plan = data?.find((p) => p.direction === "SALE");
+  const plan = data?.find((p) => p.direction === direction);
   const anyPaid = plan?.installments.some((i) => i.status === "PAID") ?? false;
+  const sale = direction === "SALE";
+
+  if (!sale && !plan) return null;
 
   const changed = () => { reload(); onChanged(); };
   const undoSale = async () => {
     setBusy(true);
     setUndoError(null);
     try {
-      onUndone(await api.undoSale(vehicleId));
+      const d = await api.undoSale(vehicleId);
+      onUndone?.(d);
     } catch (e) {
       setUndoError(errorMessage(e));
     } finally {
@@ -37,8 +43,8 @@ export function PaymentPlanCard({ vehicleId, onChanged, onUndone }: {
   return (
     <section className="kart p-4 md:p-5">
       <div className="flex items-center justify-between gap-3 pb-3 mb-4 border-b border-cizgi">
-        <h2 className="font-cond font-bold text-[21px] tracking-tight">Ödeme planı</h2>
-        {plan && <span className="text-[13px] text-murekkep-2">{plan.counterparty.name}</span>}
+        <h2 className="font-cond font-bold text-[21px] tracking-tight">{sale ? "Ödeme planı" : "Alış ödeme planı"}</h2>
+        {plan && <span className="text-[13px] text-murekkep-2">{sale ? "" : "Satıcı: "}{plan.counterparty.name}</span>}
       </div>
       <ErrorBox message={error} />
       {data && !plan && <p className="text-[14px] text-murekkep-3">Bu satış için ödeme planı yok (eski kayıt).</p>}
@@ -47,7 +53,7 @@ export function PaymentPlanCard({ vehicleId, onChanged, onUndone }: {
         <>
           <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3">
             <Stat label="Toplam" value={tl(plan.totalCents)} />
-            <Stat label="Tahsil edilen" value={tl(plan.paidCents)} tone="text-basari" />
+            <Stat label={sale ? "Tahsil edilen" : "Ödenen"} value={tl(plan.paidCents)} tone="text-basari" />
             <Stat label="Kalan" value={tl(plan.remainingCents)} tone={plan.remainingCents ? "text-uyari" : "text-murekkep-3"} />
             <Stat label="Geciken" value={tl(plan.overdueCents)} tone={plan.overdueCents ? "text-tehlike" : "text-murekkep-3"} />
           </dl>
@@ -67,7 +73,7 @@ export function PaymentPlanCard({ vehicleId, onChanged, onUndone }: {
         </>
       )}
 
-      {data && (
+      {data && sale && (
         <div className="mt-4 pt-3 border-t border-cizgi">
           <ErrorBox message={undoError} />
           {!confirming ? (

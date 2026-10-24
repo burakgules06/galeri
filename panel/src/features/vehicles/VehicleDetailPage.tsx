@@ -92,6 +92,11 @@ export function VehicleDetailPage({ id }: { id: string }) {
             <CostCard key={`${admin.actualPurchaseCents}-${admin.salePriceCents}-${admin.purchaseAccountId}`} vehicle={v} />
           )}
 
+          {admin && (
+            <PaymentPlanCard key={`purchase-${admin.actualPurchaseCents}-${admin.seller?.id}-${v.purchaseDate}`} vehicleId={v.id}
+              direction="PURCHASE" onChanged={reload} />
+          )}
+
           {admin && v.status !== "IN_STOCK" && (
             <PaymentPlanCard key={`${v.status}-${admin.salePriceCents}`} vehicleId={v.id} onChanged={reload}
               onUndone={(d) => setData(d)} />

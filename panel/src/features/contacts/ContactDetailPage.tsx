@@ -79,7 +79,8 @@ export function ContactDetailPage({ id }: { id: string }) {
                     )}
                   </span>
                   <span className="text-right shrink-0">
-                    <span className={`block sayi font-semibold text-[17px] ${l.amountCents > 0 ? "text-murekkep" : "text-basari"}`}>
+                    <span className={`block sayi font-semibold text-[17px] ${
+                      !l.reversal && (l.type === "COLLECTION" || l.type === "PAYMENT") ? "text-basari" : "text-murekkep"}`}>
                       {l.amountCents > 0 ? "+" : "−"} {tl(Math.abs(l.amountCents))}
                     </span>
                     <span className="block text-[12px] text-murekkep-3">bakiye <span className="sayi text-[13px]">{tl(l.runningCents)}</span></span>

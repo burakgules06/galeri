@@ -1,4 +1,4 @@
-// Satis formunun plan kurucusu: hazir seceneklerden taksit satirlari uretir. Tutarlar kurus (tam sayi).
+// Odeme plani kurucusu (satis ve alis): hazir seceneklerden taksit satirlari uretir. Tutarlar kurus (tam sayi).
 import { addMonthsIso } from "../../shared/format";
 import type { ContactSummary, InstallmentRequest, PaymentMethod } from "../../shared/types";
 

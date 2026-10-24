@@ -73,7 +73,8 @@ function Row({ e, direction, onChange, showVehicle }: { e: LedgerEntryResponse; 
           <p className={`font-cond font-semibold text-[19px] whitespace-nowrap ${amountColor} ${cancelled ? "line-through" : ""}`}>
             {sign}{sign && " "}{tl(e.amountCents)}
           </p>
-          {!isReversal && !cancelled && !confirming && !LINKED.includes(e.type) && (
+          {!isReversal && !cancelled && !confirming && !LINKED.includes(e.type)
+            && !(e.type === "VEHICLE_PURCHASE" && e.source.type === "BALANCE") && (
             <button type="button" onClick={() => setConfirming(true)} className="text-[13px] font-semibold text-murekkep-2 hover:text-murekkep">
               Düzelt
             </button>

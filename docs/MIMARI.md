@@ -147,6 +147,16 @@ Satış kuralları (3A ile kesinleşti):
 - Ödenmemiş taksitte sadece vade ve senet no değişir; tutar/ödeyen değişecekse satış geri alınıp yeniden girilir.
 - Satışa ya da taksite bağlı hareket kasa ekranından düzeltilmez (hata 1023).
 
+Alış kuralları (3B ile kesinleşti):
+- Araç formunda ödeme **Peşin** (kasa/banka → VEHICLE, `syncVehiclePurchase`) ya da **Senetli / taksitli** (`direction = PURCHASE`).
+- Planlı alışta satıcı zorunlu (1025); plan toplamı (ödenmişler dahil) gerçek alış bedeline eşit (1024).
+- Deftere ödenecek kişi başına `VEHICLE_PURCHASE` BALANCE(satıcı) → VEHICLE, alış tarihinde. "Şimdi ödendi" satırlar
+  aynı işlemde `PAYMENT` CASH/BANK → BALANCE(satıcı) ile kapanır; sonraki taksitler ödemeler ekranında "Öde" ile.
+- Düzenleme: istek sadece ödenmemiş satırları taşır. Değişiklik yoksa hiçbir şey yazılmaz; sadece vade/senet no değiştiyse
+  ödenmemiş taksitler yeniden yazılır, defter aynı kalır; bedel ya da satıcı değiştiyse alış hareketleri terslenip yeniden yazılır.
+- Ödenmiş taksit varken bedel, satıcı ya da plandan peşine geçiş değiştirilemez (1026); önce ödemeler geri alınır.
+- Planlı alış hareketi kasa ekranından düzeltilmez (1023); araç formundaki "Ödeme nereden" sadece peşin alışta dolar.
+
 Durum (saklanmaz, bugüne göre hesaplanır): `PAID` (ödendi, yeşil), `UPCOMING` (bekliyor, turuncu; vadesi bugün dahil),
 `OVERDUE` (gecikti, kırmızı). Geciken ve bu haftanın ödemeleri ana ekranda ve `#/payments`'ta görünür.
 

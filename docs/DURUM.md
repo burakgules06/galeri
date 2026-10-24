@@ -53,14 +53,24 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
   - Dev seed: satışlar plana bağlandı (peşin: 206, 207, 208, 210; senetli: 211 Emre, 5 gün gecikmiş / bugün / gelecek ay;
     havale taksitli: 203 Ayşe, dün gecikmiş; Evim: 209 Hakan + Eminevim). **Seed değişti: `docker compose down -v`, `docker compose up -d`.**
 
-## Sıradaki: Adım 3B, senetli ve taksitli alış (`feat/purchase-payment-plan`)
+- **Adım 3B: senetli ve taksitli alış** (`feat/purchase-payment-plan`, 3A'nın üstünde). Kurallar `MIMARI.md` §6 "Alış kuralları".
+  - Migration yok. `VehicleRequest.purchasePlan` (ödenmemiş satırlar); alış ödemesi artık `PaymentPlanService.syncPurchase`
+    üzerinden: peşinse eski akış, planlıysa BALANCE(satıcı) → VEHICLE ve "şimdi ödendi" satırlar için `PAYMENT`.
+  - Hata kodları: 1024 plan toplamı alış bedeline eşit değil, 1025 satıcı yok, 1026 ödenmiş taksitli alış değiştirilemez.
+  - Panel: plan kurucu ortak bileşen oldu (`features/payments/PlanBuilder.tsx`, satış ve araç formu kullanır); araç formunda
+    "Peşin / Senetli-taksitli", ödenmiş taksitler kilitli gösterilir; araç detayında "Alış ödeme planı"; Ödemeler'de
+    "Ödenecekler" sekmesi ("Öde"). Kişi carisinde sadece tahsilat/ödeme satırları yeşil.
+  - Dev seed: 205 BMW (Mehmet) gerçek alış planı: 600K ödendi, 500K 5 gün sonra, 500K 35 gün sonra.
+    **Seed değişti: `docker compose down -v`, `docker compose up -d`.**
 
-Araç formunda "Ödeme": peşin (bugünkü akış) ya da plan (`direction = PURCHASE`, aynı plan kurucu). Planlı alış
-`VEHICLE_PURCHASE` BALANCE(satıcı) → VEHICLE; her taksit `PAYMENT` CASH/BANK → BALANCE(satıcı) (tahsil/öde ucu ve servis
-yönü zaten destekliyor). Ödemeler ekranına "Ödenecekler" sekmesi. Seed'deki "Mehmet, senetli alış" gerçek plana çevrilecek.
-Sonra 3C: ödeme günü bildirimleri (web push). Dükkân sahibini ve ortak sermayesini panelden girmek Adım 5'te.
+## Sıradaki: Adım 3C, ödeme günü bildirimleri (`feat/payment-notifications`)
 
-Adım 3A'dan açık sorular:
+MIMARI §9: web push (Akıllı Randevum'daki altyapı), her gün 09:00 Europe/Istanbul, bugün vadesi gelen ve 1-3 gün gecikmiş
+ödenmemiş taksitler için ADMIN'e tek toplu bildirim, `notification_log` ile tekrar engeli. Yeni ayarlar: `VAPID_*`.
+Dükkân sahibini ve ortak sermayesini panelden girmek Adım 5'te.
+
+Adım 3A / 3B'den açık sorular:
+- Planlı alışta Evim/kredi (kurumdan alış) yöntemi panelde sunulmuyor; gerekirse eklenir (backend destekliyor).
 - **Kısmi tahsilat** yok: taksit tek seferde tahsil edilir. Müşteri senedin bir kısmını öderse ne olacak (taksiti bölmek mi,
   kısmi ödeme kaydı mı)? Galericiye sorulacak.
 - Bütün taksitler ödenince araç `CLOSED` olmuyor (MIMARI §4'te var); listeler `SOLD`'a göre süzdüğü için ayrı ele alınmalı.

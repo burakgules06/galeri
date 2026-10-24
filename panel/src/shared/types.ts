@@ -135,7 +135,8 @@ export interface VehicleRequest {
   boughtById: string | null;
   actualPurchaseCents: number | null;
   officialPurchaseCents: number | null;
-  purchaseAccountId: string | null;
+  purchaseAccountId: string | null;                // pesin alis
+  purchasePlan: InstallmentRequest[] | null;       // senetli / taksitli alis (odenmis taksitler haric)
 }
 
 export interface SaleRequest {
