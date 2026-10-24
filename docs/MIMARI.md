@@ -13,6 +13,8 @@ Oto galeri sahibinin parasını takip etmesi için:
 - Kasada ve bankada ne kadar para olduğu
 - Sermaye ortaklarının payı ve galerinin kârı
 - Masrafların kategoriye göre raporu
+- Hangi çalışanın hangi ay kaç araç aldığı ve sattığı
+- Ödeme günü gelen tahsilat ve ödemeler için telefona bildirim
 
 Fotoğraf yok. Döviz yok (her şey TL; ileride gerekirse eklenir).
 
@@ -95,8 +97,11 @@ sol arka kapı, sol arka çamurluk, sağ ön çamurluk, sağ ön kapı, sağ ark
 - `OZEL_ORTAKLI`: havuz dışı; `arac_payi` tablosunda kişi + yüzde (toplam %100). Kârı bu oranlarla gösterilir.
 
 ### Alış bilgileri
-Alış tarihi, kimden alındı, **gerçek alış bedeli** ve **resmi (beyan edilen) alış bedeli**, ödeme şekli.
+Alış tarihi, kimden alındı, **aracı alan çalışan**, **gerçek alış bedeli** ve **resmi (beyan edilen) alış bedeli**, ödeme şekli.
 Kâr hesapları her zaman gerçek bedelle yapılır.
+
+### Satış bilgileri
+Satış tarihi, alıcı, **aracı satan çalışan**, satış bedeli, ödeme şekli.
 
 ### Durum
 `STOKTA` → `SATILDI` → `KAPANDI` (satışın bütün tahsilatı tamamlandığında).
@@ -143,17 +148,39 @@ taksit:      plan | vade_tarihi | tutar | tur (NAKIT/HAVALE/SENET/KURUM) | senet
 - En fazla 3 seviye. İçinde kayıt olan kategori silinmez, arşivlenir.
 - Rapor: dönem içinde kategori ve alt kategori bazında toplamlar; araç bazında masraf dökümü.
 
-## 8. Yetki
+## 8. Çalışan bazında aylık alım-satım görünümü
+
+Akıllı Randevum'daki haftalık görünümün aylık karşılığı:
+
+- Ay seçilir (önceki/sonraki ay okları).
+- Her çalışan için o ay **kaç araç aldığı** ve **kaç araç sattığı** gösterilir.
+- Çalışana dokununca o ayın listesi açılır: alınanlar ve satılanlar ayrı, her satırda **marka-model ve plaka** (tarihle birlikte).
+- **Tutar ve kâr gösterilmez.** Bu yüzden ekran STAFF'a da açıktır.
+- Kaynağı: araçtaki `alan_calisan_id` + `alis_tarihi` ve `satan_calisan_id` + `satis_tarihi`.
+
+## 9. Ödeme günü bildirimleri
+
+Galeri sahibine, vadesi gelen ödemeler için telefonuna bildirim gider (Akıllı Randevum'daki PWA web push altyapısı aynen kullanılır: tarayıcı/telefon "bildirimlere izin ver", VAPID anahtarları `.env`'de).
+
+- Her sabah (galerinin saat dilimine göre 09.00) bir zamanlanmış görev o gün vadesi gelen `taksit` satırlarını bulur.
+- **Tahsilat** (bize ödenecek): "Bugün Ali Yılmaz'dan 25.000 TL senet tahsilatı var (34 ABC 123)".
+- **Ödeme** (bizim ödeyeceğimiz, alıştaki taksit/senetler): "Bugün Mehmet Demir'e 40.000 TL senet ödemesi var".
+- Aynı gün birden fazla varsa tek bildirimde toplanır ("Bugün 3 tahsilat, 1 ödeme"), dokununca ilgili liste açılır.
+- Vadesi geçmiş ve hâlâ ödenmemiş olanlar için ertesi günlerde de hatırlatma (en fazla 3 gün) gider.
+- Bildirimler sadece `ADMIN` kullanıcılara gider (tutar içerdikleri için).
+- Bildirim gönderimi bir kayıt tablosuna yazılır; aynı taksit için aynı gün iki kez bildirim gitmez.
+
+## 10. Yetki
 
 | Rol | Görür |
 |---|---|
 | `ADMIN` (galeri sahibi) | Her şey |
-| `STAFF` (çalışan) | Sadece araç teknik bilgileri ve hasar şeması. **Hiçbir tutar yok** (alış, satış, masraf, cari, kasa, sermaye). |
+| `STAFF` (çalışan) | Araç teknik bilgileri, hasar şeması ve çalışan bazında aylık alım-satım görünümü. **Hiçbir tutar yok** (alış, satış, masraf, cari, kasa, sermaye). |
 
 Bu kısıt **backend'de** uygulanır: STAFF'a dönen DTO'larda para alanları hiç yer almaz,
 para uç noktaları STAFF için 403 döner. Sadece arayüzde gizlemek yetmez.
 
-## 9. Veri modeli (özet)
+## 11. Veri modeli (özet)
 
 | Tablo | Önemli alanlar |
 |---|---|
@@ -161,26 +188,32 @@ para uç noktaları STAFF için 403 döner. Sadece arayüzde gizlemek yetmez.
 | `hesap` | tur, kisi_id (CARI/SERMAYE için), arac_id (ARAC için), ad |
 | `hareket` | tarih, kaynak_hesap_id, hedef_hesap_id, tutar_kurus, arac_id, masraf_kategori_id, aciklama, duzeltilen_hareket_id, olusturan_kullanici_id |
 | `masraf_kategori` | ust_id, ad, kok (ARAC/GENEL), arsivlendi |
-| `arac` | plaka, marka, model, model_yili, yakit, vites, km, renk, tramer_kurus, sahiplik, konsinye_sahibi_id, komisyon_orani / komisyon_kurus, alis_tarihi, gercek_alis_kurus, resmi_alis_kurus, satis_tarihi, satis_kurus, alici_id, durum |
+| `arac` | plaka, marka, model, model_yili, yakit, vites, km, renk, tramer_kurus, sahiplik, konsinye_sahibi_id, komisyon_orani / komisyon_kurus, alis_tarihi, gercek_alis_kurus, resmi_alis_kurus, satis_tarihi, satis_kurus, alici_id, alan_calisan_id, satan_calisan_id, durum |
 | `arac_parca` | arac_id, parca, durum |
 | `arac_payi` | arac_id, kisi_id, yuzde (sadece OZEL_ORTAKLI) |
 | `odeme_plani`, `taksit` | bkz. 6 |
+| `push_abonelik` | panel_user_id, endpoint, anahtarlar (Akıllı Randevum'daki gibi) |
+| `bildirim_kaydi` | taksit_id, tarih, gonderildi_at (aynı gün tekrarını önler) |
 
 Hepsi `tenant_id` taşır ve tenant'a göre filtrelenir. Tablo/kolon adları Türkçe ASCII.
 
-## 10. Yol haritası
+## 12. Yol haritası
 
 Her adım ayrı bir PR; her biri bittiğinde galericiye gösterilebilir.
 
-1. **Kişiler ve araçlar:** kişi kaydı, araç kaydı, teknik bilgiler, hasar şeması, araç listesi ve detayı. STAFF/ADMIN ayrımı.
+1. **Kişiler ve araçlar:** kişi kaydı, araç kaydı, teknik bilgiler, hasar şeması, alan/satan çalışan, araç listesi ve detayı. STAFF/ADMIN ayrımı.
+   - Çalışan bazında aylık alım-satım görünümü (para içermediği için bu adımda yapılabilir).
 2. **Para defteri:** hesaplar, hareket tablosu, kasa/banka bakiyesi, araç alışı (peşin), masraf girişi (kategori yazarken oluşur), araç maliyeti.
 3. **Satış ve tahsilat:** satış kaydı, ödeme planı (peşin, taksit, senet, Evim, kredi), tahsilat, geciken ödemeler, müşteri carisi.
+   - Ödeme günü bildirimleri (web push).
 4. **Konsinye araçlar:** sahiplik türü, komisyon, sahibin carisi.
 5. **Sermaye:** sermaye hareketleri, paylar, dönem kârı, "kâr payını sermayeye ekle".
 6. **Raporlar ve ana ekran:** kategori bazında giderler, araç kârlılığı, stok yaşı; ana ekran özeti.
 
-## 11. Açık sorular
+## 13. Açık sorular
 
 - Konsinye araçlardan alınan komisyon sermaye havuzunun kârına giriyor mu? (Galerici "sonra konuşalım" dedi. Şimdilik GELIR'e yazılır ve dönem kârına dahil gösterilir; değişirse sadece rapor değişir.)
 - Takas yapılıyor mu? (Sorulmadı. Gerekirse: alıcının verdiği araç yeni bir STOKTA araç olur, değeri alıcının carisinden düşülür.)
 - Ana ekranda ne görünecek? (Galerici henüz düşünmedi; 6. adımda karar verilecek.)
+- Çalışan görünümünde STAFF herkesi mi, sadece kendini mi görsün? (Şimdilik herkesi; para içermiyor.)
+- Bildirim saati sabah 09.00 uygun mu, galerici başka saat ister mi?
