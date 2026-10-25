@@ -238,3 +238,73 @@ FROM (VALUES
   ('00000000-0000-0000-0000-000000000717', 3,  35, 50000000, 'A-2203', NULL)
 ) AS v(id, seq, due_in, amount, note_no, paid_entry)
 ON CONFLICT DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- Konsinye ve ortakli (4B)
+-- 214 Golf: Burak Gules'in araci, stokta, komisyon %3. Masraf: 4.500 TL sahibine yansitildi, 1.500 TL galeri ustlendi.
+-- 215 C-HR: Deniz Aksoy'un araci, sabit komisyon 40.000 TL, 8 gun once 1.450.000'e Zeynep'e satildi (pesin, bankaya).
+--      Sahibine borc 1.410.000; 1.000.000 odendi, 410.000 kaldi.
+-- 216 Megane: ozel ortakli (Furkan %60, Kerem %40), kasadan pesin 980.000.
+-- ---------------------------------------------------------------------------
+INSERT INTO contact (id, tenant_id, name, phone, type) VALUES
+  ('00000000-0000-0000-0000-000000000110', '00000000-0000-0000-0000-000000000001', 'Burak Gules', '905367771122', 'PERSON'),
+  ('00000000-0000-0000-0000-000000000111', '00000000-0000-0000-0000-000000000001', 'Deniz Aksoy', '905419990011', 'PERSON')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO vehicle (id, tenant_id, plate, make, model, model_year, fuel, transmission, mileage_km, color, tramer_cents,
+                     purchase_date, seller_id, bought_by_id, actual_purchase_cents, official_purchase_cents, status,
+                     sale_date, buyer_id, sold_by_id, sale_price_cents,
+                     ownership, consignor_id, commission_type, commission_rate_bp, commission_cents)
+VALUES
+  ('00000000-0000-0000-0000-000000000214', '00000000-0000-0000-0000-000000000001', '34 BG 1907', 'Volkswagen', 'Golf 1.5 TSI Style', 2022, 'GASOLINE', 'AUTOMATIC', 36000, 'Gri', NULL,
+   CURRENT_DATE - 18, NULL, '00000000-0000-0000-0000-000000000011', NULL, NULL, 'IN_STOCK', NULL, NULL, NULL, NULL,
+   'CONSIGNMENT', '00000000-0000-0000-0000-000000000110', 'RATE', 300, NULL),
+  ('00000000-0000-0000-0000-000000000215', '00000000-0000-0000-0000-000000000001', '06 DA 450', 'Toyota', 'C-HR 1.8 Hybrid Dream', 2021, 'HYBRID', 'AUTOMATIC', 54000, 'Beyaz', NULL,
+   CURRENT_DATE - 50, NULL, '00000000-0000-0000-0000-000000000012', NULL, NULL, 'SOLD', CURRENT_DATE - 8, '00000000-0000-0000-0000-000000000108', '00000000-0000-0000-0000-000000000011', 145000000,
+   'CONSIGNMENT', '00000000-0000-0000-0000-000000000111', 'FIXED', NULL, 4000000),
+  ('00000000-0000-0000-0000-000000000216', '00000000-0000-0000-0000-000000000001', '35 KO 735', 'Renault', 'Megane 1.3 TCe Icon', 2021, 'GASOLINE', 'AUTOMATIC', 49000, 'Lacivert', NULL,
+   CURRENT_DATE - 15, NULL, '00000000-0000-0000-0000-000000000011', 98000000, 85000000, 'IN_STOCK', NULL, NULL, NULL, NULL,
+   'CO_OWNED', NULL, NULL, NULL, NULL)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO vehicle_share (id, tenant_id, vehicle_id, contact_id, share_bp) VALUES
+  ('00000000-0000-0000-0000-000000000801', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000216', '00000000-0000-0000-0000-000000000104', 6000),
+  ('00000000-0000-0000-0000-000000000802', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000216', '00000000-0000-0000-0000-000000000106', 4000)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO account (id, tenant_id, type, name, contact_id, vehicle_id) VALUES
+  ('00000000-0000-0000-0000-000000000330', '00000000-0000-0000-0000-000000000001', 'VEHICLE', 'Araç 35 KO 735', NULL, '00000000-0000-0000-0000-000000000216'),
+  ('00000000-0000-0000-0000-000000000331', '00000000-0000-0000-0000-000000000001', 'BALANCE', 'Burak Gules',    '00000000-0000-0000-0000-000000000110', NULL),
+  ('00000000-0000-0000-0000-000000000332', '00000000-0000-0000-0000-000000000001', 'BALANCE', 'Deniz Aksoy',    '00000000-0000-0000-0000-000000000111', NULL)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO ledger_entry (id, tenant_id, entry_date, type, source_account_id, target_account_id, amount_cents, vehicle_id,
+                          expense_category_id, description, corrected_entry_id, created_by_id)
+SELECT v.id::uuid, '00000000-0000-0000-0000-000000000001', CURRENT_DATE - v.days_ago, v.type, v.source::uuid, v.target::uuid,
+       v.amount, v.vehicle::uuid, v.category::uuid, v.description, NULL, u.id
+FROM (VALUES
+  -- 214 konsinye: sahibine yansitilan (kasa -> sahibin carisi) ve galerinin ustlendigi (kasa -> genel gider)
+  ('00000000-0000-0000-0000-000000000547', 16, 'VEHICLE_EXPENSE', '00000000-0000-0000-0000-000000000301', '00000000-0000-0000-0000-000000000331',   450000, '00000000-0000-0000-0000-000000000214', '00000000-0000-0000-0000-000000000403', 'Detaylı temizlik (sahibine)'),
+  ('00000000-0000-0000-0000-000000000548', 17, 'VEHICLE_EXPENSE', '00000000-0000-0000-0000-000000000301', '00000000-0000-0000-0000-000000000303',   150000, '00000000-0000-0000-0000-000000000214', '00000000-0000-0000-0000-000000000402', NULL),
+  -- 215 konsinye satis: satis, pesin tahsilat, sahibine borc (satis - 40.000 komisyon), sahibine kismi odeme
+  ('00000000-0000-0000-0000-000000000549',  8, 'VEHICLE_SALE',           '00000000-0000-0000-0000-000000000307', '00000000-0000-0000-0000-000000000319', 145000000, '00000000-0000-0000-0000-000000000215', NULL, 'Satış'),
+  ('00000000-0000-0000-0000-000000000550',  8, 'COLLECTION',             '00000000-0000-0000-0000-000000000319', '00000000-0000-0000-0000-000000000302', 145000000, '00000000-0000-0000-0000-000000000215', NULL, 'Peşin tahsilat'),
+  ('00000000-0000-0000-0000-000000000551',  8, 'CONSIGNMENT_SETTLEMENT', '00000000-0000-0000-0000-000000000332', '00000000-0000-0000-0000-000000000307', 141000000, '00000000-0000-0000-0000-000000000215', NULL, 'Konsinye satış: sahibine borç'),
+  ('00000000-0000-0000-0000-000000000552',  4, 'PAYMENT',                '00000000-0000-0000-0000-000000000302', '00000000-0000-0000-0000-000000000332', 100000000, NULL, NULL, 'C-HR satış parası (ilk kısım)'),
+  -- 216 ortakli: kasadan pesin alis
+  ('00000000-0000-0000-0000-000000000553', 15, 'VEHICLE_PURCHASE',       '00000000-0000-0000-0000-000000000301', '00000000-0000-0000-0000-000000000330',  98000000, '00000000-0000-0000-0000-000000000216', NULL, 'Araç alışı')
+) AS v(id, days_ago, type, source, target, amount, vehicle, category, description)
+JOIN panel_user u ON u.phone = '905550000000'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO payment_plan (id, tenant_id, vehicle_id, direction, contact_id, total_cents, created_by_id)
+SELECT '00000000-0000-0000-0000-000000000609', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000215',
+       'SALE', '00000000-0000-0000-0000-000000000108', 145000000, u.id
+FROM panel_user u WHERE u.phone = '905550000000'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO installment (id, tenant_id, plan_id, seq, due_date, amount_cents, method, note_no, payer_contact_id, paid_entry_id, paid_at)
+VALUES ('00000000-0000-0000-0000-000000000718', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000609', 1,
+        CURRENT_DATE - 8, 145000000, 'TRANSFER', NULL, '00000000-0000-0000-0000-000000000108', '00000000-0000-0000-0000-000000000550',
+        (CURRENT_DATE - 8)::timestamptz)
+ON CONFLICT DO NOTHING;

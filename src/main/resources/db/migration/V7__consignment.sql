@@ -39,6 +39,10 @@ CREATE TABLE vehicle_share (
 CREATE INDEX idx_vehicle_share_tenant ON vehicle_share(tenant_id);
 CREATE INDEX idx_vehicle_share_vehicle ON vehicle_share(vehicle_id);
 
+-- 'CONSIGNMENT_SETTLEMENT' 22 karakter: kolon 20'den 30'a genisler (veri kaybi yok).
+-- Hareket tablosundaki UPDATE/DELETE trigger'i satirlara dokunur; ALTER COLUMN TYPE satir guncellemesi sayilmaz.
+ALTER TABLE ledger_entry ALTER COLUMN type TYPE VARCHAR(30);
+
 ALTER TABLE ledger_entry DROP CONSTRAINT ledger_entry_type_check;
 ALTER TABLE ledger_entry ADD CONSTRAINT ledger_entry_type_check
     CHECK (type IN ('VEHICLE_PURCHASE', 'VEHICLE_EXPENSE', 'GENERAL_EXPENSE', 'CAPITAL',

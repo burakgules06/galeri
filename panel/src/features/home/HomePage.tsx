@@ -63,6 +63,7 @@ function AdminSummary() {
   const money = data.cashCents + data.bankCents;
   const months = data.months.map((m) => SHORT_MONTHS[m.month - 1]);
   const totalProfit = data.months.reduce((t, m) => t + m.profitCents, 0);
+  const totalCommission = data.months.reduce((t, m) => t + m.commissionCents, 0);
   const totalSold = data.months.reduce((t, m) => t + m.sold, 0);
 
   return (
@@ -76,7 +77,10 @@ function AdminSummary() {
           ]} />
         </StatTile>
         <StatTile label="Stok" value={`${data.inStockCount} araç`}
-          sub={<span>Maliyet <b className="sayi font-semibold text-murekkep text-[14px]">{tlShort(data.stockCostCents)}</b> · ort. {data.averageDaysInStock} gün</span>} />
+          sub={<span>
+            Maliyet <b className="sayi font-semibold text-murekkep text-[14px]">{tlShort(data.stockCostCents)}</b> · ort. {data.averageDaysInStock} gün
+            {data.consignmentCount > 0 && <span className="block text-konsinye font-semibold">+ {data.consignmentCount} konsinye araç</span>}
+          </span>} />
         <StatTile label="Alacak" value={tlShort(data.receivableCents)} tone="positive" sub={`${data.receivables.length} kişiden tahsil edilecek`} />
         <StatTile label="Verecek" value={tlShort(data.payableCents)} tone="negative" sub={`${data.payables.length} kişiye ödenecek`} />
       </div>
@@ -106,9 +110,18 @@ function AdminSummary() {
         </section>
 
         <section className="kart p-4 md:p-5">
-          <div className="mb-2">
-            <p className="etiket">Son 6 ay · satış kârı</p>
-            <p className={`sayi font-bold text-[22px] leading-tight mt-0.5 ${totalProfit >= 0 ? "text-basari" : "text-tehlike"}`}>{tl(totalProfit)}</p>
+          <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <p className="etiket">Son 6 ay · satış kârı</p>
+              <p className={`sayi font-bold text-[22px] leading-tight mt-0.5 ${totalProfit >= 0 ? "text-basari" : "text-tehlike"}`}>{tl(totalProfit)}</p>
+            </div>
+            {/* Konsinye komisyonu arac karindan ayri: sermaye karina girip girmeyecegi acik soru (MIMARI §13) */}
+            {totalCommission > 0 && (
+              <p className="text-right">
+                <span className="etiket block">Konsinye komisyonu</span>
+                <span className="sayi font-semibold text-[18px] text-konsinye">{tl(totalCommission)}</span>
+              </p>
+            )}
           </div>
           <BarChart ariaLabel="Son 6 ayda satılan araçların kârı" categories={months} height={230} minMax={0}
             format={(n) => (n === 0 ? "0" : tlShort(n * 100).replace(" ₺", ""))}

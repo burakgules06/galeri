@@ -1,12 +1,13 @@
 import { useState, type ReactNode } from "react";
 import { api, isAdminDetail } from "../../api/galeri";
-import { formatDate, formatNumber, FUEL, STATUS, tl, TRANSMISSION } from "../../shared/format";
-import type { BodyPart, PartCondition, VehicleDetail, VehicleDetailAdmin, VehicleStatus } from "../../shared/types";
+import { formatDate, formatNumber, FUEL, percent, STATUS, tl, TRANSMISSION } from "../../shared/format";
+import type { BodyPart, ContactSummary, PartCondition, VehicleDetail, VehicleDetailAdmin, VehicleStatus } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Plate } from "../../shared/ui/Plate";
 import { Button, ErrorBox } from "../../shared/ui/Common";
 import { DamageMap } from "./DamageMap";
 import { DaysInStock } from "./DaysInStock";
+import { OwnershipBadge } from "./OwnershipBadge";
 import { PaymentPlanCard } from "./PaymentPlanCard";
 import { SaleForm } from "./SaleForm";
 import { VehicleForm } from "./VehicleForm";
@@ -46,6 +47,7 @@ export function VehicleDetailPage({ id }: { id: string }) {
           <div className="flex flex-wrap items-center gap-2.5 mt-1.5">
             <span className="sayi font-semibold text-[18px]">{v.modelYear}</span>
             <span className={`text-[12.5px] font-semibold rounded-full px-2.5 py-1 ${STATUS_PILL[v.status]}`}>{STATUS[v.status]}</span>
+            <OwnershipBadge ownership={v.ownership} className="py-1 px-2 text-[12.5px]" />
             <DaysInStock days={v.daysInStock} status={v.status} />
           </div>
         </div>
@@ -75,10 +77,29 @@ export function VehicleDetailPage({ id }: { id: string }) {
           {admin && (
             <Card title="Alış ve satış">
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
-                <Info label="Kimden alındı" value={admin.seller?.name ?? "—"} />
-                <Info label="Alan çalışan" value={admin.boughtBy?.name ?? "—"} />
-                <Info label="Gerçek alış bedeli" value={tl(admin.actualPurchaseCents)} numeric strong />
-                <Info label="Resmi alış bedeli" value={tl(admin.officialPurchaseCents)} numeric />
+                {v.ownership === "CONSIGNMENT" ? <>
+                  <ContactInfo label="Aracın sahibi (konsinye)" contact={admin.consignor} />
+                  <Info label="Alan çalışan" value={admin.boughtBy?.name ?? "—"} />
+                  <Info label="Komisyon" numeric strong value={admin.commissionType === "RATE"
+                    ? percent(admin.commissionRateBp ?? 0, 2) : tl(admin.commissionCents)} />
+                </> : <>
+                  <Info label="Kimden alındı" value={admin.seller?.name ?? "—"} />
+                  <Info label="Alan çalışan" value={admin.boughtBy?.name ?? "—"} />
+                  <Info label="Gerçek alış bedeli" value={tl(admin.actualPurchaseCents)} numeric strong />
+                  <Info label="Resmi alış bedeli" value={tl(admin.officialPurchaseCents)} numeric />
+                </>}
+                {v.ownership === "CO_OWNED" && (
+                  <div className="col-span-2">
+                    <dt className="etiket">Ortaklar</dt>
+                    <dd className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[15px]">
+                      {admin.shares.map((s) => (
+                        <a key={s.contactId} href={`#/contacts/${s.contactId}`} className="font-semibold hover:underline">
+                          {s.name} <span className="sayi text-[16px] text-ortakli">{percent(s.shareBp)}</span>
+                        </a>
+                      ))}
+                    </dd>
+                  </div>
+                )}
                 {v.status !== "IN_STOCK" && <>
                   <Info label="Alıcı" value={admin.buyer?.name ?? "—"} />
                   <Info label="Satan çalışan" value={admin.soldBy?.name ?? "—"} />
@@ -89,10 +110,11 @@ export function VehicleDetailPage({ id }: { id: string }) {
           )}
 
           {admin && (
-            <CostCard key={`${admin.actualPurchaseCents}-${admin.salePriceCents}-${admin.purchaseAccountId}`} vehicle={v} />
+            <CostCard key={`${admin.actualPurchaseCents}-${admin.salePriceCents}-${admin.purchaseAccountId}-${v.ownership}-${admin.commissionRateBp}-${admin.commissionCents}`}
+              vehicle={v} consignor={admin.consignor} />
           )}
 
-          {admin && (
+          {admin && v.ownership !== "CONSIGNMENT" && (
             <PaymentPlanCard key={`purchase-${admin.actualPurchaseCents}-${admin.seller?.id}-${v.purchaseDate}`} vehicleId={v.id}
               direction="PURCHASE" onChanged={reload} />
           )}
@@ -123,15 +145,38 @@ export function VehicleDetailPage({ id }: { id: string }) {
 }
 
 // Maliyet = gercek alis + araca bagli masraflar (defterden). Kar sadece satilmis aracta.
-function CostCard({ vehicle }: { vehicle: VehicleDetail }) {
+// Konsinye: alis yok; kar = komisyon - galerinin ustlendigi masraflar, sahibine borc ve yansitilan masraf ayri.
+// Ortakli: kar, ortaklarin payina gore bolunur (sadece gosterim).
+function CostCard({ vehicle, consignor }: { vehicle: VehicleDetail; consignor: ContactSummary | null }) {
   const { data, error, reload } = useLoad(() => api.vehicleCost(vehicle.id), [vehicle.id]);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const expenses = (data?.entries ?? []).filter((e) => e.type === "VEHICLE_EXPENSE");
+  const consignment = data?.ownership === "CONSIGNMENT";
 
   return (
-    <Card title="Maliyet">
+    <Card title={consignment ? "Komisyon ve masraflar" : "Maliyet"}>
       <ErrorBox message={error} />
-      {data && (
+      {data && consignment && (
+        <>
+          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+            <Info label="Komisyon" value={data.commissionCents == null ? "Satışta belli olur" : tl(data.commissionCents)}
+              numeric={data.commissionCents != null} strong />
+            <Info label="Galerinin masrafı" value={tl(data.expenseCents)} numeric />
+            <Info label="Sahibine yansıtılan" value={tl(data.ownerChargedCents)} numeric />
+            {data.profitCents != null && <>
+              <Info label="Satış bedeli" value={tl(data.salePriceCents)} numeric />
+              <Info label="Sahibine borç" value={tl(data.ownerPayoutCents)} numeric />
+              <ProfitInfo cents={data.profitCents} />
+            </>}
+          </dl>
+          {consignor && (
+            <p className="mt-3 text-[13.5px] text-murekkep-2">
+              Sahibine ödeme ve yansıtılan masraflar <a href={`#/contacts/${consignor.id}`} className="font-semibold text-plaka hover:underline">{consignor.name}</a> carisinde.
+            </p>
+          )}
+        </>
+      )}
+      {data && !consignment && (
         <>
           <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
             <div>
@@ -143,13 +188,32 @@ function CostCard({ vehicle }: { vehicle: VehicleDetail }) {
             <Info label="Toplam maliyet" value={tl(data.totalCents)} numeric strong />
             {data.profitCents != null && <>
               <Info label="Satış bedeli" value={tl(data.salePriceCents)} numeric />
-              <div>
-                <dt className="text-[13px] text-murekkep-2">{data.profitCents >= 0 ? "Kâr" : "Zarar"}</dt>
-                <dd className={`font-cond text-[19px] font-bold ${data.profitCents >= 0 ? "text-basari" : "text-tehlike"}`}>{tl(Math.abs(data.profitCents))}</dd>
-              </div>
+              <ProfitInfo cents={data.profitCents} />
             </>}
           </dl>
-
+          {data.shares.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-cizgi">
+              <h3 className="etiket mb-2">{data.profitCents == null ? "Ortak payları" : data.profitCents >= 0 ? "Kârın ortaklara bölünmesi" : "Zararın ortaklara bölünmesi"}</h3>
+              <ul className="space-y-1.5">
+                {data.shares.map((s) => (
+                  <li key={s.contactId} className="flex items-center gap-3">
+                    <span className="grow min-w-0 truncate font-semibold">{s.name}</span>
+                    <span className="sayi text-[16px] text-ortakli w-14 text-right">{percent(s.shareBp)}</span>
+                    {s.profitCents != null && (
+                      <span className={`sayi text-[17px] w-32 text-right font-semibold ${s.profitCents >= 0 ? "text-basari" : "text-tehlike"}`}>
+                        {s.profitCents < 0 ? "−" : ""}{tl(Math.abs(s.profitCents))}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[12.5px] text-murekkep-3 mt-2">Sadece bilgi: sistem kârı dağıtmaz.</p>
+            </div>
+          )}
+        </>
+      )}
+      {data && (
+        <>
           <div className="mt-4 pt-3 border-t border-cizgi">
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-semibold text-[15px] text-murekkep-2">Masraf dökümü</h3>
@@ -210,6 +274,26 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
       <h2 className="font-cond font-bold text-[21px] tracking-tight pb-3 mb-4 border-b border-cizgi">{title}</h2>
       {children}
     </section>
+  );
+}
+
+function ProfitInfo({ cents }: { cents: number }) {
+  return (
+    <div className="min-w-0">
+      <dt className="etiket">{cents >= 0 ? "Kâr" : "Zarar"}</dt>
+      <dd className={`mt-1 sayi text-[21px] leading-tight font-bold ${cents >= 0 ? "text-basari" : "text-tehlike"}`}>{tl(Math.abs(cents))}</dd>
+    </div>
+  );
+}
+
+function ContactInfo({ label, contact }: { label: string; contact: ContactSummary | null }) {
+  return (
+    <div className="min-w-0">
+      <dt className="etiket">{label}</dt>
+      <dd className="mt-1 truncate text-[16px] font-semibold">
+        {contact ? <a href={`#/contacts/${contact.id}`} className="text-konsinye hover:underline">{contact.name}</a> : "—"}
+      </dd>
+    </div>
   );
 }
 

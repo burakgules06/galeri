@@ -32,7 +32,7 @@ public class LedgerEntry {
     private LocalDate entryDate;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20, updatable = false)
+    @Column(nullable = false, length = 30, updatable = false)
     private LedgerEntryType type;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

@@ -99,9 +99,30 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
   - Service worker (`sw.js`) önbellek tutmuyor; çevrimdışı çalışma yok (isteyen olursa ayrıca).
   - İkon değişirse: `icon.svg`'yi düzenle, PNG'leri ondan yeniden üret (180, 192, 512 px).
 
+- **Adım 4B: konsinye ve ortaklı araç** (`feat/consignment`, `feat/pwa` üstünde). Kurallar `MIMARI.md` §4 Sahiplik.
+  - `V7__consignment.sql`: `vehicle.consignor_id`, `commission_type` (RATE/FIXED), `commission_rate_bp`, `commission_cents` + CHECK
+    (konsinyede dolu, değilse boş); `vehicle_share` (vehicle_id, contact_id, share_bp); hareket türüne `CONSIGNMENT_SETTLEMENT`
+    (`ledger_entry.type` 20'den 30 karaktere genişledi).
+  - Konsinye: alış deftere yazılmaz (alış bedeli, satıcı, alış planı tutulmaz). Satışta normal satış + plan, ek olarak
+    BALANCE(sahibi) → INCOME (satış − komisyon). Komisyon kuruşa yarım yukarı (`util/ConsignmentMath`). Satış geri alınınca ya da
+    sahip/komisyon değişince bu hareket ters hareketle yeniden yazılır; Kasa'dan elle düzeltilemez. Sabit komisyon satıştan büyükse 1034.
+  - Konsinye masraf: "Sahibine yansıt" → BALANCE(sahibi); değilse EXPENSE (genel gider). İkisi de araca bağlı; araç kârı =
+    komisyon − galerinin üstlendiği masraf. Sahibine ödeme: `POST /api/contacts/{id}/payments` (PAYMENT, kısmi olabilir), kişi carisinde "Öde".
+  - Ortaklı: paylar toplamı 10000 (1033); defter galeri aracı gibi; maliyet kartında kâr paylara bölünür (kalan kuruş büyük paya).
+  - Ana ekran: konsinye stok ayrı sayılır, stok maliyetine ve ortalama güne girmez; aylık kârda komisyon ayrı (`MonthStat.commissionCents`).
+  - Düzeltilen hata: araç masraf toplamları VEHICLE hesabına dokunmayan masrafları eksi sayıyordu; artık sadece VEHICLE hesabı.
+  - STAFF: listede ve detayda sadece `ownership` rozeti; sahip, komisyon, tutar dönmez.
+  - Hata kodları: 1032 konsinyede sahip/komisyon yok, 1033 ortak payları, 1034 komisyon satıştan büyük.
+  - Dev seed: 214 Golf (Burak Gules, %3, stokta, yansıtılan + üstlenilen masraf), 215 C-HR (Deniz Aksoy, sabit 40.000, satıldı,
+    sahibine 1.410.000 borç, 1.000.000 ödendi), 216 Megane (ortaklı Furkan %60 / Kerem %40). **Seed değişti: `docker compose down -v`, `docker compose up -d`.**
+
 ## Sıradaki
 
-PR 4B: konsinye ve ortaklı araç (`feat/consignment`). Sonra PR 5: sermaye, kâr ve kasa işlemleri.
+PR 5: sermaye, kâr ve kasa işlemleri (`feat/capital`). Dönem kârında komisyon ayrı satır (bkz. §13 açık soru).
+
+Adım 4B'den açık sorular:
+- Konsinye sahibinin galeriye borcu (yansıtılan masraf) için ayrı "tahsil et" yok; satışta sahibine borçla netleşir. Gerekirse eklenir.
+- Ortaklı aracın ortaklara kâr ödemesi yok (sadece gösterim); ödenirse kişiye "Öde" ile yapılabilir.
 
 Adım 4A'dan açık sorular:
 - Şifre sıfırlama/değiştirme açık oturumları kapatmıyor (token 24 saat geçerli). Gerekirse `panel_user.token_version` ile yapılır.

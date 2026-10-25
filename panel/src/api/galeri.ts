@@ -3,7 +3,7 @@ import type {
   AccountResponse, BodyPart, CategoryResponse, ContactRequest, ContactResponse, DashboardResponse, ExpenseRequest, ExpenseRoot,
   YearlyTrades, PaymentPlanResponse, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
   LedgerEntryResponse, MonthlyTrades, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
-  VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary, UserResponse, UserRole,
+  VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary, UserResponse, UserRole, ContactPaymentRequest,
 } from "../shared/types";
 
 const json = (body: unknown, method = "POST"): RequestInit => ({ method, body: JSON.stringify(body) });
@@ -34,6 +34,8 @@ export const api = {
   undoInstallment: (id: string) => apiFetch<InstallmentResponse>(`/api/installments/${id}/undo`, { method: "POST" }),
   updateInstallment: (id: string, dueDate: string, noteNo: string | null) =>
     apiFetch<InstallmentResponse>(`/api/installments/${id}`, json({ dueDate, noteNo }, "PATCH")),
+  payContact: (contactId: string, request: ContactPaymentRequest) =>
+    apiFetch<LedgerEntryResponse>(`/api/contacts/${contactId}/payments`, json(request)),
   statement: (contactId: string) => apiFetch<ContactStatement>(`/api/contacts/${contactId}/statement`),
   contacts: (q = "") => apiFetch<ContactResponse[]>(`/api/contacts${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`),
   addContact: (request: ContactRequest) => apiFetch<ContactResponse>("/api/contacts", json(request)),

@@ -96,6 +96,15 @@ sol arka kapı, sol arka çamurluk, sağ ön çamurluk, sağ ön kapı, sağ ark
 - `CONSIGNMENT` (konsinye): sahibi bir kişidir, komisyon oranı ya da sabit tutarı tutulur. VEHICLE hesabına maliyet yazılmaz.
 - `CO_OWNED` (özel ortaklı): havuz dışı; `vehicle_share` tablosunda kişi + yüzde (toplam %100). Kârı bu oranlarla gösterilir.
 
+Uygulama (Adım 4B):
+- Komisyon: `RATE` (baz puan, %3 = 300; satış × oran, kuruşa yarım yukarı) ya da `FIXED` (kuruş). Konsinye araçta alış bedeli,
+  satıcı ve alış ödemesi tutulmaz; araç stok maliyetine girmez.
+- Konsinye satış: `VEHICLE_SALE` INCOME → BALANCE(alıcı) (her satışta olduğu gibi) + `CONSIGNMENT_SETTLEMENT` BALANCE(sahibi) → INCOME
+  (satış − komisyon). Sahibine ödeme `PAYMENT` CASH/BANK → BALANCE(sahibi), kısmi olabilir.
+- Konsinye masraf: sahibine yansıtılırsa CASH/BANK → BALANCE(sahibi), değilse CASH/BANK → EXPENSE; ikisi de `VEHICLE_EXPENSE` ve araca bağlı.
+  Araç kârı = komisyon − galerinin üstlendiği masraf. Dönem kârında üstlenilen masraf genel giderlerin içinde sayılır (çift sayılmaz).
+- Ortaklı araç: defter `DEALER` ile aynı; kâr paylara bölünerek gösterilir (aşağı yuvarlanır, kalan kuruş en büyük paya).
+
 ### Alış bilgileri
 Alış tarihi, kimden alındı, **aracı alan çalışan**, **gerçek alış bedeli** ve **resmi (beyan edilen) alış bedeli**, ödeme şekli.
 Kâr hesapları her zaman gerçek bedelle yapılır.
@@ -239,16 +248,16 @@ ADMIN kendini pasifleştiremez. Rol ve aktiflik her istekte DB'den okunur; pasif
 | `account` | type, contact_id (BALANCE/CAPITAL için), vehicle_id (VEHICLE için), name |
 | `ledger_entry` | entry_date, type, source_account_id, target_account_id, amount_cents, vehicle_id, expense_category_id, description, corrected_entry_id, created_by_id |
 | `expense_category` | parent_id, name, root (VEHICLE/GENERAL), archived |
-| `vehicle` | plate, make, model, model_year, fuel, transmission, mileage_km, color, tramer_cents, notes, ownership, consignor_id, commission_rate / commission_cents, purchase_date, seller_id, bought_by_id, actual_purchase_cents, official_purchase_cents, sale_date, buyer_id, sold_by_id, sale_price_cents, status |
+| `vehicle` | plate, make, model, model_year, fuel, transmission, mileage_km, color, tramer_cents, notes, ownership, consignor_id, commission_type (RATE/FIXED), commission_rate_bp / commission_cents, purchase_date, seller_id, bought_by_id, actual_purchase_cents, official_purchase_cents, sale_date, buyer_id, sold_by_id, sale_price_cents, status |
 | `vehicle_part` | vehicle_id, part (BodyPart), condition (PartCondition) |
-| `vehicle_share` | vehicle_id, contact_id, share_percent (sadece CO_OWNED) |
+| `vehicle_share` | vehicle_id, contact_id, share_bp (baz puan, toplam 10000; sadece CO_OWNED) |
 | `payment_plan` | vehicle_id, direction (SALE/PURCHASE), contact_id, total_cents, created_by_id; unique (vehicle_id, direction) |
 | `installment` | plan_id, seq, due_date, amount_cents, method, note_no, payer_contact_id, paid_entry_id, paid_at; index (tenant_id, due_date) ödenmemişler için |
 | `push_subscription` | panel_user_id, endpoint (unique), p256dh, auth |
 | `notification_log` | installment_id, notify_date, sent_at; unique (installment_id, notify_date) |
 
 Hepsi `tenant_id` taşır ve tenant'a göre filtrelenir. Tablo/kolon adları İngilizce (bkz. §14 sözlük);
-henüz yazılmamış tabloların (`vehicle_share` ...) adları plandır, migration'ı yazılırken kesinleşir.
+yeni tabloların adları migration'ı yazılırken kesinleşir.
 
 ## 12. Yol haritası
 
@@ -265,7 +274,8 @@ Her adım ayrı bir PR; her biri bittiğinde galericiye gösterilebilir.
 
 ## 13. Açık sorular
 
-- Konsinye araçlardan alınan komisyon sermaye havuzunun kârına giriyor mu? (Galerici "sonra konuşalım" dedi. Şimdilik INCOME'a yazılır ve dönem kârına dahil gösterilir; değişirse sadece rapor değişir.)
+- Konsinye araçlardan alınan komisyon sermaye havuzunun kârına giriyor mu? (Galerici "sonra konuşalım" dedi. Şimdilik INCOME'a yazılır ve dönem kârına dahil gösterilir; değişirse sadece rapor değişir. Ana ekranda ve raporlarda komisyon
+  araç kârından ayrı satırda gösterilir.)
 - Takas yapılıyor mu? (Sorulmadı. Gerekirse: alıcının verdiği araç yeni bir IN_STOCK araç olur, değeri alıcının carisinden düşülür.)
 - Ana ekranda ne görünecek? (İlk hali yapıldı, bkz. §8b; galericiye gösterilip geri bildirimle şekillenecek.)
 

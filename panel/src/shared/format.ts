@@ -1,6 +1,7 @@
 // Gosterim yardimcilari. Tutarlar backend'de kurus (tam sayi); arayuzde TL.
 import type {
-  BodyPart, Fuel, InstallmentResponse, LedgerEntryResponse, LedgerEntryType, PartCondition, PaymentMethod, Transmission, VehicleStatus,
+  BodyPart, Fuel, InstallmentResponse, LedgerEntryResponse, LedgerEntryType, Ownership, PartCondition, PaymentMethod, Transmission,
+  VehicleStatus,
 } from "./types";
 
 const tlFormat = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2, minimumFractionDigits: 0 });
@@ -76,8 +77,23 @@ export function formatPlate(input: string): string {
 
 export const ENTRY_TYPE: Record<LedgerEntryType, string> = {
   VEHICLE_PURCHASE: "Araç alışı", VEHICLE_EXPENSE: "Araç masrafı", GENERAL_EXPENSE: "Genel gider", CAPITAL: "Sermaye",
-  VEHICLE_SALE: "Araç satışı", COLLECTION: "Tahsilat", PAYMENT: "Ödeme",
+  VEHICLE_SALE: "Araç satışı", COLLECTION: "Tahsilat", PAYMENT: "Ödeme", CONSIGNMENT_SETTLEMENT: "Konsinye borcu",
 };
+
+export const OWNERSHIP: Record<Ownership, string> = { DEALER: "Galeri", CONSIGNMENT: "Konsinye", CO_OWNED: "Ortaklı" };
+
+/** Yuzde girisi -> baz puan: "3" -> 300, "2,5" -> 250. Bos ise null, gecersizse NaN. */
+export function percentToBp(input: string): number | null {
+  const s = input.trim().replace(",", ".");
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 && n <= 100 ? Math.round(n * 100) : NaN;
+}
+
+/** Baz puan -> yuzde girisi: 250 -> "2,5". */
+export function bpToInput(bp: number | null | undefined): string {
+  return bp == null ? "" : String(bp / 100).replace(".", ",");
+}
 
 /** Buyuk tutarlar icin kisa yazim: 1.250.000 TL -> "1,25 Mn ₺", 395.000 -> "395 B ₺". */
 export function tlShort(cents: number): string {
