@@ -78,6 +78,7 @@ export function formatPlate(input: string): string {
 export const ENTRY_TYPE: Record<LedgerEntryType, string> = {
   VEHICLE_PURCHASE: "Araç alışı", VEHICLE_EXPENSE: "Araç masrafı", GENERAL_EXPENSE: "Genel gider", CAPITAL: "Sermaye",
   VEHICLE_SALE: "Araç satışı", COLLECTION: "Tahsilat", PAYMENT: "Ödeme", CONSIGNMENT_SETTLEMENT: "Konsinye borcu",
+  PROFIT_ALLOCATION: "Kâr payı sermayeye", TRANSFER: "Virman", OPENING_BALANCE: "Açılış bakiyesi",
 };
 
 export const OWNERSHIP: Record<Ownership, string> = { DEALER: "Galeri", CONSIGNMENT: "Konsinye", CO_OWNED: "Ortaklı" };

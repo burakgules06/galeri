@@ -1,20 +1,28 @@
-// Kasa: nakit (kasa + bankalar), ortaklarin sermaye paylari, alacak / verecek ve hareket listesi. Sadece ADMIN.
-// Bakiyeler hareketlerden hesaplanir; ortak ve cari ozeti /api/dashboard'dan gelir.
+// Kasa: nakit (kasa + bankalar) ve uc sekme: hareketler (ortak payi, alacak / verecek, hareket listesi),
+// ortaklar (sermaye girisi / cekisi, dukkan sahibi), donem kari (kar payini sermayeye ekleme). Sadece ADMIN.
+// Bakiyeler ve paylar hareketlerden hesaplanir; ortak ve cari ozeti /api/dashboard'dan gelir.
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
 import { SplitBar } from "../../shared/charts/Donut";
 import { entryDirection, percent, SERIES, tl } from "../../shared/format";
 import { errorMessage, useLoad } from "../../shared/useLoad";
-import { Button, Empty, ErrorBox, inputClass } from "../../shared/ui/Common";
+import { Button, Empty, ErrorBox, inputClass, Segment } from "../../shared/ui/Common";
 import { BalancesCard } from "./BalancesCard";
 import { CapitalCard } from "./CapitalCard";
 import { ExpenseForm } from "./ExpenseForm";
 import { LedgerEntryList } from "./LedgerEntryList";
+import { PartnersPanel } from "./PartnersPanel";
+import { PeriodProfitPanel } from "./PeriodProfitPanel";
+import { OpeningBalanceForm, TransferForm } from "./TreasuryForms";
+
+type Tab = "entries" | "partners" | "profit";
 
 export function LedgerPage() {
   const [selected, setSelected] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("entries");
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [bankOpen, setBankOpen] = useState(false);
+  const [dialog, setDialog] = useState<"transfer" | "opening" | null>(null);
   const accounts = useLoad(() => api.accounts(), []);
   const summary = useLoad(() => api.dashboard(), []);
   const entries = useLoad(() => api.ledgerEntries(selected), [selected]);
@@ -32,7 +40,11 @@ export function LedgerPage() {
           <p className="etiket">Para defteri</p>
           <h1 className="font-cond font-bold text-[30px] md:text-[34px] leading-tight tracking-tight">Kasa ve banka</h1>
         </div>
-        <Button onClick={() => setExpenseOpen(true)}>Masraf ekle</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setDialog("opening")}>Açılış bakiyesi</Button>
+          <Button variant="secondary" onClick={() => setDialog("transfer")}>Virman</Button>
+          <Button onClick={() => setExpenseOpen(true)}>Masraf ekle</Button>
+        </div>
       </header>
 
       <ErrorBox message={accounts.error ?? summary.error} />
@@ -61,7 +73,14 @@ export function LedgerPage() {
         </div>
       </section>
 
-      {summary.data && (
+      <Segment<Tab> value={tab} onChange={setTab} options={[
+        { value: "entries", label: "Hareketler" }, { value: "partners", label: "Ortaklar ve sermaye" }, { value: "profit", label: "Dönem kârı" },
+      ]} />
+
+      {tab === "partners" && <PartnersPanel onChange={reload} />}
+      {tab === "profit" && <PeriodProfitPanel onChange={reload} />}
+
+      {tab === "entries" && summary.data && (
         <div className="grid gap-4 lg:grid-cols-2">
           <CapitalCard partners={summary.data.partners} totalCents={summary.data.capitalCents} />
           <BalancesCard receivableCents={summary.data.receivableCents} payableCents={summary.data.payableCents}
@@ -69,7 +88,7 @@ export function LedgerPage() {
         </div>
       )}
 
-      <section className="kart p-4 md:p-5">
+      {tab === "entries" && <section className="kart p-4 md:p-5">
         <div className="flex items-baseline justify-between gap-3 mb-3">
           <h2 className="font-cond font-bold text-[22px]">{selectedName ? `${selectedName} hareketleri` : "Son hareketler"}</h2>
           {entries.data && <span className="text-[13px] text-murekkep-2">{entries.data.length} kayıt</span>}
@@ -81,8 +100,10 @@ export function LedgerPage() {
         {entries.data && entries.data.length > 0 && (
           <LedgerEntryList entries={entries.data} direction={(e) => entryDirection(e, selected)} onChange={reload} />
         )}
-      </section>
+      </section>}
 
+      {dialog === "transfer" && <TransferForm onClose={() => setDialog(null)} onSaved={() => { setDialog(null); reload(); }} />}
+      {dialog === "opening" && <OpeningBalanceForm onClose={() => setDialog(null)} onSaved={() => { setDialog(null); reload(); }} />}
       <ExpenseForm open={expenseOpen} onClose={() => setExpenseOpen(false)} onSaved={() => { setExpenseOpen(false); reload(); }} />
     </div>
   );
