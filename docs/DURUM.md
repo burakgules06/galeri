@@ -91,6 +91,14 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
     (herkes; sol menü altında isim, telefonda üst çubukta kişi ikonu).
   - Seed değişmedi.
 
+- **Telefona kurulabilir panel (PWA)** (`feat/pwa`). Sadece panel.
+  - `public/manifest.webmanifest` (Galeri Paneli, standalone, gece/zemin renkleri), plaka mavisi ikonlar (`icon.svg`,
+    `icon-180/192/512.png`; 512 maskable da), `index.html`'de manifest, `theme-color`, `apple-touch-icon`, iOS etiketleri ve `viewport-fit=cover`.
+  - Hesabım'da "Telefona kur" kartı: Android/Chrome'da "Ana ekrana ekle" düğmesi (`beforeinstallprompt`, `shared/pwa/install.ts`),
+    iPhone'da Paylaş → Ana Ekrana Ekle tarifi; kurulu uygulamada görünmez. iPhone'da ödeme bildirimleri bu kurulumla çalışır.
+  - Service worker (`sw.js`) önbellek tutmuyor; çevrimdışı çalışma yok (isteyen olursa ayrıca).
+  - İkon değişirse: `icon.svg`'yi düzenle, PNG'leri ondan yeniden üret (180, 192, 512 px).
+
 ## Sıradaki
 
 PR 4B: konsinye ve ortaklı araç (`feat/consignment`). Sonra PR 5: sermaye, kâr ve kasa işlemleri.
@@ -100,7 +108,7 @@ Adım 4A'dan açık sorular:
 - Kullanıcı telefonu değiştirilemiyor; gerekirse yeni kullanıcı + eskisini pasifleştir.
 
 Adım 3C'den açık sorular:
-- iPhone'da web push sadece "Ana Ekrana Ekle" ile kurulmuş PWA'da çalışır; panelde henüz `manifest.webmanifest` yok.
+- iPhone'da web push sadece "Ana Ekrana Ekle" ile kurulmuş PWA'da çalışır (manifest PWA PR'ında eklendi; gerçek iPhone'da denenmedi).
 - Bildirim gönderilen ADMIN'ler arasında hepsi başarısız olursa kayıt yazılmaz ve ertesi tetiklemede tekrar denenir (günde bir).
 
 Adım 3A / 3B'den açık sorular:
