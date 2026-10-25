@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface ContactRepository extends JpaRepository<Contact, UUID> {
@@ -18,4 +19,7 @@ public interface ContactRepository extends JpaRepository<Contact, UUID> {
             """)
     // q bos string ise filtre yok (null parametre PostgreSQL tip cikarimini bozar).
     List<Contact> search(@Param("tenantId") UUID tenantId, @Param("q") String q);
+
+    /** Dukkan sahibi (galeri basina en fazla bir, uq_contact_owner). */
+    Optional<Contact> findFirstByTenantIdAndOwnerTrue(UUID tenantId);
 }

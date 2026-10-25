@@ -6,6 +6,7 @@ import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.ExpenseRoot;
 import com.galeri.app.model.enums.PlanDirection;
 import com.galeri.app.model.request.AccountRequest;
+import com.galeri.app.model.request.CapitalRequests;
 import com.galeri.app.model.request.ContactPaymentRequest;
 import com.galeri.app.model.request.ExpenseRequest;
 import com.galeri.app.model.response.AccountResponse;
@@ -84,4 +85,15 @@ public interface LedgerService {
 
     /** Kisiye odeme (ornegin konsinye sahibine): PAYMENT kasa/banka -> BALANCE(kisi). Kismi olabilir. */
     LedgerEntryResponse payContact(UUID contactId, ContactPaymentRequest request);
+
+    // ------------------------------------------------------------------ kasa islemleri
+
+    /** Virman: TRANSFER kasa/banka -> kasa/banka; toplam nakit degismez. */
+    LedgerEntryResponse transfer(CapitalRequests.Transfer request);
+
+    /**
+     * Acilis bakiyesi (sisteme geciste): OPENING -> kasa/banka; caride OPENING -> BALANCE (kisi bize borclu) ya da
+     * BALANCE -> OPENING (biz borcluyuz). Hesap basina bir kez; duzeltilirse (Kasa'dan) yeniden girilebilir.
+     */
+    LedgerEntryResponse openingBalance(CapitalRequests.Opening request);
 }

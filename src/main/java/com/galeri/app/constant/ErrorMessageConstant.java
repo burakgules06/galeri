@@ -38,4 +38,9 @@ public class ErrorMessageConstant {
     public static final int CONSIGNMENT_DETAILS_REQUIRED = 1032;
     public static final int INVALID_SHARES = 1033;
     public static final int COMMISSION_EXCEEDS_SALE = 1034;
+    public static final int NOT_A_PARTNER = 1035;
+    public static final int CAPITAL_EXCEEDED = 1036;
+    public static final int SAME_ACCOUNT = 1037;
+    public static final int OPENING_BALANCE_EXISTS = 1038;
+    public static final int INVALID_PERIOD = 1039;
 }

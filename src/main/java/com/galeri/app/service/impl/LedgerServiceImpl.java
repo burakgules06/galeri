@@ -7,6 +7,8 @@ import com.galeri.app.exception.runtime.EntryAlreadyCorrectedException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidCategoryException;
 import com.galeri.app.exception.runtime.LinkedEntryException;
+import com.galeri.app.exception.runtime.OpeningBalanceExistsException;
+import com.galeri.app.exception.runtime.SameAccountException;
 import com.galeri.app.exception.runtime.RecordNotFoundException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.model.entity.Account;
@@ -22,6 +24,7 @@ import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.PlanDirection;
 import com.galeri.app.model.enums.VehicleStatus;
 import com.galeri.app.model.request.AccountRequest;
+import com.galeri.app.model.request.CapitalRequests;
 import com.galeri.app.model.request.ContactPaymentRequest;
 import com.galeri.app.model.request.ExpenseRequest;
 import com.galeri.app.model.response.AccountResponse;
@@ -355,6 +358,49 @@ public class LedgerServiceImpl implements LedgerService {
         return toResponse(entryRepository.save(e), false);
     }
 
+    // ------------------------------------------------------------------ kasa islemleri
+
+    @Override
+    @Transactional
+    public LedgerEntryResponse transfer(CapitalRequests.Transfer r) {
+        Account from = getMoneyAccount(r.fromAccountId());
+        Account to = getMoneyAccount(r.toAccountId());
+        if (from.getId().equals(to.getId())) throw new SameAccountException();
+        LedgerEntry e = newEntry(from.getTenantId(), LedgerEntryType.TRANSFER, from, to, r.amountCents(), r.date());
+        String description = blankToNull(r.description());
+        e.setDescription(description == null ? "Virman" : description);
+        return toResponse(entryRepository.save(e), false);
+    }
+
+    @Override
+    @Transactional
+    public LedgerEntryResponse openingBalance(CapitalRequests.Opening r) {
+        if ((r.accountId() == null) == (r.contactId() == null)) throw new InvalidAccountException();
+        UUID tenantId = CurrentUser.tenantId();
+        Account opening = systemAccount(tenantId, AccountType.OPENING);
+
+        Account account;
+        boolean intoAccount;   // true: OPENING -> hesap (hesabin bakiyesi artar)
+        if (r.accountId() != null) {
+            account = getMoneyAccount(r.accountId());
+            intoAccount = true;
+        } else {
+            Contact contact = contactRepository.findById(r.contactId()).orElseThrow(RecordNotFoundException::new);
+            if (!contact.getTenantId().equals(tenantId)) throw new SourceNotBelongToTenantException();
+            if (r.side() == null) throw new InvalidAccountException();
+            account = balanceAccount(contact);
+            intoAccount = r.side() == CapitalRequests.OpeningSide.RECEIVABLE;
+        }
+        if (!activeEntries(entryRepository.byTypeTouching(LedgerEntryType.OPENING_BALANCE, account.getId())).isEmpty()) {
+            throw new OpeningBalanceExistsException();
+        }
+        LedgerEntry e = intoAccount
+                ? newEntry(tenantId, LedgerEntryType.OPENING_BALANCE, opening, account, r.amountCents(), r.date())
+                : newEntry(tenantId, LedgerEntryType.OPENING_BALANCE, account, opening, r.amountCents(), r.date());
+        e.setDescription("Açılış bakiyesi");
+        return toResponse(entryRepository.save(e), false);
+    }
+
     @Override
     @Transactional
     public void syncVehiclePurchase(Vehicle vehicle, UUID purchaseAccountId) {
@@ -416,7 +462,12 @@ public class LedgerServiceImpl implements LedgerService {
 
     /** Aracin bu turdeki gecerli hareketleri: duzeltme olmayan ve duzeltilmemis olanlar. */
     private List<LedgerEntry> activeVehicleEntries(UUID vehicleId, LedgerEntryType type) {
-        List<LedgerEntry> list = entryRepository.findByVehicle_IdAndType(vehicleId, type).stream()
+        return activeEntries(entryRepository.findByVehicle_IdAndType(vehicleId, type));
+    }
+
+    /** Gecerli hareketler: kendisi duzeltme olmayan ve duzeltilmemis olanlar. */
+    private List<LedgerEntry> activeEntries(List<LedgerEntry> entries) {
+        List<LedgerEntry> list = entries.stream()
                 .filter(e -> e.getCorrectedEntryId() == null)
                 .toList();
         if (list.isEmpty()) return List.of();
@@ -465,7 +516,12 @@ public class LedgerServiceImpl implements LedgerService {
             Account a = new Account();
             a.setTenantId(tenantId);
             a.setType(type);
-            a.setName(type == AccountType.CASH ? "Kasa" : type == AccountType.EXPENSE ? "Genel giderler" : "Gelirler");
+            a.setName(switch (type) {
+                case CASH -> "Kasa";
+                case EXPENSE -> "Genel giderler";
+                case OPENING -> "Açılış bakiyeleri";
+                default -> "Gelirler";
+            });
             return accountRepository.save(a);
         });
     }
@@ -544,7 +600,8 @@ public class LedgerServiceImpl implements LedgerService {
         return list.stream().map(e -> toResponse(e, corrected.contains(e.getId()))).toList();
     }
 
-    private static LedgerEntryResponse toResponse(LedgerEntry e, boolean corrected) {
+    /** Sermaye islemleri de (CapitalServiceImpl) ayni cevap bicimini kullanir. */
+    static LedgerEntryResponse toResponse(LedgerEntry e, boolean corrected) {
         Vehicle v = e.getVehicle();
         return new LedgerEntryResponse(e.getId(), e.getEntryDate(), e.getType(),
                 accountSummary(e.getSourceAccount()), accountSummary(e.getTargetAccount()), e.getAmountCents(),

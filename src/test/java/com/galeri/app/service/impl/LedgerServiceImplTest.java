@@ -7,6 +7,8 @@ import com.galeri.app.exception.runtime.EntryAlreadyCorrectedException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidCategoryException;
 import com.galeri.app.exception.runtime.LinkedEntryException;
+import com.galeri.app.exception.runtime.OpeningBalanceExistsException;
+import com.galeri.app.exception.runtime.SameAccountException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.model.entity.Account;
 import com.galeri.app.model.entity.Contact;
@@ -21,6 +23,7 @@ import com.galeri.app.model.enums.ExpenseRoot;
 import com.galeri.app.model.enums.LedgerEntryType;
 import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.VehicleStatus;
+import com.galeri.app.model.request.CapitalRequests;
 import com.galeri.app.model.request.ContactPaymentRequest;
 import com.galeri.app.model.request.ExpenseRequest;
 import com.galeri.app.model.response.AccountResponse;
@@ -613,6 +616,88 @@ class LedgerServiceImplTest {
         when(entryRepository.findById(e.getId())).thenReturn(Optional.of(e));
 
         assertThatThrownBy(() -> service.correct(e.getId())).isInstanceOf(LinkedEntryException.class);
+    }
+
+    // ------------------------------------------------------------------ kasa islemleri
+
+    @Test
+    void virman_toplamNakdiDegistirmez() {
+        Account bank = account(AccountType.BANK, tenantId);
+        when(accountRepository.findById(bank.getId())).thenReturn(Optional.of(bank));
+
+        service.transfer(new CapitalRequests.Transfer(cash.getId(), bank.getId(), DAY, 2500000L, null));
+
+        ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
+        verify(entryRepository).save(saved.capture());
+        LedgerEntry e = saved.getValue();
+        assertThat(e.getType()).isEqualTo(LedgerEntryType.TRANSFER);
+        assertThat(e.getSourceAccount()).isSameAs(cash);
+        assertThat(e.getTargetAccount()).isSameAs(bank);
+        long moneyEffect = (e.getTargetAccount().getType().isMoneyAccount() ? e.getAmountCents() : 0)
+                - (e.getSourceAccount().getType().isMoneyAccount() ? e.getAmountCents() : 0);
+        assertThat(moneyEffect).isZero();   // kasa -25.000, banka +25.000
+        assertThat(e.getDescription()).isEqualTo("Virman");
+    }
+
+    @Test
+    void virman_ayniHesabaYaDaParaHesabiDisinaYapilamaz() {
+        assertThatThrownBy(() -> service.transfer(new CapitalRequests.Transfer(cash.getId(), cash.getId(), DAY, 1L, null)))
+                .isInstanceOf(SameAccountException.class);
+        when(accountRepository.findById(expense.getId())).thenReturn(Optional.of(expense));
+        assertThatThrownBy(() -> service.transfer(new CapitalRequests.Transfer(cash.getId(), expense.getId(), DAY, 1L, null)))
+                .isInstanceOf(InvalidAccountException.class);
+        verify(entryRepository, never()).save(any());
+    }
+
+    @Test
+    void acilisBakiyesi_hesapBasinaBirKezGirilir_duzeltilirseYenidenGirilebilir() {
+        Account opening = account(AccountType.OPENING, tenantId);
+        when(accountRepository.findFirstByTenantIdAndType(tenantId, AccountType.OPENING)).thenReturn(Optional.of(opening));
+        when(entryRepository.byTypeTouching(LedgerEntryType.OPENING_BALANCE, cash.getId())).thenReturn(List.of());
+
+        service.openingBalance(new CapitalRequests.Opening(cash.getId(), null, null, DAY, 12000000L));
+
+        ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
+        verify(entryRepository).save(saved.capture());
+        LedgerEntry first = saved.getValue();
+        assertThat(first.getSourceAccount()).isSameAs(opening);
+        assertThat(first.getTargetAccount()).isSameAs(cash);
+
+        // Ikinci giris reddedilir
+        when(entryRepository.byTypeTouching(LedgerEntryType.OPENING_BALANCE, cash.getId())).thenReturn(List.of(first));
+        when(entryRepository.correctedIds(anyCollection())).thenReturn(List.of());
+        assertThatThrownBy(() -> service.openingBalance(new CapitalRequests.Opening(cash.getId(), null, null, DAY, 1L)))
+                .isInstanceOf(OpeningBalanceExistsException.class);
+
+        // Kasa'dan duzeltildiyse yeniden girilebilir
+        when(entryRepository.correctedIds(anyCollection())).thenReturn(List.of(first.getId()));
+        service.openingBalance(new CapitalRequests.Opening(cash.getId(), null, null, DAY, 11000000L));
+        verify(entryRepository, times(2)).save(any(LedgerEntry.class));
+    }
+
+    @Test
+    void cariAcilisBakiyesi_borcumuzsaCaridenAcilisaYazilir() {
+        Contact seller = contact("Mehmet Yilmaz");
+        Account sellerBalance = balance(seller);
+        when(contactRepository.findById(seller.getId())).thenReturn(Optional.of(seller));
+        Account opening = account(AccountType.OPENING, tenantId);
+        when(accountRepository.findFirstByTenantIdAndType(tenantId, AccountType.OPENING)).thenReturn(Optional.of(opening));
+        when(entryRepository.byTypeTouching(LedgerEntryType.OPENING_BALANCE, sellerBalance.getId())).thenReturn(List.of());
+
+        service.openingBalance(new CapitalRequests.Opening(null, seller.getId(), CapitalRequests.OpeningSide.PAYABLE, DAY, 500000L));
+
+        ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
+        verify(entryRepository).save(saved.capture());
+        assertThat(saved.getValue().getSourceAccount()).isSameAs(sellerBalance);   // cari eksiye: biz borcluyuz
+        assertThat(saved.getValue().getTargetAccount()).isSameAs(opening);
+    }
+
+    @Test
+    void acilisBakiyesinde_hesapVeKisiBirlikteYaDaHicVerilmezse_reddedilir() {
+        assertThatThrownBy(() -> service.openingBalance(new CapitalRequests.Opening(null, null, null, DAY, 1L)))
+                .isInstanceOf(InvalidAccountException.class);
+        assertThatThrownBy(() -> service.openingBalance(new CapitalRequests.Opening(cash.getId(), UUID.randomUUID(), null, DAY, 1L)))
+                .isInstanceOf(InvalidAccountException.class);
     }
 
     // ------------------------------------------------------------------ yardimcilar

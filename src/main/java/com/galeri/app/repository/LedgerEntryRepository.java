@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +21,28 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> 
 
     @Query("select e.sourceAccount.id, sum(e.amountCents) from LedgerEntry e where e.tenantId = :tenantId group by e.sourceAccount.id")
     List<Object[]> outgoingTotals(@Param("tenantId") UUID tenantId);
+
+    /** Bu turdeki hesaplara (ornegin tum CAPITAL hesaplari) giren ya da cikan hareketler; tarih filtresi cagirida. */
+    @Query("""
+            select e from LedgerEntry e
+            join fetch e.sourceAccount join fetch e.targetAccount
+            where e.tenantId = :tenantId and (e.sourceAccount.type = :type or e.targetAccount.type = :type)
+            """)
+    List<LedgerEntry> touchingType(@Param("tenantId") UUID tenantId, @Param("type") AccountType type);
+
+    /** Tarih araliginda (iki uc dahil) bu turdeki hesaplara net giris: giren - cikan. Ornek: donemin genel giderleri. */
+    @Query("""
+            select coalesce(sum(case when e.targetAccount.type = :type then e.amountCents else -e.amountCents end), 0)
+            from LedgerEntry e
+            where e.tenantId = :tenantId and e.entryDate between :from and :to
+              and (e.targetAccount.type = :type or e.sourceAccount.type = :type)
+            """)
+    long netInto(@Param("tenantId") UUID tenantId, @Param("type") AccountType type,
+                 @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /** Bir hesaba dokunan bu turdeki hareketler (ornegin acilis bakiyesi bir kez mi girildi). */
+    @Query("select e from LedgerEntry e where e.type = :type and (e.sourceAccount.id = :accountId or e.targetAccount.id = :accountId)")
+    List<LedgerEntry> byTypeTouching(@Param("type") LedgerEntryType type, @Param("accountId") UUID accountId);
 
     @Query("""
             select e from LedgerEntry e
