@@ -6,6 +6,7 @@ import { useLoad } from "../../shared/useLoad";
 import { formatNumber, formatPhone, FUEL, TRANSMISSION } from "../../shared/format";
 import type { VehicleStatus, VehicleSummary } from "../../shared/types";
 import { Plate } from "../../shared/ui/Plate";
+import { OwnershipBadge } from "./OwnershipBadge";
 import { Button, Empty, ErrorBox, inputClass, Segment } from "../../shared/ui/Common";
 import { DamageBadge } from "./DamageMap";
 import { DaysInStock } from "./DaysInStock";
@@ -93,6 +94,7 @@ export function VehicleList() {
                         {v.make} {v.model}
                       </a>
                       <span className="text-murekkep-2"> {v.modelYear}</span>
+                      <OwnershipBadge ownership={v.ownership} className="ml-2 align-middle" />
                     </td>
                     <td className="px-3 py-2.5 text-right font-cond text-[17px]">{formatNumber(v.mileageKm)}</td>
                     <td className="px-3 py-2.5 text-murekkep-2">{FUEL[v.fuel]}, {TRANSMISSION[v.transmission].toLocaleLowerCase("tr-TR")}</td>
@@ -135,6 +137,7 @@ function PhoneRow({ v, showBuyer }: { v: VehicleSummary; showBuyer: boolean }) {
         <div className="min-w-0 grow">
           <div className="flex items-center gap-2">
             <Plate plate={v.plate} size="sm" />
+            <OwnershipBadge ownership={v.ownership} />
           </div>
           <p className="font-semibold text-[16px] mt-1.5 truncate">{v.make} {v.model}</p>
           <p className="text-[14px] text-murekkep-2 flex items-center gap-2 flex-wrap">

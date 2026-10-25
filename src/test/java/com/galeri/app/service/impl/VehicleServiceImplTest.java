@@ -1,6 +1,8 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.ConsignmentDetailsRequiredException;
 import com.galeri.app.exception.runtime.InvalidDateException;
+import com.galeri.app.exception.runtime.InvalidSharesException;
 import com.galeri.app.exception.runtime.PlateAlreadyInStockException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.exception.runtime.VehicleAlreadySoldException;
@@ -8,13 +10,17 @@ import com.galeri.app.exception.runtime.VehicleNotSoldException;
 import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.entity.VehiclePart;
+import com.galeri.app.model.entity.VehicleShare;
 import com.galeri.app.model.enums.BodyPart;
+import com.galeri.app.model.enums.CommissionType;
 import com.galeri.app.model.enums.Fuel;
+import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.PartCondition;
 import com.galeri.app.model.enums.PaymentMethod;
 import com.galeri.app.model.enums.Transmission;
 import com.galeri.app.model.enums.VehicleStatus;
 import com.galeri.app.model.request.InstallmentRequest;
+import com.galeri.app.model.request.ShareRequest;
 import com.galeri.app.model.request.VehiclePartsRequest;
 import com.galeri.app.model.request.VehicleRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
@@ -25,6 +31,7 @@ import com.galeri.app.repository.ContactRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehiclePartRepository;
 import com.galeri.app.repository.VehicleRepository;
+import com.galeri.app.repository.VehicleShareRepository;
 import com.galeri.app.service.LedgerService;
 import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.support.TestSession;
@@ -50,6 +57,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,6 +70,7 @@ class VehicleServiceImplTest {
     @Mock private PanelUserRepository panelUserRepository;
     @Mock private LedgerService ledgerService;
     @Mock private PaymentPlanService paymentPlanService;
+    @Mock private VehicleShareRepository shareRepository;
 
     // "Su an": 1 Temmuz 2026, 09:00 Istanbul (06:00 UTC)
     private final Clock clock = Clock.fixed(Instant.parse("2026-07-01T06:00:00Z"), ZoneOffset.UTC);
@@ -75,7 +84,7 @@ class VehicleServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new VehicleServiceImpl(vehicleRepository, vehiclePartRepository, contactRepository, panelUserRepository,
-                ledgerService, paymentPlanService, clock);
+                ledgerService, paymentPlanService, shareRepository, clock);
         buyer = new Contact();
         buyer.setId(UUID.randomUUID());
         buyer.setTenantId(tenantId);
@@ -90,7 +99,8 @@ class VehicleServiceImplTest {
 
     private VehicleRequest request(String plate) {
         return new VehicleRequest(plate, "Renault", "Clio", (short) 2022, Fuel.GASOLINE, Transmission.MANUAL, 31000,
-                "Kırmızı", null, null, LocalDate.of(2026, 6, 1), null, null, 72000000L, 60000000L, cashId, null);
+                "Kırmızı", null, null, LocalDate.of(2026, 6, 1), null, null, 72000000L, 60000000L, cashId, null,
+                null, null, null, null, null, null);
     }
 
     private Vehicle inStockVehicle(UUID id, UUID tenant) {
@@ -311,5 +321,108 @@ class VehicleServiceImplTest {
         vp.setPart(p);
         vp.setCondition(c);
         return vp;
+    }
+
+    // ------------------------------------------------------------------ sahiplik
+
+    private VehicleRequest ownershipRequest(Ownership ownership, UUID consignorId, CommissionType type, Integer bp, Long fixed,
+                                            List<ShareRequest> shares) {
+        return new VehicleRequest("34 KLM 4521", "Renault", "Clio", (short) 2022, Fuel.GASOLINE, Transmission.MANUAL, 31000,
+                null, null, null, LocalDate.of(2026, 6, 1), null, null, 72000000L, 60000000L, cashId, null,
+                ownership, consignorId, type, bp, fixed, shares);
+    }
+
+    private void savesWithId() {
+        when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(inv -> {
+            Vehicle v = inv.getArgument(0);
+            v.setId(UUID.randomUUID());
+            return v;
+        });
+    }
+
+    private Contact contact(String name) {
+        Contact c = new Contact();
+        c.setId(UUID.randomUUID());
+        c.setTenantId(tenantId);
+        c.setName(name);
+        when(contactRepository.findById(c.getId())).thenReturn(Optional.of(c));
+        return c;
+    }
+
+    @Test
+    void konsinyeArac_alisBedeliVeSaticisiTutulmaz_alisDeftereYazilmaz() {
+        Contact owner = contact("Burak Gules");
+        savesWithId();
+
+        VehicleDetailAdmin result = service.create(ownershipRequest(Ownership.CONSIGNMENT, owner.getId(), CommissionType.RATE, 300, 999L, null));
+
+        ArgumentCaptor<Vehicle> saved = ArgumentCaptor.forClass(Vehicle.class);
+        verify(vehicleRepository).save(saved.capture());
+        Vehicle v = saved.getValue();
+        assertThat(v.getOwnership()).isEqualTo(Ownership.CONSIGNMENT);
+        assertThat(v.getConsignor()).isSameAs(owner);
+        assertThat(v.getCommissionRateBp()).isEqualTo(300);
+        assertThat(v.getCommissionCents()).isNull();          // oran tipinde sabit tutar tutulmaz
+        assertThat(v.getActualPurchaseCents()).isNull();
+        assertThat(v.getOfficialPurchaseCents()).isNull();
+        assertThat(v.getSeller()).isNull();
+        assertThat(result.consignor().name()).isEqualTo("Burak Gules");
+        verify(paymentPlanService).syncPurchase(v, null, null);   // kasa secilmis olsa da alis yazilmaz
+    }
+
+    @Test
+    void konsinyede_sahipYaDaKomisyonYoksa_reddedilir() {
+        assertThatThrownBy(() -> service.create(ownershipRequest(Ownership.CONSIGNMENT, null, CommissionType.RATE, 300, null, null)))
+                .isInstanceOf(ConsignmentDetailsRequiredException.class);
+        assertThatThrownBy(() -> service.create(ownershipRequest(Ownership.CONSIGNMENT, UUID.randomUUID(), CommissionType.FIXED, 300, null, null)))
+                .isInstanceOf(ConsignmentDetailsRequiredException.class);
+        verify(vehicleRepository, never()).save(any());
+    }
+
+    @Test
+    void ortakPaylari_toplami10000DegilseYaDaKisiTekrarliysa_reddedilir() {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        List<ShareRequest> eksik = List.of(new ShareRequest(a, 5000), new ShareRequest(b, 4000));
+        List<ShareRequest> fazla = List.of(new ShareRequest(a, 6000), new ShareRequest(b, 5000));
+        List<ShareRequest> tekrar = List.of(new ShareRequest(a, 5000), new ShareRequest(a, 5000));
+
+        for (List<ShareRequest> shares : List.of(eksik, fazla, tekrar, List.<ShareRequest>of())) {
+            assertThatThrownBy(() -> service.create(ownershipRequest(Ownership.CO_OWNED, null, null, null, null, shares)))
+                    .isInstanceOf(InvalidSharesException.class);
+        }
+        verify(vehicleRepository, never()).save(any());
+    }
+
+    @Test
+    void ortakliArac_paylarKaydedilir_alisNormalYazilir() {
+        Contact furkan = contact("Furkan");
+        Contact selin = contact("Selin");
+        savesWithId();
+
+        service.create(ownershipRequest(Ownership.CO_OWNED, null, null, null, null,
+                List.of(new ShareRequest(furkan.getId(), 5000), new ShareRequest(selin.getId(), 5000))));
+
+        ArgumentCaptor<VehicleShare> shares = ArgumentCaptor.forClass(VehicleShare.class);
+        verify(shareRepository, times(2)).save(shares.capture());
+        assertThat(shares.getAllValues()).extracting(VehicleShare::getShareBp).containsExactly(5000, 5000);
+        assertThat(shares.getAllValues()).extracting(s -> s.getContact().getId()).containsExactly(furkan.getId(), selin.getId());
+        ArgumentCaptor<Vehicle> saved = ArgumentCaptor.forClass(Vehicle.class);
+        verify(vehicleRepository).save(saved.capture());
+        verify(paymentPlanService).syncPurchase(saved.getValue(), cashId, null);
+    }
+
+    @Test
+    void satis_konsinyeBorcunuEsitler_satisGeriAlininca_yeniden() {
+        UUID id = UUID.randomUUID();
+        Vehicle v = inStockVehicle(id, tenantId);
+        when(vehicleRepository.findById(id)).thenReturn(Optional.of(v));
+        when(contactRepository.findById(buyer.getId())).thenReturn(Optional.of(buyer));
+
+        service.sell(id, new VehicleSaleRequest(LocalDate.of(2026, 6, 20), buyer.getId(), null, 80000000L,
+                List.of(new InstallmentRequest(LocalDate.of(2026, 6, 20), 80000000L, PaymentMethod.CASH, null, null, true, cashId))));
+        service.undoSale(id);
+
+        verify(ledgerService, times(2)).syncConsignmentSettlement(v);
     }
 }

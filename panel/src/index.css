@@ -59,6 +59,12 @@
   --color-seri-5: #D6457F;      /* frambuaz */
   --color-seri-6: #6250D6;      /* mor */
   --color-izgara: #EBEDF0;      /* grafik izgara cizgisi */
+
+  /* Sahiplik rozetleri: durum renklerinden (yesil/kirmizi/turuncu/mavi) ayri tutulur */
+  --color-konsinye: #5B47C9;        /* konsinye: aracin sahibi baska biri */
+  --color-konsinye-zemin: #EFECFB;
+  --color-ortakli: #0B6E7F;         /* ozel ortakli arac */
+  --color-ortakli-zemin: #E2F1F4;
   --color-eksen: #CDD2D9;       /* grafik taban cizgisi */
 }
 

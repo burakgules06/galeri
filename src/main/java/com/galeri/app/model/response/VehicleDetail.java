@@ -2,6 +2,7 @@ package com.galeri.app.model.response;
 
 import com.galeri.app.model.enums.BodyPart;
 import com.galeri.app.model.enums.Fuel;
+import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.PartCondition;
 import com.galeri.app.model.enums.Transmission;
 import com.galeri.app.model.enums.VehicleStatus;
@@ -28,5 +29,6 @@ public record VehicleDetail(
         LocalDate purchaseDate,
         LocalDate saleDate,
         long daysInStock,
-        Map<BodyPart, PartCondition> parts
+        Map<BodyPart, PartCondition> parts,
+        Ownership ownership       // rozet icin; para ya da kisi bilgisi icermez
 ) {}

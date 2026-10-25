@@ -26,6 +26,11 @@ export type BodyPart =
   | "LEFT_FRONT_FENDER" | "LEFT_FRONT_DOOR" | "LEFT_REAR_DOOR" | "LEFT_REAR_FENDER"
   | "RIGHT_FRONT_FENDER" | "RIGHT_FRONT_DOOR" | "RIGHT_REAR_DOOR" | "RIGHT_REAR_FENDER";
 export type ContactType = "PERSON" | "ORGANIZATION";
+// Sahiplik: galeri (varsayilan), konsinye (sahibi bir kisi, galeri komisyon alir), ozel ortakli (paylar).
+export type Ownership = "DEALER" | "CONSIGNMENT" | "CO_OWNED";
+export type CommissionType = "RATE" | "FIXED";   // RATE: baz puan (%3 = 300), FIXED: kurus
+export interface ShareRequest { contactId: string; shareBp: number }
+export interface ShareResponse { contactId: string; name: string; shareBp: number; profitCents: number | null }
 
 export interface DamageSummary { locallyPainted: number; painted: number; replaced: number }
 
@@ -45,6 +50,7 @@ export interface VehicleSummary {
   daysInStock: number;
   damage: DamageSummary;
   buyer: ContactSummary | null;   // sadece ADMIN'de dolu
+  ownership: Ownership;
 }
 
 export interface VehicleDetail {
@@ -64,6 +70,7 @@ export interface VehicleDetail {
   saleDate: string | null;
   daysInStock: number;
   parts: Record<BodyPart, PartCondition>;
+  ownership: Ownership;
 }
 
 export interface ContactSummary { id: string; name: string; phone: string | null }
@@ -84,6 +91,11 @@ export interface VehicleDetailAdmin {
   soldBy: StaffSummary | null;
   salePriceCents: number | null;
   purchaseAccountId: string | null;
+  consignor: ContactSummary | null;      // konsinye: aracin sahibi
+  commissionType: CommissionType | null;
+  commissionRateBp: number | null;
+  commissionCents: number | null;
+  shares: ShareResponse[];               // ortakli: ortaklar ve paylari
 }
 
 export interface ContactResponse { id: string; name: string; phone: string | null; type: ContactType; notes: string | null }
@@ -102,7 +114,7 @@ export interface YearlyTrades { year: number; staff: StaffSummary[]; items: Trad
 // ---- Ana ekran (sadece ADMIN). Tutarlar kurus, paylar baz puan (10000 = %100). ----
 export interface PartnerShare { contactId: string; name: string; owner: boolean; capitalCents: number; shareBasisPoints: number }
 export interface ContactBalance { contactId: string; name: string; phone: string | null; amountCents: number }
-export interface MonthStat { year: number; month: number; bought: number; sold: number; revenueCents: number; profitCents: number }
+export interface MonthStat { year: number; month: number; bought: number; sold: number; revenueCents: number; profitCents: number; commissionCents: number }
 export interface DashboardResponse {
   cashCents: number;
   bankCents: number;
@@ -112,7 +124,8 @@ export interface DashboardResponse {
   partners: PartnerShare[];
   receivables: ContactBalance[];
   payables: ContactBalance[];
-  inStockCount: number;
+  inStockCount: number;           // konsinye haric
+  consignmentCount: number;       // stoktaki konsinye araclar; stok maliyetine girmez
   stockCostCents: number;
   averageDaysInStock: number;
   months: MonthStat[];
@@ -141,6 +154,12 @@ export interface VehicleRequest {
   officialPurchaseCents: number | null;
   purchaseAccountId: string | null;                // pesin alis
   purchasePlan: InstallmentRequest[] | null;       // senetli / taksitli alis (odenmis taksitler haric)
+  ownership: Ownership;
+  consignorId: string | null;
+  commissionType: CommissionType | null;
+  commissionRateBp: number | null;
+  commissionCents: number | null;
+  shares: ShareRequest[] | null;
 }
 
 export interface SaleRequest {
@@ -219,7 +238,8 @@ export interface ContactRequest { name: string; phone: string | null; type: Cont
 // ---- Para defteri (sadece ADMIN). Tutarlar kurus. ----
 export type AccountType = "CASH" | "BANK" | "BALANCE" | "CAPITAL" | "VEHICLE" | "EXPENSE" | "INCOME";
 export type LedgerEntryType =
-  | "VEHICLE_PURCHASE" | "VEHICLE_EXPENSE" | "GENERAL_EXPENSE" | "CAPITAL" | "VEHICLE_SALE" | "COLLECTION" | "PAYMENT";
+  | "VEHICLE_PURCHASE" | "VEHICLE_EXPENSE" | "GENERAL_EXPENSE" | "CAPITAL" | "VEHICLE_SALE" | "COLLECTION" | "PAYMENT"
+  | "CONSIGNMENT_SETTLEMENT";
 export type ExpenseRoot = "VEHICLE" | "GENERAL";
 
 export interface AccountSummary { id: string; type: AccountType; name: string }
@@ -243,14 +263,20 @@ export interface LedgerEntryResponse {
 
 export interface CategoryResponse { id: string; name: string; root: ExpenseRoot; parentId: string | null; usage: number }
 
+// CONSIGNMENT: purchase 0, expenseCents = galerinin ustlendigi masraf, kar = komisyon - expenseCents.
 export interface VehicleCost {
   vehicleId: string;
+  ownership: Ownership;
   purchaseCents: number;
   purchaseInLedger: boolean;
   expenseCents: number;
   totalCents: number;
   salePriceCents: number | null;
   profitCents: number | null;
+  commissionCents: number | null;
+  ownerPayoutCents: number | null;   // konsinye: sahibine borc (satis - komisyon)
+  ownerChargedCents: number;         // konsinye: sahibine yansitilan masraf
+  shares: ShareResponse[];           // ortakli: kardaki paylari
   entries: LedgerEntryResponse[];
 }
 
@@ -262,4 +288,7 @@ export interface ExpenseRequest {
   categoryId: string | null;
   categoryName: string | null;
   description: string | null;
+  chargeToOwner: boolean | null;   // konsinye aracta: masraf sahibinin carisine
 }
+
+export interface ContactPaymentRequest { accountId: string; date: string; amountCents: number; description: string | null }

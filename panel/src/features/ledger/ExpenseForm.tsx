@@ -1,13 +1,14 @@
 // Masraf girisi: araca bagliysa aracin maliyetine eklenir, degilse genel gider. Odeme kasadan ya da bankadan.
+// Konsinye aracta maliyet yok: masraf ya sahibine yansitilir (sahibi galeriye borclanir) ya da galerinin genel gideridir.
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
 import { tl, tlToCents, todayIso } from "../../shared/format";
-import type { ExpenseRoot, LedgerEntryResponse } from "../../shared/types";
+import type { ExpenseRoot, LedgerEntryResponse, Ownership } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
 import { CategoryPicker } from "./CategoryPicker";
 
-interface VehicleChoice { id: string; plate: string; make: string; model: string }
+interface VehicleChoice { id: string; plate: string; make: string; model: string; ownership?: Ownership }
 
 interface Props {
   open: boolean;
@@ -29,12 +30,15 @@ function ExpenseFormContent({ onClose, onSaved, vehicle }: Props) {
   const [accountId, setAccountId] = useState("");
   const [date, setDate] = useState(todayIso());
   const [description, setDescription] = useState("");
+  const [chargeToOwner, setChargeToOwner] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const accounts = useLoad(() => api.accounts(), []);
   const stock = useLoad(() => (vehicle ? Promise.resolve([]) : api.vehicles("", "IN_STOCK")), [vehicle?.id]);
   const selectedAccount = accountId || accounts.data?.[0]?.id || "";
+  const ownership = vehicle?.ownership ?? stock.data?.find((v) => v.id === vehicleId)?.ownership;
+  const consignment = root === "VEHICLE" && ownership === "CONSIGNMENT";
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -50,6 +54,7 @@ function ExpenseFormContent({ onClose, onSaved, vehicle }: Props) {
         date, sourceAccountId: selectedAccount, amountCents: cents,
         vehicleId: root === "VEHICLE" ? vehicleId : null, categoryId: null, categoryName: category.trim(),
         description: description.trim() || null,
+        chargeToOwner: consignment ? chargeToOwner : null,
       }));
     } catch (err) {
       setError(errorMessage(err));
@@ -75,11 +80,19 @@ function ExpenseFormContent({ onClose, onSaved, vehicle }: Props) {
         )}
 
         {!vehicle && root === "VEHICLE" && (
-          <Field label="Araç" hint="Masraf aracın maliyetine eklenir">
+          <Field label="Araç" hint={consignment ? undefined : "Masraf aracın maliyetine eklenir"}>
             <select className={inputClass} value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
               <option value="">Seç</option>
               {(stock.data ?? []).map((v) => <option key={v.id} value={v.id}>{v.plate} · {v.make} {v.model}</option>)}
             </select>
+          </Field>
+        )}
+
+        {consignment && (
+          <Field label="Konsinye araç: masrafı kim üstleniyor?"
+            hint={chargeToOwner ? "Aracın sahibinin carisine yazılır; sahibi galeriye borçlanır." : "Galerinin genel gideri olur; komisyondan düşülerek araç kârında görünür."}>
+            <Segment<"owner" | "dealer"> value={chargeToOwner ? "owner" : "dealer"} onChange={(v) => setChargeToOwner(v === "owner")}
+              options={[{ value: "dealer", label: "Galeri üstlenir" }, { value: "owner", label: "Sahibine yansıt" }]} />
           </Field>
         )}
 

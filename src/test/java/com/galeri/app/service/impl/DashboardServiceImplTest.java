@@ -4,7 +4,9 @@ import com.galeri.app.model.entity.Account;
 import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.AccountType;
+import com.galeri.app.model.enums.CommissionType;
 import com.galeri.app.model.enums.InstallmentStatus;
+import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.LedgerEntryType;
 import com.galeri.app.model.enums.PaymentMethod;
 import com.galeri.app.model.enums.PlanDirection;
@@ -137,6 +139,45 @@ class DashboardServiceImplTest {
         assertThat(june.sold()).isEqualTo(1);
         assertThat(june.revenueCents()).isEqualTo(130000L);
         assertThat(june.profitCents()).isEqualTo(25000L);
+    }
+
+    @Test
+    void konsinyeArac_stokSayisinaVeMaliyetineGirmez_ayriSayilir() {
+        Vehicle own = new Vehicle();
+        own.setId(UUID.randomUUID());
+        own.setPurchaseDate(LocalDate.of(2026, 6, 1));
+        own.setActualPurchaseCents(100000L);
+        Vehicle consigned = new Vehicle();
+        consigned.setId(UUID.randomUUID());
+        consigned.setPurchaseDate(LocalDate.of(2026, 3, 1));
+        consigned.setOwnership(Ownership.CONSIGNMENT);
+        when(vehicleRepository.findByTenantIdAndStatus(tenantId, VehicleStatus.IN_STOCK)).thenReturn(List.of(own, consigned));
+
+        DashboardResponse r = service.summary();
+
+        assertThat(r.inStockCount()).isEqualTo(1);
+        assertThat(r.consignmentCount()).isEqualTo(1);
+        assertThat(r.stockCostCents()).isEqualTo(100000L);
+        assertThat(r.averageDaysInStock()).isEqualTo(30);   // sadece galerinin araci (1 Haziran -> 1 Temmuz)
+    }
+
+    @Test
+    void konsinyeSatis_karaDegil_komisyonSatirinaYazilir() {
+        Vehicle consigned = new Vehicle();
+        consigned.setId(UUID.randomUUID());
+        consigned.setOwnership(Ownership.CONSIGNMENT);
+        consigned.setCommissionType(CommissionType.RATE);
+        consigned.setCommissionRateBp(300);
+        consigned.setPurchaseDate(LocalDate.of(2026, 5, 2));
+        consigned.setSaleDate(LocalDate.of(2026, 6, 15));
+        consigned.setSalePriceCents(130000000L);
+        when(vehicleRepository.findByTenantIdAndSaleDateBetween(any(), any(), any())).thenReturn(List.of(consigned));
+
+        MonthStat june = service.summary().months().get(4);
+
+        assertThat(june.revenueCents()).isEqualTo(130000000L);
+        assertThat(june.profitCents()).isZero();
+        assertThat(june.commissionCents()).isEqualTo(3900000L);
     }
 
     @Test

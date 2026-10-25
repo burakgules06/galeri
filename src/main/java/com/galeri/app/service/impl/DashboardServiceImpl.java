@@ -9,7 +9,9 @@ import com.galeri.app.model.enums.PlanDirection;
 import com.galeri.app.model.response.InstallmentResponse;
 import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.model.enums.LedgerEntryType;
+import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.VehicleStatus;
+import com.galeri.app.util.ConsignmentMath;
 import com.galeri.app.model.response.DashboardResponse;
 import com.galeri.app.model.response.DashboardResponse.ContactBalance;
 import com.galeri.app.model.response.DashboardResponse.MonthStat;
@@ -106,7 +108,10 @@ public class DashboardServiceImpl implements DashboardService {
         for (Object[] s : entryRepository.vehicleExpenseTotals(tenantId, LedgerEntryType.VEHICLE_EXPENSE, AccountType.VEHICLE)) {
             expenses.put((UUID) s[0], ((Number) s[1]).longValue());
         }
-        List<Vehicle> inStock = vehicleRepository.findByTenantIdAndStatus(tenantId, VehicleStatus.IN_STOCK);
+        // Konsinye araclar galerinin mali degil: stok sayisina ve maliyetine girmez, ayri sayilir
+        List<Vehicle> allInStock = vehicleRepository.findByTenantIdAndStatus(tenantId, VehicleStatus.IN_STOCK);
+        List<Vehicle> inStock = allInStock.stream().filter(v -> v.getOwnership() != Ownership.CONSIGNMENT).toList();
+        int consignmentCount = allInStock.size() - inStock.size();
         long stockCost = inStock.stream().mapToLong(v -> cost(v, expenses)).sum();
         long averageDays = inStock.isEmpty() ? 0
                 : Math.round(inStock.stream().mapToLong(v -> VehicleServiceImpl.daysInStock(v, today)).average().orElse(0));
@@ -121,7 +126,7 @@ public class DashboardServiceImpl implements DashboardService {
                 .filter(i -> !i.dueDate().isBefore(today) && !i.dueDate().isAfter(weekEnd)).toList();
 
         return new DashboardResponse(cash, bank, capital, receivable, payable, shares,
-                top(receivables), top(payables), inStock.size(), stockCost, averageDays,
+                top(receivables), top(payables), inStock.size(), consignmentCount, stockCost, averageDays,
                 months(tenantId, YearMonth.from(today), expenses),
                 overdue.size(), sum(overdue, null), week, sum(week, PlanDirection.SALE), sum(week, PlanDirection.PURCHASE));
     }
@@ -144,9 +149,16 @@ public class DashboardServiceImpl implements DashboardService {
         for (YearMonth m = first; !m.isAfter(current); m = m.plusMonths(1)) {
             List<Vehicle> s = sold.getOrDefault(m, List.of());
             long revenue = s.stream().mapToLong(v -> v.getSalePriceCents() == null ? 0 : v.getSalePriceCents()).sum();
-            long profit = s.stream().filter(v -> v.getSalePriceCents() != null)
+            // Arac kari galerinin (ve ortakli) araclarindan; konsinyeden gelen komisyon ayri satir (MIMARI §13 acik soru)
+            long profit = s.stream().filter(v -> v.getSalePriceCents() != null && v.getOwnership() != Ownership.CONSIGNMENT)
                     .mapToLong(v -> v.getSalePriceCents() - cost(v, expenses)).sum();
-            result.add(new MonthStat(m.getYear(), m.getMonthValue(), bought.getOrDefault(m, List.of()).size(), s.size(), revenue, profit));
+            long commission = s.stream().filter(v -> v.getOwnership() == Ownership.CONSIGNMENT)
+                    .mapToLong(v -> {
+                        Long c = ConsignmentMath.commission(v, v.getSalePriceCents());
+                        return c == null ? 0 : c;
+                    }).sum();
+            result.add(new MonthStat(m.getYear(), m.getMonthValue(), bought.getOrDefault(m, List.of()).size(), s.size(), revenue,
+                    profit, commission));
         }
         return result;
     }

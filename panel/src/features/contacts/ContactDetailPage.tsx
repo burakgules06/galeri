@@ -9,10 +9,12 @@ import { Plate } from "../../shared/ui/Plate";
 import { StatTile } from "../../shared/ui/StatTile";
 import { InstallmentRow } from "../payments/InstallmentRow";
 import { ContactForm } from "./ContactList";
+import { ContactPaymentForm } from "./ContactPaymentForm";
 
 export function ContactDetailPage({ id }: { id: string }) {
   const { data, error, reload } = useLoad(() => api.statement(id), [id]);
   const [editing, setEditing] = useState(false);
+  const [paying, setPaying] = useState(false);
 
   if (error) return <ErrorBox message={error} />;
   if (!data) return <p className="text-murekkep-2 py-10 text-center">Yükleniyor…</p>;
@@ -37,7 +39,10 @@ export function ContactDetailPage({ id }: { id: string }) {
           <p className="sayi text-[17px] text-murekkep-2 mt-0.5">{formatPhone(c.phone) || "Telefon yok"}</p>
           {c.notes && <p className="text-[14px] text-murekkep-3 mt-1 max-w-xl">{c.notes}</p>}
         </div>
-        <Button variant="secondary" onClick={() => setEditing(true)}>Düzenle</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setEditing(true)}>Düzenle</Button>
+          <Button variant={balance < 0 ? "primary" : "secondary"} onClick={() => setPaying(true)}>Öde</Button>
+        </div>
       </header>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -91,6 +96,8 @@ export function ContactDetailPage({ id }: { id: string }) {
           )}
       </section>
 
+      {paying && <ContactPaymentForm contact={c} debtCents={balance < 0 ? -balance : 0} onClose={() => setPaying(false)}
+        onSaved={() => { setPaying(false); reload(); }} />}
       {editing && <ContactForm existing={c} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); reload(); }} />}
     </div>
   );

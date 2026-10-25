@@ -6,6 +6,7 @@ import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.ExpenseRoot;
 import com.galeri.app.model.enums.PlanDirection;
 import com.galeri.app.model.request.AccountRequest;
+import com.galeri.app.model.request.ContactPaymentRequest;
 import com.galeri.app.model.request.ExpenseRequest;
 import com.galeri.app.model.response.AccountResponse;
 import com.galeri.app.model.response.CategoryResponse;
@@ -71,4 +72,16 @@ public interface LedgerService {
 
     /** Aracin gecerli alis hareketleri (duzeltme ve duzeltilmis olanlar haric). */
     List<LedgerEntry> activeVehiclePurchases(UUID vehicleId);
+
+    // ------------------------------------------------------------------ konsinye
+
+    /**
+     * Konsinye satisin sahibine borcunu aracin son haline esitler: satilmis konsinye aracta
+     * BALANCE(sahibi) -> INCOME (satis - komisyon), satis tarihinde. Arac stoktaysa, konsinye degilse ya da
+     * tutar/sahip/tarih degistiyse eski hareket terslenir. Satis, satisi geri alma ve arac guncellemesi cagirir.
+     */
+    void syncConsignmentSettlement(Vehicle vehicle);
+
+    /** Kisiye odeme (ornegin konsinye sahibine): PAYMENT kasa/banka -> BALANCE(kisi). Kismi olabilir. */
+    LedgerEntryResponse payContact(UUID contactId, ContactPaymentRequest request);
 }

@@ -4,6 +4,7 @@ import type { VehicleSummary } from "../../shared/types";
 import { Plate } from "../../shared/ui/Plate";
 import { DamageBadge } from "./DamageMap";
 import { DaysInStock } from "./DaysInStock";
+import { OwnershipBadge } from "./OwnershipBadge";
 
 export function VehicleCard({ v }: { v: VehicleSummary }) {
   const age = v.status !== "IN_STOCK" ? "bg-cizgi" : v.daysInStock >= 60 ? "bg-tehlike-canli" : v.daysInStock >= 30 ? "bg-boyali" : "bg-cizgi-2";
@@ -16,7 +17,10 @@ export function VehicleCard({ v }: { v: VehicleSummary }) {
           <Plate plate={v.plate} size="sm" />
           <DaysInStock days={v.daysInStock} status={v.status} />
         </div>
-        <p className="mt-3 font-semibold text-[17px] leading-snug truncate group-hover:text-plaka">{v.make} <span className="font-medium">{v.model}</span></p>
+        <p className="mt-3 flex items-center gap-2 min-w-0">
+          <span className="font-semibold text-[17px] leading-snug truncate group-hover:text-plaka">{v.make} <span className="font-medium">{v.model}</span></span>
+          <OwnershipBadge ownership={v.ownership} className="shrink-0" />
+        </p>
         <p className="mt-0.5 text-[13.5px] text-murekkep-2 truncate">
           <span className="font-semibold text-murekkep">{v.modelYear}</span>
           <span className="mx-1.5 text-murekkep-3">·</span>

@@ -4,6 +4,7 @@ import { api } from "../../api/galeri";
 import { useAuth } from "../../auth/useAuth";
 import { errorMessage } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass } from "../../shared/ui/Common";
+import { InstallCard } from "./InstallCard";
 
 export function AccountPage() {
   const { auth, isAdmin } = useAuth();
@@ -21,6 +22,7 @@ export function AccountPage() {
         {isAdmin && <a href="#/users" className="basilir text-plaka font-semibold text-[15px] hover:underline shrink-0">Kullanıcıları yönet ›</a>}
       </div>
 
+      <InstallCard />
       <ChangePasswordCard />
     </div>
   );

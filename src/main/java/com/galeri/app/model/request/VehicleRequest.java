@@ -1,6 +1,8 @@
 package com.galeri.app.model.request;
 
+import com.galeri.app.model.enums.CommissionType;
 import com.galeri.app.model.enums.Fuel;
+import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.Transmission;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -35,5 +37,18 @@ public record VehicleRequest(
         UUID purchaseAccountId,   // pesin alis: gercek alis bedeli bu kasa/banka hesabindan deftere yazilir
         // Planli (senetli / taksitli) alis: doluysa purchaseAccountId yok sayilir. Odenmis taksit varsa sadece
         // odenmemis satirlar gonderilir; odenmisler + bunlar gercek alis bedeline esit olmali.
-        List<@Valid InstallmentRequest> purchasePlan
-) {}
+        List<@Valid InstallmentRequest> purchasePlan,
+        // Sahiplik (bos = DEALER). CONSIGNMENT: sahibi + komisyon (oran baz puan ya da sabit kurus), alis deftere yazilmaz.
+        // CO_OWNED: ortaklar ve paylari (toplam 10000).
+        Ownership ownership,
+        UUID consignorId,
+        CommissionType commissionType,
+        @Min(0) @Max(10000) Integer commissionRateBp,
+        @PositiveOrZero Long commissionCents,
+        List<@Valid ShareRequest> shares
+) {
+
+    public Ownership ownershipOrDefault() {
+        return ownership == null ? Ownership.DEALER : ownership;
+    }
+}

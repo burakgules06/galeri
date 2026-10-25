@@ -1,6 +1,7 @@
 package com.galeri.app.service.impl;
 
 import com.galeri.app.exception.runtime.CategoryDepthLimitException;
+import com.galeri.app.exception.runtime.CommissionExceedsSaleException;
 import com.galeri.app.exception.runtime.CorrectionNotCorrectableException;
 import com.galeri.app.exception.runtime.EntryAlreadyCorrectedException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
@@ -13,17 +14,24 @@ import com.galeri.app.model.entity.ExpenseCategory;
 import com.galeri.app.model.entity.LedgerEntry;
 import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.Vehicle;
+import com.galeri.app.model.entity.VehicleShare;
 import com.galeri.app.model.enums.AccountType;
+import com.galeri.app.model.enums.CommissionType;
 import com.galeri.app.model.enums.ExpenseRoot;
 import com.galeri.app.model.enums.LedgerEntryType;
+import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.VehicleStatus;
+import com.galeri.app.model.request.ContactPaymentRequest;
 import com.galeri.app.model.request.ExpenseRequest;
 import com.galeri.app.model.response.AccountResponse;
 import com.galeri.app.model.response.LedgerEntryResponse;
+import com.galeri.app.model.response.ShareResponse;
 import com.galeri.app.model.response.VehicleCost;
 import com.galeri.app.repository.AccountRepository;
 import com.galeri.app.repository.ExpenseCategoryRepository;
+import com.galeri.app.repository.ContactRepository;
 import com.galeri.app.repository.InstallmentRepository;
+import com.galeri.app.repository.VehicleShareRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehicleRepository;
@@ -62,6 +70,8 @@ class LedgerServiceImplTest {
     @Mock private VehicleRepository vehicleRepository;
     @Mock private PanelUserRepository panelUserRepository;
     @Mock private InstallmentRepository installmentRepository;
+    @Mock private VehicleShareRepository shareRepository;
+    @Mock private ContactRepository contactRepository;
 
     private static final LocalDate DAY = LocalDate.of(2026, 7, 1);
 
@@ -75,7 +85,7 @@ class LedgerServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new LedgerServiceImpl(accountRepository, entryRepository, categoryRepository, vehicleRepository, panelUserRepository,
-                installmentRepository);
+                installmentRepository, shareRepository, contactRepository);
         TestSession.open(userId, tenantId, "ADMIN");
 
         cash = account(AccountType.CASH, tenantId);
@@ -199,7 +209,7 @@ class LedgerServiceImplTest {
         ExpenseCategory rent = category(ExpenseRoot.GENERAL, "Kira", null);
         when(categoryRepository.findById(rent.getId())).thenReturn(Optional.of(rent));
 
-        ExpenseRequest request = new ExpenseRequest(DAY, cash.getId(), 100L, vehicle.getId(), rent.getId(), null, null, null);
+        ExpenseRequest request = new ExpenseRequest(DAY, cash.getId(), 100L, vehicle.getId(), rent.getId(), null, null, null, null);
         assertThatThrownBy(() -> service.addExpense(request)).isInstanceOf(InvalidCategoryException.class);
     }
 
@@ -215,7 +225,7 @@ class LedgerServiceImplTest {
         when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
         when(accountRepository.findByVehicleId(vehicle.getId())).thenReturn(Optional.of(vehicleAccount(vehicle)));
 
-        ExpenseRequest request = new ExpenseRequest(DAY, cash.getId(), 100L, vehicle.getId(), null, "Filtre", c3.getId(), null);
+        ExpenseRequest request = new ExpenseRequest(DAY, cash.getId(), 100L, vehicle.getId(), null, "Filtre", c3.getId(), null, null);
         assertThatThrownBy(() -> service.addExpense(request)).isInstanceOf(CategoryDepthLimitException.class);
     }
 
@@ -456,10 +466,195 @@ class LedgerServiceImplTest {
         assertThat(cost.profitCents()).isNull();
     }
 
+    // ------------------------------------------------------------------ konsinye
+
+    @Test
+    void konsinyeSatis_sahibininCarisine_satisEksiKomisyonYazilir() {
+        Contact owner = contact("Burak Gules");
+        Account ownerBalance = balance(owner);
+        Account income = account(AccountType.INCOME, tenantId);
+        when(accountRepository.findFirstByTenantIdAndType(tenantId, AccountType.INCOME)).thenReturn(Optional.of(income));
+        Vehicle v = soldConsignment(owner, 130000000L);   // 1.300.000 TL, %3
+        when(entryRepository.findByVehicle_IdAndType(v.getId(), LedgerEntryType.CONSIGNMENT_SETTLEMENT)).thenReturn(List.of());
+
+        service.syncConsignmentSettlement(v);
+
+        ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
+        verify(entryRepository).save(saved.capture());
+        LedgerEntry e = saved.getValue();
+        assertThat(e.getType()).isEqualTo(LedgerEntryType.CONSIGNMENT_SETTLEMENT);
+        assertThat(e.getSourceAccount()).isSameAs(ownerBalance);   // sahibinin carisinden cikar: galeri sahibine borclu
+        assertThat(e.getTargetAccount()).isSameAs(income);         // INCOME'da net komisyon kalir
+        assertThat(e.getAmountCents()).isEqualTo(126100000L);      // 1.261.000 TL
+        assertThat(e.getEntryDate()).isEqualTo(v.getSaleDate());
+    }
+
+    @Test
+    void konsinyeBorcu_degismediyseYenidenYazilmaz_satisGeriAlininca_terslenir() {
+        Contact owner = contact("Burak Gules");
+        Account ownerBalance = balance(owner);
+        Account income = account(AccountType.INCOME, tenantId);
+        Vehicle v = soldConsignment(owner, 130000000L);
+        LedgerEntry existing = entry(LedgerEntryType.CONSIGNMENT_SETTLEMENT, ownerBalance, income, 126100000L);
+        existing.setEntryDate(v.getSaleDate());
+        when(entryRepository.findByVehicle_IdAndType(v.getId(), LedgerEntryType.CONSIGNMENT_SETTLEMENT)).thenReturn(List.of(existing));
+
+        service.syncConsignmentSettlement(v);
+        verify(entryRepository, never()).save(any());
+
+        v.setStatus(VehicleStatus.IN_STOCK);
+        v.setSalePriceCents(null);
+        v.setSaleDate(null);
+        service.syncConsignmentSettlement(v);
+
+        ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
+        verify(entryRepository).save(saved.capture());
+        assertThat(saved.getValue().getCorrectedEntryId()).isEqualTo(existing.getId());
+        assertThat(saved.getValue().getSourceAccount()).isSameAs(income);
+        assertThat(saved.getValue().getTargetAccount()).isSameAs(ownerBalance);
+    }
+
+    @Test
+    void sabitKomisyonSatistanBuyukse_reddedilir() {
+        Contact owner = contact("Burak Gules");
+        Vehicle v = soldConsignment(owner, 1000000L);
+        v.setCommissionType(CommissionType.FIXED);
+        v.setCommissionRateBp(null);
+        v.setCommissionCents(2000000L);
+        when(entryRepository.findByVehicle_IdAndType(v.getId(), LedgerEntryType.CONSIGNMENT_SETTLEMENT)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.syncConsignmentSettlement(v)).isInstanceOf(CommissionExceedsSaleException.class);
+    }
+
+    @Test
+    void konsinyeMasrafi_sahibineYansitilirsa_sahibininCarisine_yoksaGenelGidereYazilir() {
+        Contact owner = contact("Burak Gules");
+        Account ownerBalance = balance(owner);
+        Vehicle v = soldConsignment(owner, 130000000L);
+        v.setStatus(VehicleStatus.IN_STOCK);
+        when(vehicleRepository.findById(v.getId())).thenReturn(Optional.of(v));
+        ExpenseCategory paint = category(ExpenseRoot.VEHICLE, "Boya", null);
+        when(categoryRepository.findFirstByTenantIdAndRootAndParentIdIsNullAndNameIgnoreCase(tenantId, ExpenseRoot.VEHICLE, "Boya"))
+                .thenReturn(Optional.of(paint));
+
+        service.addExpense(new ExpenseRequest(DAY, cash.getId(), 500000L, v.getId(), null, "Boya", null, null, true));
+        service.addExpense(new ExpenseRequest(DAY, cash.getId(), 300000L, v.getId(), null, "Boya", null, null, false));
+
+        ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
+        verify(entryRepository, times(2)).save(saved.capture());
+        LedgerEntry charged = saved.getAllValues().get(0);
+        LedgerEntry absorbed = saved.getAllValues().get(1);
+        assertThat(charged.getSourceAccount()).isSameAs(cash);
+        assertThat(charged.getTargetAccount()).isSameAs(ownerBalance);   // sahibi galeriye borclanir
+        assertThat(charged.getVehicle()).isSameAs(v);
+        assertThat(absorbed.getTargetAccount()).isSameAs(expense);       // galerinin genel gideri
+        assertThat(absorbed.getVehicle()).isSameAs(v);
+        verify(accountRepository, never()).findByVehicleId(v.getId());   // konsinye araca maliyet hesabi acilmaz
+    }
+
+    @Test
+    void konsinyeMaliyeti_alisYok_kar_komisyonEksiUstlenilenMasraf() {
+        Contact owner = contact("Burak Gules");
+        Account ownerBalance = balance(owner);
+        Vehicle v = soldConsignment(owner, 130000000L);
+        when(vehicleRepository.findById(v.getId())).thenReturn(Optional.of(v));
+        when(entryRepository.vehicleEntries(v.getId())).thenReturn(List.of(
+                entry(LedgerEntryType.VEHICLE_EXPENSE, cash, ownerBalance, 500000L),
+                entry(LedgerEntryType.VEHICLE_EXPENSE, cash, expense, 300000L)));
+
+        VehicleCost cost = service.vehicleCost(v.getId());
+
+        assertThat(cost.purchaseCents()).isZero();
+        assertThat(cost.expenseCents()).isEqualTo(300000L);
+        assertThat(cost.ownerChargedCents()).isEqualTo(500000L);
+        assertThat(cost.commissionCents()).isEqualTo(3900000L);
+        assertThat(cost.ownerPayoutCents()).isEqualTo(126100000L);
+        assertThat(cost.profitCents()).isEqualTo(3600000L);   // 39.000 - 3.000
+    }
+
+    @Test
+    void ortakliAracKari_paylaraBolunur_kurusKalaniBuyukPayaGider() {
+        Vehicle v = vehicle();
+        v.setOwnership(Ownership.CO_OWNED);
+        v.setStatus(VehicleStatus.SOLD);
+        v.setSalePriceCents(72000001L);   // kar 0,01 TL: bolunemeyen kurus buyuk paya
+        when(vehicleRepository.findById(v.getId())).thenReturn(Optional.of(v));
+        when(entryRepository.vehicleEntries(v.getId())).thenReturn(List.of());
+        VehicleShare a = share(contact("Furkan"), 6000);
+        VehicleShare b = share(contact("Selin"), 4000);
+        when(shareRepository.findByVehicleIdWithContact(v.getId())).thenReturn(List.of(a, b));
+
+        VehicleCost cost = service.vehicleCost(v.getId());
+
+        assertThat(cost.profitCents()).isEqualTo(1L);
+        assertThat(cost.shares()).extracting(ShareResponse::profitCents).containsExactly(1L, 0L);
+    }
+
+    @Test
+    void kisiyeOdeme_kasadanCariyeYazilir() {
+        Contact owner = contact("Burak Gules");
+        Account ownerBalance = balance(owner);
+        when(contactRepository.findById(owner.getId())).thenReturn(Optional.of(owner));
+
+        LedgerEntryResponse res = service.payContact(owner.getId(), new ContactPaymentRequest(cash.getId(), DAY, 50000000L, null));
+
+        ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
+        verify(entryRepository).save(saved.capture());
+        assertThat(saved.getValue().getType()).isEqualTo(LedgerEntryType.PAYMENT);
+        assertThat(saved.getValue().getSourceAccount()).isSameAs(cash);
+        assertThat(saved.getValue().getTargetAccount()).isSameAs(ownerBalance);
+        assertThat(res.description()).isEqualTo("Ödeme");
+    }
+
+    @Test
+    void konsinyeBorcHareketi_kasaEkranindanDuzeltilemez() {
+        Account ownerBalance = account(AccountType.BALANCE, tenantId);
+        LedgerEntry e = entry(LedgerEntryType.CONSIGNMENT_SETTLEMENT, ownerBalance, account(AccountType.INCOME, tenantId), 100L);
+        when(entryRepository.findById(e.getId())).thenReturn(Optional.of(e));
+
+        assertThatThrownBy(() -> service.correct(e.getId())).isInstanceOf(LinkedEntryException.class);
+    }
+
     // ------------------------------------------------------------------ yardimcilar
 
+    private Contact contact(String name) {
+        Contact c = new Contact();
+        c.setId(UUID.randomUUID());
+        c.setTenantId(tenantId);
+        c.setName(name);
+        return c;
+    }
+
+    private Account balance(Contact c) {
+        Account a = account(AccountType.BALANCE, tenantId);
+        a.setContactId(c.getId());
+        when(accountRepository.findFirstByTenantIdAndTypeAndContactId(tenantId, AccountType.BALANCE, c.getId())).thenReturn(Optional.of(a));
+        return a;
+    }
+
+    private Vehicle soldConsignment(Contact owner, long salePrice) {
+        Vehicle v = vehicle();
+        v.setOwnership(Ownership.CONSIGNMENT);
+        v.setActualPurchaseCents(null);
+        v.setConsignor(owner);
+        v.setCommissionType(CommissionType.RATE);
+        v.setCommissionRateBp(300);
+        v.setStatus(VehicleStatus.SOLD);
+        v.setSaleDate(LocalDate.of(2026, 6, 20));
+        v.setSalePriceCents(salePrice);
+        return v;
+    }
+
+    private VehicleShare share(Contact c, int bp) {
+        VehicleShare s = new VehicleShare();
+        s.setId(UUID.randomUUID());
+        s.setContact(c);
+        s.setShareBp(bp);
+        return s;
+    }
+
     private ExpenseRequest expenseRequest(UUID sourceId, long amount, UUID vehicleId, String categoryName) {
-        return new ExpenseRequest(DAY, sourceId, amount, vehicleId, null, categoryName, null, null);
+        return new ExpenseRequest(DAY, sourceId, amount, vehicleId, null, categoryName, null, null, null);
     }
 
     private Account account(AccountType type, UUID tenant) {
