@@ -10,7 +10,9 @@ import { LedgerPage } from "../features/ledger/LedgerPage";
 import { MonthlyView } from "../features/monthly/MonthlyView";
 import { VehicleDetailPage } from "../features/vehicles/VehicleDetailPage";
 import { VehicleList } from "../features/vehicles/VehicleList";
+import { disablePush } from "../shared/push/push";
 import { useRoute, type Route } from "../shared/useRoute";
+import { NotificationButton } from "./NotificationButton";
 
 type Section = "home" | "vehicles" | "payments" | "ledger" | "monthly" | "contacts";
 
@@ -41,7 +43,9 @@ function readMenuOpen(): boolean {
 }
 
 export function Dashboard() {
-  const { auth, isAdmin, logout } = useAuth();
+  const { auth, isAdmin, logout: endSession } = useAuth();
+  // Cikista bu cihazin bildirim aboneligi de kapanir (ayni cihazda calisan oturum acarsa tutar gormesin)
+  const logout = () => { disablePush().catch(() => {}).finally(endSession); };
   const route = useRoute();
   const [open, setOpen] = useState(readMenuOpen);
   const sections: Section[] = isAdmin ? ["home", "vehicles", "payments", "ledger", "monthly", "contacts"] : ["home", "vehicles", "monthly"];
@@ -90,6 +94,7 @@ export function Dashboard() {
               <p className="text-[12px]">{isAdmin ? "Yönetici" : "Çalışan"}</p>
             </div>
           )}
+          {isAdmin && <NotificationButton expanded={open} className="mb-1" />}
           <div className={`flex gap-1 ${open ? "" : "flex-col items-center"}`}>
             <button onClick={toggle} aria-label={open ? "Menüyü daralt" : "Menüyü genişlet"} title={open ? "Menüyü daralt" : "Menüyü genişlet"}
               className="basilir w-10 h-10 rounded-[10px] grid place-items-center hover:bg-gece-2 hover:text-white">
@@ -110,9 +115,12 @@ export function Dashboard() {
             <span className="w-8 h-8 rounded-lg bg-seri-1 grid place-items-center font-cond font-bold text-[14px] shrink-0">{initials}</span>
             <p className="font-cond font-bold text-[19px] tracking-tight truncate">{auth?.tenantName || "Galeri"}</p>
           </div>
-          <button onClick={logout} aria-label="Çıkış yap" className="basilir w-10 h-10 rounded-lg grid place-items-center text-gece-yazi hover:bg-gece-2">
-            <Icon><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" /></Icon>
-          </button>
+          <div className="flex items-center gap-1 text-gece-yazi">
+            {isAdmin && <NotificationButton expanded={false} />}
+            <button onClick={logout} aria-label="Çıkış yap" className="basilir w-10 h-10 rounded-lg grid place-items-center hover:bg-gece-2">
+              <Icon><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" /></Icon>
+            </button>
+          </div>
         </header>
 
         <main className="px-4 md:px-8 py-5 md:py-8 pb-28 md:pb-10 max-w-[1240px] mx-auto">{content}</main>

@@ -63,11 +63,26 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
   - Dev seed: 205 BMW (Mehmet) gerçek alış planı: 600K ödendi, 500K 5 gün sonra, 500K 35 gün sonra.
     **Seed değişti: `docker compose down -v`, `docker compose up -d`.**
 
-## Sıradaki: Adım 3C, ödeme günü bildirimleri (`feat/payment-notifications`)
+- **Adım 3C: ödeme günü bildirimleri** (`feat/payment-notifications`). Kurallar `MIMARI.md` §9.
+  - `V6__push_notifications.sql`: `push_subscription` (endpoint tekil, kullanıcı silinirse düşer), `notification_log`
+    (unique `installment_id, notify_date`).
+  - `PaymentReminderJob` her gün 09:00 Europe/Istanbul `PaymentReminderService.sendDailyReminders()`'ı çağırır: bugün vadeli +
+    1-3 gün gecikmiş ödenmemiş taksitler, galeri başına tek bildirim, sadece aktif ADMIN abonelikleri. Hiç ADMIN abonesi
+    yoksa kayıt yazılmaz (sonra izin verilirse pencere içinde yine hatırlatılır). 404/410 dönen abonelik silinir.
+    Gönderim `aes128gcm` (iOS için şart). Lokal denemede saat `push.reminder-cron` ile değiştirilebilir.
+  - Uçlar (sadece ADMIN): `GET /api/push/public-key` (boşsa bildirim kapalı), `POST/DELETE /api/push/subscribe`.
+  - Yeni `.env`: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`npx web-push generate-vapid-keys`). Boşsa görev çalışmaz.
+  - Panel: `public/sw.js` (bildirim, tıklayınca `#/payments`), menünün altında / telefonda üst çubukta zil düğmesi
+    (turuncu nokta kapalı, yeşil açık, üstü çizili engelli). Çıkışta cihazın aboneliği silinir.
+  - Migration var, seed değişmedi.
 
-MIMARI §9: web push (Akıllı Randevum'daki altyapı), her gün 09:00 Europe/Istanbul, bugün vadesi gelen ve 1-3 gün gecikmiş
-ödenmemiş taksitler için ADMIN'e tek toplu bildirim, `notification_log` ile tekrar engeli. Yeni ayarlar: `VAPID_*`.
-Dükkân sahibini ve ortak sermayesini panelden girmek Adım 5'te.
+## Sıradaki
+
+Adım 4 (konsinye araçlar) ya da Adım 5 (sermaye). Dükkân sahibini ve ortak sermayesini panelden girmek Adım 5'te.
+
+Adım 3C'den açık sorular:
+- iPhone'da web push sadece "Ana Ekrana Ekle" ile kurulmuş PWA'da çalışır; panelde henüz `manifest.webmanifest` yok.
+- Bildirim gönderilen ADMIN'ler arasında hepsi başarısız olursa kayıt yazılmaz ve ertesi tetiklemede tekrar denenir (günde bir).
 
 Adım 3A / 3B'den açık sorular:
 - Planlı alışta Evim/kredi (kurumdan alış) yöntemi panelde sunulmuyor; gerekirse eklenir (backend destekliyor).

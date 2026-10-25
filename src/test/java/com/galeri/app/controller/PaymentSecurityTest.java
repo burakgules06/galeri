@@ -1,5 +1,8 @@
 package com.galeri.app.controller;
 
+import com.galeri.app.config.PushProperties;
+import com.galeri.app.repository.PanelUserRepository;
+import com.galeri.app.repository.PushSubscriptionRepository;
 import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.service.VehicleService;
 import com.galeri.app.service.impl.GenericResponseService;
@@ -32,10 +35,14 @@ class PaymentSecurityTest {
         @Bean GenericResponseService genericResponseService() { return new GenericResponseService(); }
         @Bean InstallmentController installmentController(PaymentPlanService s, GenericResponseService r) { return new InstallmentController(s, r); }
         @Bean VehicleController vehicleController(VehicleService v, PaymentPlanService s, GenericResponseService r) { return new VehicleController(v, s, r); }
+        @Bean PushController pushController(GenericResponseService r) {
+            return new PushController(new PushProperties("", "", ""), Mockito.mock(PushSubscriptionRepository.class), Mockito.mock(PanelUserRepository.class), r);
+        }
     }
 
     @Autowired private InstallmentController installments;
     @Autowired private VehicleController vehicles;
+    @Autowired private PushController push;
 
     @AfterEach
     void tearDown() {
@@ -50,6 +57,15 @@ class PaymentSecurityTest {
         assertThatThrownBy(() -> installments.undo(UUID.randomUUID())).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> vehicles.paymentPlans(UUID.randomUUID())).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> vehicles.undoSale(UUID.randomUUID())).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void calisan_bildirimeAboneOlamaz_403() {
+        TestSession.open(UUID.randomUUID(), UUID.randomUUID(), "STAFF");
+
+        assertThatThrownBy(() -> push.publicKey()).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> push.subscribe(new PushController.SubscribeRequest("https://push.example/x",
+                new PushController.SubscribeRequest.Keys("p", "a")))).isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
