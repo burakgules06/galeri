@@ -10,6 +10,11 @@ public final class PhoneUtil {
         return "*".repeat(phone.length() - 4) + phone.substring(phone.length() - 4);
     }
 
+    /** Normalize edilmis Turkiye cep telefonu mu: 905XXXXXXXXX. */
+    public static boolean isValidMobile(String normalized) {
+        return normalized != null && normalized.matches("^905\\d{9}$");
+    }
+
     /**
      * Telefonu standart 90XXXXXXXXXX formatina cevirir.
      * 5301390726 / 05301390726 / +90 530 139 07 26 -> 905301390726

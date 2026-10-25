@@ -1,5 +1,6 @@
 package com.galeri.app.security;
 
+import com.galeri.app.repository.PanelUserRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -25,9 +26,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(JwtAuthFilter.class);
 
     private final JwtService jwtService;
+    private final PanelUserRepository panelUserRepository;
 
-    public JwtAuthFilter(JwtService jwtService) {
+    public JwtAuthFilter(JwtService jwtService, PanelUserRepository panelUserRepository) {
         this.jwtService = jwtService;
+        this.panelUserRepository = panelUserRepository;
     }
 
     @Override
@@ -47,8 +50,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String tenantStr = claims.get("tenantId", String.class);
                 UUID tenantId = (tenantStr != null) ? UUID.fromString(tenantStr) : null;   // SUPER_ADMIN icin null
 
-                String role = claims.get("role", String.class);
-                if (role == null) role = "STAFF";
+                // Pasiflestirilen kullanici token'i bitmeden de disari cikar; rol degisikligi hemen gecerli olur
+                String role = panelUserRepository.findActiveRole(userId).orElse(null);
+                if (role == null) {
+                    log.debug("Pasif ya da silinmis kullanici: {}", userId);
+                    chain.doFilter(request, response);
+                    return;
+                }
 
                 var auth = new UsernamePasswordAuthenticationToken(
                         new PanelPrincipal(userId, tenantId, role),

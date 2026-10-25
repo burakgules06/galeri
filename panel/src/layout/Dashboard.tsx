@@ -10,11 +10,13 @@ import { LedgerPage } from "../features/ledger/LedgerPage";
 import { MonthlyView } from "../features/monthly/MonthlyView";
 import { VehicleDetailPage } from "../features/vehicles/VehicleDetailPage";
 import { VehicleList } from "../features/vehicles/VehicleList";
+import { AccountPage } from "../features/users/AccountPage";
+import { UsersPage } from "../features/users/UsersPage";
 import { disablePush } from "../shared/push/push";
 import { useRoute, type Route } from "../shared/useRoute";
 import { NotificationButton } from "./NotificationButton";
 
-type Section = "home" | "vehicles" | "payments" | "ledger" | "monthly" | "contacts";
+type Section = "home" | "vehicles" | "payments" | "ledger" | "monthly" | "contacts" | "users";
 
 const ICON: Record<Section, ReactNode> = {
   home: <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" />,
@@ -23,19 +25,24 @@ const ICON: Record<Section, ReactNode> = {
   monthly: <path d="M4 19V9M10 19V5M16 19v-7M3 19h18" />,
   ledger: <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h15A1.5 1.5 0 0 1 21 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 16.5zM3 10h18M7 14.5h3" />,
   contacts: <path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.6c2 .7 3.2 2.6 3.6 5.4" />,
+  users: <path d="M12 3.5l7 2.6v5.2c0 4.4-3 7.9-7 9.2-4-1.3-7-4.8-7-9.2V6.1zM12 11.5a2.3 2.3 0 1 0 0-4.6 2.3 2.3 0 0 0 0 4.6zM8.3 16c.6-1.8 2-2.8 3.7-2.8s3.1 1 3.7 2.8" />,
 };
+const ACCOUNT_ICON = <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20.5c.9-3.6 3.9-5.8 7.5-5.8s6.6 2.2 7.5 5.8" />;
 
 const LABEL: Record<Section, string> = {
-  home: "Ana sayfa", vehicles: "Araçlar", payments: "Ödemeler", ledger: "Kasa", monthly: "Alım ve satım", contacts: "Kişiler",
+  home: "Ana sayfa", vehicles: "Araçlar", payments: "Ödemeler", ledger: "Kasa", monthly: "Alım ve satım", contacts: "Kişiler", users: "Kullanıcılar",
 };
 const SHORT_LABEL: Record<Section, string> = {
-  home: "Ana sayfa", vehicles: "Araçlar", payments: "Ödemeler", ledger: "Kasa", monthly: "Alım-satım", contacts: "Kişiler",
+  home: "Ana sayfa", vehicles: "Araçlar", payments: "Ödemeler", ledger: "Kasa", monthly: "Alım-satım", contacts: "Kişiler", users: "Kullanıcılar",
 };
 
 const MENU_KEY = "galeri_menu_open";
 
-function sectionOf(route: Route): Section {
-  return route.page === "vehicle" ? "vehicles" : route.page === "contact" ? "contacts" : route.page;
+function sectionOf(route: Route): Section | null {
+  if (route.page === "vehicle") return "vehicles";
+  if (route.page === "contact") return "contacts";
+  if (route.page === "account") return null;
+  return route.page;
 }
 
 function readMenuOpen(): boolean {
@@ -48,7 +55,9 @@ export function Dashboard() {
   const logout = () => { disablePush().catch(() => {}).finally(endSession); };
   const route = useRoute();
   const [open, setOpen] = useState(readMenuOpen);
-  const sections: Section[] = isAdmin ? ["home", "vehicles", "payments", "ledger", "monthly", "contacts"] : ["home", "vehicles", "monthly"];
+  const sections: Section[] = isAdmin ? ["home", "vehicles", "payments", "ledger", "monthly", "contacts", "users"] : ["home", "vehicles", "monthly"];
+  // Telefon alt sekmesi dolu: Kullanicilar'a Hesabim sayfasindan gidilir
+  const tabs = sections.filter((s) => s !== "users");
   const active = sectionOf(route);
   const initials = (auth?.tenantName || "Galeri").split(" ").map((w) => w[0]).slice(0, 2).join("").toLocaleUpperCase("tr-TR");
 
@@ -65,6 +74,8 @@ export function Dashboard() {
     : route.page === "contact" && isAdmin ? <ContactDetailPage id={route.id} />
     : route.page === "contacts" && isAdmin ? <ContactList />
     : route.page === "ledger" && isAdmin ? <LedgerPage />
+    : route.page === "users" && isAdmin ? <UsersPage />
+    : route.page === "account" ? <AccountPage />
     : <HomePage />;
 
   return (
@@ -88,12 +99,17 @@ export function Dashboard() {
         </nav>
 
         <div className={`border-t border-gece-cizgi py-3 ${open ? "px-4" : "px-3"}`}>
-          {open && (
-            <div className="mb-2 px-1">
-              <p className="font-semibold text-[14px] text-white truncate">{auth?.fullName}</p>
-              <p className="text-[12px]">{isAdmin ? "Yönetici" : "Çalışan"}</p>
-            </div>
-          )}
+          <a href="#/account" aria-current={route.page === "account" ? "page" : undefined} title={open ? undefined : "Hesabım"} aria-label="Hesabım"
+            className={`basilir mb-1 flex items-center gap-2.5 rounded-[10px] hover:bg-gece-2 hover:text-white ${open ? "px-2 py-1.5" : "w-10 h-10 justify-center"} ${
+              route.page === "account" ? "bg-gece-2 text-white" : ""}`}>
+            <Icon>{ACCOUNT_ICON}</Icon>
+            {open && (
+              <span className="min-w-0">
+                <span className="block font-semibold text-[14px] text-white truncate">{auth?.fullName}</span>
+                <span className="block text-[12px]">{isAdmin ? "Yönetici" : "Çalışan"} · Hesabım</span>
+              </span>
+            )}
+          </a>
           {isAdmin && <NotificationButton expanded={open} className="mb-1" />}
           <div className={`flex gap-1 ${open ? "" : "flex-col items-center"}`}>
             <button onClick={toggle} aria-label={open ? "Menüyü daralt" : "Menüyü genişlet"} title={open ? "Menüyü daralt" : "Menüyü genişlet"}
@@ -117,6 +133,9 @@ export function Dashboard() {
           </div>
           <div className="flex items-center gap-1 text-gece-yazi">
             {isAdmin && <NotificationButton expanded={false} />}
+            <a href="#/account" aria-label="Hesabım" className={`basilir w-10 h-10 rounded-lg grid place-items-center hover:bg-gece-2 ${route.page === "account" ? "bg-gece-2 text-white" : ""}`}>
+              <Icon>{ACCOUNT_ICON}</Icon>
+            </a>
             <button onClick={logout} aria-label="Çıkış yap" className="basilir w-10 h-10 rounded-lg grid place-items-center hover:bg-gece-2">
               <Icon><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" /></Icon>
             </button>
@@ -128,7 +147,7 @@ export function Dashboard() {
 
       {/* Telefon: alt sekmeler */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-yuzey border-t border-cizgi flex pb-[env(safe-area-inset-bottom)]">
-        {sections.map((s) => (
+        {tabs.map((s) => (
           <a key={s} href={`#/${s === "home" ? "" : s}`} aria-current={active === s ? "page" : undefined}
             className={`relative grow basis-0 min-w-0 flex flex-col items-center gap-0.5 pt-2.5 pb-2 text-[10.5px] font-semibold whitespace-nowrap ${active === s ? "text-plaka" : "text-murekkep-3"}`}>
             {active === s && <span className="absolute top-0 inset-x-4 h-[3px] rounded-b bg-plaka" />}

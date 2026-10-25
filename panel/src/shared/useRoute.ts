@@ -1,5 +1,5 @@
 // Basit hash yonlendirme: #/ (ana ekran), #/vehicles, #/vehicles/<id>, #/payments, #/monthly,
-// #/contacts, #/contacts/<id>, #/ledger
+// #/contacts, #/contacts/<id>, #/ledger, #/users, #/account
 import { useEffect, useState } from "react";
 
 export type Route =
@@ -10,7 +10,9 @@ export type Route =
   | { page: "monthly" }
   | { page: "contacts" }
   | { page: "contact"; id: string }
-  | { page: "ledger" };
+  | { page: "ledger" }
+  | { page: "users" }
+  | { page: "account" };
 
 function parse(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
@@ -19,6 +21,8 @@ function parse(hash: string): Route {
   if (parts[0] === "monthly") return { page: "monthly" };
   if (parts[0] === "contacts") return parts[1] ? { page: "contact", id: parts[1] } : { page: "contacts" };
   if (parts[0] === "ledger") return { page: "ledger" };
+  if (parts[0] === "users") return { page: "users" };
+  if (parts[0] === "account") return { page: "account" };
   return { page: "home" };
 }
 

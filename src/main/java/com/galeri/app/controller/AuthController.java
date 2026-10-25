@@ -4,11 +4,13 @@ import com.galeri.app.constant.ErrorMessageConstant;
 import com.galeri.app.model.GenericResponse;
 import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.Tenant;
+import com.galeri.app.model.request.UserRequests;
 import com.galeri.app.model.response.LoginResponse;
 import com.galeri.app.model.response.MeResponse;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.security.CurrentUser;
 import com.galeri.app.security.JwtService;
+import com.galeri.app.service.UserService;
 import com.galeri.app.service.impl.GenericResponseService;
 import com.galeri.app.util.PhoneUtil;
 import jakarta.validation.Valid;
@@ -35,6 +37,7 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final GenericResponseService responseService;
+    private final UserService userService;
 
     public record LoginRequest(@NotBlank String phone, @NotBlank String password) {}
 
@@ -61,6 +64,13 @@ public class AuthController {
                 user.getFullName() != null ? user.getFullName() : "",
                 user.getRole(),
                 tenant != null ? tenant.getDisplayName() : "")));
+    }
+
+    /** Herkes kendi sifresini degistirir; mevcut sifre zorunlu. */
+    @PostMapping("/change-password")
+    public ResponseEntity<GenericResponse<Void>> changePassword(@Valid @RequestBody UserRequests.ChangePassword req) {
+        userService.changeOwnPassword(req);
+        return ResponseEntity.ok(responseService.success(null));
     }
 
     /** Panel acilisinda token hala gecerli mi diye kontrol etmek icin. */

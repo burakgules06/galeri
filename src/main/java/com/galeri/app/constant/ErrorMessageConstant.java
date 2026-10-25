@@ -30,4 +30,9 @@ public class ErrorMessageConstant {
     public static final int PURCHASE_TOTAL_MISMATCH = 1024;
     public static final int SELLER_REQUIRED = 1025;
     public static final int PURCHASE_HAS_PAYMENTS = 1026;
+    public static final int PHONE_ALREADY_USED = 1027;
+    public static final int LAST_ACTIVE_ADMIN = 1028;
+    public static final int SELF_CHANGE_NOT_ALLOWED = 1029;
+    public static final int WRONG_PASSWORD = 1030;
+    public static final int INVALID_PHONE = 1031;
 }
