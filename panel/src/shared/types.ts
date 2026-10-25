@@ -69,6 +69,10 @@ export interface VehicleDetail {
 export interface ContactSummary { id: string; name: string; phone: string | null }
 export interface StaffSummary { id: string; name: string | null }
 
+// Kullanicilar ekrani (sadece ADMIN). self: oturumdaki kullanicinin kendisi.
+export type UserRole = "ADMIN" | "STAFF";
+export interface UserResponse { id: string; fullName: string | null; phone: string; role: UserRole; active: boolean; self: boolean }
+
 // Sadece ADMIN'e gelir. STAFF'a dogrudan VehicleDetail gelir.
 export interface VehicleDetailAdmin {
   vehicle: VehicleDetail;

@@ -76,9 +76,28 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
     (turuncu nokta kapalı, yeşil açık, üstü çizili engelli). Çıkışta cihazın aboneliği silinir.
   - Migration var, seed değişmedi.
 
+- **Adım 4A: ilk kurulum ve kullanıcı yönetimi** (`feat/users-bootstrap`). Migration yok.
+  - İlk kurulum: `BootstrapRunner` → `BootstrapService`. Beş `BOOTSTRAP_*` değişkeninin hepsi doluysa ve hiç galeri yoksa
+    galeriyi (`ACTIVE`) ve ADMIN'i oluşturur. Galeri varsa "Bootstrap atlandi" loglar, eksik/geçersiz değerde çalışmaz.
+    Şifre loglanmaz. Kullanım aşağıda "Prod kurulumu".
+  - Uçlar (ADMIN): `GET/POST /api/users`, `PATCH /api/users/{id}` (ad, rol, aktif), `POST /api/users/{id}/reset-password`.
+    Herkes: `POST /api/auth/change-password` (mevcut şifre zorunlu). Şifre en az 8 karakter. Kullanıcı silinmez, pasifleştirilir.
+  - Kurallar: telefon `PhoneUtil` ile normalize, geçerli cep telefonu ve tüm sistemde tekil. ADMIN kendini pasifleştiremez
+    ve rolünü düşüremez; galeride en az bir aktif ADMIN kalır. Telefon sonradan değiştirilemez.
+  - **JWT filtresi her istekte kullanıcıyı DB'den okur**: pasifleştirilen kullanıcının açık oturumu hemen 401 alır, rol değişikliği
+    hemen geçerli olur (token'daki rol artık kullanılmıyor).
+  - Hata kodları: 1027 telefon kayıtlı, 1028 son aktif yönetici, 1029 kendini değiştiremez, 1030 mevcut şifre hatalı, 1031 geçersiz telefon.
+  - Panel: `#/users` Kullanıcılar (sol menü, sadece yönetici; telefonda Hesabım'dan), `#/account` Hesabım + Şifremi değiştir
+    (herkes; sol menü altında isim, telefonda üst çubukta kişi ikonu).
+  - Seed değişmedi.
+
 ## Sıradaki
 
-Adım 4 (konsinye araçlar) ya da Adım 5 (sermaye). Dükkân sahibini ve ortak sermayesini panelden girmek Adım 5'te.
+PR 4B: konsinye ve ortaklı araç (`feat/consignment`). Sonra PR 5: sermaye, kâr ve kasa işlemleri.
+
+Adım 4A'dan açık sorular:
+- Şifre sıfırlama/değiştirme açık oturumları kapatmıyor (token 24 saat geçerli). Gerekirse `panel_user.token_version` ile yapılır.
+- Kullanıcı telefonu değiştirilemiyor; gerekirse yeni kullanıcı + eskisini pasifleştir.
 
 Adım 3C'den açık sorular:
 - iPhone'da web push sadece "Ana Ekrana Ekle" ile kurulmuş PWA'da çalışır; panelde henüz `manifest.webmanifest` yok.
@@ -103,8 +122,16 @@ Adım 2'den kalan küçükler (gerekirse):
    `/opt/galeri/.env`, `galeri.service`, Nginx + SSL). Tekrar çalıştırmak güvenli.
 3. Repo secret'ları (`DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, `DEPLOY_HOST`) eklenmiş mi kontrol et, sonra Actions > Deploy (prod).
 4. Panel: `npm run build`, `dist` içeriği `/var/www/galeri-panel/`.
-5. **İlk ADMIN kullanıcısı**: prod'da seed yok (dev seed sadece dev profilinde). Galeri (tenant) ve ADMIN'i
-   eklemenin yolu henüz yok; tek seferlik SQL ya da küçük bir komut olarak hazırlanacak.
+5. **İlk galeri ve ADMIN** (prod'da seed yok): `/opt/galeri/.env`'e bir kez yaz:
+   ```
+   BOOTSTRAP_TENANT_NAME=Galeri Adı
+   BOOTSTRAP_TENANT_SLUG=galeri-adi          # küçük harf, rakam, tire
+   BOOTSTRAP_ADMIN_NAME=Ad Soyad
+   BOOTSTRAP_ADMIN_PHONE=0530 111 22 33      # giriş telefonu
+   BOOTSTRAP_ADMIN_PASSWORD=...              # en az 8 karakter, girişten sonra Hesabım'dan değiştir
+   ```
+   `systemctl restart galeri` → `journalctl -u galeri | grep Bootstrap` ile "Bootstrap tamam" gör → bu beş satırı `.env`'den sil →
+   tekrar restart. Galeri varken çalıştırılırsa hiçbir şey yapmaz ("Bootstrap atlandi"). Çalışanları sonra panelden Kullanıcılar'dan ekle.
 
 ## Açık sorular
 

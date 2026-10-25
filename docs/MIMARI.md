@@ -227,6 +227,10 @@ Uygulama (Adım 3C):
 Bu kısıt **backend'de** uygulanır: STAFF'a dönen DTO'larda para alanları hiç yer almaz,
 para uç noktaları STAFF için 403 döner. Sadece arayüzde gizlemek yetmez.
 
+Kullanıcılar (Adım 4A): ADMIN çalışan ve yönetici ekler, rolünü değiştirir, pasifleştirir, şifresini sıfırlar; herkes kendi şifresini
+değiştirir. Kullanıcı silinmez (araçtaki alan/satan çalışan kaydı bozulmasın). Galeride her zaman en az bir aktif ADMIN kalır,
+ADMIN kendini pasifleştiremez. Rol ve aktiflik her istekte DB'den okunur; pasifleştirme açık oturumu hemen kapatır.
+
 ## 11. Veri modeli (özet)
 
 | Tablo | Önemli alanlar |

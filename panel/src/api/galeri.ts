@@ -3,7 +3,7 @@ import type {
   AccountResponse, BodyPart, CategoryResponse, ContactRequest, ContactResponse, DashboardResponse, ExpenseRequest, ExpenseRoot,
   YearlyTrades, PaymentPlanResponse, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
   LedgerEntryResponse, MonthlyTrades, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
-  VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary,
+  VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary, UserResponse, UserRole,
 } from "../shared/types";
 
 const json = (body: unknown, method = "POST"): RequestInit => ({ method, body: JSON.stringify(body) });
@@ -51,6 +51,15 @@ export const api = {
   addExpense: (request: ExpenseRequest) => apiFetch<LedgerEntryResponse>("/api/expenses", json(request)),
   categories: (root: ExpenseRoot) => apiFetch<CategoryResponse[]>(`/api/expense-categories?root=${root}`),
   vehicleCost: (vehicleId: string) => apiFetch<VehicleCost>(`/api/vehicles/${vehicleId}/cost`),
+  // Kullanicilar (sadece ADMIN) ve herkesin kendi sifresi
+  users: () => apiFetch<UserResponse[]>("/api/users"),
+  addUser: (request: { fullName: string; phone: string; role: UserRole; password: string }) =>
+    apiFetch<UserResponse>("/api/users", json(request)),
+  updateUser: (id: string, request: { fullName: string; role: UserRole; active: boolean }) =>
+    apiFetch<UserResponse>(`/api/users/${id}`, json(request, "PATCH")),
+  resetUserPassword: (id: string, password: string) => apiFetch<void>(`/api/users/${id}/reset-password`, json({ password })),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    apiFetch<void>("/api/auth/change-password", json({ currentPassword, newPassword })),
   // Odeme gunu bildirimleri (sadece ADMIN); anahtar bossa sunucuda bildirim kapali
   pushPublicKey: () => apiFetch<{ publicKey: string }>("/api/push/public-key"),
   subscribePush: (endpoint: string, p256dh: string, auth: string) =>
