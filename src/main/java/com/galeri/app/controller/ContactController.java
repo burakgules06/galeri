@@ -5,6 +5,9 @@ import com.galeri.app.model.request.ContactRequest;
 import com.galeri.app.model.response.ContactResponse;
 import com.galeri.app.model.response.ContactStatement;
 import com.galeri.app.service.ContactService;
+import com.galeri.app.model.request.ContactPaymentRequest;
+import com.galeri.app.model.response.LedgerEntryResponse;
+import com.galeri.app.service.LedgerService;
 import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.service.impl.GenericResponseService;
 import jakarta.validation.Valid;
@@ -24,6 +27,7 @@ public class ContactController {
 
     private final ContactService contactService;
     private final PaymentPlanService paymentPlanService;
+    private final LedgerService ledgerService;
     private final GenericResponseService responseService;
 
     @GetMapping
@@ -35,6 +39,12 @@ public class ContactController {
     @GetMapping("/{id}/statement")
     public GenericResponse<ContactStatement> statement(@PathVariable UUID id) {
         return responseService.success(paymentPlanService.statement(id));
+    }
+
+    // Kisiye odeme (konsinye sahibine satis parasi vb.): kasa/bankadan kisinin carisine, kismi olabilir.
+    @PostMapping("/{id}/payments")
+    public GenericResponse<LedgerEntryResponse> pay(@PathVariable UUID id, @Valid @RequestBody ContactPaymentRequest request) {
+        return responseService.success(ledgerService.payContact(id, request));
     }
 
     @PostMapping

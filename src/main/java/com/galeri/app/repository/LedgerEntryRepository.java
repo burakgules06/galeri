@@ -55,11 +55,13 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> 
 
     List<LedgerEntry> findByVehicle_IdAndType(UUID vehicleId, LedgerEntryType type);
 
-    // Arac bazinda masraf toplami (duzeltmeler ters yonde oldugu icin kendiliginden duser): [vehicleId, totalCents]
+    // Arac bazinda maliyete giren masraf toplami (duzeltmeler ters yonde oldugu icin kendiliginden duser): [vehicleId, totalCents].
+    // Sadece aracin maliyet hesabina (VEHICLE) dokunanlar: konsinye aracin genel gidere ya da sahibine yazilan masraflari sayilmaz.
     @Query("""
             select e.vehicle.id, sum(case when e.targetAccount.type = :vehicleType then e.amountCents else -e.amountCents end)
             from LedgerEntry e
             where e.tenantId = :tenantId and e.type = :type and e.vehicle is not null
+              and (e.targetAccount.type = :vehicleType or e.sourceAccount.type = :vehicleType)
             group by e.vehicle.id
             """)
     List<Object[]> vehicleExpenseTotals(@Param("tenantId") UUID tenantId, @Param("type") LedgerEntryType type,

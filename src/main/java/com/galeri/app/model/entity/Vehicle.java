@@ -1,5 +1,6 @@
 package com.galeri.app.model.entity;
 
+import com.galeri.app.model.enums.CommissionType;
 import com.galeri.app.model.enums.Fuel;
 import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.Transmission;
@@ -98,4 +99,19 @@ public class Vehicle extends BaseModel {
 
     @Column(name = "sale_price_cents")
     private Long salePriceCents;
+
+    // ---- konsinye (sadece CONSIGNMENT'ta dolu; V7 CHECK) ----
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "consignor_id")
+    private Contact consignor;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "commission_type", length = 5)
+    private CommissionType commissionType;
+
+    @Column(name = "commission_rate_bp")
+    private Integer commissionRateBp;
+
+    @Column(name = "commission_cents")
+    private Long commissionCents;
 }

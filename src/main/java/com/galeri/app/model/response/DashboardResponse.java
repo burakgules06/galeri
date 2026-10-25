@@ -14,7 +14,8 @@ public record DashboardResponse(
         List<PartnerShare> partners,
         List<ContactBalance> receivables,
         List<ContactBalance> payables,
-        int inStockCount,
+        int inStockCount,               // galerinin ve ortakli stoktaki araclar (konsinye haric)
+        int consignmentCount,           // stoktaki konsinye araclar; stok maliyetine girmez
         long stockCostCents,
         long averageDaysInStock,
         List<MonthStat> months,
@@ -31,6 +32,9 @@ public record DashboardResponse(
     /** Bir kisinin carisi: amountCents her zaman pozitif, yonu listeden belli. */
     public record ContactBalance(UUID contactId, String name, String phone, long amountCents) {}
 
-    /** Son aylar: alinan / satilan adet, satis cirosu ve satilan araclarin kari. */
-    public record MonthStat(int year, int month, int bought, int sold, long revenueCents, long profitCents) {}
+    /**
+     * Son aylar: alinan / satilan adet, satis cirosu (konsinye dahil), satilan galeri araclarinin kari ve
+     * konsinye satislardan komisyon (ayri satir; sermaye karina girip girmeyecegi acik soru, MIMARI §13).
+     */
+    public record MonthStat(int year, int month, int bought, int sold, long revenueCents, long profitCents, long commissionCents) {}
 }

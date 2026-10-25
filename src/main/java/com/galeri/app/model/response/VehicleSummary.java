@@ -1,6 +1,7 @@
 package com.galeri.app.model.response;
 
 import com.galeri.app.model.enums.Fuel;
+import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.Transmission;
 import com.galeri.app.model.enums.VehicleStatus;
 
@@ -23,5 +24,6 @@ public record VehicleSummary(
         LocalDate saleDate,
         long daysInStock,
         DamageSummary damage,
-        ContactSummary buyer
+        ContactSummary buyer,
+        Ownership ownership       // rozet icin (konsinye / ortakli); para icermez
 ) {}

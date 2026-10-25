@@ -17,5 +17,8 @@ public record ExpenseRequest(
         UUID categoryId,
         @Size(max = 60) String categoryName,
         UUID parentCategoryId,
-        @Size(max = 500) String description
+        @Size(max = 500) String description,
+        // Sadece konsinye aracta: true ise masraf sahibinin carisine yazilir (sahibi galeriye borclanir),
+        // degilse galerinin genel gideridir. Diger araclarda yok sayilir.
+        Boolean chargeToOwner
 ) {}

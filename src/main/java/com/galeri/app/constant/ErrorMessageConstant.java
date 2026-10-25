@@ -35,4 +35,7 @@ public class ErrorMessageConstant {
     public static final int SELF_CHANGE_NOT_ALLOWED = 1029;
     public static final int WRONG_PASSWORD = 1030;
     public static final int INVALID_PHONE = 1031;
+    public static final int CONSIGNMENT_DETAILS_REQUIRED = 1032;
+    public static final int INVALID_SHARES = 1033;
+    public static final int COMMISSION_EXCEEDS_SALE = 1034;
 }
