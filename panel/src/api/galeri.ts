@@ -51,6 +51,11 @@ export const api = {
   addExpense: (request: ExpenseRequest) => apiFetch<LedgerEntryResponse>("/api/expenses", json(request)),
   categories: (root: ExpenseRoot) => apiFetch<CategoryResponse[]>(`/api/expense-categories?root=${root}`),
   vehicleCost: (vehicleId: string) => apiFetch<VehicleCost>(`/api/vehicles/${vehicleId}/cost`),
+  // Odeme gunu bildirimleri (sadece ADMIN); anahtar bossa sunucuda bildirim kapali
+  pushPublicKey: () => apiFetch<{ publicKey: string }>("/api/push/public-key"),
+  subscribePush: (endpoint: string, p256dh: string, auth: string) =>
+    apiFetch<void>("/api/push/subscribe", json({ endpoint, keys: { p256dh, auth } })),
+  unsubscribePush: (endpoint: string) => apiFetch<void>("/api/push/subscribe", json({ endpoint }, "DELETE")),
 };
 
 export function isAdminDetail(d: VehicleDetail | VehicleDetailAdmin): d is VehicleDetailAdmin {

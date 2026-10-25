@@ -210,6 +210,13 @@ Galeri sahibine, vadesi gelen ödemeler için telefonuna bildirim gider (Akıll�
 - Bildirimler sadece `ADMIN` kullanıcılara gider (tutar içerdikleri için).
 - Bildirim gönderimi bir kayıt tablosuna yazılır; aynı taksit için aynı gün iki kez bildirim gitmez.
 
+Uygulama (Adım 3C):
+- Tek kayıtta metin: tahsilatta ayrılma eki ("Ali Yılmaz'dan"), ödemede yönelme eki ("Mehmet Demir'e"), yöntem kelimesi
+  (senet / kurum / havale, nakitte yok). Gecikmişte: "Ayşe Demir'den 395.000 TL havale tahsilatı 1 gün gecikti (34 ABC 123)".
+- Birden fazlada: "Bugün 3 tahsilat, 1 ödeme (1 gecikmiş)". Dokununca `/#/payments`.
+- Hiç ADMIN abonesi yoksa ya da hiçbir gönderim başarılı olmazsa `notification_log` yazılmaz.
+- Abonelik endpoint'e göre tekildir: aynı cihazda başka ADMIN izin verirse ona geçer; çıkışta panel aboneliği siler.
+
 ## 10. Yetki
 
 | Rol | Görür |
@@ -233,11 +240,11 @@ para uç noktaları STAFF için 403 döner. Sadece arayüzde gizlemek yetmez.
 | `vehicle_share` | vehicle_id, contact_id, share_percent (sadece CO_OWNED) |
 | `payment_plan` | vehicle_id, direction (SALE/PURCHASE), contact_id, total_cents, created_by_id; unique (vehicle_id, direction) |
 | `installment` | plan_id, seq, due_date, amount_cents, method, note_no, payer_contact_id, paid_entry_id, paid_at; index (tenant_id, due_date) ödenmemişler için |
-| `push_subscription` | panel_user_id, endpoint, anahtarlar (Akıllı Randevum'daki gibi) |
-| `notification_log` | installment_id, date, sent_at (aynı gün tekrarını önler) |
+| `push_subscription` | panel_user_id, endpoint (unique), p256dh, auth |
+| `notification_log` | installment_id, notify_date, sent_at; unique (installment_id, notify_date) |
 
 Hepsi `tenant_id` taşır ve tenant'a göre filtrelenir. Tablo/kolon adları İngilizce (bkz. §14 sözlük);
-henüz yazılmamış tabloların (`vehicle_share`, `push_subscription` ...) adları plandır, migration'ı yazılırken kesinleşir.
+henüz yazılmamış tabloların (`vehicle_share` ...) adları plandır, migration'ı yazılırken kesinleşir.
 
 ## 12. Yol haritası
 
@@ -247,7 +254,7 @@ Her adım ayrı bir PR; her biri bittiğinde galericiye gösterilebilir.
    - Çalışan bazında aylık alım-satım görünümü (para içermediği için bu adımda yapılabilir).
 2. **Para defteri:** hesaplar, hareket tablosu, kasa/banka bakiyesi, araç alışı (peşin), masraf girişi (kategori yazarken oluşur), araç maliyeti.
 3. **Satış ve tahsilat:** satış kaydı, ödeme planı (peşin, taksit, senet, Evim, kredi), tahsilat, geciken ödemeler, müşteri carisi.
-   - Ödeme günü bildirimleri (web push).
+   - Ödeme günü bildirimleri (web push). (Yapıldı, Adım 3C.)
 4. **Konsinye araçlar:** sahiplik türü, komisyon, sahibin carisi.
 5. **Sermaye:** sermaye hareketleri, paylar, dönem kârı, "kâr payını sermayeye ekle".
 6. **Raporlar ve ana ekran:** kategori bazında giderler, araç kârlılığı, stok yaşı; ana ekran özeti.
