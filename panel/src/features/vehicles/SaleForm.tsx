@@ -9,6 +9,7 @@ import { Button, ErrorBox, Field, inputClass, Modal } from "../../shared/ui/Comm
 import { ContactPicker } from "../contacts/ContactPicker";
 import { cashPlan, rowProblem, toRequest, type PlanMode, type PlanRow } from "../payments/plan";
 import { PlanBuilder, PlanSummary } from "../payments/PlanBuilder";
+import { NumberInput } from "../../shared/ui/NumberInput";
 
 interface Props { open: boolean; onClose: () => void; vehicle: VehicleDetailAdmin; onSaved: (d: VehicleDetailAdmin) => void }
 
@@ -83,8 +84,8 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
               onCreated={(c) => setExtraContacts((l) => [c, ...l])} placeholder="İsim yaz ya da seç" />
           </Field>
           <Field label="Satış bedeli" hint="TL">
-            <input className={`${inputClass} sayi text-[19px] font-semibold`} value={priceText} onChange={(e) => changePrice(e.target.value)}
-              inputMode="decimal" placeholder="1.400.000" />
+            <NumberInput className={`${inputClass} sayi text-[19px] font-semibold`} value={priceText} onValueChange={changePrice}
+              placeholder="1.400.000" />
           </Field>
           <Field label="Satış tarihi">
             <input type="date" className={inputClass} value={date} min={vehicle.vehicle.purchaseDate} onChange={(e) => setDate(e.target.value)} required />

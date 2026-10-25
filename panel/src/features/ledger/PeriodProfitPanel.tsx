@@ -9,6 +9,7 @@ import { Button, Empty, ErrorBox, Field, inputClass, Modal, Segment } from "../.
 import { Plate } from "../../shared/ui/Plate";
 import { StatTile } from "../../shared/ui/StatTile";
 import { OwnershipBadge } from "../vehicles/OwnershipBadge";
+import { NumberInput } from "../../shared/ui/NumberInput";
 
 type Preset = "month" | "lastMonth" | "quarter" | "year" | "custom";
 
@@ -204,8 +205,8 @@ function AllocationForm({ partner, period, onClose, onSaved }: {
           bu dönem eklenen <b className="sayi text-[16px] text-murekkep">{tl(partner.allocatedCents)}</b>. Tutarı ortaklar belirler.
         </p>
         <Field label="Sermayeye eklenecek tutar" hint="Gelirdeki kâr ortağın sermayesine geçer; payı buna göre değişir.">
-          <input className={`${inputClass} font-cond text-[18px]`} value={amount} onChange={(e) => setAmount(e.target.value)}
-            inputMode="decimal" placeholder="250.000" autoFocus />
+          <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount}
+            placeholder="250.000" autoFocus />
         </Field>
         <Field label="Tarih"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
       </form>

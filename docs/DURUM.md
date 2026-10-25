@@ -133,6 +133,10 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
   - Panel: Kasa'da "Hareketler / Ortaklar ve sermaye / Dönem kârı" sekmeleri, başlıkta "Açılış bakiyesi" ve "Virman".
   - Seed değişmedi.
 
+- **Sayı girişleri** (`fix/number-inputs`). Bütün tutar, kilometre, taksit sayısı, yüzde ve telefon alanları `NumberInput`:
+  yazarken `1.250.000,50` / `64.000` / `0530 111 22 33`. Önceden "1250.50" yazılınca noktalar silinip 125.050 TL oluyordu;
+  artık nokta yok sayılır ve kullanıcı farkı ekranda görür. Kuralı `design/README.md` "Sayı girişi". Sadece panel.
+
 ## Sıradaki
 
 Yol haritasının 6. adımı (raporlar ve ana ekranın son hali) galericiden geri bildirim gelince planlanacak.

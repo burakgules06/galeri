@@ -53,6 +53,10 @@ Kalınlık, incelik ve renk birlikte hiyerarşi kurar: etiket soluk ve küçük,
 - **Sermaye kartı** (`CapitalCard`): halka + ortak listesi; sahip ilk sırada "Dükkân sahibi" rozetiyle; her ortakta toplamdaki pay ve sahibe oranı. Liste satırına gelince halkada o dilim öne çıkar.
 - **Alacak/verecek kartı** (`BalancesCard`): iki büyük tutar, oran şeridi, en büyük 5 kişi (çubuk + telefon), net durum.
 - Kişi seçimi: yatay kayan yuvarlak çipler (baş harf avatarı). Telefonda taşarsa kayar, satır kırılmaz.
+- **Sayı girişi** her zaman `NumberInput` (`shared/ui/NumberInput.tsx`): yazarken basamaklarına ayrılır, Türkçe yazım.
+  Tutar `1.250.000,50` (binlik nokta, kuruş virgül, en fazla 2 hane; nokta yazılırsa yok sayılır), kilometre ve adet `64.000`,
+  telefon `0530 111 22 33`. Değer biçimli metindir; tutar `tlToCents`, sayı noktaları atılarak okunur. Model yılı gruplanmaz.
+  Düz `<input inputMode="decimal">` ile tutar alanı yazılmaz.
 
 ## Yerleşim ve mobil
 

@@ -6,6 +6,7 @@ import { centsToInput, tl, tlToCents, todayIso } from "../../shared/format";
 import type { ContactResponse } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
+import { NumberInput } from "../../shared/ui/NumberInput";
 
 export function ContactPaymentForm({ contact, debtCents, onClose, onSaved }: {
   contact: ContactResponse; debtCents: number; onClose: () => void; onSaved: () => void;
@@ -54,8 +55,8 @@ export function ContactPaymentForm({ contact, debtCents, onClose, onSaved }: {
         <Field label="Tutar" hint={debtCents > 0 && cents && !Number.isNaN(cents)
           ? after > 0 ? `Ödemeden sonra kalan borç: ${tl(after)}` : after === 0 ? "Borç kapanır." : `Fazla ödeme: ${tl(-after)} (kişi bize borçlanır)`
           : "TL"}>
-          <input className={`${inputClass} font-cond text-[18px]`} value={amount} onChange={(e) => setAmount(e.target.value)}
-            inputMode="decimal" placeholder="250.000" autoFocus />
+          <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount}
+            placeholder="250.000" autoFocus />
         </Field>
         <Field label="Nereden ödendi">
           {accounts.data && (

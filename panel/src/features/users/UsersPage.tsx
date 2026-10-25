@@ -6,6 +6,7 @@ import { formatPhone } from "../../shared/format";
 import type { UserResponse, UserRole } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, Empty, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
+import { NumberInput } from "../../shared/ui/NumberInput";
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: "STAFF", label: "Çalışan" },
@@ -121,7 +122,7 @@ function UserForm({ existing, onClose, onSaved }: { existing: UserResponse | nul
               <p className="sayi text-[18px] text-murekkep-2">{formatPhone(existing.phone)}</p>
             </Field>
           : <Field label="Cep telefonu (giriş için)">
-              <input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="0530 111 22 33" required />
+              <NumberInput kind="phone" value={phone} onValueChange={setPhone} placeholder="0530 111 22 33" required />
             </Field>}
         <Field label="Rol" hint={self ? "Kendi rolünüzü düşüremezsiniz." : undefined}>
           {self ? <p className="font-semibold">Yönetici</p> : <Segment<UserRole> value={role} onChange={setRole} options={ROLE_OPTIONS} />}

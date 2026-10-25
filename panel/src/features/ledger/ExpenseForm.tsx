@@ -7,6 +7,7 @@ import type { ExpenseRoot, LedgerEntryResponse, Ownership } from "../../shared/t
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
 import { CategoryPicker } from "./CategoryPicker";
+import { NumberInput } from "../../shared/ui/NumberInput";
 
 interface VehicleChoice { id: string; plate: string; make: string; model: string; ownership?: Ownership }
 
@@ -97,8 +98,8 @@ function ExpenseFormContent({ onClose, onSaved, vehicle }: Props) {
         )}
 
         <Field label="Tutar" hint="TL">
-          <input className={`${inputClass} font-cond text-[18px]`} value={amount} onChange={(e) => setAmount(e.target.value)}
-            inputMode="decimal" placeholder="5.000" autoFocus />
+          <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount}
+            placeholder="5.000" autoFocus />
         </Field>
 
         <Field label="Kategori">

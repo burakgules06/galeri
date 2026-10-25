@@ -5,6 +5,7 @@ import { addMonthsIso, centsToInput, METHOD, tl, tlToCents } from "../../shared/
 import type { AccountResponse, ContactResponse, PaymentMethod } from "../../shared/types";
 import { Button, Field, inputClass, Segment } from "../../shared/ui/Common";
 import { cashPlan, installmentPlan, institutionPlan, row, rowProblem, type PlanMode, type PlanRow } from "./plan";
+import { NumberInput } from "../../shared/ui/NumberInput";
 
 const MODE_LABEL: Record<PlanMode, string> = {
   CASH: "Peşin", INSTALLMENTS: "Taksit / senet", INSTITUTION: "Evim / kredi", MIXED: "Karma",
@@ -94,8 +95,8 @@ function InstallmentGenerator({ price, date, account, methods, downHint, onBuild
   return (
     <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
-        <Field label="Peşinat" hint={downHint}><input className={inputClass} value={down} onChange={(e) => setDown(e.target.value)} inputMode="decimal" placeholder="300.000" /></Field>
-        <Field label="Taksit sayısı"><input className={inputClass} value={count} onChange={(e) => setCount(e.target.value)} inputMode="numeric" /></Field>
+        <Field label="Peşinat" hint={downHint}><NumberInput value={down} onValueChange={setDown} placeholder="300.000" /></Field>
+        <Field label="Taksit sayısı"><NumberInput kind="integer" value={count} onValueChange={setCount} /></Field>
         <Field label="İlk vade"><input type="date" className={inputClass} value={firstDue} onChange={(e) => setFirstDue(e.target.value)} /></Field>
         <Field label="Yöntem">
           <select className={inputClass} value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
@@ -126,7 +127,7 @@ function InstitutionGenerator({ price, date, account, organizations, downHint, o
   return (
     <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
       <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
-        <Field label="Peşinat (alıcıdan)" hint={downHint}><input className={inputClass} value={down} onChange={(e) => setDown(e.target.value)} inputMode="decimal" placeholder="290.000" /></Field>
+        <Field label="Peşinat (alıcıdan)" hint={downHint}><NumberInput value={down} onValueChange={setDown} placeholder="290.000" /></Field>
         <Field label="Kurum" hint={organizations.length ? undefined : "Kişiler'de kurum ekle"}>
           <select className={inputClass} value={orgId} onChange={(e) => setOrgId(e.target.value)}>
             <option value="">Seç</option>
@@ -161,7 +162,7 @@ function RowEditor({ r, problem, accounts, organizations, methods, paidNowLabel,
     <div className={`rounded-[12px] border p-2.5 md:p-2 grid gap-2 grid-cols-2 md:grid-cols-[140px_150px_140px_1fr_40px] md:items-center ${
       problem ? "border-uyari bg-uyari-zemin/40" : r.paidNow ? "border-basari/30 bg-basari-zemin/50" : "border-cizgi bg-yuzey"}`}>
       <input type="date" className={`${inputClass} h-9`} value={r.dueDate} onChange={(e) => onChange({ dueDate: e.target.value })} aria-label="Vade" />
-      <input className={`${inputClass} h-9 sayi text-[16px]`} value={text} onChange={(e) => changeAmount(e.target.value)} inputMode="decimal" aria-label="Tutar" />
+      <NumberInput className={`${inputClass} h-9 sayi text-[16px]`} value={text} onValueChange={changeAmount} aria-label="Tutar" />
       <select className={`${inputClass} h-9`} value={r.method} aria-label="Yöntem"
         onChange={(e) => onChange({ method: e.target.value as PaymentMethod, payer: null })}>
         {methods.map((m) => <option key={m} value={m}>{METHOD[m]}</option>)}
