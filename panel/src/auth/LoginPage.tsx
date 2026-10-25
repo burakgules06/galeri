@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { login as loginRequest } from "../api/client";
 import { ApiError } from "../shared/errors/ApiError";
 import { useAuth } from "./useAuth";
+import { NumberInput } from "../shared/ui/NumberInput";
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -33,12 +34,12 @@ export function LoginPage() {
 
         <label className="block">
           <span className="text-[13px] font-semibold text-murekkep-2">Telefon</span>
-          <input
-            type="tel"
+          <NumberInput
+            kind="phone"
             autoComplete="username"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="5XX XXX XX XX"
+            onValueChange={setPhone}
+            placeholder="0530 111 22 33"
             required
             className="mt-1 w-full rounded-lg border border-cizgi-2 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-plaka/20 focus:border-plaka"
           />

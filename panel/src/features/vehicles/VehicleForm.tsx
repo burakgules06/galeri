@@ -3,8 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
 import {
-  bpToInput, centsToInput, formatDate, formatPlate, FUEL, METHOD, percentToBp, tl, tlToCents, todayIso, TRANSMISSION,
+  bpToInput, centsToInput, formatDate, formatNumber, formatPlate, FUEL, METHOD, percentToBp, tl, tlToCents, todayIso, TRANSMISSION,
 } from "../../shared/format";
+import { NumberInput } from "../../shared/ui/NumberInput";
 import type {
   CommissionType, ContactResponse, ContactSummary, Fuel, Ownership, PaymentPlanResponse, Transmission, VehicleDetailAdmin,
   VehicleRequest,
@@ -56,7 +57,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const [year, setYear] = useState(v ? String(v.modelYear) : "");
   const [fuel, setFuel] = useState<Fuel>(v?.fuel ?? "GASOLINE");
   const [transmission, setTransmission] = useState<Transmission>(v?.transmission ?? "MANUAL");
-  const [mileage, setMileage] = useState(v ? String(v.mileageKm) : "");
+  const [mileage, setMileage] = useState(v ? formatNumber(v.mileageKm) : "");
   const [color, setColor] = useState(v?.color ?? "");
   const [tramer, setTramer] = useState(centsToInput(v?.tramerCents));
   const [notes, setNotes] = useState(v?.notes ?? "");
@@ -166,7 +167,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Marka"><input className={inputClass} value={make} onChange={(e) => setMake(e.target.value)} required placeholder="Volkswagen" /></Field>
-            <Field label="Model yılı"><input className={inputClass} value={year} onChange={(e) => setYear(e.target.value)} required inputMode="numeric" placeholder="2021" /></Field>
+            <Field label="Model yılı"><input className={inputClass} value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))} required inputMode="numeric" placeholder="2021" /></Field>
           </div>
           <Field label="Model"><input className={inputClass} value={model} onChange={(e) => setModel(e.target.value)} required placeholder="Passat 1.5 TSI Business" /></Field>
           <Field label="Yakıt">
@@ -176,11 +177,11 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
             <Segment<Transmission> value={transmission} onChange={setTransmission} options={(Object.keys(TRANSMISSION) as Transmission[]).map((t) => ({ value: t, label: TRANSMISSION[t] }))} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Kilometre"><input className={inputClass} value={mileage} onChange={(e) => setMileage(e.target.value)} required inputMode="numeric" placeholder="64000" /></Field>
+            <Field label="Kilometre"><NumberInput kind="integer" value={mileage} onValueChange={setMileage} required placeholder="64.000" /></Field>
             <Field label="Renk"><input className={inputClass} value={color} onChange={(e) => setColor(e.target.value)} placeholder="Beyaz" /></Field>
           </div>
           <Field label="Tramer (hasar kaydı)" hint="TL, yoksa boş bırak">
-            <input className={inputClass} value={tramer} onChange={(e) => setTramer(e.target.value)} inputMode="decimal" placeholder="18.500" />
+            <NumberInput value={tramer} onValueChange={setTramer} placeholder="18.500" />
           </Field>
         </section>
 
@@ -204,10 +205,10 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
                 </Field>
                 {commissionType === "RATE"
                   ? <Field label="Oran" hint="Satış bedelinin yüzdesi">
-                      <input className={inputClass} value={commissionRate} onChange={(e) => setCommissionRate(e.target.value)} inputMode="decimal" placeholder="3" />
+                      <NumberInput value={commissionRate} onValueChange={setCommissionRate} placeholder="3" />
                     </Field>
                   : <Field label="Tutar" hint="TL">
-                      <input className={inputClass} value={commissionFixed} onChange={(e) => setCommissionFixed(e.target.value)} inputMode="decimal" placeholder="25.000" />
+                      <NumberInput value={commissionFixed} onValueChange={setCommissionFixed} placeholder="25.000" />
                     </Field>}
               </div>
             </>
@@ -220,8 +221,8 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
                   <ContactPicker contacts={allContacts} selected={r.contact} onSelect={(c) => updateShare(r.key, { contact: c })}
                     onCreated={(c) => setExtraContacts((l) => [c, ...l])} placeholder="Ortak" />
                   <div className="relative">
-                    <input className={`${inputClass} pr-7 text-right`} value={r.percent} inputMode="decimal" placeholder="50" aria-label="Pay yüzdesi"
-                      onChange={(e) => updateShare(r.key, { percent: e.target.value })} />
+                    <NumberInput className={`${inputClass} pr-7 text-right`} value={r.percent} placeholder="50" aria-label="Pay yüzdesi"
+                      onValueChange={(percent) => updateShare(r.key, { percent })} />
                     <span className="absolute right-2.5 top-2 text-murekkep-3">%</span>
                   </div>
                   <button type="button" aria-label="Ortağı kaldır" disabled={shares.length <= 1}
@@ -259,10 +260,10 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Gerçek alış bedeli" hint="Kâr bununla hesaplanır">
-              <input className={inputClass} value={actual} onChange={(e) => setActual(e.target.value)} inputMode="decimal" placeholder="1.250.000" />
+              <NumberInput value={actual} onValueChange={setActual} placeholder="1.250.000" />
             </Field>
             <Field label="Resmi alış bedeli" hint="Belgedeki tutar">
-              <input className={inputClass} value={official} onChange={(e) => setOfficial(e.target.value)} inputMode="decimal" placeholder="980.000" />
+              <NumberInput value={official} onValueChange={setOfficial} placeholder="980.000" />
             </Field>
           </div>
           </>}

@@ -7,6 +7,7 @@ import type { ContactResponse, ContactSummary, OpeningSide } from "../../shared/
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
 import { ContactPicker } from "../contacts/ContactPicker";
+import { NumberInput } from "../../shared/ui/NumberInput";
 
 export function TransferForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const accounts = useLoad(() => api.accounts(), []);
@@ -51,8 +52,8 @@ export function TransferForm({ onClose, onSaved }: { onClose: () => void; onSave
         <Field label="Nereden"><Segment<string> value={from} onChange={setFromId} options={options} /></Field>
         <Field label="Nereye"><Segment<string> value={to} onChange={setToId} options={options.filter((o) => o.value !== from)} /></Field>
         <Field label="Tutar" hint="Toplam nakit değişmez; para bir hesaptan diğerine geçer.">
-          <input className={`${inputClass} font-cond text-[18px]`} value={amount} onChange={(e) => setAmount(e.target.value)}
-            inputMode="decimal" placeholder="50.000" autoFocus />
+          <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount}
+            placeholder="50.000" autoFocus />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Tarih"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
@@ -130,7 +131,7 @@ export function OpeningBalanceForm({ onClose, onSaved }: { onClose: () => void; 
         )}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Tutar" hint="TL">
-            <input className={`${inputClass} font-cond text-[18px]`} value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="120.000" />
+            <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount} placeholder="120.000" />
           </Field>
           <Field label="Tarih" hint="Sisteme geçiş günü"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
         </div>

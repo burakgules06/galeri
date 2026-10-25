@@ -5,6 +5,7 @@ import { formatPhone } from "../../shared/format";
 import type { ContactResponse, ContactType } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, Empty, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
+import { NumberInput } from "../../shared/ui/NumberInput";
 
 export function ContactList() {
   const [q, setQ] = useState("");
@@ -51,7 +52,7 @@ export function ContactList() {
 
 export function ContactForm({ existing, onClose, onSaved }: { existing: ContactResponse | null; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(existing?.name ?? "");
-  const [phone, setPhone] = useState(existing?.phone ?? "");
+  const [phone, setPhone] = useState(formatPhone(existing?.phone));
   const [type, setType] = useState<ContactType>(existing?.type ?? "PERSON");
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +77,7 @@ export function ContactForm({ existing, onClose, onSaved }: { existing: ContactR
           <Segment<ContactType> value={type} onChange={setType} options={[{ value: "PERSON", label: "Kişi" }, { value: "ORGANIZATION", label: "Kurum (Evim, banka)" }]} />
         </Field>
         <Field label="Ad soyad"><input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required /></Field>
-        <Field label="Telefon"><input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="0530 111 22 33" /></Field>
+        <Field label="Telefon"><NumberInput kind="phone" value={phone} onValueChange={setPhone} placeholder="0530 111 22 33" /></Field>
         <Field label="Notlar"><textarea className={`${inputClass} h-20 py-2`} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
       </form>
     </Modal>

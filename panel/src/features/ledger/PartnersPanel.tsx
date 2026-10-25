@@ -8,6 +8,7 @@ import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, Empty, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
 import { ContactPicker } from "../contacts/ContactPicker";
 import { CapitalCard } from "./CapitalCard";
+import { NumberInput } from "../../shared/ui/NumberInput";
 
 export function PartnersPanel({ onChange }: { onChange: () => void }) {
   const { data, error, reload } = useLoad(() => api.partners(), []);
@@ -125,8 +126,8 @@ function CapitalMovementForm({ partner, direction, onClose, onSaved }: {
           {into ? " Para seçilen hesaba girer, ortağın payı artar." : " Para seçilen hesaptan çıkar, ortağın payı azalır."}
         </p>
         <Field label="Tutar" hint="TL">
-          <input className={`${inputClass} font-cond text-[18px]`} value={amount} onChange={(e) => setAmount(e.target.value)}
-            inputMode="decimal" placeholder="1.000.000" autoFocus />
+          <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount}
+            placeholder="1.000.000" autoFocus />
         </Field>
         <Field label={into ? "Hangi hesaba girdi" : "Hangi hesaptan çıktı"}>
           {accounts.data && (
