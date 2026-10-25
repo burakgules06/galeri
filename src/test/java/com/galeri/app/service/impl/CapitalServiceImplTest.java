@@ -133,12 +133,30 @@ class CapitalServiceImplTest {
 
         List<PartnerProfit> partners = service.periodProfit(FROM, TO).partners();
 
-        // Sermaye donem sonunda: Furkan 60.000 + 3.000 kar payi, Selin 40.000 + 1.000 (onceki donemin kar payi)
+        // Pay icin sermaye donem sonunda, bu donemin kar payi haric: Furkan 60.000 (3.000 bu donemden eklendi, sayilmaz),
+        // Selin 40.000 + 1.000 (onceki donemin kar payi sayilir). Donemden sonraki giris sayilmaz.
         assertThat(partners).extracting(PartnerProfit::name).containsExactly("Furkan", "Selin");
-        assertThat(partners).extracting(PartnerProfit::capitalCents).containsExactly(6300000L, 4100000L);
+        assertThat(partners).extracting(PartnerProfit::capitalCents).containsExactly(6000000L, 4100000L);
         assertThat(partners).extracting(PartnerProfit::allocatedCents).containsExactly(300000L, 0L);
         assertThat(partners.stream().mapToLong(PartnerProfit::suggestedCents).sum()).isEqualTo(1000000L);
-        assertThat(partners).extracting(PartnerProfit::suggestedCents).containsExactly(605770L, 394230L);
+        assertThat(partners).extracting(PartnerProfit::suggestedCents).containsExactly(594060L, 405940L);
+    }
+
+    @Test
+    void karPayiEklenince_donemOnerisiDegismez() {
+        Account furkan = partner("Furkan", true);
+        Account selin = partner("Selin", false);
+        capitalEntries.add(entry(LedgerEntryType.CAPITAL, furkan, cash, 6000000L, LocalDate.of(2026, 1, 1)));
+        capitalEntries.add(entry(LedgerEntryType.CAPITAL, selin, cash, 4000000L, LocalDate.of(2026, 1, 1)));
+        when(vehicleRepository.findByTenantIdAndSaleDateBetween(tenantId, FROM, TO)).thenReturn(List.of());
+        when(entryRepository.netInto(tenantId, AccountType.EXPENSE, FROM, TO)).thenReturn(-1000000L);
+        List<Long> before = service.periodProfit(FROM, TO).partners().stream().map(PartnerProfit::suggestedCents).toList();
+
+        capitalEntries.add(entry(LedgerEntryType.PROFIT_ALLOCATION, furkan, income, before.get(0), TO));
+        List<PartnerProfit> after = service.periodProfit(FROM, TO).partners();
+
+        assertThat(after).extracting(PartnerProfit::suggestedCents).containsExactlyElementsOf(before);
+        assertThat(after.get(0).allocatedCents()).isEqualTo(before.get(0));
     }
 
     @Test

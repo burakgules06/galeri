@@ -116,9 +116,31 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
   - Dev seed: 214 Golf (Burak Gules, %3, stokta, yansıtılan + üstlenilen masraf), 215 C-HR (Deniz Aksoy, sabit 40.000, satıldı,
     sahibine 1.410.000 borç, 1.000.000 ödendi), 216 Megane (ortaklı Furkan %60 / Kerem %40). **Seed değişti: `docker compose down -v`, `docker compose up -d`.**
 
+- **Adım 5: sermaye, kâr ve kasa işlemleri** (`feat/capital`). Kurallar `MIMARI.md` §5.
+  - `V8__capital_and_treasury.sql`: hesap türüne `OPENING` (galeri başına tek), hareket türlerine `PROFIT_ALLOCATION`, `TRANSFER`,
+    `OPENING_BALANCE`. Sadece kısıt ve index; veri değişmez.
+  - Ortaklar (`CapitalService`): kişiyi ortak yap (CAPITAL hesabı açılır), dükkân sahibini işaretle (eski sahip kalkar), sermaye girişi
+    CAPITAL(ortak) → kasa/banka, çekişi ters yön (sermayeden fazla olamaz). Paylar her zaman CAPITAL hareketlerinden.
+  - Dönem kârı (iki tarih dahil): satılan galeri araçlarının kârı + konsinye komisyonu (ayrı satır) − genel giderler (EXPENSE hesabına
+    net giriş). Özel ortaklı araç kârı ayrı gösterilir, nete girmez. Ortak payı = net × (dönem sonu sermayesi, bu dönemin kâr payı
+    eklemeleri hariç); öneri kâr payı eklendikçe kaymaz. Kâr payını sermayeye ekleme elle: **CAPITAL(ortak) → INCOME**
+    (MIMARI'deki "INCOME → CAPITAL" defterin işaret kuralıyla sermayeyi azaltırdı; düzeltildi).
+  - Virman (TRANSFER, iki para hesabı arasında) ve açılış bakiyesi (OPENING ↔ kasa / banka / cari, hesap başına bir kez; Kasa'dan
+    düzeltilirse yeniden girilebilir). Hepsi Kasa'dan "Düzelt" ile terslenebilir.
+  - Uçlar (ADMIN): `GET/POST /api/partners`, `PUT /api/partners/{id}/owner`, `POST /api/partners/{id}/capital`,
+    `GET /api/reports/period-profit?from=&to=`, `POST /api/profit-allocations`, `POST /api/transfers`, `POST /api/opening-balances`.
+  - Hata kodları: 1035 ortak değil, 1036 çekiş sermayeden büyük, 1037 virman aynı hesap, 1038 açılış bakiyesi var, 1039 dönem ters.
+  - Panel: Kasa'da "Hareketler / Ortaklar ve sermaye / Dönem kârı" sekmeleri, başlıkta "Açılış bakiyesi" ve "Virman".
+  - Seed değişmedi.
+
 ## Sıradaki
 
-PR 5: sermaye, kâr ve kasa işlemleri (`feat/capital`). Dönem kârında komisyon ayrı satır (bkz. §13 açık soru).
+Yol haritasının 6. adımı (raporlar ve ana ekranın son hali) galericiden geri bildirim gelince planlanacak.
+
+Adım 5'ten açık sorular:
+- Özel ortaklı araçların kârı havuz dışı sayıldı (dönem net kârına girmiyor). Galerici farklı düşünüyorsa tek satır değişir.
+- Komisyon şimdilik dönem net kârına dahil (MIMARI §13); ayrı satırda gösteriliyor.
+- Açılış bakiyesi sermaye için yok: sermaye girişi zaten "Sermaye girişi" ile yapılır.
 
 Adım 4B'den açık sorular:
 - Konsinye sahibinin galeriye borcu (yansıtılan masraf) için ayrı "tahsil et" yok; satışta sahibine borçla netleşir. Gerekirse eklenir.

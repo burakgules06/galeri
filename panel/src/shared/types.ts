@@ -236,10 +236,10 @@ export interface ContactStatement {
 export interface ContactRequest { name: string; phone: string | null; type: ContactType; notes: string | null }
 
 // ---- Para defteri (sadece ADMIN). Tutarlar kurus. ----
-export type AccountType = "CASH" | "BANK" | "BALANCE" | "CAPITAL" | "VEHICLE" | "EXPENSE" | "INCOME";
+export type AccountType = "CASH" | "BANK" | "BALANCE" | "CAPITAL" | "VEHICLE" | "EXPENSE" | "INCOME" | "OPENING";
 export type LedgerEntryType =
   | "VEHICLE_PURCHASE" | "VEHICLE_EXPENSE" | "GENERAL_EXPENSE" | "CAPITAL" | "VEHICLE_SALE" | "COLLECTION" | "PAYMENT"
-  | "CONSIGNMENT_SETTLEMENT";
+  | "CONSIGNMENT_SETTLEMENT" | "PROFIT_ALLOCATION" | "TRANSFER" | "OPENING_BALANCE";
 export type ExpenseRoot = "VEHICLE" | "GENERAL";
 
 export interface AccountSummary { id: string; type: AccountType; name: string }
@@ -292,3 +292,28 @@ export interface ExpenseRequest {
 }
 
 export interface ContactPaymentRequest { accountId: string; date: string; amountCents: number; description: string | null }
+
+// ---- Sermaye, donem kari, kasa islemleri (sadece ADMIN). Tutarlar kurus, paylar baz puan. ----
+// Sermaye CAPITAL hareketlerinden hesaplanir, hicbir yerde saklanmaz.
+export interface Partner { contactId: string; name: string; phone: string | null; owner: boolean; capitalCents: number; shareBp: number }
+export type CapitalDirection = "IN" | "OUT";
+export interface CapitalMovementRequest { direction: CapitalDirection; accountId: string; date: string; amountCents: number; description: string | null }
+export interface ProfitAllocationRequest { contactId: string; date: string; amountCents: number; periodFrom: string; periodTo: string }
+export interface TransferRequest { fromAccountId: string; toAccountId: string; date: string; amountCents: number; description: string | null }
+export type OpeningSide = "RECEIVABLE" | "PAYABLE";
+export interface OpeningBalanceRequest { accountId: string | null; contactId: string | null; side: OpeningSide | null; date: string; amountCents: number }
+
+/** CONSIGNMENT'ta profitCents komisyondur (costCents null). CO_OWNED havuz disi: nete girmez. */
+export interface SoldVehicleProfit {
+  vehicle: VehicleRef; ownership: Ownership; saleDate: string; salePriceCents: number; costCents: number | null; profitCents: number;
+}
+export interface PartnerProfit {
+  contactId: string; name: string; owner: boolean; capitalCents: number; shareBp: number;
+  suggestedCents: number;   // net kar x pay (sadece bilgi)
+  allocatedCents: number;   // donem icinde sermayeye eklenen
+}
+export interface PeriodProfit {
+  from: string; to: string; vehicles: SoldVehicleProfit[];
+  vehicleProfitCents: number; commissionCents: number; generalExpenseCents: number; netCents: number;
+  coOwnedProfitCents: number; partners: PartnerProfit[];
+}

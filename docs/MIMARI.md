@@ -58,6 +58,7 @@ Kurallar:
 | `VEHICLE` | Araç başına 1 | Aracın maliyeti (alış + araç masrafları) |
 | `EXPENSE` (gider) | 1 | Araca bağlı olmayan genel giderler |
 | `INCOME` (gelir) | 1 | Satış gelirleri ve komisyonlar |
+| `OPENING` (açılış) | 1 | Açılış bakiyelerinin karşı hesabı (sisteme geçiş) |
 
 Gösterimde işaret hesap türüne göre çevrilir: `CAPITAL` hesabından 2 milyon çıkmışsa ekranda
 "Burak'ın sermayesi: 2.000.000 TL" yazar.
@@ -76,7 +77,9 @@ Gösterimde işaret hesap türüne göre çevrilir: `CAPITAL` hesabından 2 mily
 | Alıcı 300.000 TL peşinat verdi | BALANCE(alıcı) → CASH 300.000 |
 | Evim şirketi kalan 1.000.000 TL'yi ödedi | BALANCE(Evim şirketi) → BANK 1.000.000 (satışta bu tutar alıcının değil şirketin carisine yazılır) |
 | Konsinye araç satıldı, komisyon %3 | INCOME → BALANCE(alıcı) 1.300.000 ve BALANCE(araç sahibi) → INCOME 1.261.000 (galeri sahibine borçlu); INCOME'da net 39.000 komisyon kalır |
-| Ortaklar kâr payını sermayeye eklemeye karar verdi | INCOME → CAPITAL(Burak) X (elle girilir, bkz. 5) |
+| Ortaklar kâr payını sermayeye eklemeye karar verdi | CAPITAL(Burak) → INCOME X (elle girilir, bkz. 5; sermaye girişiyle aynı yön: sermaye hesabından çıkış = sermaye artar) |
+| Kasadan bankaya para yatırıldı (virman) | CASH → BANK 100.000 (toplam nakit değişmez) |
+| Sisteme geçişte kasada 120.000 TL vardı | OPENING → CASH 120.000 (hesap başına bir kez) |
 
 ## 4. Araç
 
@@ -130,6 +133,13 @@ Sistem **kâr dağıtmaz**. Sadece gösterir:
 
 Ortaklar kendi aralarında konuşup karar verince, kâr payını sermayeye ekleme işlemini
 **elle** girerler (tek ekran: dönem, kime, ne kadar). Bu işlem bir harekettir ve payları otomatik günceller.
+
+Uygulama (Adım 5):
+- Ortağın sermayesi = CAPITAL hesabından çıkan − giren (giriş CAPITAL → kasa, çekiş kasa → CAPITAL, kâr payı CAPITAL → INCOME).
+- Dönem kârı iki tarih dahil: satılan galeri araçlarının kârı (satış − gerçek alış − araç masrafları) + konsinye komisyonu
+  − genel giderler (EXPENSE hesabına net giriş; galerinin üstlendiği konsinye masrafı dahil). Özel ortaklı araç havuz dışı: ayrı satır.
+- Önerilen pay = net kâr × (dönem sonu sermayesi − bu dönemin kârından eklenen) / toplam; kuruş kalanı en büyük paya.
+- Virman TRANSFER; açılış bakiyesi OPENING_BALANCE (hesap başına bir kez, düzeltilirse yeniden).
 
 ## 6. Ödeme planı (alışta ve satışta)
 

@@ -162,12 +162,16 @@ public class CapitalServiceImpl implements CapitalService {
                 partnerProfits(tenantId, from, to, net));
     }
 
-    /** Paylar donem sonundaki sermayelerden; onerilen tutar net kardan bu paylarla (sadece bilgi). */
+    /**
+     * Paylar donem sonundaki sermayelerden, bu donemin karindan sermayeye eklenenler haric (yoksa kar payi eklendikce
+     * oneri kayar). Onerilen tutar net kardan bu paylarla (sadece bilgi).
+     */
     private List<PartnerProfit> partnerProfits(UUID tenantId, LocalDate from, LocalDate to, long net) {
         List<Account> accounts = capitalAccounts(tenantId);
         List<LedgerEntry> capitalEntries = entryRepository.touchingType(tenantId, AccountType.CAPITAL);
-        Map<UUID, Long> capital = capitalByAccount(capitalEntries, to);
         Map<UUID, Long> allocated = allocatedByAccount(capitalEntries, from, to);
+        Map<UUID, Long> capital = new HashMap<>();
+        capitalByAccount(capitalEntries, to).forEach((id, c) -> capital.put(id, c - allocated.getOrDefault(id, 0L)));
         Map<UUID, Contact> contacts = contacts(accounts);
 
         List<Account> involved = accounts.stream()

@@ -4,6 +4,7 @@ import type {
   YearlyTrades, PaymentPlanResponse, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
   LedgerEntryResponse, MonthlyTrades, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
   VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary, UserResponse, UserRole, ContactPaymentRequest,
+  CapitalMovementRequest, OpeningBalanceRequest, Partner, PeriodProfit, ProfitAllocationRequest, TransferRequest,
 } from "../shared/types";
 
 const json = (body: unknown, method = "POST"): RequestInit => ({ method, body: JSON.stringify(body) });
@@ -34,6 +35,16 @@ export const api = {
   undoInstallment: (id: string) => apiFetch<InstallmentResponse>(`/api/installments/${id}/undo`, { method: "POST" }),
   updateInstallment: (id: string, dueDate: string, noteNo: string | null) =>
     apiFetch<InstallmentResponse>(`/api/installments/${id}`, json({ dueDate, noteNo }, "PATCH")),
+  // Sermaye ve kasa islemleri (sadece ADMIN)
+  partners: () => apiFetch<Partner[]>("/api/partners"),
+  addPartner: (contactId: string) => apiFetch<Partner>("/api/partners", json({ contactId })),
+  setOwner: (contactId: string) => apiFetch<Partner>(`/api/partners/${contactId}/owner`, { method: "PUT" }),
+  moveCapital: (contactId: string, request: CapitalMovementRequest) =>
+    apiFetch<LedgerEntryResponse>(`/api/partners/${contactId}/capital`, json(request)),
+  periodProfit: (from: string, to: string) => apiFetch<PeriodProfit>(`/api/reports/period-profit?from=${from}&to=${to}`),
+  allocateProfit: (request: ProfitAllocationRequest) => apiFetch<LedgerEntryResponse>("/api/profit-allocations", json(request)),
+  transfer: (request: TransferRequest) => apiFetch<LedgerEntryResponse>("/api/transfers", json(request)),
+  openingBalance: (request: OpeningBalanceRequest) => apiFetch<LedgerEntryResponse>("/api/opening-balances", json(request)),
   payContact: (contactId: string, request: ContactPaymentRequest) =>
     apiFetch<LedgerEntryResponse>(`/api/contacts/${contactId}/payments`, json(request)),
   statement: (contactId: string) => apiFetch<ContactStatement>(`/api/contacts/${contactId}/statement`),
