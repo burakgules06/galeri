@@ -111,6 +111,7 @@ public class CapitalServiceImpl implements CapitalService {
         Account capital = capitalAccount(contact, in);   // giris kisiyi ortak yapar; cekis icin ortak olmali
         if (capital == null) throw new NotAPartnerException();
         if (!in) {
+            accountRepository.lockById(capital.getId());   // es zamanli iki cekis ayni bakiyeyi gormesin
             long current = capitalByAccount(entryRepository.touchingType(contact.getTenantId(), AccountType.CAPITAL), null)
                     .getOrDefault(capital.getId(), 0L);
             if (r.amountCents() > current) throw new CapitalExceededException();

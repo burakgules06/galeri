@@ -109,6 +109,7 @@ class PaymentPlanServiceImplTest {
             return p;
         });
         when(installmentRepository.save(any(Installment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(installmentRepository.markPaid(any(), any(), any())).thenReturn(1);   // kosullu guncelleme: taksit hala odenmemis
         when(ledgerService.writeSale(any(), any(), anyLong(), any())).thenAnswer(inv -> entry());
         when(ledgerService.writeSettlement(any(), any(), any(), any(), anyLong(), any(), any())).thenAnswer(inv -> entry());
     }
@@ -229,6 +230,17 @@ class PaymentPlanServiceImplTest {
         assertThatThrownBy(() -> service.collect(i.getId(), new CollectRequest(cashId, TODAY)))
                 .isInstanceOf(InstallmentAlreadyPaidException.class);
         verify(ledgerService, never()).writeSettlement(any(), any(), any(), any(), anyLong(), any(), any());
+    }
+
+    @Test
+    void ayniAndaBaskaIstekTahsilEttiyse_kosulluGuncellemeSifirSatir_1019() {
+        Installment i = installment(plan(), TODAY, 50000L, false);   // okunurken odenmemis gorunuyor
+        when(installmentRepository.findById(i.getId())).thenReturn(Optional.of(i));
+        when(installmentRepository.markPaid(any(), any(), any())).thenReturn(0);   // ama diger istek once yazdi
+
+        assertThatThrownBy(() -> service.collect(i.getId(), new CollectRequest(cashId, TODAY)))
+                .isInstanceOf(InstallmentAlreadyPaidException.class);
+        assertThat(i.isPaid()).isFalse();   // bellekteki nesneye yazilmaz; hata transaction'i geri alir
     }
 
     @Test

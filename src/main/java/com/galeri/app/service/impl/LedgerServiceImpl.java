@@ -7,6 +7,7 @@ import com.galeri.app.exception.runtime.EntryAlreadyCorrectedException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidCategoryException;
 import com.galeri.app.exception.runtime.LinkedEntryException;
+import com.galeri.app.exception.runtime.NotAnExpenseException;
 import com.galeri.app.exception.runtime.OpeningBalanceExistsException;
 import com.galeri.app.exception.runtime.SameAccountException;
 import com.galeri.app.exception.runtime.RecordNotFoundException;
@@ -124,6 +125,34 @@ public class LedgerServiceImpl implements LedgerService {
     @Override
     @Transactional
     public LedgerEntryResponse addExpense(ExpenseRequest r) {
+        return toResponse(writeExpense(r), false);
+    }
+
+    @Override
+    @Transactional
+    public LedgerEntryResponse updateExpense(UUID entryId, ExpenseRequest r) {
+        // Defter degismez: eski masraf terslenir, yeni degerlerle yeni masraf yazilir (ayni transaction)
+        writeReversal(changeableExpense(entryId));
+        return toResponse(writeExpense(r), false);
+    }
+
+    @Override
+    @Transactional
+    public LedgerEntryResponse deleteExpense(UUID entryId) {
+        // Silme = ters kayit: para kasaya / bankaya geri doner, arac maliyetinden duser
+        return toResponse(writeReversal(changeableExpense(entryId)), false);
+    }
+
+    /** Duzenlenip silinebilecek masraf: bu galerinin, gecerli (duzeltme degil, duzeltilmemis) arac masrafi ya da genel gideri. */
+    private LedgerEntry changeableExpense(UUID entryId) {
+        LedgerEntry original = reversible(entryId);
+        if (original.getType() != LedgerEntryType.VEHICLE_EXPENSE && original.getType() != LedgerEntryType.GENERAL_EXPENSE) {
+            throw new NotAnExpenseException();
+        }
+        return original;
+    }
+
+    private LedgerEntry writeExpense(ExpenseRequest r) {
         UUID tenantId = CurrentUser.tenantId();
         Account source = getMoneyAccount(r.sourceAccountId());
 
@@ -155,7 +184,7 @@ public class LedgerServiceImpl implements LedgerService {
         e.setVehicle(vehicle);
         e.setCategory(category);
         e.setDescription(blankToNull(r.description()));
-        return toResponse(entryRepository.save(e), false);
+        return entryRepository.save(e);
     }
 
     @Override
@@ -219,7 +248,8 @@ public class LedgerServiceImpl implements LedgerService {
 
     /** Tersi yazilabilecek hareket: bu galerinin, kendisi duzeltme degil, daha once duzeltilmemis. */
     private LedgerEntry reversible(UUID entryId) {
-        LedgerEntry original = entryRepository.findById(entryId).orElseThrow(RecordNotFoundException::new);
+        // Satir kilidi: ayni hareket iki istekte birden terslenmesin (ikincisi bekler, sonra "zaten duzeltildi" alir)
+        LedgerEntry original = entryRepository.lockById(entryId).orElseThrow(RecordNotFoundException::new);
         if (!original.getTenantId().equals(CurrentUser.tenantId())) throw new SourceNotBelongToTenantException();
         if (original.getCorrectedEntryId() != null) throw new CorrectionNotCorrectableException();
         if (entryRepository.existsByCorrectedEntryId(original.getId())) throw new EntryAlreadyCorrectedException();
