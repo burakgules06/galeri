@@ -45,7 +45,11 @@ public record VehicleRequest(
         CommissionType commissionType,
         @Min(0) @Max(10000) Integer commissionRateBp,
         @PositiveOrZero Long commissionCents,
-        List<@Valid ShareRequest> shares
+        List<@Valid ShareRequest> shares,
+        // "Listede yok": true ise marka + catalogModel (temel model, paketsiz) once galerinin katalogune eklenir.
+        // Model alani yine "temel model + paket" tasir.
+        Boolean addToCatalog,
+        @Size(max = 60) String catalogModel
 ) {
 
     public Ownership ownershipOrDefault() {
