@@ -1,5 +1,6 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.CatalogUnknownException;
 import com.galeri.app.exception.runtime.ConsignmentDetailsRequiredException;
 import com.galeri.app.exception.runtime.InvalidDateException;
 import com.galeri.app.exception.runtime.InvalidSharesException;
@@ -35,6 +36,7 @@ import com.galeri.app.repository.VehiclePartRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.repository.VehicleShareRepository;
 import com.galeri.app.security.CurrentUser;
+import com.galeri.app.service.CatalogService;
 import com.galeri.app.service.LedgerService;
 import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.service.VehicleService;
@@ -69,6 +71,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final LedgerService ledgerService;
     private final PaymentPlanService paymentPlanService;
     private final VehicleShareRepository shareRepository;
+    private final CatalogService catalogService;
     private final Clock clock;
 
     // ------------------------------------------------------------------ okuma
@@ -219,8 +222,7 @@ public class VehicleServiceImpl implements VehicleService {
     // ------------------------------------------------------------------ yardimcilar
 
     private void apply(Vehicle vehicle, VehicleRequest r) {
-        vehicle.setMake(r.make().trim());
-        vehicle.setModel(r.model().trim());
+        applyMakeModel(vehicle, r);
         vehicle.setModelYear(r.modelYear());
         vehicle.setFuel(r.fuel());
         vehicle.setTransmission(r.transmission());
@@ -258,6 +260,26 @@ public class VehicleServiceImpl implements VehicleService {
             vehicle.setOfficialPurchaseCents(r.officialPurchaseCents());
         }
         if (ownership == Ownership.CO_OWNED) validateShares(r.shares());
+    }
+
+    /**
+     * Marka / model katalogdan: yeni kayitta ya da marka / model degistiyse katalogda olmali (katalog yazimina cevrilir,
+     * paket korunur). Katalog oncesi eski kayit marka / modeline dokunulmadikca aynen kalir. "Listede yok" onaylandiysa
+     * once galerinin katalogune eklenir.
+     */
+    private void applyMakeModel(Vehicle vehicle, VehicleRequest r) {
+        String make = r.make().trim();
+        String model = r.model().trim().replaceAll("\\s+", " ");
+        boolean unchanged = vehicle.getId() != null && make.equalsIgnoreCase(vehicle.getMake()) && model.equals(vehicle.getModel());
+        if (unchanged) return;
+        if (Boolean.TRUE.equals(r.addToCatalog())) {
+            String base = r.catalogModel() == null || r.catalogModel().isBlank() ? model : r.catalogModel();
+            catalogService.add(vehicle.getTenantId(), make, base);
+        }
+        CatalogService.Resolved resolved = catalogService.resolve(vehicle.getTenantId(), make, model)
+                .orElseThrow(CatalogUnknownException::new);
+        vehicle.setMake(resolved.make());
+        vehicle.setModel(resolved.model());
     }
 
     /** Ortakli aracta: en az bir ortak, her kisi bir kez, paylar toplami 10000 (%100). */

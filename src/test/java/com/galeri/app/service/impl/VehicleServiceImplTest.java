@@ -1,5 +1,6 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.CatalogUnknownException;
 import com.galeri.app.exception.runtime.ConsignmentDetailsRequiredException;
 import com.galeri.app.exception.runtime.InvalidDateException;
 import com.galeri.app.exception.runtime.InvalidSharesException;
@@ -7,6 +8,7 @@ import com.galeri.app.exception.runtime.PlateAlreadyInStockException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.exception.runtime.VehicleAlreadySoldException;
 import com.galeri.app.exception.runtime.VehicleNotSoldException;
+import com.galeri.app.model.entity.CatalogEntry;
 import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.entity.VehiclePart;
@@ -27,6 +29,7 @@ import com.galeri.app.model.request.VehicleSaleRequest;
 import com.galeri.app.model.response.VehicleDetail;
 import com.galeri.app.model.response.VehicleDetailAdmin;
 import com.galeri.app.model.response.VehicleSummary;
+import com.galeri.app.repository.CatalogEntryRepository;
 import com.galeri.app.repository.ContactRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehiclePartRepository;
@@ -71,6 +74,8 @@ class VehicleServiceImplTest {
     @Mock private LedgerService ledgerService;
     @Mock private PaymentPlanService paymentPlanService;
     @Mock private VehicleShareRepository shareRepository;
+    @Mock private CatalogEntryRepository catalogEntryRepository;
+    private CatalogServiceImpl catalog;
 
     // "Su an": 1 Temmuz 2026, 09:00 Istanbul (06:00 UTC)
     private final Clock clock = Clock.fixed(Instant.parse("2026-07-01T06:00:00Z"), ZoneOffset.UTC);
@@ -83,8 +88,9 @@ class VehicleServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        catalog = new CatalogServiceImpl(catalogEntryRepository);   // gercek katalog (vehicles.json), eklemeler mock
         service = new VehicleServiceImpl(vehicleRepository, vehiclePartRepository, contactRepository, panelUserRepository,
-                ledgerService, paymentPlanService, shareRepository, clock);
+                ledgerService, paymentPlanService, shareRepository, catalog, clock);
         buyer = new Contact();
         buyer.setId(UUID.randomUUID());
         buyer.setTenantId(tenantId);
@@ -100,7 +106,70 @@ class VehicleServiceImplTest {
     private VehicleRequest request(String plate) {
         return new VehicleRequest(plate, "Renault", "Clio", (short) 2022, Fuel.GASOLINE, Transmission.MANUAL, 31000,
                 "Kırmızı", null, null, LocalDate.of(2026, 6, 1), null, null, 72000000L, 60000000L, cashId, null,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
+    }
+
+    private VehicleRequest makeModel(String make, String model, Boolean addToCatalog, String catalogModel) {
+        return new VehicleRequest("34 KLM 4521", make, model, (short) 2022, Fuel.GASOLINE, Transmission.MANUAL, 31000,
+                null, null, null, LocalDate.of(2026, 6, 1), null, null, 72000000L, null, cashId, null,
+                null, null, null, null, null, null, addToCatalog, catalogModel);
+    }
+
+    // ------------------------------------------------------------------ katalog
+
+    @Test
+    void yeniArac_markaModelKatalogYazimina_cevrilir_paketKorunur() {
+        when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.create(makeModel("volkswagen", "passat  1.5 TSI Business", null, null));
+
+        ArgumentCaptor<Vehicle> saved = ArgumentCaptor.forClass(Vehicle.class);
+        verify(vehicleRepository).save(saved.capture());
+        assertThat(saved.getValue().getMake()).isEqualTo("Volkswagen");
+        assertThat(saved.getValue().getModel()).isEqualTo("Passat 1.5 TSI Business");
+    }
+
+    @Test
+    void katalogdaOlmayanMarkaModel_reddedilir() {
+        assertThatThrownBy(() -> service.create(makeModel("Volkswagen", "Pasat", null, null))).isInstanceOf(CatalogUnknownException.class);
+        assertThatThrownBy(() -> service.create(makeModel("Yugo", "45", null, null))).isInstanceOf(CatalogUnknownException.class);
+        verify(vehicleRepository, never()).save(any());
+    }
+
+    @Test
+    void listedeYok_onaylanirsa_galeriKatalogunaEklenir_aracKaydedilir() {
+        when(catalogEntryRepository.findByTenantId(tenantId)).thenReturn(List.of());
+        when(catalogEntryRepository.save(any(CatalogEntry.class))).thenAnswer(inv -> {
+            CatalogEntry e = inv.getArgument(0);
+            when(catalogEntryRepository.findByTenantId(tenantId)).thenReturn(List.of(e));   // sonraki okumalar eklemeyi gorur
+            return e;
+        });
+        when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.create(makeModel("Yugo", "45 GL", true, "45"));
+
+        ArgumentCaptor<CatalogEntry> entry = ArgumentCaptor.forClass(CatalogEntry.class);
+        verify(catalogEntryRepository).save(entry.capture());
+        assertThat(entry.getValue().getMake()).isEqualTo("Yugo");
+        assertThat(entry.getValue().getModel()).isEqualTo("45");
+        assertThat(entry.getValue().getTenantId()).isEqualTo(tenantId);
+        ArgumentCaptor<Vehicle> saved = ArgumentCaptor.forClass(Vehicle.class);
+        verify(vehicleRepository).save(saved.capture());
+        assertThat(saved.getValue().getModel()).isEqualTo("45 GL");
+    }
+
+    @Test
+    void katalogOncesiEskiKayit_markaModelDegismedikce_aynenKalir() {
+        UUID id = UUID.randomUUID();
+        Vehicle legacy = inStockVehicle(id, tenantId);
+        legacy.setMake("BMW");
+        legacy.setModel("320i M Sport");   // katalogda "3 Serisi"; eski kayit
+        when(vehicleRepository.findById(id)).thenReturn(Optional.of(legacy));
+
+        service.update(id, makeModel("BMW", "320i M Sport", null, null));
+        assertThat(legacy.getModel()).isEqualTo("320i M Sport");
+
+        assertThatThrownBy(() -> service.update(id, makeModel("BMW", "320d", null, null))).isInstanceOf(CatalogUnknownException.class);
     }
 
     private Vehicle inStockVehicle(UUID id, UUID tenant) {
@@ -329,7 +398,7 @@ class VehicleServiceImplTest {
                                             List<ShareRequest> shares) {
         return new VehicleRequest("34 KLM 4521", "Renault", "Clio", (short) 2022, Fuel.GASOLINE, Transmission.MANUAL, 31000,
                 null, null, null, LocalDate.of(2026, 6, 1), null, null, 72000000L, 60000000L, cashId, null,
-                ownership, consignorId, type, bp, fixed, shares);
+                ownership, consignorId, type, bp, fixed, shares, null, null);
     }
 
     private void savesWithId() {

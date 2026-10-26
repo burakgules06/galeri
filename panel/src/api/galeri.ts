@@ -4,7 +4,7 @@ import type {
   YearlyTrades, PaymentPlanResponse, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
   LedgerEntryResponse, MonthlyTrades, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
   VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary, UserResponse, UserRole, ContactPaymentRequest,
-  CapitalMovementRequest, OpeningBalanceRequest, Partner, PeriodProfit, ProfitAllocationRequest, TransferRequest,
+  CapitalMovementRequest, OpeningBalanceRequest, Partner, PeriodProfit, ProfitAllocationRequest, TransferRequest, CatalogItem,
 } from "../shared/types";
 
 const json = (body: unknown, method = "POST"): RequestInit => ({ method, body: JSON.stringify(body) });
@@ -52,6 +52,8 @@ export const api = {
   addContact: (request: ContactRequest) => apiFetch<ContactResponse>("/api/contacts", json(request)),
   updateContact: (id: string, request: ContactRequest) => apiFetch<ContactResponse>(`/api/contacts/${id}`, json(request, "PUT")),
   staff: () => apiFetch<StaffSummary[]>("/api/staff"),
+  catalogMakes: () => apiFetch<CatalogItem[]>("/api/catalog/makes"),
+  catalogModels: (make: string) => apiFetch<CatalogItem[]>(`/api/catalog/makes/${encodeURIComponent(make)}/models`),
   monthlyTrades: (year: number, month: number) => apiFetch<MonthlyTrades>(`/api/reports/monthly-trades?year=${year}&month=${month}`),
   yearlyTrades: (year: number) => apiFetch<YearlyTrades>(`/api/reports/yearly-trades?year=${year}`),
   dashboard: () => apiFetch<DashboardResponse>("/api/dashboard"),

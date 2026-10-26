@@ -1,6 +1,8 @@
 // Arac ekleme / duzenleme. Sadece ADMIN acar. Tutarlar TL girilir, kurus gonderilir.
 // Sahiplik: galeri (varsayilan), konsinye (sahibi + komisyon; alis bedeli ve odemesi yok), ortakli (ortaklar, toplam %100).
 import { useState, type FormEvent } from "react";
+import { MakeModelPicker } from "./MakeModelPicker";
+import type { MakeModelValue } from "./makeModel";
 import { api } from "../../api/galeri";
 import {
   bpToInput, centsToInput, formatDate, formatNumber, formatPlate, FUEL, METHOD, percentToBp, tl, tlToCents, todayIso, TRANSMISSION,
@@ -52,8 +54,9 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       payer: i.payer.id !== i.counterparty.id ? i.payer : null,
     })));
   const [plate, setPlate] = useState(v?.plate ?? "");
-  const [make, setMake] = useState(v?.make ?? "");
-  const [model, setModel] = useState(v?.model ?? "");
+  // Katalogdan secilen marka / model; ilk deger sabit kalsin (secici her render'da yeniden eslestirmesin)
+  const [initialMakeModel] = useState(() => (v ? { make: v.make, model: v.model } : null));
+  const [makeModel, setMakeModel] = useState<MakeModelValue | null>(null);
   const [year, setYear] = useState(v ? String(v.modelYear) : "");
   const [fuel, setFuel] = useState<Fuel>(v?.fuel ?? "GASOLINE");
   const [transmission, setTransmission] = useState<Transmission>(v?.transmission ?? "MANUAL");
@@ -102,6 +105,8 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
     const yearNumber = Number(year), mileageNumber = Number(mileage.replace(/\./g, ""));
     if (!Number.isInteger(yearNumber) || yearNumber < 1950 || yearNumber > 2100) return setError("Model yılını kontrol et.");
     if (!Number.isInteger(mileageNumber) || mileageNumber < 0) return setError("Kilometreyi kontrol et.");
+    if (!makeModel?.ready) return setError("Marka ve modeli seç.");
+    if (makeModel.needsCatalogConsent) return setError("Listede olmayan marka / model için kataloğa eklemeyi onayla.");
     if (consignment) {
       if (!consignor) return setError("Konsinye araçta aracın sahibini seç.");
       const rate = percentToBp(commissionRate), fixed = tlToCents(commissionFixed);
@@ -121,7 +126,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
     }
 
     const request: VehicleRequest = {
-      plate, make, model, modelYear: yearNumber, fuel, transmission, mileageKm: mileageNumber,
+      plate, make: makeModel.make, model: makeModel.model, modelYear: yearNumber, fuel, transmission, mileageKm: mileageNumber,
       color: color.trim() || null, tramerCents: amounts[0], notes: notes.trim() || null,
       purchaseDate, sellerId: seller?.id ?? null, boughtById: boughtBy || null,
       actualPurchaseCents: amounts[1], officialPurchaseCents: amounts[2],
@@ -133,6 +138,8 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       commissionRateBp: consignment && commissionType === "RATE" ? percentToBp(commissionRate) : null,
       commissionCents: consignment && commissionType === "FIXED" ? tlToCents(commissionFixed) : null,
       shares: ownership === "CO_OWNED" ? shares.map((r, k) => ({ contactId: r.contact!.id, shareBp: shareBps[k]! })) : null,
+      addToCatalog: makeModel.addToCatalog,
+      catalogModel: makeModel.catalogModel,
     };
     setSaving(true);
     setError(null);
@@ -165,11 +172,10 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
             <input className={`${inputClass} font-cond font-bold tracking-[0.06em] text-[18px]`} value={plate}
               onChange={(e) => setPlate(formatPlate(e.target.value))} required autoCapitalize="characters" placeholder="34 ABC 123" />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Marka"><input className={inputClass} value={make} onChange={(e) => setMake(e.target.value)} required placeholder="Volkswagen" /></Field>
-            <Field label="Model yılı"><input className={inputClass} value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))} required inputMode="numeric" placeholder="2021" /></Field>
-          </div>
-          <Field label="Model"><input className={inputClass} value={model} onChange={(e) => setModel(e.target.value)} required placeholder="Passat 1.5 TSI Business" /></Field>
+          <MakeModelPicker initial={initialMakeModel} onChange={setMakeModel} />
+          <Field label="Model yılı">
+            <input className={`${inputClass} max-w-40`} value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))} required inputMode="numeric" placeholder="2021" />
+          </Field>
           <Field label="Yakıt">
             <Segment<Fuel> value={fuel} onChange={setFuel} options={(Object.keys(FUEL) as Fuel[]).map((f) => ({ value: f, label: FUEL[f] }))} />
           </Field>
