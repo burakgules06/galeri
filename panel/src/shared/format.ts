@@ -1,7 +1,7 @@
 // Gosterim yardimcilari. Tutarlar backend'de kurus (tam sayi); arayuzde TL.
 import type {
-  BodyPart, Fuel, InstallmentResponse, LedgerEntryResponse, LedgerEntryType, Ownership, PartCondition, PaymentMethod, Transmission,
-  VehicleStatus,
+  BodyPart, ContributionSource, Fuel, InstallmentResponse, LedgerEntryResponse, LedgerEntryType, Ownership, PartCondition,
+  PaymentMethod, Transmission, VehicleStatus,
 } from "./types";
 
 const tlFormat = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2, minimumFractionDigits: 0 });
@@ -86,9 +86,12 @@ export const ENTRY_TYPE: Record<LedgerEntryType, string> = {
   VEHICLE_PURCHASE: "Araç alışı", VEHICLE_EXPENSE: "Araç masrafı", GENERAL_EXPENSE: "Genel gider", CAPITAL: "Sermaye",
   VEHICLE_SALE: "Araç satışı", COLLECTION: "Tahsilat", PAYMENT: "Ödeme", CONSIGNMENT_SETTLEMENT: "Konsinye borcu",
   PROFIT_ALLOCATION: "Kâr payı sermayeye", TRANSFER: "Virman", OPENING_BALANCE: "Açılış bakiyesi",
+  VEHICLE_PROFIT_SHARE: "Ortak kâr payı",
 };
 
-export const OWNERSHIP: Record<Ownership, string> = { DEALER: "Galeri", CONSIGNMENT: "Konsinye", CO_OWNED: "Ortaklı" };
+export const OWNERSHIP: Record<Ownership, string> = { DEALER: "Galeri", CONSIGNMENT: "Konsinye", CO_OWNED: "Ortak" };
+
+export const CONTRIBUTION_SOURCE: Record<ContributionSource, string> = { CAPITAL: "Sermayeden", POCKET: "Cepten", HYBRID: "Hibrit" };
 
 /** Yuzde girisi -> baz puan: "3" -> 300, "2,5" -> 250. Bos ise null, gecersizse NaN. */
 export function percentToBp(input: string): number | null {

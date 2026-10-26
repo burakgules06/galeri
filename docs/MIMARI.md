@@ -24,9 +24,9 @@ Fotoğraf yok. Döviz yok (her şey TL; ileride gerekirse eklenir).
 |---|---|
 | **Galeri (tenant)** | Uygulamayı kullanan işletme. Örnek: Furkan'ın dükkânı. |
 | **Kişi** | Uygulamada adı geçen her insan ya da kurum: ortaklar, müşteriler, araç sattığımız kişiler, Evim şirketi, banka. Rolü sabit değildir; aynı kişi bir araçta alıcı, başka araçta konsinye sahibi olabilir. |
-| **Sermaye ortağı** | Galeriye para koymuş kişi. Payı = kendi sermayesi / toplam sermaye. Örnek: 50 milyonluk sermayenin 2 milyonu Burak'ın → Burak %4. Galerinin toplam kâr ve zararı bu oranlarla paylaşılır. |
+| **Sermaye ortağı** | Galeriye sermaye koymuş kişi. Genel dönem kârı önerisindeki ağırlığı, araçlarda bağlı olmayan nakit sermayesidir. |
 | **Konsinye araç** | Aracın sahibi galeri değil bir kişidir (örn. Burak'ın kendi aracı). Galeride satılır, galeri satıştan komisyon alır. Galerinin bu araca maliyeti yoktur, kârı sadece komisyondur. |
-| **Özel ortaklı araç** | İstisna: bir araç havuz dışında, belirli kişilerle belirli oranlarla (örn. %50-%50) alınmış olabilir. Varsayılan değildir. |
+| **Ortak araç** | Aracın maliyeti Havuz (galerinin ortak parası) ve/veya sermaye ortaklarınca karşılanır. Her sahibin katkı ve kâr payı hesaplanır. |
 | **Hareket** | Bir para hareketi. Sistemdeki bütün bakiyeler hareketlerden hesaplanır. |
 
 ## 3. Temel kural: hareket defteri
@@ -105,7 +105,8 @@ sol arka kapı, sol arka çamurluk, sağ ön çamurluk, sağ ön kapı, sağ ark
 ### Sahiplik
 - `DEALER` (galeri): varsayılan. Maliyeti VEHICLE hesabında birikir, kârı galerinin kârıdır.
 - `CONSIGNMENT` (konsinye): sahibi bir kişidir, komisyon oranı ya da sabit tutarı tutulur. VEHICLE hesabına maliyet yazılmaz.
-- `CO_OWNED` (özel ortaklı): havuz dışı; `vehicle_share` tablosunda kişi + yüzde (toplam %100). Kârı bu oranlarla gösterilir.
+- `CO_OWNED` (ortak): Havuz (kişi hesabı olmayan galeri payı) ve/veya kişiler `vehicle_share` satırlarında sahip olur. Sahiplik payları
+  toplamı 100%; ortakların katkısı ve kâr payı oranı ayrı tutulur. Havuz payı dönem kârına, ortak payı satışta ortağın sermayesine yazılır.
 
 Uygulama (Adım 4B):
 - Komisyon: `RATE` (baz puan, %3 = 300; satış × oran, kuruşa yarım yukarı) ya da `FIXED` (kuruş). Konsinye araçta alış bedeli,
@@ -114,7 +115,22 @@ Uygulama (Adım 4B):
   (satış − komisyon). Sahibine ödeme `PAYMENT` CASH/BANK → BALANCE(sahibi), kısmi olabilir.
 - Konsinye masraf: sahibine yansıtılırsa CASH/BANK → BALANCE(sahibi), değilse CASH/BANK → EXPENSE; ikisi de `VEHICLE_EXPENSE` ve araca bağlı.
   Araç kârı = komisyon − galerinin üstlendiği masraf. Dönem kârında üstlenilen masraf genel giderlerin içinde sayılır (çift sayılmaz).
-- Ortaklı araç: defter `DEALER` ile aynı; kâr paylara bölünerek gösterilir (aşağı yuvarlanır, kalan kuruş en büyük paya).
+- Ortak araç: defter `DEALER` ile aynı; sahiplik ve kâr payı oranları aşağıdaki PR 3 kurallarıyla hesaplanır.
+
+Uygulama (Revizyon PR 3, ortak finansmanı):
+- Katkı = gerçek alış bedeli × sahiplik payı; araç masrafları katkıya eklenmez. Katkı bakiyesi saklanmaz, alış ödemelerinden hesaplanır.
+  Peşinat ve her senet ödemesi bütün sahipler arasında sahiplik paylarına göre bölünür; kuruş farkı Havuz'a (Havuz yoksa en büyük paya) gider.
+- Ortağın katkısı `CAPITAL` (nakitteki sermayeyi araca bağlar), `POCKET` (aynı transaction'da otomatik sermaye girişi) veya `HYBRID`
+  (cepten girilen tutar önce, kalanı sermayeden) olabilir. Sermayeden gelen kısım ortağın nakitteki sermayesini negatife düşüremez.
+- Ortağın toplam sermayesi CAPITAL hareketlerinden; araçta bağlı sermayesi stoktaki ortak araçların ödenmiş katkılarından hesaplanır.
+  Nakit sermaye = toplam sermaye − bağlı sermaye. Dönem kârı önerisinin ağırlığı sadece nakit sermayedir.
+- Kâr/zarar = satış − gerçek alış − araca bağlı masraflar. `profit_share_bp` oranlarıyla bölünür; bütün kuruşlar korunur.
+  İsteğe bağlı dükkân payı yalnız pozitif ortak kârından alınır ve Havuz'a eklenir. Ortakların payı `VEHICLE_PROFIT_SHARE` ile
+  satışta sermayeye yazılır; zarar önce sermayeden katkısı kadar düşer, aşan kısım ortağın BALANCE hesabına borç yazılır.
+- Satıştaki ortak dönüşü alıcı ödeme planından bağımsız olarak aynı transaction'da hesaplanır: sermayede bırak, tüm alacak için nakit
+  öde veya hibrit tutarı nakit öde. Nakit ödeme sermaye çekiş hareketidir. Satış bu çekişler terslenmeden geri alınamaz.
+- Zamanlama `CoOwnerSettlementPolicy` ile belirlenir. Bugünkü tek politika `AT_SALE`; `ON_COLLECTION` ileride eklenebilir.
+- Araç sahiplerinin farklı alış ödeme planı seçmesi (ör. Havuz peşin, ortak taksitli) kapsam dışıdır.
 
 ### Alış bilgileri
 Alış tarihi, kimden alındı, **aracı alan çalışan**, **gerçek alış bedeli** ve **resmi (beyan edilen) alış bedeli**, ödeme şekli.
@@ -133,10 +149,12 @@ Stoktaki araç kâr/zarar sayılmaz. Tahsilat ayrı takip edilir.
 
 ## 5. Sermaye ve kâr
 
-Sistem **kâr dağıtmaz**. Sadece gösterir:
+Sistem genel dönem kârını **kendiliğinden dağıtmaz**. Kâr payı sermayeye ekleme işlemi manuel kalır. Ortak araç için PR 3'te tanımlanan satış
+anındaki otomatik kâr/zarar payı bu kuralın araç bazlı özel halidir.
 
-- Her ortağın sermayesi ve payı (%), toplam sermaye
-- Seçilen dönemin kârı: satılan araçların kârı + komisyonlar − genel giderler
+- Her ortağın toplam sermayesi ve payı (%), nakitteki ve araçlarda bağlı sermayesi
+- Seçilen dönemin Havuz kârı: galeri araçlarının kârı + ortak araçlardaki Havuz ve dükkân payı + komisyonlar − genel giderler.
+  Ortak araçta ortaklara sermayelerine yazılan kâr bu nete girmez.
 - Bilgi amaçlı: "Bu oranlarla Burak'ın payı X TL olur"
 
 Ortaklar kendi aralarında konuşup karar verince, kâr payını sermayeye ekleme işlemini
@@ -144,9 +162,9 @@ Ortaklar kendi aralarında konuşup karar verince, kâr payını sermayeye eklem
 
 Uygulama (Adım 5):
 - Ortağın sermayesi = CAPITAL hesabından çıkan − giren (giriş CAPITAL → kasa, çekiş kasa → CAPITAL, kâr payı CAPITAL → INCOME).
-- Dönem kârı iki tarih dahil: satılan galeri araçlarının kârı (satış − gerçek alış − araç masrafları) + konsinye komisyonu
-  − genel giderler (EXPENSE hesabına net giriş; galerinin üstlendiği konsinye masrafı dahil). Özel ortaklı araç havuz dışı: ayrı satır.
-- Önerilen pay = net kâr × (dönem sonu sermayesi − bu dönemin kârından eklenen) / toplam; kuruş kalanı en büyük paya.
+- Dönem kârı iki tarih dahil: satılan galeri araçlarının kârı + ortak araçlarda Havuz/dükkân payı + konsinye komisyonu
+  − genel giderler (EXPENSE hesabına net giriş; galerinin üstlendiği konsinye masrafı dahil). Ortaklara sermayelerine yazılan paylar nete girmez.
+- Önerilen pay = Havuz net kârı × (dönem sonu nakit sermaye − bu dönemin kârından eklenen) / toplam nakit sermaye; kuruş kalanı en büyük paya.
 - Virman TRANSFER; açılış bakiyesi OPENING_BALANCE (hesap başına bir kez, düzeltilirse yeniden).
 
 ## 6. Ödeme planı (alışta ve satışta)
@@ -266,10 +284,10 @@ ADMIN kendini pasifleştiremez. Rol ve aktiflik her istekte DB'den okunur; pasif
 | `account` | type, contact_id (BALANCE/CAPITAL için), vehicle_id (VEHICLE için), name |
 | `ledger_entry` | entry_date, type, source_account_id, target_account_id, amount_cents, vehicle_id, expense_category_id, description, corrected_entry_id, created_by_id |
 | `expense_category` | parent_id, name, root (VEHICLE/GENERAL), archived |
-| `vehicle` | plate, make, model, model_year, fuel, transmission, mileage_km, color, tramer_cents, notes, ownership, consignor_id, commission_type (RATE/FIXED), commission_rate_bp / commission_cents, purchase_date, seller_id, bought_by_id, actual_purchase_cents, official_purchase_cents, sale_date, buyer_id, sold_by_id, sale_price_cents, status |
+| `vehicle` | plate, make, model, model_year, fuel, transmission, mileage_km, color, tramer_cents, notes, ownership, consignor_id, commission_type / commission_rate_bp / commission_cents, shop_cut_type / shop_cut_rate_bp / shop_cut_cents, purchase_date, seller_id, bought_by_id, actual_purchase_cents, official_purchase_cents, sale_date, buyer_id, sold_by_id, sale_price_cents, status |
 | `vehicle_part` | vehicle_id, part (BodyPart), condition (PartCondition) |
 | `catalog_entry` | make, model (galerinin kataloğa eklediği temel model); unique (tenant_id, lower(make), lower(model)) |
-| `vehicle_share` | vehicle_id, contact_id, share_bp (baz puan, toplam 10000; sadece CO_OWNED) |
+| `vehicle_share` | vehicle_id, nullable contact_id (null = Havuz), share_bp, profit_share_bp, contribution_source (CAPITAL/POCKET/HYBRID), pocket_cents |
 | `payment_plan` | vehicle_id, direction (SALE/PURCHASE), contact_id, total_cents, created_by_id; unique (vehicle_id, direction) |
 | `installment` | plan_id, seq, due_date, amount_cents, method, note_no, payer_contact_id, paid_entry_id, paid_at; index (tenant_id, due_date) ödenmemişler için |
 | `push_subscription` | panel_user_id, endpoint (unique), p256dh, auth |
@@ -314,7 +332,7 @@ Her yerde aynı terim kullanılır:
 | vites: manuel, otomatik, yarı otomatik | `transmission`: `MANUAL`, `AUTOMATIC`, `SEMI_AUTOMATIC` |
 | km / renk / notlar | `mileage_km` / `color` / `notes` |
 | tramer | `tramer` (özel ad) |
-| sahiplik: galeri, konsinye, özel ortaklı | `ownership`: `DEALER`, `CONSIGNMENT`, `CO_OWNED` |
+| sahiplik: galeri, konsinye, ortak | `ownership`: `DEALER`, `CONSIGNMENT`, `CO_OWNED` |
 | durum: stokta, satıldı, kapandı | `status`: `IN_STOCK`, `SOLD`, `CLOSED` |
 | parça durumu: orijinal, lokal boyalı, boyalı, değişen | `ORIGINAL`, `LOCALLY_PAINTED`, `PAINTED`, `REPLACED` |
 | parçalar: ön tampon, motor kaputu, tavan, bagaj kapağı, arka tampon, sol/sağ ön/arka çamurluk ve kapı | `FRONT_BUMPER`, `HOOD`, `ROOF`, `TRUNK_LID`, `REAR_BUMPER`, `LEFT/RIGHT_FRONT/REAR_FENDER`, `LEFT/RIGHT_FRONT/REAR_DOOR` |
@@ -329,7 +347,7 @@ Her yerde aynı terim kullanılır:
 | kasa / banka | `CASH` / `BANK` |
 | gider / gelir (hesap türü) | `EXPENSE` / `INCOME` |
 | masraf / masraf kategorisi (kök, üst) | `expense` / `expense_category` (`root`: `VEHICLE`, `GENERAL`; `parent_id`) |
-| hareket türü: araç alışı, araç masrafı, genel gider, sermaye, araç satışı, tahsilat, ödeme | `VEHICLE_PURCHASE`, `VEHICLE_EXPENSE`, `GENERAL_EXPENSE`, `CAPITAL`, `VEHICLE_SALE`, `COLLECTION`, `PAYMENT` |
+| hareket türü: araç alışı, araç masrafı, genel gider, sermaye, araç satışı, tahsilat, ödeme, ortak araç kâr/zararı | `VEHICLE_PURCHASE`, `VEHICLE_EXPENSE`, `GENERAL_EXPENSE`, `CAPITAL`, `VEHICLE_SALE`, `COLLECTION`, `PAYMENT`, `VEHICLE_PROFIT_SHARE` |
 | alacak / verecek | `receivable` / `payable` |
 | dükkân sahibi | `owner` (`contact.is_owner`) |
 | ana ekran | `dashboard` (`/api/dashboard`) |
@@ -338,6 +356,9 @@ Her yerde aynı terim kullanılır:
 | cari | `balance` (hesap türü `BALANCE`; hesap özeti: `statement`) |
 | ödeme planı / taksit / senet / tahsilat | `payment_plan` / `installment` / `promissory_note` / `collection` |
 | konsinye / komisyon | `consignment` / `commission` |
+| Havuz / ortak araç sahip satırı / sahiplik payı / kâr payı oranı | `pool` / `vehicle_share` / `share_bp` / `profit_share_bp` |
+| katkı kaynağı / cepten tutar / dükkân payı | `contribution_source` (`CAPITAL`, `POCKET`, `HYBRID`) / `pocket_cents` / `shop_cut_*` |
+| ortağa dönüş / satış anında ödeme politikası | `owner return` / `CoOwnerSettlementPolicy` (`AT_SALE`) |
 
 API: `/api/vehicles` (`/{id}/parts`, `/{id}/sale`, `/{id}/cost`), `/api/contacts`, `/api/staff`,
 `/api/reports/monthly-trades`, `/api/reports/yearly-trades`, `/api/dashboard`, `/api/accounts`, `/api/ledger-entries` (`/{id}/correct`), `/api/expenses`,

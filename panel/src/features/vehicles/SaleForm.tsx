@@ -1,5 +1,5 @@
 // Satis: alici, bedel ve odeme plani (PlanBuilder). Altta her zaman "Planlanan / Kalan"; kalan 0 olmadan kaydedilmez.
-// Pesinat ("simdi alindi") ayni islemde kasaya girer.
+// Pesinat ("simdi alindi") ayni islemde kasaya girer. Ortak aracta altta ortaga donus secimi (OwnerReturns).
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
 import { tlToCents, todayIso } from "../../shared/format";
@@ -10,6 +10,9 @@ import { ContactPicker } from "../contacts/ContactPicker";
 import { cashPlan, rowProblem, toRequest, type PlanMode, type PlanRow } from "../payments/plan";
 import { PlanBuilder, PlanSummary } from "../payments/PlanBuilder";
 import { NumberInput } from "../../shared/ui/NumberInput";
+import { OwnerReturns } from "./OwnerReturns";
+import { toOwnerReturns, type OwnerReturnDraft } from "./ownerReturnDraft";
+import { ownerReceivables } from "./coOwners";
 
 interface Props { open: boolean; onClose: () => void; vehicle: VehicleDetailAdmin; onSaved: (d: VehicleDetailAdmin) => void }
 
@@ -24,11 +27,15 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
   const [priceText, setPriceText] = useState("");
   const [mode, setMode] = useState<PlanMode | null>(null);
   const [rows, setRows] = useState<PlanRow[]>([]);
+  const [returns, setReturns] = useState<Record<string, OwnerReturnDraft>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const contacts = useLoad(() => api.contacts(), []);
   const staff = useLoad(() => api.staff(), []);
   const accounts = useLoad(() => api.accounts(), []);
+  const coOwned = vehicle.vehicle.ownership === "CO_OWNED";
+  // Ortak arac: tahmini kar icin maliyet (alis + masraflar)
+  const cost = useLoad(() => (coOwned ? api.vehicleCost(vehicle.vehicle.id) : Promise.resolve(null)), [coOwned, vehicle.vehicle.id]);
   const [extraContacts, setExtraContacts] = useState<ContactResponse[]>([]);
   const allContacts = [...extraContacts, ...(contacts.data ?? [])];
 
@@ -51,11 +58,17 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
     e.preventDefault();
     if (!buyer) return setError("Alıcıyı seç.");
     if (!canSave) return setError("Planı tamamla: kalan 0 olmalı ve her satır dolu olmalı.");
+    const profit = cost.data ? price - cost.data.totalCents : null;
+    const receivables = profit == null ? {} : ownerReceivables(profit, vehicle.shares,
+      vehicle.shopCutType, vehicle.shopCutRateBp, vehicle.shopCutCents);
+    const ownerReturns = toOwnerReturns(returns, receivables);
+    if (typeof ownerReturns === "string") return setError(ownerReturns);
     setSaving(true);
     setError(null);
     try {
       onSaved(await api.sell(vehicle.vehicle.id, {
         saleDate: date, buyerId: buyer.id, soldById: soldBy || null, salePriceCents: price, installments: rows.map(toRequest),
+        ownerReturns: coOwned ? ownerReturns : null,
       }));
     } catch (err) {
       setError(errorMessage(err));
@@ -105,6 +118,12 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
             modes={["CASH", "INSTALLMENTS", "INSTITUTION", "MIXED"]} methods={["CASH", "TRANSFER", "PROMISSORY_NOTE", "INSTITUTION"]}
             paidNowLabel="Şimdi alındı" downHint="Şimdi alınır" />
         </section>
+
+        {coOwned && (
+          <OwnerReturns owners={vehicle.shares} profitCents={price > 0 && cost.data ? price - cost.data.totalCents : null}
+            shopCutType={vehicle.shopCutType} shopCutRateBp={vehicle.shopCutRateBp} shopCutCents={vehicle.shopCutCents}
+            accounts={accounts.data ?? []} value={returns} onChange={setReturns} />
+        )}
       </form>
     </Modal>
   );
