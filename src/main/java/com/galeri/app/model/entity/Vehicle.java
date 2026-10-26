@@ -114,4 +114,15 @@ public class Vehicle extends BaseModel {
 
     @Column(name = "commission_cents")
     private Long commissionCents;
+
+    // ---- ortak aracta istege bagli dukkan payi (V10 CHECK): ortaklarin kar payindan havuza kalan ----
+    @Enumerated(EnumType.STRING)
+    @Column(name = "shop_cut_type", length = 5)
+    private CommissionType shopCutType;
+
+    @Column(name = "shop_cut_rate_bp")
+    private Integer shopCutRateBp;
+
+    @Column(name = "shop_cut_cents")
+    private Long shopCutCents;
 }

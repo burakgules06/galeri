@@ -20,5 +20,8 @@ public record VehicleDetailAdmin(
         CommissionType commissionType,
         Integer commissionRateBp,
         Long commissionCents,
-        List<ShareResponse> shares // ortakli: ortaklar ve paylari (profitCents burada null)
+        List<ShareResponse> shares, // ortak arac: sahipler (Havuz dahil), paylari ve katkilari
+        CommissionType shopCutType, // ortak arac: istege bagli dukkan payi
+        Integer shopCutRateBp,
+        Long shopCutCents
 ) {}

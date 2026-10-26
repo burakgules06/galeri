@@ -11,7 +11,6 @@ import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.model.enums.LedgerEntryType;
 import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.VehicleStatus;
-import com.galeri.app.util.ConsignmentMath;
 import com.galeri.app.model.response.DashboardResponse;
 import com.galeri.app.model.response.DashboardResponse.ContactBalance;
 import com.galeri.app.model.response.DashboardResponse.MonthStat;
@@ -21,6 +20,8 @@ import com.galeri.app.repository.ContactRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.security.CurrentUser;
+import com.galeri.app.model.response.CapitalResponses.PeriodProfit;
+import com.galeri.app.service.CapitalService;
 import com.galeri.app.service.DashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -51,6 +52,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final ContactRepository contactRepository;
     private final VehicleRepository vehicleRepository;
     private final PaymentPlanService paymentPlanService;
+    private final CapitalService capitalService;
     private final Clock clock;
 
     @Override
@@ -127,7 +129,7 @@ public class DashboardServiceImpl implements DashboardService {
 
         return new DashboardResponse(cash, bank, capital, receivable, payable, shares,
                 top(receivables), top(payables), inStock.size(), consignmentCount, stockCost, averageDays,
-                months(tenantId, YearMonth.from(today), expenses),
+                months(tenantId, YearMonth.from(today)),
                 overdue.size(), sum(overdue, null), week, sum(week, PlanDirection.SALE), sum(week, PlanDirection.PURCHASE));
     }
 
@@ -136,7 +138,7 @@ public class DashboardServiceImpl implements DashboardService {
                 .mapToLong(InstallmentResponse::amountCents).sum();
     }
 
-    private List<MonthStat> months(UUID tenantId, YearMonth current, Map<UUID, Long> expenses) {
+    private List<MonthStat> months(UUID tenantId, YearMonth current) {
         YearMonth first = current.minusMonths(MONTH_COUNT - 1);
         LocalDate start = first.atDay(1);
         LocalDate end = current.atEndOfMonth();
@@ -149,16 +151,11 @@ public class DashboardServiceImpl implements DashboardService {
         for (YearMonth m = first; !m.isAfter(current); m = m.plusMonths(1)) {
             List<Vehicle> s = sold.getOrDefault(m, List.of());
             long revenue = s.stream().mapToLong(v -> v.getSalePriceCents() == null ? 0 : v.getSalePriceCents()).sum();
-            // Arac kari galerinin (ve ortakli) araclarindan; konsinyeden gelen komisyon ayri satir (MIMARI §13 acik soru)
-            long profit = s.stream().filter(v -> v.getSalePriceCents() != null && v.getOwnership() != Ownership.CONSIGNMENT)
-                    .mapToLong(v -> v.getSalePriceCents() - cost(v, expenses)).sum();
-            long commission = s.stream().filter(v -> v.getOwnership() == Ownership.CONSIGNMENT)
-                    .mapToLong(v -> {
-                        Long c = ConsignmentMath.commission(v, v.getSalePriceCents());
-                        return c == null ? 0 : c;
-                    }).sum();
+            // Kar Donem kari ile ayni tanim (MIMARI §5): havuzun kari = galeri araclari + ortak araclarda havuz payi
+            // + komisyon + dukkan paylari - genel giderler. Komisyon bilgi icin ayrica (net kara dahil).
+            PeriodProfit p = capitalService.periodProfit(m.atDay(1), m.atEndOfMonth());
             result.add(new MonthStat(m.getYear(), m.getMonthValue(), bought.getOrDefault(m, List.of()).size(), s.size(), revenue,
-                    profit, commission));
+                    p.netCents(), p.commissionCents()));
         }
         return result;
     }

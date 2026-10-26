@@ -9,15 +9,14 @@ import com.galeri.app.exception.runtime.InvalidCategoryException;
 import com.galeri.app.exception.runtime.LinkedEntryException;
 import com.galeri.app.exception.runtime.NotAnExpenseException;
 import com.galeri.app.exception.runtime.OpeningBalanceExistsException;
-import com.galeri.app.exception.runtime.SameAccountException;
 import com.galeri.app.exception.runtime.RecordNotFoundException;
+import com.galeri.app.exception.runtime.SameAccountException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.model.entity.Account;
 import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.ExpenseCategory;
 import com.galeri.app.model.entity.LedgerEntry;
 import com.galeri.app.model.entity.Vehicle;
-import com.galeri.app.model.entity.VehicleShare;
 import com.galeri.app.model.enums.AccountType;
 import com.galeri.app.model.enums.ExpenseRoot;
 import com.galeri.app.model.enums.LedgerEntryType;
@@ -37,22 +36,21 @@ import com.galeri.app.model.response.VehicleCost;
 import com.galeri.app.model.response.VehicleRef;
 import com.galeri.app.repository.AccountRepository;
 import com.galeri.app.repository.ContactRepository;
-import com.galeri.app.repository.VehicleShareRepository;
-import com.galeri.app.util.ConsignmentMath;
 import com.galeri.app.repository.ExpenseCategoryRepository;
 import com.galeri.app.repository.InstallmentRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.security.CurrentUser;
+import com.galeri.app.service.CoOwnershipService;
 import com.galeri.app.service.LedgerService;
+import com.galeri.app.util.ConsignmentMath;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -76,8 +74,8 @@ public class LedgerServiceImpl implements LedgerService {
     private final VehicleRepository vehicleRepository;
     private final PanelUserRepository panelUserRepository;
     private final InstallmentRepository installmentRepository;
-    private final VehicleShareRepository shareRepository;
     private final ContactRepository contactRepository;
+    private final CoOwnershipService coOwnershipService;
 
     // ------------------------------------------------------------------ hesaplar
 
@@ -125,22 +123,32 @@ public class LedgerServiceImpl implements LedgerService {
     @Override
     @Transactional
     public LedgerEntryResponse addExpense(ExpenseRequest r) {
-        return toResponse(writeExpense(r), false);
+        return toResponse(afterExpense(writeExpense(r)), false);
     }
 
     @Override
     @Transactional
     public LedgerEntryResponse updateExpense(UUID entryId, ExpenseRequest r) {
         // Defter degismez: eski masraf terslenir, yeni degerlerle yeni masraf yazilir (ayni transaction)
-        writeReversal(changeableExpense(entryId));
-        return toResponse(writeExpense(r), false);
+        afterExpense(writeReversal(changeableExpense(entryId)));
+        return toResponse(afterExpense(writeExpense(r)), false);
     }
 
     @Override
     @Transactional
     public LedgerEntryResponse deleteExpense(UUID entryId) {
         // Silme = ters kayit: para kasaya / bankaya geri doner, arac maliyetinden duser
-        return toResponse(writeReversal(changeableExpense(entryId)), false);
+        return toResponse(afterExpense(writeReversal(changeableExpense(entryId))), false);
+    }
+
+    /** Satilmis ortak araca masraf girildi / degisti: kar degisti, ortaklarin kar paylari yeniden yazilir. */
+    private LedgerEntry afterExpense(LedgerEntry e) {
+        Vehicle v = e.getVehicle();
+        if (v != null && v.getOwnership() == Ownership.CO_OWNED && v.getStatus() != VehicleStatus.IN_STOCK) {
+            entryRepository.flush();
+            coOwnershipService.resyncProfitShares(v);
+        }
+        return e;
     }
 
     /** Duzenlenip silinebilecek masraf: bu galerinin, gecerli (duzeltme degil, duzeltilmemis) arac masrafi ya da genel gideri. */
@@ -197,10 +205,13 @@ public class LedgerServiceImpl implements LedgerService {
                 && original.getSourceAccount().getType() == AccountType.BALANCE;
         if (original.getType() == LedgerEntryType.VEHICLE_SALE || original.getType() == LedgerEntryType.CONSIGNMENT_SETTLEMENT
                 || plannedPurchase
+                || coOwnershipService.isLinkedEntry(original)
                 || installmentRepository.existsByPaidEntryId(original.getId())) {
             throw new LinkedEntryException();
         }
-        return toResponse(writeReversal(original), false);
+        LedgerEntry reversal = writeReversal(original);
+        if (original.getType() == LedgerEntryType.VEHICLE_EXPENSE) afterExpense(reversal);
+        return toResponse(reversal, false);
     }
 
     // ------------------------------------------------------------------ odeme plani
@@ -316,16 +327,8 @@ public class LedgerServiceImpl implements LedgerService {
         Long profit = !sold ? null : consignment ? (commission == null ? 0 : commission) - expense : sale - total;
         Long payout = consignment && sold && commission != null ? sale - commission : null;
 
-        List<ShareResponse> shares = List.of();
-        if (vehicle.getOwnership() == Ownership.CO_OWNED) {
-            List<VehicleShare> rows = shareRepository.findByVehicleIdWithContact(vehicle.getId());
-            List<Long> parts = profit == null ? null : ConsignmentMath.split(profit, rows.stream().map(VehicleShare::getShareBp).toList());
-            shares = new ArrayList<>();
-            for (int k = 0; k < rows.size(); k++) {
-                VehicleShare s = rows.get(k);
-                shares.add(new ShareResponse(s.getContact().getId(), s.getContact().getName(), s.getShareBp(), parts == null ? null : parts.get(k)));
-            }
-        }
+        // Ortak arac: sahipler, katkilari, satildiysa kar paylari (dukkan payi dusulmus) ve alacaklari
+        List<ShareResponse> shares = coOwnershipService.owners(vehicle);
         return new VehicleCost(vehicle.getId(), vehicle.getOwnership(), purchase, purchaseInLedger, expense, total, sale, profit,
                 commission, payout, consignment ? charged : 0, shares, toResponse(entries));
     }

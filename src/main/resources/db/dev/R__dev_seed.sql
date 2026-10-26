@@ -244,7 +244,7 @@ ON CONFLICT DO NOTHING;
 -- 214 Golf: Burak Gules'in araci, stokta, komisyon %3. Masraf: 4.500 TL sahibine yansitildi, 1.500 TL galeri ustlendi.
 -- 215 C-HR: Deniz Aksoy'un araci, sabit komisyon 40.000 TL, 8 gun once 1.450.000'e Zeynep'e satildi (pesin, bankaya).
 --      Sahibine borc 1.410.000; 1.000.000 odendi, 410.000 kaldi.
--- 216 Megane: ozel ortakli (Furkan %60, Kerem %40), kasadan pesin 980.000.
+-- 216 Megane: ortak arac (Havuz %50, Kerem %50; kar payi orani ayni), kasadan pesin 980.000.
 -- ---------------------------------------------------------------------------
 INSERT INTO contact (id, tenant_id, name, phone, type) VALUES
   ('00000000-0000-0000-0000-000000000110', '00000000-0000-0000-0000-000000000001', 'Burak Gules', '905367771122', 'PERSON'),
@@ -267,9 +267,10 @@ VALUES
    'CO_OWNED', NULL, NULL, NULL, NULL)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO vehicle_share (id, tenant_id, vehicle_id, contact_id, share_bp) VALUES
-  ('00000000-0000-0000-0000-000000000801', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000216', '00000000-0000-0000-0000-000000000104', 6000),
-  ('00000000-0000-0000-0000-000000000802', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000216', '00000000-0000-0000-0000-000000000106', 4000)
+-- Sahipler: Havuz (contact NULL) ve Kerem; Kerem'in 490.000 katkisi sermayesinden (aracta bagli)
+INSERT INTO vehicle_share (id, tenant_id, vehicle_id, contact_id, share_bp, profit_share_bp, contribution_source, pocket_cents) VALUES
+  ('00000000-0000-0000-0000-000000000801', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000216', NULL, 5000, 5000, 'CAPITAL', NULL),
+  ('00000000-0000-0000-0000-000000000802', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000216', '00000000-0000-0000-0000-000000000106', 5000, 5000, 'CAPITAL', NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO account (id, tenant_id, type, name, contact_id, vehicle_id) VALUES
