@@ -69,7 +69,7 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
           </div>
         </div>
         <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-          <span className={`sayi font-bold text-[21px] ${paid ? "text-basari" : i.status === "OVERDUE" ? "text-tehlike" : "text-murekkep"}`}>
+          <span className={`sayi font-bold text-[21px] whitespace-nowrap ${paid ? "text-basari" : i.status === "OVERDUE" ? "text-tehlike" : "text-murekkep"}`}>
             {tl(i.amountCents)}
           </span>
           {!paid && panel === null && (

@@ -79,10 +79,10 @@ export function PaymentsPage() {
 
       <section className="kart overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 md:p-4 border-b border-cizgi">
-          <div className="flex gap-1 rounded-[12px] bg-yuzey-2 p-1 self-start" role="tablist">
+          <div className="flex gap-1 rounded-[12px] bg-yuzey-2 p-1 self-start max-w-full overflow-x-auto" role="tablist">
             {TABS.map((t) => (
               <button key={t.value} type="button" role="tab" aria-selected={tab === t.value} onClick={() => setTab(t.value)}
-                className={`basilir h-9 px-3 md:px-3.5 rounded-[9px] text-[14px] font-semibold flex items-center gap-2 whitespace-nowrap ${
+                className={`basilir shrink-0 h-9 px-3 md:px-3.5 rounded-[9px] text-[14px] font-semibold flex items-center gap-2 whitespace-nowrap ${
                   tab === t.value ? "bg-yuzey text-murekkep shadow-sm" : "text-murekkep-2 hover:text-murekkep"}`}>
                 {t.label}
                 <span className={`sayi text-[13px] rounded-full px-1.5 min-w-[22px] ${
