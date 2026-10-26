@@ -44,7 +44,28 @@ jobs:
           cache: maven
       - run: chmod +x mvnw
       - name: Derle ve test et
-        run: ./mvnw -B verify
+        run: |
+          set +e
+          ./mvnw -B verify 2>&1 | tee mvn.log
+          exit ${PIPESTATUS[0]}
+      # Hata ayrintisi Checks ekraninda (ve API'de) annotation olarak gorunsun: derleme hatasi ve basarisiz testler
+      - name: Hatalari ozetle
+        if: failure()
+        run: |
+          grep -E '^\[ERROR\] /.*\.java:\[[0-9]+' mvn.log | head -20 | while IFS= read -r line; do
+            echo "::error title=Derleme::${line#\[ERROR\] }"
+          done
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          n = 0
+          for f in sorted(glob.glob('target/surefire-reports/*.xml') + glob.glob('target/failsafe-reports/*.xml')):
+              for tc in ET.parse(f).getroot().iter('testcase'):
+                  for bad in list(tc.findall('failure')) + list(tc.findall('error')):
+                      msg = ((bad.get('message') or '') + ' | ' + (bad.text or '')[:600]).replace('\n', ' ').replace('%', '%25')
+                      print(f"::error title={tc.get('classname','').split('.')[-1]}.{tc.get('name')}::{msg[:900]}")
+                      n += 1
+                      if n >= 25: raise SystemExit
+          PY
       - name: Test raporlari
         if: failure()
         uses: actions/upload-artifact@v4
