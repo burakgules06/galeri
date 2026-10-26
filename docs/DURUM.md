@@ -193,6 +193,13 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
 
 ## Sıradaki
 
+Galerici geri bildirimi 4 (`feat/basket-sale`): toplu satış. `V14__basket_sale.sql`: `payment_plan_vehicle` (sepet planı araçsızdır;
+araç ve satış bedeli burada, bir araç en fazla bir sepette). `POST /api/vehicles/basket-sale` { saleDate, buyerId, soldById, items[{vehicleId,
+salePriceCents}], installments } → her araç SOLD ve kendi bedeliyle; satış hareketi araç başına, ödeyenlerin tutarları araçlara sırayla
+(şelale) dağıtılır; taksitler toplam üzerinden tek plan. Sepetteki herhangi bir araçtan "Satışı geri al" bütün sepeti geri alır.
+Ortak araçta ortağa dönüş seçilmez (pay sermayede kalır). Hata kodu 1053. Panel: satış formunda "+ Aynı alıcıya araç ekle",
+ödeme planı kartında sepet listesi. Test: `BasketSaleIT`.
+
 Galerici geri bildirimi 3 (`feat/open-items`): geçmiş senet / çek aktarımı. `V13__open_items.sql`: `payment_plan.vehicle_id`
 boş olabilir, `opening_entry_id` (plan toplamını cariye yazan `OPENING_BALANCE`). `POST /api/contacts/{id}/open-items`
 { direction SALE (bize borçlu) | PURCHASE (biz borçluyuz), date, installments } → OPENING → BALANCE ya da BALANCE → OPENING,
