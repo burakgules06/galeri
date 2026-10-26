@@ -3,7 +3,7 @@ package com.galeri.app.service.impl;
 import com.galeri.app.exception.runtime.CatalogUnknownException;
 import com.galeri.app.exception.runtime.ConsignmentDetailsRequiredException;
 import com.galeri.app.exception.runtime.InvalidDateException;
-import com.galeri.app.exception.runtime.InvalidSharesException;
+import com.galeri.app.exception.runtime.InvalidShopCutException;
 import com.galeri.app.exception.runtime.PlateAlreadyInStockException;
 import com.galeri.app.exception.runtime.RecordNotFoundException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
@@ -13,19 +13,16 @@ import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.entity.VehiclePart;
-import com.galeri.app.model.entity.VehicleShare;
 import com.galeri.app.model.enums.BodyPart;
 import com.galeri.app.model.enums.CommissionType;
 import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.PartCondition;
 import com.galeri.app.model.enums.VehicleStatus;
-import com.galeri.app.model.request.ShareRequest;
 import com.galeri.app.model.request.VehiclePartsRequest;
 import com.galeri.app.model.request.VehicleRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
 import com.galeri.app.model.response.ContactSummary;
 import com.galeri.app.model.response.DamageSummary;
-import com.galeri.app.model.response.ShareResponse;
 import com.galeri.app.model.response.StaffSummary;
 import com.galeri.app.model.response.VehicleDetail;
 import com.galeri.app.model.response.VehicleDetailAdmin;
@@ -34,13 +31,12 @@ import com.galeri.app.repository.ContactRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehiclePartRepository;
 import com.galeri.app.repository.VehicleRepository;
-import com.galeri.app.repository.VehicleShareRepository;
 import com.galeri.app.security.CurrentUser;
 import com.galeri.app.service.CatalogService;
+import com.galeri.app.service.CoOwnershipService;
 import com.galeri.app.service.LedgerService;
 import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.service.VehicleService;
-import com.galeri.app.util.ConsignmentMath;
 import com.galeri.app.util.PlateUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -70,8 +66,8 @@ public class VehicleServiceImpl implements VehicleService {
     private final PanelUserRepository panelUserRepository;
     private final LedgerService ledgerService;
     private final PaymentPlanService paymentPlanService;
-    private final VehicleShareRepository shareRepository;
     private final CatalogService catalogService;
+    private final CoOwnershipService coOwnershipService;
     private final Clock clock;
 
     // ------------------------------------------------------------------ okuma
@@ -127,8 +123,9 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setPlate(plate);
         apply(vehicle, request);
         Vehicle saved = vehicleRepository.save(vehicle);
-        syncShares(saved, request);
+        coOwnershipService.syncOwners(saved, request.shares());
         syncPurchase(saved, request);
+        coOwnershipService.syncContributions(saved);   // ortak aracta cepten katki ve nakit sermaye kontrolu
         return toAdmin(saved, toDetail(saved));
     }
 
@@ -147,8 +144,10 @@ public class VehicleServiceImpl implements VehicleService {
         if (vehicle.getSaleDate() != null && vehicle.getSaleDate().isBefore(vehicle.getPurchaseDate())) {
             throw new InvalidDateException();
         }
-        syncShares(vehicle, request);
+        coOwnershipService.syncOwners(vehicle, request.shares());
         syncPurchase(vehicle, request);
+        // Ortak aracta katkilar; satilmissa kar paylari da yeniden yazilir
+        coOwnershipService.syncContributions(vehicle);
         // Satilmis aracta sahiplik ya da komisyon degistiyse sahibine borc yeniden yazilir
         if (vehicle.getStatus() != VehicleStatus.IN_STOCK) ledgerService.syncConsignmentSettlement(vehicle);
         return toAdmin(vehicle, toDetail(vehicle));
@@ -197,6 +196,7 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setSalePriceCents(request.salePriceCents());
         paymentPlanService.recordSale(vehicle, buyer, request);
         ledgerService.syncConsignmentSettlement(vehicle);   // konsinyede: BALANCE(sahibi) -> INCOME (satis - komisyon)
+        coOwnershipService.onSale(vehicle, request.ownerReturns());   // ortak aracta kar paylari ve ortaga donus
         return toAdmin(vehicle, toDetail(vehicle));
     }
 
@@ -209,6 +209,7 @@ public class VehicleServiceImpl implements VehicleService {
         if (vehicleRepository.existsByTenantIdAndPlateAndStatus(vehicle.getTenantId(), vehicle.getPlate(), VehicleStatus.IN_STOCK)) {
             throw new PlateAlreadyInStockException();
         }
+        coOwnershipService.onUndoSale(vehicle);   // ortaga nakit donus yapildiysa 1043; kar paylari terslenir
         paymentPlanService.undoSale(vehicle);
         vehicle.setStatus(VehicleStatus.IN_STOCK);
         vehicle.setSaleDate(null);
@@ -216,6 +217,7 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setSoldBy(null);
         vehicle.setSalePriceCents(null);
         ledgerService.syncConsignmentSettlement(vehicle);   // stoktaki araca sahibine borc kalmaz
+        coOwnershipService.syncContributions(vehicle);      // katkilar yeniden araca baglanir: nakit sermaye yetmeli
         return toAdmin(vehicle, toDetail(vehicle));
     }
 
@@ -259,7 +261,20 @@ public class VehicleServiceImpl implements VehicleService {
             vehicle.setActualPurchaseCents(r.actualPurchaseCents());
             vehicle.setOfficialPurchaseCents(r.officialPurchaseCents());
         }
-        if (ownership == Ownership.CO_OWNED) validateShares(r.shares());
+        applyShopCut(vehicle, r);
+    }
+
+    /** Dukkan payi sadece ortak aracta, istege bagli: oranda baz puan, sabitte tutar. */
+    private static void applyShopCut(Vehicle vehicle, VehicleRequest r) {
+        CommissionType type = r.shopCutType();
+        if (type != null && (vehicle.getOwnership() != Ownership.CO_OWNED
+                || (type == CommissionType.RATE && r.shopCutRateBp() == null)
+                || (type == CommissionType.FIXED && r.shopCutCents() == null))) {
+            throw new InvalidShopCutException();
+        }
+        vehicle.setShopCutType(type);
+        vehicle.setShopCutRateBp(type == CommissionType.RATE ? r.shopCutRateBp() : null);
+        vehicle.setShopCutCents(type == CommissionType.FIXED ? r.shopCutCents() : null);
     }
 
     /**
@@ -280,34 +295,6 @@ public class VehicleServiceImpl implements VehicleService {
                 .orElseThrow(CatalogUnknownException::new);
         vehicle.setMake(resolved.make());
         vehicle.setModel(resolved.model());
-    }
-
-    /** Ortakli aracta: en az bir ortak, her kisi bir kez, paylar toplami 10000 (%100). */
-    static void validateShares(List<ShareRequest> shares) {
-        if (shares == null || shares.isEmpty()) throw new InvalidSharesException();
-        long total = shares.stream().mapToLong(ShareRequest::shareBp).sum();
-        long distinct = shares.stream().map(ShareRequest::contactId).distinct().count();
-        if (total != ConsignmentMath.FULL_SHARE_BP || distinct != shares.size()) throw new InvalidSharesException();
-    }
-
-    /** Ortak paylarini istekle esitler; ortakli degilse paylari kaldirir. */
-    private void syncShares(Vehicle vehicle, VehicleRequest r) {
-        List<VehicleShare> existing = shareRepository.findByVehicleId(vehicle.getId());
-        List<ShareRequest> wanted = vehicle.getOwnership() == Ownership.CO_OWNED ? r.shares() : List.of();
-        Map<UUID, Integer> current = existing.stream().collect(Collectors.toMap(s -> s.getContact().getId(), VehicleShare::getShareBp));
-        Map<UUID, Integer> next = wanted.stream().collect(Collectors.toMap(ShareRequest::contactId, ShareRequest::shareBp));
-        if (current.equals(next)) return;
-
-        shareRepository.deleteAll(existing);
-        shareRepository.flush();   // (vehicle_id, contact_id) tekilligi: silmeler eklemelerden once
-        for (ShareRequest s : wanted) {
-            VehicleShare share = new VehicleShare();
-            share.setTenantId(vehicle.getTenantId());
-            share.setVehicleId(vehicle.getId());
-            share.setContact(getContact(s.contactId(), vehicle.getTenantId()));
-            share.setShareBp(s.shareBp());
-            shareRepository.save(share);
-        }
     }
 
     /** Konsinye aracin alisi deftere yazilmaz: varsa onceki alis hareketi / plani kaldirilir. */
@@ -383,15 +370,12 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     private VehicleDetailAdmin toAdmin(Vehicle v, VehicleDetail detail) {
-        List<ShareResponse> shares = v.getOwnership() != Ownership.CO_OWNED || v.getId() == null ? List.of()
-                : shareRepository.findByVehicleIdWithContact(v.getId()).stream()
-                        .map(s -> new ShareResponse(s.getContact().getId(), s.getContact().getName(), s.getShareBp(), null))
-                        .toList();
         return new VehicleDetailAdmin(detail,
                 contactSummary(v.getSeller()), staffSummary(v.getBoughtBy()), v.getActualPurchaseCents(), v.getOfficialPurchaseCents(),
                 contactSummary(v.getBuyer()), staffSummary(v.getSoldBy()), v.getSalePriceCents(),
                 ledgerService.purchaseAccountId(v.getId()),
-                contactSummary(v.getConsignor()), v.getCommissionType(), v.getCommissionRateBp(), v.getCommissionCents(), shares);
+                contactSummary(v.getConsignor()), v.getCommissionType(), v.getCommissionRateBp(), v.getCommissionCents(),
+                coOwnershipService.owners(v), v.getShopCutType(), v.getShopCutRateBp(), v.getShopCutCents());
     }
 
     private static ContactSummary contactSummary(Contact c) {

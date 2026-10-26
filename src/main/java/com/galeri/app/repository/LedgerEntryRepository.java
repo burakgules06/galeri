@@ -101,6 +101,17 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> 
     List<Object[]> vehicleExpenseTotals(@Param("tenantId") UUID tenantId, @Param("type") LedgerEntryType type,
                                         @Param("vehicleType") AccountType vehicleType);
 
+    // Ortak araclarda ortaklara yazilan kar payi, arac bazinda net (CAPITAL'den INCOME'a arti; zarar ve duzeltmeler eksi):
+    // [vehicleId, totalCents]. Havuzun payi = aracin kari - bu tutar.
+    @Query("""
+            select e.vehicle.id, sum(case when e.sourceAccount.type = :capitalType then e.amountCents else -e.amountCents end)
+            from LedgerEntry e
+            where e.tenantId = :tenantId and e.type = :type and e.vehicle is not null
+            group by e.vehicle.id
+            """)
+    List<Object[]> partnerProfitShareTotals(@Param("tenantId") UUID tenantId, @Param("type") LedgerEntryType type,
+                                           @Param("capitalType") AccountType capitalType);
+
     // Kategori kullanim sayisi (hizli butonlar icin), duzeltmeler sayilmaz: [categoryId, count]
     @Query("""
             select e.category.id, count(e) from LedgerEntry e

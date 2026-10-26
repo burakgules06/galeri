@@ -28,12 +28,14 @@ import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.security.CurrentUser;
 import com.galeri.app.service.CapitalService;
+import com.galeri.app.service.CoOwnershipService;
 import com.galeri.app.util.ConsignmentMath;
 import com.galeri.app.util.MoneyMath;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -56,6 +58,8 @@ public class CapitalServiceImpl implements CapitalService {
     private final ContactRepository contactRepository;
     private final VehicleRepository vehicleRepository;
     private final PanelUserRepository panelUserRepository;
+    private final CoOwnershipService coOwnershipService;
+    private final Clock clock;
 
     // ------------------------------------------------------------------ ortaklar
 
@@ -65,14 +69,16 @@ public class CapitalServiceImpl implements CapitalService {
         UUID tenantId = CurrentUser.tenantId();
         List<Account> accounts = capitalAccounts(tenantId);
         Map<UUID, Long> capital = capitalByAccount(entryRepository.touchingType(tenantId, AccountType.CAPITAL), null);
+        Map<UUID, Long> bound = coOwnershipService.boundCapital(tenantId, today());
         Map<UUID, Contact> contacts = contacts(accounts);
         long total = accounts.stream().mapToLong(a -> Math.max(0, capital.getOrDefault(a.getId(), 0L))).sum();
         return accounts.stream()
                 .map(a -> {
                     Contact c = contacts.get(a.getContactId());
                     long cap = capital.getOrDefault(a.getId(), 0L);
+                    long inVehicles = bound.getOrDefault(a.getContactId(), 0L);
                     return new Partner(a.getContactId(), c != null ? c.getName() : a.getName(), c != null ? c.getPhone() : null,
-                            c != null && c.isOwner(), cap, MoneyMath.basisPoints(Math.max(0, cap), total));
+                            c != null && c.isOwner(), cap, cap - inVehicles, inVehicles, MoneyMath.basisPoints(Math.max(0, cap), total));
                 })
                 .sorted(Comparator.comparing(Partner::owner).reversed().thenComparing(Comparator.comparingLong(Partner::capitalCents).reversed()))
                 .toList();
@@ -112,8 +118,10 @@ public class CapitalServiceImpl implements CapitalService {
         if (capital == null) throw new NotAPartnerException();
         if (!in) {
             accountRepository.lockById(capital.getId());   // es zamanli iki cekis ayni bakiyeyi gormesin
+            // Cekis en fazla nakitteki sermaye kadar: araclarda bagli kisim arac satilinca nakde doner
             long current = capitalByAccount(entryRepository.touchingType(contact.getTenantId(), AccountType.CAPITAL), null)
-                    .getOrDefault(capital.getId(), 0L);
+                    .getOrDefault(capital.getId(), 0L)
+                    - coOwnershipService.boundCapital(contact.getTenantId(), today()).getOrDefault(contact.getId(), 0L);
             if (r.amountCents() > current) throw new CapitalExceededException();
         }
         LedgerEntry e = in
@@ -136,6 +144,10 @@ public class CapitalServiceImpl implements CapitalService {
         for (Object[] s : entryRepository.vehicleExpenseTotals(tenantId, LedgerEntryType.VEHICLE_EXPENSE, AccountType.VEHICLE)) {
             expenses.put((UUID) s[0], ((Number) s[1]).longValue());
         }
+        Map<UUID, Long> partnerShares = new HashMap<>();
+        for (Object[] s : entryRepository.partnerProfitShareTotals(tenantId, LedgerEntryType.VEHICLE_PROFIT_SHARE, AccountType.CAPITAL)) {
+            partnerShares.put((UUID) s[0], ((Number) s[1]).longValue());
+        }
         List<SoldVehicle> vehicles = new ArrayList<>();
         long vehicleProfit = 0, commission = 0, coOwned = 0;
         for (Vehicle v : vehicleRepository.findByTenantIdAndSaleDateBetween(tenantId, from, to)) {
@@ -145,12 +157,15 @@ public class CapitalServiceImpl implements CapitalService {
                 Long c = ConsignmentMath.commission(v, v.getSalePriceCents());
                 long amount = c == null ? 0 : c;
                 commission += amount;
-                vehicles.add(new SoldVehicle(ref, v.getOwnership(), v.getSaleDate(), v.getSalePriceCents(), null, amount));
+                vehicles.add(new SoldVehicle(ref, v.getOwnership(), v.getSaleDate(), v.getSalePriceCents(), null, amount, amount));
             } else {
                 long cost = (v.getActualPurchaseCents() == null ? 0 : v.getActualPurchaseCents()) + expenses.getOrDefault(v.getId(), 0L);
                 long profit = v.getSalePriceCents() - cost;
-                if (v.getOwnership() == Ownership.CO_OWNED) coOwned += profit; else vehicleProfit += profit;
-                vehicles.add(new SoldVehicle(ref, v.getOwnership(), v.getSaleDate(), v.getSalePriceCents(), cost, profit));
+                // Ortak arac: ortaklarin payi satista sermayelerine gecti (defterde); kalan havuzun payi (dukkan payi dahil)
+                long partners = v.getOwnership() == Ownership.CO_OWNED ? partnerShares.getOrDefault(v.getId(), 0L) : 0;
+                vehicleProfit += profit - partners;
+                coOwned += partners;
+                vehicles.add(new SoldVehicle(ref, v.getOwnership(), v.getSaleDate(), v.getSalePriceCents(), cost, profit, profit - partners));
             }
         }
         vehicles.sort(Comparator.comparing(SoldVehicle::saleDate));
@@ -164,15 +179,18 @@ public class CapitalServiceImpl implements CapitalService {
     }
 
     /**
-     * Paylar donem sonundaki sermayelerden, bu donemin karindan sermayeye eklenenler haric (yoksa kar payi eklendikce
-     * oneri kayar). Onerilen tutar net kardan bu paylarla (sadece bilgi).
+     * Paylar donem sonundaki nakitteki sermayelerden: araclarda bagli kisim havuz karindan pay almaz; bu donemin karindan
+     * sermayeye eklenenler de haric (yoksa kar payi eklendikce oneri kayar). Onerilen tutar net kardan bu paylarla (bilgi).
      */
     private List<PartnerProfit> partnerProfits(UUID tenantId, LocalDate from, LocalDate to, long net) {
         List<Account> accounts = capitalAccounts(tenantId);
         List<LedgerEntry> capitalEntries = entryRepository.touchingType(tenantId, AccountType.CAPITAL);
         Map<UUID, Long> allocated = allocatedByAccount(capitalEntries, from, to);
+        Map<UUID, Long> bound = coOwnershipService.boundCapital(tenantId, to);
+        Map<UUID, UUID> contactOf = accounts.stream().collect(Collectors.toMap(Account::getId, Account::getContactId));
         Map<UUID, Long> capital = new HashMap<>();
-        capitalByAccount(capitalEntries, to).forEach((id, c) -> capital.put(id, c - allocated.getOrDefault(id, 0L)));
+        capitalByAccount(capitalEntries, to).forEach((id, c) -> capital.put(id,
+                c - allocated.getOrDefault(id, 0L) - bound.getOrDefault(contactOf.get(id), 0L)));
         Map<UUID, Contact> contacts = contacts(accounts);
 
         List<Account> involved = accounts.stream()
@@ -293,6 +311,10 @@ public class CapitalServiceImpl implements CapitalService {
         e.setEntryDate(date);
         e.setCreatedBy(panelUserRepository.getReferenceById(CurrentUser.principal().userId()));
         return e;
+    }
+
+    private LocalDate today() {
+        return LocalDate.now(clock.withZone(VehicleServiceImpl.DEALER_ZONE));
     }
 
     private static String blankToNull(String s) {

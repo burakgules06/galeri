@@ -17,9 +17,9 @@ import com.galeri.app.model.entity.ExpenseCategory;
 import com.galeri.app.model.entity.LedgerEntry;
 import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.Vehicle;
-import com.galeri.app.model.entity.VehicleShare;
 import com.galeri.app.model.enums.AccountType;
 import com.galeri.app.model.enums.CommissionType;
+import com.galeri.app.model.enums.ContributionSource;
 import com.galeri.app.model.enums.ExpenseRoot;
 import com.galeri.app.model.enums.LedgerEntryType;
 import com.galeri.app.model.enums.Ownership;
@@ -32,13 +32,13 @@ import com.galeri.app.model.response.LedgerEntryResponse;
 import com.galeri.app.model.response.ShareResponse;
 import com.galeri.app.model.response.VehicleCost;
 import com.galeri.app.repository.AccountRepository;
-import com.galeri.app.repository.ExpenseCategoryRepository;
 import com.galeri.app.repository.ContactRepository;
+import com.galeri.app.repository.ExpenseCategoryRepository;
 import com.galeri.app.repository.InstallmentRepository;
-import com.galeri.app.repository.VehicleShareRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehicleRepository;
+import com.galeri.app.service.CoOwnershipService;
 import com.galeri.app.support.TestSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,7 +74,7 @@ class LedgerServiceImplTest {
     @Mock private VehicleRepository vehicleRepository;
     @Mock private PanelUserRepository panelUserRepository;
     @Mock private InstallmentRepository installmentRepository;
-    @Mock private VehicleShareRepository shareRepository;
+    @Mock private CoOwnershipService coOwnershipService;
     @Mock private ContactRepository contactRepository;
 
     private static final LocalDate DAY = LocalDate.of(2026, 7, 1);
@@ -89,7 +89,7 @@ class LedgerServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new LedgerServiceImpl(accountRepository, entryRepository, categoryRepository, vehicleRepository, panelUserRepository,
-                installmentRepository, shareRepository, contactRepository);
+                installmentRepository, contactRepository, coOwnershipService);
         TestSession.open(userId, tenantId, "ADMIN");
 
         cash = account(AccountType.CASH, tenantId);
@@ -577,21 +577,33 @@ class LedgerServiceImplTest {
     }
 
     @Test
-    void ortakliAracKari_paylaraBolunur_kurusKalaniBuyukPayaGider() {
+    void ortakAracMaliyeti_sahiplerOrtakFinansmandan_karAracinTamKari() {
         Vehicle v = vehicle();
         v.setOwnership(Ownership.CO_OWNED);
         v.setStatus(VehicleStatus.SOLD);
-        v.setSalePriceCents(72000001L);   // kar 0,01 TL: bolunemeyen kurus buyuk paya
+        v.setSalePriceCents(72000001L);   // kar 0,01 TL
         when(vehicleRepository.findById(v.getId())).thenReturn(Optional.of(v));
         when(entryRepository.vehicleEntries(v.getId())).thenReturn(List.of());
-        VehicleShare a = share(contact("Furkan"), 6000);
-        VehicleShare b = share(contact("Selin"), 4000);
-        when(shareRepository.findByVehicleIdWithContact(v.getId())).thenReturn(List.of(a, b));
+        List<ShareResponse> owners = List.of(new ShareResponse(null, "Havuz", 5000, 5000, ContributionSource.CAPITAL, null, 0, 1L, 1L));
+        when(coOwnershipService.owners(v)).thenReturn(owners);
 
         VehicleCost cost = service.vehicleCost(v.getId());
 
         assertThat(cost.profitCents()).isEqualTo(1L);
-        assertThat(cost.shares()).extracting(ShareResponse::profitCents).containsExactly(1L, 0L);
+        assertThat(cost.shares()).isEqualTo(owners);
+    }
+
+    @Test
+    void ortakKarPayiVeCeptenKatki_kasadanDuzeltilemez() {
+        LedgerEntry share = new LedgerEntry();
+        share.setId(UUID.randomUUID());
+        share.setTenantId(tenantId);
+        share.setType(LedgerEntryType.VEHICLE_PROFIT_SHARE);
+        when(entryRepository.lockById(share.getId())).thenReturn(Optional.of(share));
+        when(coOwnershipService.isLinkedEntry(share)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.correct(share.getId())).isInstanceOf(LinkedEntryException.class);
+        verify(entryRepository, never()).save(any());
     }
 
     @Test
@@ -801,14 +813,6 @@ class LedgerServiceImplTest {
         v.setSaleDate(LocalDate.of(2026, 6, 20));
         v.setSalePriceCents(salePrice);
         return v;
-    }
-
-    private VehicleShare share(Contact c, int bp) {
-        VehicleShare s = new VehicleShare();
-        s.setId(UUID.randomUUID());
-        s.setContact(c);
-        s.setShareBp(bp);
-        return s;
     }
 
     private ExpenseRequest expenseRequest(UUID sourceId, long amount, UUID vehicleId, String categoryName) {

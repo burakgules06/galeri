@@ -11,21 +11,31 @@ public final class CapitalResponses {
 
     private CapitalResponses() {}
 
-    /** Ortak: sermayesi CAPITAL hesabinin bakiyesinden hesaplanir, hicbir yerde saklanmaz. */
-    public record Partner(UUID contactId, String name, String phone, boolean owner, long capitalCents, int shareBp) {}
+    /**
+     * Ortak: sermayesi CAPITAL hesabinin bakiyesinden hesaplanir, hicbir yerde saklanmaz. Sermaye = nakitteki + araclarda
+     * bagli (stoktaki ortak araclardaki odenmis katkilari). Pay toplam sermayeden; cekis en fazla nakitteki kadar.
+     */
+    public record Partner(UUID contactId, String name, String phone, boolean owner, long capitalCents,
+                          long cashCents, long boundCents, int shareBp) {}
 
-    /** Donemde satilan arac. CONSIGNMENT'ta profitCents komisyondur; CO_OWNED havuz disi (net kara girmez). */
+    /**
+     * Donemde satilan arac. profitCents aracin kari (konsinyede komisyon); poolProfitCents havuza kalan kisim:
+     * galeri aracinda kar, konsinyede komisyon, ortak aracta havuzun payi + dukkan payi (ortaklarin payi dusulmus).
+     */
     public record SoldVehicle(VehicleRef vehicle, Ownership ownership, LocalDate saleDate, long salePriceCents,
-                              Long costCents, long profitCents) {}
+                              Long costCents, long profitCents, long poolProfitCents) {}
 
-    /** Ortagin bu donemdeki payi: onerilen = net kar x pay; allocated = donem icinde sermayeye eklenmis olan. */
+    /**
+     * Ortagin bu donemdeki payi: capitalCents agirligi = donem sonu nakitteki sermayesi (araclarda bagli kismi ve bu
+     * donemin karindan eklenen haric); onerilen = net kar x pay; allocated = donem icinde sermayeye eklenmis olan.
+     */
     public record PartnerProfit(UUID contactId, String name, boolean owner, long capitalCents, int shareBp,
                                 long suggestedCents, long allocatedCents) {}
 
     /**
-     * Donem kari = satilan galeri araclarinin kari + komisyonlar - genel giderler (MIMARI §5).
-     * coOwnedProfitCents ayri gosterilir, nete girmez (ozel ortakli arac havuz disi).
-     * Paylar donem sonundaki sermayelerden.
+     * Havuzun donem kari = galeri araclarinin kari + ortak araclarda havuzun payi (dukkan payi dahil) + komisyonlar
+     * - genel giderler (MIMARI §5). coOwnedProfitCents ortak araclarda ortaklara yazilan kar paylari: satista dogrudan
+     * sermayelerine gecer, nete girmez (bilgi). Paylar donem sonundaki nakitteki sermayelerden.
      */
     public record PeriodProfit(LocalDate from, LocalDate to, List<SoldVehicle> vehicles,
                                long vehicleProfitCents, long commissionCents, long generalExpenseCents, long netCents,

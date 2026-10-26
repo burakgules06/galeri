@@ -56,19 +56,27 @@ public final class LedgerInvariants {
         long assets = byType.getOrDefault("CASH", 0L) + byType.getOrDefault("BANK", 0L) + stock + byType.getOrDefault("BALANCE", 0L);
         assertThat(assets).as("%s: toplam mal = sermaye + acilis + dagitilmamis kar", step).isEqualTo(capital + opening + undistributed);
 
-        // Rapor (donem kari, tum zamanlar) - sermayeye eklenen = defterdeki dagitilmamis kar
+        // Rapor (havuzun donem kari, tum zamanlar) - sermayeye eklenen = defterdeki dagitilmamis kar. Ortak araclarda
+        // ortaklarin payi satista sermayelerine gecti: dagitilmamis kara da rapor netine de girmez.
         CapitalResponses.PeriodProfit report = capitalService.periodProfit(LocalDate.of(2000, 1, 1), LocalDate.of(2100, 12, 31));
         long allocated = report.partners().stream().mapToLong(CapitalResponses.PartnerProfit::allocatedCents).sum();
-        assertThat(report.netCents() + report.coOwnedProfitCents() - allocated)
-                .as("%s: rapor kari - sermayeye eklenen = defter", step).isEqualTo(undistributed);
+        assertThat(report.netCents() - allocated).as("%s: rapor kari - sermayeye eklenen = defter", step).isEqualTo(undistributed);
 
-        // 3) Ortak sermayeleri defterle ayni; toplam sermaye
+        // 3) Ortak sermayeleri defterle ayni; her ortakta sermaye = nakitteki + araclarda bagli, nakitteki eksi degil
         Map<UUID, Long> capitalByContact = new HashMap<>();
         jdbc.queryForList("select id, contact_id from account where tenant_id = ? and type = 'CAPITAL'", tenant)
                 .forEach(r -> capitalByContact.put((UUID) r.get("contact_id"), -balance.get((UUID) r.get("id"))));
         List<CapitalResponses.Partner> partners = capitalService.partners();
-        partners.forEach(p -> assertThat(p.capitalCents()).as("%s: %s sermayesi", step, p.name()).isEqualTo(capitalByContact.get(p.contactId())));
+        for (CapitalResponses.Partner p : partners) {
+            assertThat(p.capitalCents()).as("%s: %s sermayesi", step, p.name()).isEqualTo(capitalByContact.get(p.contactId()));
+            assertThat(p.cashCents() + p.boundCents()).as("%s: %s sermaye = nakitteki + bagli", step, p.name()).isEqualTo(p.capitalCents());
+            assertThat(p.cashCents()).as("%s: %s nakitteki sermaye", step, p.name()).isNotNegative();
+            assertThat(p.boundCents()).as("%s: %s bagli sermaye", step, p.name()).isNotNegative();
+        }
         assertThat(partners.stream().mapToLong(CapitalResponses.Partner::capitalCents).sum()).as("%s: toplam sermaye", step).isEqualTo(capital);
+        // Bagli sermaye stoktaki araclarin maliyetini asamaz (ortaklar en fazla araclarin alis bedeli kadar katki yapar)
+        assertThat(partners.stream().mapToLong(CapitalResponses.Partner::boundCents).sum())
+                .as("%s: bagli sermaye <= stok", step).isLessThanOrEqualTo(stock);
 
         // 4) Plan toplami = taksit toplami
         assertThat(jdbc.queryForList("""

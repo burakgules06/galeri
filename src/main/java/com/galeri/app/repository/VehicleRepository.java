@@ -1,6 +1,7 @@
 package com.galeri.app.repository;
 
 import com.galeri.app.model.entity.Vehicle;
+import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.VehicleStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -39,4 +40,6 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     List<Vehicle> findByTenantIdAndPurchaseDateBetween(UUID tenantId, LocalDate start, LocalDate end);
 
     List<Vehicle> findByTenantIdAndSaleDateBetween(UUID tenantId, LocalDate start, LocalDate end);
+
+    List<Vehicle> findByTenantIdAndOwnership(UUID tenantId, Ownership ownership);
 }

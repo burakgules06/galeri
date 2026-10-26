@@ -49,8 +49,24 @@ public record VehicleRequest(
         // "Listede yok": true ise marka + catalogModel (temel model, paketsiz) once galerinin katalogune eklenir.
         // Model alani yine "temel model + paket" tasir.
         Boolean addToCatalog,
-        @Size(max = 60) String catalogModel
+        @Size(max = 60) String catalogModel,
+        // Ortak aracta istege bagli dukkan payi: ortaklarin kar payindan havuza kalan oran (baz puan) ya da sabit kurus
+        CommissionType shopCutType,
+        @Min(0) @Max(10000) Integer shopCutRateBp,
+        @PositiveOrZero Long shopCutCents
 ) {
+    /** Dukkan payi olmadan (ortak arac disindaki kayitlar ve eski cagrilar). */
+    public VehicleRequest(String plate, String make, String model, Short modelYear, Fuel fuel, Transmission transmission,
+                          Integer mileageKm, String color, Long tramerCents, String notes, LocalDate purchaseDate,
+                          UUID sellerId, UUID boughtById, Long actualPurchaseCents, Long officialPurchaseCents,
+                          UUID purchaseAccountId, List<InstallmentRequest> purchasePlan, Ownership ownership, UUID consignorId,
+                          CommissionType commissionType, Integer commissionRateBp, Long commissionCents,
+                          List<ShareRequest> shares, Boolean addToCatalog, String catalogModel) {
+        this(plate, make, model, modelYear, fuel, transmission, mileageKm, color, tramerCents, notes, purchaseDate, sellerId,
+                boughtById, actualPurchaseCents, officialPurchaseCents, purchaseAccountId, purchasePlan, ownership, consignorId,
+                commissionType, commissionRateBp, commissionCents, shares, addToCatalog, catalogModel, null, null, null);
+    }
+
 
     public Ownership ownershipOrDefault() {
         return ownership == null ? Ownership.DEALER : ownership;

@@ -39,6 +39,7 @@ import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.PaymentPlanRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.security.CurrentUser;
+import com.galeri.app.service.CoOwnershipService;
 import com.galeri.app.service.LedgerService;
 import com.galeri.app.service.PaymentPlanService;
 import lombok.RequiredArgsConstructor;
@@ -75,6 +76,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     private final LedgerEntryRepository entryRepository;
     private final PanelUserRepository panelUserRepository;
     private final LedgerService ledgerService;
+    private final CoOwnershipService coOwnershipService;
     private final Clock clock;
 
     // ------------------------------------------------------------------ satis
@@ -323,6 +325,8 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         if (installmentRepository.markPaid(i.getId(), entry.getId(), paidAt) == 0) throw new InstallmentAlreadyPaidException();
         i.setPaidEntryId(entry.getId());   // bellekteki nesne de guncel (ayni degerler; ek UPDATE zararsiz)
         i.setPaidAt(paidAt);
+        // Ortak aracin alis taksiti: odeme sahiplere paylarina gore bolunur (cepten kisim sermaye girisi)
+        if (plan.getDirection() == PlanDirection.PURCHASE) coOwnershipService.syncContributions(vehicle);
         return single(i, vehicle);
     }
 
@@ -334,6 +338,10 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         ledgerService.reverse(i.getPaidEntryId());
         i.setPaidEntryId(null);
         i.setPaidAt(null);
+        if (i.getPlan().getDirection() == PlanDirection.PURCHASE) {
+            installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
+            coOwnershipService.syncContributions(vehicleRepository.findById(i.getPlan().getVehicleId()).orElseThrow(RecordNotFoundException::new));
+        }
         return single(i, null);
     }
 

@@ -15,5 +15,11 @@ public record VehicleSaleRequest(
         @NotNull UUID buyerId,
         UUID soldById,
         @NotNull @Positive Long salePriceCents,
-        @NotEmpty List<@Valid InstallmentRequest> installments
-) {}
+        @NotEmpty List<@Valid InstallmentRequest> installments,
+        // Ortak aracta ortaga donus secimi (bos = herkesinki sermayede kalir)
+        List<@Valid OwnerReturnRequest> ownerReturns
+) {
+    public VehicleSaleRequest(LocalDate saleDate, UUID buyerId, UUID soldById, Long salePriceCents, List<InstallmentRequest> installments) {
+        this(saleDate, buyerId, soldById, salePriceCents, installments, null);
+    }
+}
