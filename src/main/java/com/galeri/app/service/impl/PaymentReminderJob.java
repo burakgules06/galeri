@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-// Her gun 09:00 Europe/Istanbul: odeme gunu bildirimleri. Mantik PaymentReminderService'te (test edilebilir).
+// Her dakika saati gelen galerilerin odeme bildirimleri kontrol edilir.
 @Component
 @RequiredArgsConstructor
 public class PaymentReminderJob {
@@ -16,8 +16,7 @@ public class PaymentReminderJob {
 
     private final PaymentReminderService reminderService;
 
-    // Saat sadece lokal denemede degistirilir (push.reminder-cron); prod'da varsayilan 09:00
-    @Scheduled(cron = "${push.reminder-cron:0 0 9 * * *}", zone = "Europe/Istanbul")
+    @Scheduled(cron = "0 * * * * *", zone = "Europe/Istanbul")
     public void run() {
         try {
             int tenants = reminderService.sendDailyReminders();

@@ -69,7 +69,7 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
   - `PaymentReminderJob` her gün 09:00 Europe/Istanbul `PaymentReminderService.sendDailyReminders()`'ı çağırır: bugün vadeli +
     1-3 gün gecikmiş ödenmemiş taksitler, galeri başına tek bildirim, sadece aktif ADMIN abonelikleri. Hiç ADMIN abonesi
     yoksa kayıt yazılmaz (sonra izin verilirse pencere içinde yine hatırlatılır). 404/410 dönen abonelik silinir.
-    Gönderim `aes128gcm` (iOS için şart). Lokal denemede saat `push.reminder-cron` ile değiştirilebilir.
+    Gönderim `aes128gcm` (iOS için şart). Saat artık Hesabım > Bildirimler'den değiştirilir (bildirim saati geliştirmesi).
   - Uçlar (sadece ADMIN): `GET /api/push/public-key` (boşsa bildirim kapalı), `POST/DELETE /api/push/subscribe`.
   - Yeni `.env`: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`npx web-push generate-vapid-keys`). Boşsa görev çalışmaz.
   - Panel: `public/sw.js` (bildirim, tıklayınca `#/payments`), menünün altında / telefonda üst çubukta zil düğmesi
@@ -192,6 +192,16 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
     panel `npm run lint` ve `npm run build` başarılı. Kuruşlu taksitlerin tamamı ödendiğinde sahip borçlarının sıfırlandığı da sınandı.
 
 ## Sıradaki
+
+Bildirim saati (`feat/reminder-time`, `bildirim-saati.md`): `V11__reminder_time.sql` ile tenant'a `reminder_time` (varsayılan 09:00)
+ve `reminder_sent_on` eklendi. Görev her dakika Europe/Istanbul'a göre saati gelen galerileri günde bir kez işler; taksit/abone/VAPID
+yoksa da günlük işaret yazılır. Saat değişince işaret sıfırlanır, mevcut `notification_log` aynı taksite aynı gün tekrar gönderimi engeller.
+ADMIN için `GET/PUT /api/settings/reminder` ve `POST /api/push/test`; test yalnız çağıranın cihazlarına gider, log/günlük işaret yazmaz.
+Hesabım'da Bildirimler kartı mevcut NotificationButton ile izin durumunu, saat seçimini ve test düğmesini gösterir.
+Migration var (`migration` etiketi); yeni `.env` yok. Eski cron ayarı kaldırıldı. Seed ve bildirim metni/taksit seçimi değişmedi.
+Doğrulama: izole `galeri_codex_test` üzerinde Maven `verify` başarılı (183 test + 20 entegrasyon testi); panel lint/build başarılı.
+Sabit Clock ile 08:59/09:00/09:01, 14:29/14:30, gecikmeli sunucu açılışı ve aynı gün saat değişikliği sınandı.
+Gerçek PostgreSQL testi saat filtresini, tenant izolasyonunu ve test gönderiminin log/günlük işareti değiştirmediğini doğruladı.
 
 Ana ekran yerleşimi: sermaye + alım/satım grafiği ve kompakt alacak/verecek + kâr grafiği bağımsız sütunlarda akar;
 kapalı detay kartı sermaye kartının yüksekliğine gerilmez. Telefonda özet kartları grafiklerden önce gelir.

@@ -5,6 +5,7 @@ import { useAuth } from "../../auth/useAuth";
 import { errorMessage } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass } from "../../shared/ui/Common";
 import { InstallCard } from "./InstallCard";
+import { NotificationsCard } from "./NotificationsCard";
 
 export function AccountPage() {
   const { auth, isAdmin } = useAuth();
@@ -23,6 +24,7 @@ export function AccountPage() {
       </div>
 
       <InstallCard />
+      {isAdmin && <NotificationsCard />}
       <ChangePasswordCard />
     </div>
   );

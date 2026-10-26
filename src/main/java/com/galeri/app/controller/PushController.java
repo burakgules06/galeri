@@ -7,6 +7,7 @@ import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.PushSubscriptionRepository;
 import com.galeri.app.security.CurrentUser;
 import com.galeri.app.service.impl.GenericResponseService;
+import com.galeri.app.service.PushTestService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -28,6 +29,13 @@ public class PushController {
     private final PushSubscriptionRepository subscriptionRepository;
     private final PanelUserRepository panelUserRepository;
     private final GenericResponseService responseService;
+    private final PushTestService testService;
+
+    @PostMapping("/test")
+    public GenericResponse<Void> test() {
+        testService.send();
+        return responseService.success(null);
+    }
 
     public record PublicKeyResponse(String publicKey) {}
 

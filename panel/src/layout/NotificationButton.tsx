@@ -10,7 +10,9 @@ const TITLE: Record<Exclude<PushStatus, "unsupported">, string> = {
   blocked: "Bildirimler tarayıcıda engelli",
 };
 
-export function NotificationButton({ expanded, className = "" }: { expanded: boolean; className?: string }) {
+export function NotificationButton({ expanded, className = "", surface = "dark" }: {
+  expanded: boolean; className?: string; surface?: "dark" | "light";
+}) {
   const [publicKey, setPublicKey] = useState("");
   const [status, setStatus] = useState<PushStatus>("unsupported");
   const [busy, setBusy] = useState(false);
@@ -24,7 +26,8 @@ export function NotificationButton({ expanded, className = "" }: { expanded: boo
     return () => { alive = false; };
   }, []);
 
-  if (!publicKey || status === "unsupported") return null;
+  if (!publicKey || status === "unsupported") return surface === "light"
+    ? <p className="text-sm text-murekkep-2">Bu cihazda bildirim açık değil</p> : null;
 
   const click = async () => {
     if (busy || status === "blocked") return;
@@ -43,14 +46,14 @@ export function NotificationButton({ expanded, className = "" }: { expanded: boo
 
   return (
     <button onClick={click} disabled={busy} aria-label={title} title={title} aria-pressed={status === "on"}
-      className={`basilir relative h-10 rounded-[10px] flex items-center gap-2 hover:bg-gece-2 hover:text-white disabled:opacity-60 ${
+      className={`basilir relative h-10 rounded-[10px] flex items-center gap-2 ${surface === "light" ? "text-plaka hover:bg-plaka-acik" : "hover:bg-gece-2 hover:text-white"} disabled:opacity-60 ${
         expanded ? "px-3 w-full text-[14px] font-semibold" : "w-10 justify-center"} ${status === "blocked" ? "cursor-not-allowed" : ""} ${className}`}>
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
         <path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20.5a2.2 2.2 0 0 0 4 0" />
         {status === "blocked" && <path d="M4 4l16 16" />}
       </svg>
       {status !== "blocked" && (
-        <span className={`absolute ${expanded ? "left-[30px]" : "left-[24px]"} top-[9px] w-2 h-2 rounded-full ring-2 ring-gece ${status === "on" ? "bg-basari-canli" : "bg-uyari"}`} />
+        <span className={`absolute ${expanded ? "left-[30px]" : "left-[24px]"} top-[9px] w-2 h-2 rounded-full ring-2 ${surface === "light" ? "ring-yuzey" : "ring-gece"} ${status === "on" ? "bg-basari-canli" : "bg-uyari"}`} />
       )}
       {expanded && <span className="truncate">{TITLE[status]}</span>}
     </button>

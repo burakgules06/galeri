@@ -7,6 +7,10 @@ import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.PaymentPlan;
 import com.galeri.app.model.entity.PushSubscription;
 import com.galeri.app.model.entity.Vehicle;
+import com.galeri.app.model.entity.Tenant;
+import com.galeri.app.repository.TenantRepository;
+import com.galeri.app.support.TestSession;
+import org.junit.jupiter.api.AfterEach;
 import com.galeri.app.model.enums.PaymentMethod;
 import com.galeri.app.model.enums.PlanDirection;
 import com.galeri.app.repository.InstallmentRepository;
@@ -26,6 +30,7 @@ import org.mockito.quality.Strictness;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +55,7 @@ class PaymentReminderServiceImplTest {
     @Mock private PushSubscriptionRepository subscriptionRepository;
     @Mock private VehicleRepository vehicleRepository;
     @Mock private PushSender pushSender;
+    @Mock private TenantRepository tenantRepository;
 
     // "Su an": 1 Temmuz 2026, 09:00 Istanbul (06:00 UTC)
     private final Clock clock = Clock.fixed(Instant.parse("2026-07-01T06:00:00Z"), ZoneOffset.UTC);
@@ -60,10 +66,18 @@ class PaymentReminderServiceImplTest {
     private PaymentReminderServiceImpl service;
     private Vehicle vehicle;
     private PushSubscription adminSub;
+    private Tenant tenant;
 
     @BeforeEach
     void setUp() {
-        service = new PaymentReminderServiceImpl(installmentRepository, logRepository, subscriptionRepository, vehicleRepository, pushSender, clock);
+        service = new PaymentReminderServiceImpl(installmentRepository, logRepository, subscriptionRepository, vehicleRepository, pushSender, tenantRepository, clock);
+        tenant = new Tenant();
+        tenant.setId(tenantId);
+        when(tenantRepository.findDueReminders(any(), any())).thenAnswer(inv -> {
+            LocalDate day = inv.getArgument(0);
+            LocalTime time = inv.getArgument(1);
+            return !tenant.getReminderTime().isAfter(time) && !day.equals(tenant.getReminderSentOn()) ? List.of(tenant) : List.of();
+        });
         vehicle = new Vehicle();
         vehicle.setId(UUID.randomUUID());
         vehicle.setPlate("34 ABC 123");
@@ -78,6 +92,68 @@ class PaymentReminderServiceImplTest {
     }
 
     // ------------------------------------------------------------------ secim
+
+    @AfterEach
+    void closeSession() { TestSession.close(); }
+
+    private PaymentReminderServiceImpl at(String instant) {
+        return new PaymentReminderServiceImpl(installmentRepository, logRepository, subscriptionRepository, vehicleRepository,
+                pushSender, tenantRepository, Clock.fixed(Instant.parse(instant), ZoneOffset.UTC));
+    }
+
+    @Test
+    void dokuzdanOnceGonderilmez_dokuzdaGonderilir_ayniGunTekrarGonderilmez() {
+        candidates.add(installment(PlanDirection.SALE, TODAY, 100L, false));
+        assertThat(at("2026-07-01T05:59:00Z").sendDailyReminders()).isZero();
+        assertThat(tenant.getReminderSentOn()).isNull();
+        assertThat(at("2026-07-01T06:00:00Z").sendDailyReminders()).isEqualTo(1);
+        assertThat(tenant.getReminderSentOn()).isEqualTo(TODAY);
+        assertThat(at("2026-07-01T06:01:00Z").sendDailyReminders()).isZero();
+        verify(pushSender, times(1)).send(any(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void galeriSaatiOndortOtuz_ondortYirmidokuzdaBekler() {
+        tenant.setReminderTime(LocalTime.of(14, 30));
+        candidates.add(installment(PlanDirection.SALE, TODAY, 100L, false));
+        assertThat(at("2026-07-01T11:29:00Z").sendDailyReminders()).isZero();
+        assertThat(at("2026-07-01T11:30:00Z").sendDailyReminders()).isEqualTo(1);
+    }
+
+    @Test
+    void sunucuGecAcildiysa_ayniGunIcindeGonderilir() {
+        candidates.add(installment(PlanDirection.SALE, TODAY, 100L, false));
+        assertThat(at("2026-07-01T17:00:00Z").sendDailyReminders()).isEqualTo(1);
+    }
+
+    @Test
+    void taksitYoksaDaGaleriIslenir_ertesiGunYenidenBakilir() {
+        assertThat(service.sendDailyReminders()).isZero();
+        assertThat(tenant.getReminderSentOn()).isEqualTo(TODAY);
+        at("2026-07-01T06:01:00Z").sendDailyReminders();
+        verify(installmentRepository, times(1)).findOpenDueBetween(any(), any());
+        at("2026-07-02T06:00:00Z").sendDailyReminders();
+        assertThat(tenant.getReminderSentOn()).isEqualTo(TODAY.plusDays(1));
+    }
+
+    @Test
+    void saatDegistirilinceYeniTaksitGonderilir_ayniTaksitTekrarlanmaz() {
+        Installment first = installment(PlanDirection.SALE, TODAY, 100L, false);
+        candidates.add(first);
+        service.sendDailyReminders();
+        when(logRepository.notifiedOn(eq(TODAY), anyCollection())).thenReturn(List.of(first.getId()));
+        when(tenantRepository.lockById(tenantId)).thenReturn(java.util.Optional.of(tenant));
+        TestSession.open(UUID.randomUUID(), tenantId, "ADMIN");
+        new ReminderSettingsServiceImpl(tenantRepository).update("09:02");
+        assertThat(tenant.getReminderSentOn()).isNull();
+        candidates.add(installment(PlanDirection.SALE, TODAY, 200L, false));
+        assertThat(at("2026-07-01T06:01:00Z").sendDailyReminders()).isZero();
+        assertThat(at("2026-07-01T06:02:00Z").sendDailyReminders()).isEqualTo(1);
+        ArgumentCaptor<NotificationLog> logs = ArgumentCaptor.forClass(NotificationLog.class);
+        verify(logRepository, times(2)).save(logs.capture());
+        assertThat(logs.getAllValues()).extracting(NotificationLog::getInstallmentId)
+                .containsExactly(first.getId(), candidates.get(1).getId());
+    }
 
     @Test
     void bugunVeBirIleUcGunGecikmisler_secilir_dortGunVeOdenmisVeIleriVade_secilmez() {

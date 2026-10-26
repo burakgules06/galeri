@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.UUID;
 
 // Galeri (isletme): multi-tenancy koku. Diger tum is tablolari tenant_id tasir.
@@ -39,4 +40,10 @@ public class Tenant extends BaseModel {
 
     @Column(nullable = false, length = 20)
     private String plan = "BASIC";
+
+    @Column(name = "reminder_time", nullable = false)
+    private LocalTime reminderTime = LocalTime.of(9, 0);
+
+    @Column(name = "reminder_sent_on")
+    private LocalDate reminderSentOn;
 }

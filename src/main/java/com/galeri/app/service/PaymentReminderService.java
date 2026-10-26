@@ -1,6 +1,6 @@
 package com.galeri.app.service;
 
-// Odeme gunu bildirimleri (bkz. docs/MIMARI.md §9). Zamanlanmis gorev her gun 09:00 Europe/Istanbul'da cagirir.
+// Odeme gunu bildirimleri: gorev her dakika, galerinin sectigi saati kontrol eder (Europe/Istanbul).
 public interface PaymentReminderService {
 
     /**

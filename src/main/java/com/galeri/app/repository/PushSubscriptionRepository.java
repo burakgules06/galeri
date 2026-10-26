@@ -17,6 +17,8 @@ public interface PushSubscriptionRepository extends JpaRepository<PushSubscripti
     @Query("select s from PushSubscription s join fetch s.panelUser where s.tenantId = :tenantId")
     List<PushSubscription> findByTenantIdWithUser(@Param("tenantId") UUID tenantId);
 
+    List<PushSubscription> findByTenantIdAndPanelUser_Id(UUID tenantId, UUID panelUserId);
+
     void deleteByEndpoint(String endpoint);
 
     void deleteByEndpointAndPanelUser_Id(String endpoint, UUID panelUserId);
