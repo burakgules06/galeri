@@ -61,6 +61,8 @@ Kalınlık, incelik ve renk birlikte hiyerarşi kurar: etiket soluk ve küçük,
   ("Kuruş için virgül kullanın"). Yüzde gibi tutar olmayan alanlarda `preview={false}`.
 - **Kişi / kurum seçici** (`ContactPicker`): listenin altında her zaman "+ Yeni kişi" (kurumda "+ Yeni kurum"); ad yazılır, kayıt
   oluşur ve seçilir, form kapanmaz. Kurum seçimi `kind="ORGANIZATION"`.
+- **Aranabilir liste** (`shared/ui/Combobox`): yazdıkça süzülür, Enter tam eşleşmeyi seçer; seçili değer yanında "Değiştir".
+  Liste dışı değer gerekiyorsa altta mavi `footer` ("Listede yok"). Marka / model seçici (`MakeModelPicker`) bunu kullanır.
 - **Defter listesi** (`LedgerEntryList`): masrafta "Düzenle / Sil", diğer hareketlerde "Düzelt". Düzeltilmiş kayıt + düzeltmesi
   varsayılan gizli, "Düzeltmeleri göster" ile görünür. Silme onayı satır içinde (tarayıcı `confirm` kullanılmaz).
 

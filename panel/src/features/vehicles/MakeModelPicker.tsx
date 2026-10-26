@@ -93,7 +93,7 @@ export function MakeModelPicker({ initial, onChange }: { initial: { make: string
       <div className="grid grid-cols-2 gap-3">
         <Field label="Marka">
           {free && freeMake
-            ? <input className={inputClass} value={make} onChange={(e) => setMake(e.target.value)} placeholder="Marka adı" required maxLength={40} />
+            ? <input className={inputClass} value={make} onChange={(e) => setMake(e.target.value)} placeholder="Marka adı" required maxLength={40} autoFocus />
             : <Combobox items={(makes.data ?? []).map((m) => m.name)} value={make} placeholder="Marka ara" ariaLabel="Marka"
                 badge={custom(makes.data)}
                 onChange={(v) => { setMake(v); setBase(""); setFreeMake(false); if (mode === "free") setMode("catalog"); }}
@@ -101,7 +101,7 @@ export function MakeModelPicker({ initial, onChange }: { initial: { make: string
         </Field>
         <Field label="Model">
           {free
-            ? <input className={inputClass} value={base} onChange={(e) => setBase(e.target.value)} placeholder="Model adı (paketsiz)" required maxLength={60} />
+            ? <input className={inputClass} value={base} onChange={(e) => setBase(e.target.value)} placeholder="Model adı (paketsiz)" required maxLength={60} autoFocus={!freeMake} />
             : <Combobox items={(models.data ?? []).map((m) => m.name)} value={base} onChange={setBase} disabled={!make}
                 placeholder={make ? "Model ara" : "Önce marka"} ariaLabel="Model" badge={custom(models.data)}
                 footer={make ? "Listede yok" : undefined} onFooter={() => { setMode("free"); setFreeMake(false); setBase(""); }} />}

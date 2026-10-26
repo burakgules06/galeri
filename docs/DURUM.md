@@ -148,6 +148,19 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
   - Tutar alanında önizleme ve "Kuruş için virgül kullanın" uyarısı. `NumberInput`'ta tümü değiştirilen değerden rakam silen hata düzeltildi.
   - Not: iki istek aynı kişinin carisini ilk kez aynı anda açarsa tekillik kısıtı ikincisini 500 ile reddeder (veri bozulmaz). Gerçek
     akışta cari satışta açıldığı için tahsilatta görülmez; gerekirse "insert … on conflict" ile çözülür.
+- **Revizyon PR 2: marka / model kataloğu** (`feat/vehicle-catalog`). Migration `V9__vehicle_catalog.sql` (yeni tablo, veri silmez).
+  Seed değişti (BMW modeli "3 Serisi 320i M Sport"): lokal DB'yi sıfırla.
+  - Katalog `catalog/vehicles.json` (50 marka, 465 model) + galeri eklemeleri (`catalog_entry`). `GET /api/catalog/makes`,
+    `GET /api/catalog/makes/{make}/models` (giriş yapan herkes). Kayıtta marka/model doğrulanır (1041), yazım katalogdakine çevrilir.
+  - Panel: araç formunda aranabilir marka → model seçici + "Paket / motor"; "Listede yok" serbest yazım ve "kataloğa eklensin mi?"
+    (eklenmezse kaydedilmez). Galeri eklemeleri listede "galeri eklemesi" rozetiyle. Katalog öncesi kayıt "dokunmadıkça aynen kalır".
+  - Araç detayında adres başka araca geçince açık düzenleme penceresi eski aracı gösteriyordu; sayfa araç değişince sıfırlanıyor.
+  - Para doğruluğu: `MoneyInvariantsIT` (gerçek Postgres, `./mvnw verify`'da failsafe ile). Sermaye, virman, açılış, peşin/planlı alış,
+    masraf ekle/düzenle/sil, taksitli satış, tahsilat/geri al, satışı geri al, konsinye, genel gider, kâr payı, sermaye çekişi, düzeltme;
+    her adımdan sonra: bakiyeler toplamı 0, toplam mal = sermaye + açılış + dağıtılmamış kâr, rapor kârı − eklenen = defter,
+    ortak sermayeleri = defter, plan toplamı = taksitler, ödenmiş taksitin hareketi geçerli ve aynı tutarda, bağsız tahsilat yok.
+  - Eksik: TC0-TC13 altın senaryo (sabit beklenen değerlerle) "Galeri: alım-satım, ödeme ve sermaye senaryoları" belgesi bekleniyor.
+    Ortak bazında "nakitte + araçta bağlı" kontrolü PR 4 (net değer) ile eklenecek; ortaklı araç senaryosu PR 3 ile.
 
 ## Sıradaki
 
