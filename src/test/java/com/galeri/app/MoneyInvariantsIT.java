@@ -54,6 +54,7 @@ class MoneyInvariantsIT {
     @Autowired private CapitalService capitalService;
     @Autowired private VehicleService vehicleService;
     @Autowired private PaymentPlanService paymentPlanService;
+    @Autowired private com.galeri.app.service.NetWorthService netWorthService;
 
     private UUID tenant;
     private LocalDate today;
@@ -171,6 +172,8 @@ class MoneyInvariantsIT {
     /** Her adimdan sonra: adim adi hata mesajinda gorunur. */
     private void check(String step) {
         new LedgerInvariants(jdbc, capitalService).check(tenant, step);
+        org.assertj.core.api.Assertions.assertThat(netWorthService.summary().differenceCents())
+                .as("%s: acilis ve duzeltmelerle varlik dengesi", step).isZero();
     }
 
     // ------------------------------------------------------------------ yardimcilar

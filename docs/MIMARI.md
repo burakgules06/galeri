@@ -167,6 +167,19 @@ Uygulama (Adım 5):
 - Önerilen pay = Havuz net kârı × (dönem sonu nakit sermaye − bu dönemin kârından eklenen) / toplam nakit sermaye; kuruş kalanı en büyük paya.
 - Virman TRANSFER; açılış bakiyesi OPENING_BALANCE (hesap başına bir kez, düzeltilirse yeniden).
 
+### Varlıklar (Revizyon PR 4)
+
+- `GET /api/net-worth` sadece ADMIN içindir. Tek PostgreSQL `REPEATABLE_READ` okuma transaction'ı aynı anın hesaplarını verir.
+- Toplam mal = kasa + banka + stoktaki VEHICLE hesaplarının maliyeti + pozitif cariler − negatif cariler. Konsinye stok dışarıda kalır.
+- Dağıtılmamış kâr = INCOME eksi bakiyesi − EXPENSE bakiyesi − stokta olmayan araçların VEHICLE maliyeti. Sermayeye eklenen kâr
+  zaten INCOME hareketlerine yansıdığı için yeniden düşülmez.
+- Denge: toplam mal = sermaye + dağıtılmamış kâr + açılıştan gelen varlık. OPENING karşı hesabı, sermaye sayılmadan ayrı gösterilir.
+- Ortak araçta brüt mal maliyetin sahiplik payıdır; borç ödenmemiş alış taksitlerinin sahiplik payıdır. Her bölmede kuruş kalanı
+  Havuz'a gider (Havuz yoksa en büyük paya). Masraflar brüt mala dahildir; bağlı sermaye yalnız ödenmiş alış katkısıdır, masraf içermez.
+  Taksitlerin ayrı ayrı yuvarlanması nedeniyle brüt net payla ödenmiş katkı arasında kuruş farkı olabilir; ikisi ayrı gösterilir.
+- Kasa > Varlıklar: toplam mal, ortak sermayeleri, nakit/araç dağılımı, araç başına mal/borç/net ve denge farkı. Nakitteki sermaye
+  fiziksel kasa bakiyesiyle aynı değildir; alacak/verecek, Havuz araçları, kâr ve açılış nedeniyle fark oluşabilir.
+
 ## 6. Ödeme planı (alışta ve satışta)
 
 Her alış ve satışın bir ödeme planı vardır:

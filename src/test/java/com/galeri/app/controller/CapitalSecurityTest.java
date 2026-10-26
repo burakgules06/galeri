@@ -30,11 +30,14 @@ class CapitalSecurityTest {
     static class Config {
         @Bean CapitalService capitalService() { return Mockito.mock(CapitalService.class); }
         @Bean LedgerService ledgerService() { return Mockito.mock(LedgerService.class); }
+        @Bean com.galeri.app.service.NetWorthService netWorthService() { return Mockito.mock(com.galeri.app.service.NetWorthService.class); }
+        @Bean NetWorthController netWorthController(com.galeri.app.service.NetWorthService s, GenericResponseService r) { return new NetWorthController(s, r); }
         @Bean GenericResponseService genericResponseService() { return new GenericResponseService(); }
         @Bean CapitalController capitalController(CapitalService c, LedgerService l, GenericResponseService r) { return new CapitalController(c, l, r); }
     }
 
     @Autowired private CapitalController capital;
+    @Autowired private NetWorthController netWorth;
 
     private static final LocalDate DAY = LocalDate.of(2026, 7, 1);
 
@@ -47,6 +50,7 @@ class CapitalSecurityTest {
     void calisan_sermayeVeKasaIslemlerineErisemez_403() {
         TestSession.open(UUID.randomUUID(), UUID.randomUUID(), "STAFF");
         UUID id = UUID.randomUUID();
+        assertThatThrownBy(() -> netWorth.summary()).isInstanceOf(AccessDeniedException.class);
 
         assertThatThrownBy(() -> capital.partners()).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> capital.addPartner(new CapitalRequests.Partner(id))).isInstanceOf(AccessDeniedException.class);
@@ -64,5 +68,6 @@ class CapitalSecurityTest {
         TestSession.open(UUID.randomUUID(), UUID.randomUUID(), "ADMIN");
 
         assertThatCode(() -> capital.periodProfit(DAY, DAY)).doesNotThrowAnyException();
+        assertThatCode(() -> netWorth.summary()).doesNotThrowAnyException();
     }
 }

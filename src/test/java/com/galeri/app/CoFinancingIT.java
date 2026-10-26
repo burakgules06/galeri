@@ -76,6 +76,7 @@ class CoFinancingIT {
     @Autowired private CapitalService capitalService;
     @Autowired private VehicleService vehicleService;
     @Autowired private PaymentPlanService paymentPlanService;
+    @Autowired private com.galeri.app.service.NetWorthService netWorthService;
 
     private final LocalDate today = LocalDate.of(2026, 4, 15);
     private UUID tenant, cash, furkan, burak, veli;
@@ -302,6 +303,61 @@ class CoFinancingIT {
 
     // ------------------------------------------------------------------ yardimcilar
 
+    @Test
+    void varliklar_baskaGalerininSermayeVeAraclariniGostermez() {
+        coOwned(2_000_000 * TL, half(burak, ContributionSource.CAPITAL, null));
+        TestSession.open(UUID.randomUUID(), UUID.randomUUID(), "ADMIN");
+        var worth = netWorthService.summary();
+        assertThat(worth.totalCents()).isZero();
+        assertThat(worth.capitalCents()).isZero();
+        assertThat(worth.partners()).isEmpty();
+        assertThat(worth.vehicles()).isEmpty();
+    }
+
+    @Test
+    void varliklar_kurusluTaksitlerTamOdendigindeSahipBorclariSifirlanir() {
+        UUID seller = person("Satici");
+        vehicleService.create(request(101, null, seller, half(burak, ContributionSource.CAPITAL, null), null, null, null,
+                List.of(new InstallmentRequest(today, 1L, PaymentMethod.CASH, null, null, true, cash),
+                        new InstallmentRequest(today, 1L, PaymentMethod.CASH, null, null, true, cash),
+                        new InstallmentRequest(today, 99L, PaymentMethod.CASH, null, null, true, cash))));
+        var stock = netWorthService.summary().vehicles().getFirst();
+        assertThat(stock.costCents()).isEqualTo(101);
+        assertThat(stock.owners().stream().mapToLong(o -> o.assetCents()).sum()).isEqualTo(101);
+        assertThat(stock.owners()).allSatisfy(o -> assertThat(o.debtCents()).isZero());
+        check("kuruslu taksitler");
+    }
+
+    @Test
+    void varliklar_senetliOrtakAractaBrutMalBorcVeNetAyriGosterilir() {
+        UUID seller = person("Satici");
+        UUID v = vehicleService.create(request(2_000_000 * TL, null, seller,
+                half(burak, ContributionSource.CAPITAL, null), null, null, null,
+                List.of(new InstallmentRequest(today, 800_000 * TL, PaymentMethod.PROMISSORY_NOTE, null, null, false, null),
+                        new InstallmentRequest(today.plusDays(30), 1_200_000 * TL, PaymentMethod.PROMISSORY_NOTE, null, null, false, null))))
+                .vehicle().id();
+        var before = netWorthService.summary();
+        assertThat(before.stockCents()).isEqualTo(2_000_000 * TL);
+        assertThat(before.payableCents()).isEqualTo(2_000_000 * TL);
+        assertThat(before.vehicles().getFirst().owners()).allSatisfy(o -> {
+            assertThat(o.assetCents()).isEqualTo(1_000_000 * TL);
+            assertThat(o.debtCents()).isEqualTo(1_000_000 * TL);
+            assertThat(o.netCents()).isZero();
+        });
+        var note = paymentPlanService.plans(v).getFirst().installments().getFirst();
+        paymentPlanService.collect(note.id(), new CollectRequest(cash, today));
+        var after = netWorthService.summary();
+        assertThat(after.stockCents()).isEqualTo(2_000_000 * TL);
+        assertThat(after.payableCents()).isEqualTo(1_200_000 * TL);
+        assertThat(after.vehicles().getFirst().owners()).allSatisfy(o -> {
+            assertThat(o.assetCents()).isEqualTo(1_000_000 * TL);
+            assertThat(o.debtCents()).isEqualTo(600_000 * TL);
+            assertThat(o.netCents()).isEqualTo(400_000 * TL);
+            assertThat(o.contributionCents()).isEqualTo(400_000 * TL);
+        });
+        check("varliklar senet odemesi");
+    }
+
     private UUID person(String name) {
         return contactService.create(new ContactRequest(name, null, ContactType.PERSON, null)).id();
     }
@@ -368,6 +424,17 @@ class CoFinancingIT {
 
     private void check(String step) {
         new LedgerInvariants(jdbc, capitalService).check(tenant, step);
+        var worth = netWorthService.summary();
+        assertThat(worth.differenceCents()).as("%s: varlik ekrani dengesi", step).isZero();
+        assertThat(worth.partners()).allSatisfy(p -> {
+            long bound = worth.vehicles().stream().flatMap(v -> v.owners().stream())
+                    .filter(o -> p.contactId().equals(o.contactId())).mapToLong(o -> o.contributionCents()).sum();
+            assertThat(p.boundCents()).as("%s: araclara gore bagli sermaye", step).isEqualTo(bound);
+        });
+        assertThat(worth.vehicles()).allSatisfy(v -> {
+            assertThat(v.owners().stream().mapToLong(o -> o.assetCents()).sum()).isEqualTo(v.costCents());
+            assertThat(v.owners().stream().mapToLong(o -> o.debtCents()).sum()).isEqualTo(v.debtCents());
+        });
     }
 
     private static void expectError(int code, ThrowableAssert.ThrowingCallable call) {

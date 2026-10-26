@@ -323,6 +323,16 @@ export interface Partner {
   contactId: string; name: string; phone: string | null; owner: boolean; capitalCents: number;
   cashCents: number; boundCents: number; shareBp: number;
 }
+export interface NetWorthOwner {
+  contactId: string | null; name: string; shareBp: number; assetCents: number; debtCents: number;
+  netCents: number; contributionCents: number;
+}
+export interface NetWorthResponse {
+  cashCents: number; bankCents: number; stockCents: number; receivableCents: number; payableCents: number;
+  totalCents: number; capitalCents: number; openingCents: number; undistributedCents: number; differenceCents: number;
+  partners: Partner[];
+  vehicles: { vehicle: VehicleRef; costCents: number; debtCents: number; owners: NetWorthOwner[] }[];
+}
 export type CapitalDirection = "IN" | "OUT";
 export interface CapitalMovementRequest { direction: CapitalDirection; accountId: string; date: string; amountCents: number; description: string | null }
 export interface ProfitAllocationRequest { contactId: string; date: string; amountCents: number; periodFrom: string; periodTo: string }
