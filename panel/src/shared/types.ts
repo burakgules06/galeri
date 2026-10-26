@@ -76,6 +76,9 @@ export interface VehicleDetail {
 export interface ContactSummary { id: string; name: string; phone: string | null }
 export interface StaffSummary { id: string; name: string | null }
 
+/** Marka / model katalogu: custom = galeriye ozel ekleme ("Listede yok" ile eklendi) */
+export interface CatalogItem { name: string; custom: boolean }
+
 // Kullanicilar ekrani (sadece ADMIN). self: oturumdaki kullanicinin kendisi.
 export type UserRole = "ADMIN" | "STAFF";
 export interface UserResponse { id: string; fullName: string | null; phone: string; role: UserRole; active: boolean; self: boolean }
@@ -160,6 +163,8 @@ export interface VehicleRequest {
   commissionRateBp: number | null;
   commissionCents: number | null;
   shares: ShareRequest[] | null;
+  addToCatalog: boolean | null;   // "Listede yok": once galerinin katalogune eklenir
+  catalogModel: string | null;    // kataloga eklenecek temel model (paketsiz)
 }
 
 export interface SaleRequest {
