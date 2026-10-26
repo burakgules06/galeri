@@ -1,5 +1,6 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.InvalidBasketException;
 import com.galeri.app.exception.runtime.CatalogUnknownException;
 import com.galeri.app.exception.runtime.ConsignmentDetailsRequiredException;
 import com.galeri.app.exception.runtime.InvalidDateException;
@@ -18,6 +19,7 @@ import com.galeri.app.model.enums.CommissionType;
 import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.PartCondition;
 import com.galeri.app.model.enums.VehicleStatus;
+import com.galeri.app.model.request.BasketSaleRequest;
 import com.galeri.app.model.request.VehiclePartsRequest;
 import com.galeri.app.model.request.VehicleRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
@@ -48,6 +50,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -205,21 +208,58 @@ public class VehicleServiceImpl implements VehicleService {
     @Transactional
     public VehicleDetailAdmin undoSale(UUID id) {
         Vehicle vehicle = getVehicle(id);
-        if (vehicle.getStatus() != VehicleStatus.SOLD) throw new VehicleNotSoldException();
-        // Ayni plakayla stokta baska arac varsa geri donus tekillik kisitini bozar
-        if (vehicleRepository.existsByTenantIdAndPlateAndStatus(vehicle.getTenantId(), vehicle.getPlate(), VehicleStatus.IN_STOCK)) {
-            throw new PlateAlreadyInStockException();
+        // Toplu satista sepetin butun araclari birlikte geri alinir
+        List<UUID> basket = paymentPlanService.basketVehicleIds(vehicle.getId());
+        List<Vehicle> all = basket.isEmpty() ? List.of(vehicle) : basket.stream().map(this::getVehicle).toList();
+        for (Vehicle v : all) {
+            if (v.getStatus() != VehicleStatus.SOLD) throw new VehicleNotSoldException();
+            // Ayni plakayla stokta baska arac varsa geri donus tekillik kisitini bozar
+            if (vehicleRepository.existsByTenantIdAndPlateAndStatus(v.getTenantId(), v.getPlate(), VehicleStatus.IN_STOCK)) {
+                throw new PlateAlreadyInStockException();
+            }
         }
-        coOwnershipService.onUndoSale(vehicle);   // ortaga nakit donus yapildiysa 1043; kar paylari terslenir
+        for (Vehicle v : all) coOwnershipService.onUndoSale(v);   // ortaga nakit donus yapildiysa 1043; kar paylari terslenir
         paymentPlanService.undoSale(vehicle);
-        vehicle.setStatus(VehicleStatus.IN_STOCK);
-        vehicle.setSaleDate(null);
-        vehicle.setBuyer(null);
-        vehicle.setSoldBy(null);
-        vehicle.setSalePriceCents(null);
-        ledgerService.syncConsignmentSettlement(vehicle);   // stoktaki araca sahibine borc kalmaz
-        coOwnershipService.syncContributions(vehicle);      // katkilar yeniden araca baglanir: nakit sermaye yetmeli
+        for (Vehicle v : all) {
+            v.setStatus(VehicleStatus.IN_STOCK);
+            v.setSaleDate(null);
+            v.setBuyer(null);
+            v.setSoldBy(null);
+            v.setSalePriceCents(null);
+            ledgerService.syncConsignmentSettlement(v);   // stoktaki araca sahibine borc kalmaz
+            coOwnershipService.syncContributions(v);      // katkilar yeniden araca baglanir: nakit sermaye yetmeli
+        }
         return toAdmin(vehicle, toDetail(vehicle));
+    }
+
+    @Override
+    @Transactional
+    public VehicleDetailAdmin sellBasket(BasketSaleRequest r) {
+        UUID tenantId = CurrentUser.tenantId();
+        List<UUID> ids = r.items().stream().map(BasketSaleRequest.Item::vehicleId).toList();
+        if (ids.size() < 2 || new HashSet<>(ids).size() != ids.size()) throw new InvalidBasketException();
+        List<Vehicle> vehicles = ids.stream().map(this::getVehicle).toList();
+        for (Vehicle v : vehicles) {
+            if (v.getStatus() != VehicleStatus.IN_STOCK) throw new VehicleAlreadySoldException();
+            if (r.saleDate().isBefore(v.getPurchaseDate())) throw new InvalidDateException();
+        }
+        Contact buyer = getContact(r.buyerId(), tenantId);
+        PanelUser soldBy = getStaff(r.soldById(), tenantId);
+        List<Long> prices = r.items().stream().map(BasketSaleRequest.Item::salePriceCents).toList();
+        for (int k = 0; k < vehicles.size(); k++) {
+            Vehicle v = vehicles.get(k);
+            v.setStatus(VehicleStatus.SOLD);
+            v.setSaleDate(r.saleDate());
+            v.setBuyer(buyer);
+            v.setSoldBy(soldBy);
+            v.setSalePriceCents(prices.get(k));
+        }
+        paymentPlanService.recordBasketSale(vehicles, prices, buyer, r);
+        for (Vehicle v : vehicles) {
+            ledgerService.syncConsignmentSettlement(v);
+            coOwnershipService.onSale(v, List.of());   // ortak aracta kar paylari sermayede kalir
+        }
+        return toAdmin(vehicles.get(0), toDetail(vehicles.get(0)));
     }
 
     // ------------------------------------------------------------------ yardimcilar

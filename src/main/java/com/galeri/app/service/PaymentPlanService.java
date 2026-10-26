@@ -4,6 +4,7 @@ import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.InstallmentStatus;
 import com.galeri.app.model.enums.PlanDirection;
+import com.galeri.app.model.request.BasketSaleRequest;
 import com.galeri.app.model.request.CollectRequest;
 import com.galeri.app.model.request.EndorseRequest;
 import com.galeri.app.model.request.InstallmentRequest;
@@ -27,8 +28,20 @@ public interface PaymentPlanService {
      */
     void recordSale(Vehicle vehicle, Contact buyer, VehicleSaleRequest request);
 
-    /** Satisi geri alir: hic taksit odenmemis olmali; satis hareketleri terslenir, plan silinir. */
+    /**
+     * Satisi geri alir: hic taksit odenmemis olmali; satis hareketleri terslenir, plan silinir. Arac bir sepetteyse sepetin
+     * tamami (butun araclarin satis hareketleri) geri alinir.
+     */
     void undoSale(Vehicle vehicle);
+
+    /**
+     * Toplu satis: tek plan (aracsiz) + sepet satirlari; satis hareketi arac basina (bedeller), taksitler toplam uzerinden.
+     * Araclarin satis alanlarini cagiran (VehicleService) doldurur.
+     */
+    void recordBasketSale(List<Vehicle> vehicles, List<Long> prices, Contact buyer, BasketSaleRequest request);
+
+    /** Arac bir sepetteyse sepetteki butun araclar (kendisi dahil), degilse bos. */
+    List<UUID> basketVehicleIds(UUID vehicleId);
 
     /**
      * Aracin alis odemesini esitler (VehicleService create / update cagirir, ayni transaction).
