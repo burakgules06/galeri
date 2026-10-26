@@ -139,7 +139,7 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
 
         <section className="space-y-2">
           {basket.map((b, k) => (
-            <div key={b.v.id} className="grid grid-cols-[1fr_170px_36px] gap-2 items-center">
+            <div key={b.v.id} className="grid grid-cols-[1fr_130px_36px] md:grid-cols-[1fr_170px_36px] gap-2 items-center">
               <span className="flex items-center gap-2 min-w-0"><Plate plate={b.v.plate} size="sm" /><span className="truncate">{b.v.make} {b.v.model}</span></span>
               <NumberInput className={`${inputClass} sayi`} value={b.priceText} aria-label={`${b.v.plate} bedeli`} placeholder="Bedel" preview={false}
                 onValueChange={(t) => changeBasket(basket.map((x, j) => (j === k ? { ...x, priceText: t } : x)))} />
