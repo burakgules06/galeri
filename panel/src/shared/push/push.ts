@@ -1,5 +1,5 @@
 // Tarayici bildirimleri: service worker kaydi, izin ve abonelik. Abonelik sunucuya kaydedilir
-// (sadece ADMIN); her sabah 09:00'da odeme gunu bildirimi gelir.
+// (sadece ADMIN); galerinin sectigi saatte odeme gunu bildirimi gelir.
 import { api } from "../../api/galeri";
 
 export type PushStatus = "unsupported" | "off" | "on" | "blocked";

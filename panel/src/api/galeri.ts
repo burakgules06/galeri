@@ -10,6 +10,9 @@ import type {
 const json = (body: unknown, method = "POST"): RequestInit => ({ method, body: JSON.stringify(body) });
 
 export const api = {
+  reminderSettings: () => apiFetch<{ time: string }>("/api/settings/reminder"),
+  updateReminderSettings: (time: string) => apiFetch<{ time: string }>("/api/settings/reminder", json({ time }, "PUT")),
+  testPush: () => apiFetch<void>("/api/push/test", json({})),
   me: () => apiFetch<{ userId: string }>("/api/auth/me"),
   netWorth: () => apiFetch<NetWorthResponse>("/api/net-worth"),
   vehicles: (q: string, status: VehicleStatus | null) => {

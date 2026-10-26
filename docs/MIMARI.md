@@ -260,7 +260,8 @@ Kaynak: `GET /api/reports/yearly-trades?year=` (gruplama panelde).
 
 Galeri sahibine, vadesi gelen ödemeler için telefonuna bildirim gider (Akıllı Randevum'daki PWA web push altyapısı aynen kullanılır: tarayıcı/telefon "bildirimlere izin ver", VAPID anahtarları `.env`'de).
 
-- Her sabah 09.00'da (galerinin saat dilimine göre; galericiyle kararlaştırıldı) bir zamanlanmış görev o gün vadesi gelen `installment` satırlarını bulur.
+- Görev her dakika Europe/Istanbul saatine göre çalışır. Galerinin `reminder_time` saati geldiyse ve `reminder_sent_on` bugün değilse
+  o gün vadesi gelen `installment` satırlarını bulur. Varsayılan saat 09:00; ADMIN Hesabım > Bildirimler'den değiştirir.
 - **Tahsilat** (bize ödenecek): "Bugün Ali Yılmaz'dan 25.000 TL senet tahsilatı var (34 ABC 123)".
 - **Ödeme** (bizim ödeyeceğimiz, alıştaki taksit/senetler): "Bugün Mehmet Demir'e 40.000 TL senet ödemesi var".
 - Aynı gün birden fazla varsa tek bildirimde toplanır ("Bugün 3 tahsilat, 1 ödeme"), dokununca ilgili liste açılır.
@@ -273,6 +274,11 @@ Uygulama (Adım 3C):
   (senet / kurum / havale, nakitte yok). Gecikmişte: "Ayşe Demir'den 395.000 TL havale tahsilatı 1 gün gecikti (34 ABC 123)".
 - Birden fazlada: "Bugün 3 tahsilat, 1 ödeme (1 gecikmiş)". Dokununca `/#/payments`.
 - Hiç ADMIN abonesi yoksa ya da hiçbir gönderim başarılı olmazsa `notification_log` yazılmaz.
+- Gönderim denemesinden sonra `reminder_sent_on` bugün olur; taksit, abone veya VAPID yoksa da galeri o gün işlenmiş sayılır.
+  Sunucu seçilen saatte kapalıysa aynı gün açıldığında gönderir. Saat değişince işaret temizlenir; `notification_log` aynı taksitin
+  aynı gün yeniden bildirilmesini engellemeye devam eder. Günlük işleme ve saat değişikliği galeri satırını kilitler.
+- ADMIN uçları: `GET/PUT /api/settings/reminder` (`{ time: "HH:mm" }`), `POST /api/push/test`. Test sadece çağıranın kayıtlı
+  cihazlarına gider; günlük işareti ve taksit bildirim logunu değiştirmez. Hata 1046: cihaz/VAPID yok; 1047: gönderim başarısız.
 - Abonelik endpoint'e göre tekildir: aynı cihazda başka ADMIN izin verirse ona geçer; çıkışta panel aboneliği siler.
 
 ## 10. Yetki

@@ -49,4 +49,6 @@ public class ErrorMessageConstant {
     public static final int OWNER_RETURN_EXISTS = 1043;
     public static final int INVALID_OWNER_RETURN = 1044;
     public static final int INVALID_SHOP_CUT = 1045;
+    public static final int PUSH_UNAVAILABLE = 1046;
+    public static final int PUSH_DELIVERY_FAILED = 1047;
 }

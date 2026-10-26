@@ -36,13 +36,18 @@ class PaymentSecurityTest {
         @Bean InstallmentController installmentController(PaymentPlanService s, GenericResponseService r) { return new InstallmentController(s, r); }
         @Bean VehicleController vehicleController(VehicleService v, PaymentPlanService s, GenericResponseService r) { return new VehicleController(v, s, r); }
         @Bean PushController pushController(GenericResponseService r) {
-            return new PushController(new PushProperties("", "", ""), Mockito.mock(PushSubscriptionRepository.class), Mockito.mock(PanelUserRepository.class), r);
+            return new PushController(new PushProperties("", "", ""), Mockito.mock(PushSubscriptionRepository.class), Mockito.mock(PanelUserRepository.class), r,
+                    Mockito.mock(com.galeri.app.service.PushTestService.class));
+        }
+        @Bean ReminderSettingsController reminderSettingsController(GenericResponseService r) {
+            return new ReminderSettingsController(Mockito.mock(com.galeri.app.service.ReminderSettingsService.class), r);
         }
     }
 
     @Autowired private InstallmentController installments;
     @Autowired private VehicleController vehicles;
     @Autowired private PushController push;
+    @Autowired private ReminderSettingsController settings;
 
     @AfterEach
     void tearDown() {
@@ -64,6 +69,9 @@ class PaymentSecurityTest {
         TestSession.open(UUID.randomUUID(), UUID.randomUUID(), "STAFF");
 
         assertThatThrownBy(() -> push.publicKey()).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> push.test()).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> settings.get()).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> settings.update(new ReminderSettingsController.Setting("14:30"))).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> push.subscribe(new PushController.SubscribeRequest("https://push.example/x",
                 new PushController.SubscribeRequest.Keys("p", "a")))).isInstanceOf(AccessDeniedException.class);
     }

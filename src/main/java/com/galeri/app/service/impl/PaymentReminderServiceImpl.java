@@ -10,6 +10,7 @@ import com.galeri.app.repository.InstallmentRepository;
 import com.galeri.app.repository.NotificationLogRepository;
 import com.galeri.app.repository.PushSubscriptionRepository;
 import com.galeri.app.repository.VehicleRepository;
+import com.galeri.app.repository.TenantRepository;
 import com.galeri.app.service.PaymentReminderService;
 import com.galeri.app.service.PushSender;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.text.NumberFormat;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -50,18 +52,29 @@ public class PaymentReminderServiceImpl implements PaymentReminderService {
     private final PushSubscriptionRepository subscriptionRepository;
     private final VehicleRepository vehicleRepository;
     private final PushSender pushSender;
+    private final TenantRepository tenantRepository;
     private final Clock clock;
 
     @Override
     @Transactional
     public int sendDailyReminders() {
+        var dealerClock = clock.withZone(VehicleServiceImpl.DEALER_ZONE);
+        var now = OffsetDateTime.now(dealerClock);
+        LocalDate today = now.toLocalDate();
+        var tenants = tenantRepository.findDueReminders(today, LocalTime.from(now));
+        if (tenants.isEmpty()) return 0;
+        Set<UUID> eligible = tenants.stream().map(t -> {
+            // Taksit veya abone olmasa da bu galeri bugun kontrol edildi.
+            t.setReminderSentOn(today);
+            return t.getId();
+        }).collect(Collectors.toSet());
+        tenantRepository.saveAll(tenants);
         if (!pushSender.enabled()) {
             log.info("Odeme bildirimi atlandi: push kapali (VAPID anahtarlari yok)");
             return 0;
         }
-        LocalDate today = LocalDate.now(clock.withZone(VehicleServiceImpl.DEALER_ZONE));
         List<Installment> due = installmentRepository.findOpenDueBetween(today.minusDays(MAX_OVERDUE_DAYS), today).stream()
-                .filter(i -> isReminderDue(i, today))
+                .filter(i -> eligible.contains(i.getTenantId()) && isReminderDue(i, today))
                 .toList();
         if (due.isEmpty()) return 0;
 
@@ -74,7 +87,6 @@ public class PaymentReminderServiceImpl implements PaymentReminderService {
         Map<UUID, Vehicle> vehicles = vehicleRepository.findAllById(byTenant.values().stream().flatMap(List::stream)
                         .map(i -> i.getPlan().getVehicleId()).distinct().toList()).stream()
                 .collect(Collectors.toMap(Vehicle::getId, Function.identity()));
-        OffsetDateTime now = OffsetDateTime.now(clock.withZone(VehicleServiceImpl.DEALER_ZONE));
 
         int sent = 0;
         for (Map.Entry<UUID, List<Installment>> e : byTenant.entrySet()) {
@@ -82,7 +94,7 @@ public class PaymentReminderServiceImpl implements PaymentReminderService {
             List<PushSubscription> subs = subscriptionRepository.findByTenantIdWithUser(e.getKey()).stream()
                     .filter(s -> "ADMIN".equals(s.getPanelUser().getRole()) && s.getPanelUser().isActive())
                     .toList();
-            // Abone yoksa kayit yazilmaz: sonradan izin verilirse 1-3 gun penceresinde yine hatirlatilir
+            // Abone yoksa taksit bildirildi sayilmaz; galeri yarin yeniden kontrol edilir.
             if (subs.isEmpty()) continue;
 
             String body = body(e.getValue(), vehicles, today);
