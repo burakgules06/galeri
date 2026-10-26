@@ -29,7 +29,7 @@ export function LoginPage() {
       <form onSubmit={handleSubmit} className="w-full max-w-sm bg-yuzey rounded-2xl border border-cizgi p-6 space-y-4">
         <div>
           <h1 className="font-cond font-bold text-[30px] leading-none tracking-tight">Galeri</h1>
-          <p className="text-murekkep-2 mt-1">Devam etmek için giriş yap</p>
+
         </div>
 
         <label className="block">

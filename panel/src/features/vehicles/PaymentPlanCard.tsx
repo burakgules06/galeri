@@ -78,9 +78,7 @@ export function PaymentPlanCard({ vehicleId, direction = "SALE", onChanged, onUn
           <ErrorBox message={undoError} />
           {!confirming ? (
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[13px] text-murekkep-3">
-                {anyPaid ? "Tahsil edilmiş taksit var; satışı geri almak için önce tahsilatları geri al." : "Hatalı girildiyse satışı geri alıp yeniden girebilirsin."}
-              </p>
+              {anyPaid && <p className="text-sm text-uyari">Önce tahsilatları geri alın.</p>}
               <Button variant="danger" className="h-9" onClick={() => setConfirming(true)} disabled={anyPaid}>Satışı geri al</Button>
             </div>
           ) : (

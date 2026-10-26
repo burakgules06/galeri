@@ -58,7 +58,7 @@ export function CategoryPicker({ root, name, onChange }: { root: ExpenseRoot; na
           </ul>
         )}
       </div>
-      {isNew && !open && <p className="text-[13px] text-murekkep-3 mt-1">Yeni kategori, kaydedince eklenecek.</p>}
+
     </div>
   );
 }

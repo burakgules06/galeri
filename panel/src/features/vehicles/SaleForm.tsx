@@ -92,11 +92,11 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
         <ErrorBox message={error} />
 
         <section className="grid gap-3 sm:grid-cols-2">
-          <Field label="Alıcı" hint="Zorunlu">
+          <Field label="Alıcı">
             <ContactPicker contacts={allContacts} selected={buyer} onSelect={setBuyer}
               onCreated={(c) => setExtraContacts((l) => [c, ...l])} placeholder="İsim yaz ya da seç" />
           </Field>
-          <Field label="Satış bedeli" hint="TL">
+          <Field label="Satış bedeli">
             <NumberInput className={`${inputClass} sayi text-[19px] font-semibold`} value={priceText} onValueChange={changePrice}
               placeholder="1.400.000" />
           </Field>

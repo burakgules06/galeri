@@ -51,7 +51,7 @@ export function TransferForm({ onClose, onSaved }: { onClose: () => void; onSave
         {accounts.data && list.length < 2 && <p className="text-[14px] text-uyari">Virman için en az iki hesap gerekir; önce banka hesabı ekleyin.</p>}
         <Field label="Nereden"><Segment<string> value={from} onChange={setFromId} options={options} /></Field>
         <Field label="Nereye"><Segment<string> value={to} onChange={setToId} options={options.filter((o) => o.value !== from)} /></Field>
-        <Field label="Tutar" hint="Toplam nakit değişmez; para bir hesaptan diğerine geçer.">
+        <Field label="Tutar">
           <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount}
             placeholder="50.000" autoFocus />
         </Field>
@@ -105,9 +105,7 @@ export function OpeningBalanceForm({ onClose, onSaved }: { onClose: () => void; 
       </>}>
       <form id="opening-form" onSubmit={submit} className="space-y-4">
         <ErrorBox message={error} />
-        <p className="text-[14px] text-murekkep-2">
-          Sisteme geçişte bir kez girilir: kasadaki, bankadaki para ve kişilerle önceden kalan alacak / borç. Her hesap için bir kez.
-        </p>
+
         <Field label="Ne için">
           <Segment<"money" | "contact"> value={kind} onChange={setKind}
             options={[{ value: "money", label: "Kasa / banka" }, { value: "contact", label: "Kişi carisi" }]} />
@@ -130,10 +128,10 @@ export function OpeningBalanceForm({ onClose, onSaved }: { onClose: () => void; 
           </>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Tutar" hint="TL">
+          <Field label="Tutar">
             <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount} placeholder="120.000" />
           </Field>
-          <Field label="Tarih" hint="Sisteme geçiş günü"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
+          <Field label="Tarih"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
         </div>
       </form>
     </Modal>

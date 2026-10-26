@@ -10,6 +10,7 @@ import type {
 const json = (body: unknown, method = "POST"): RequestInit => ({ method, body: JSON.stringify(body) });
 
 export const api = {
+  me: () => apiFetch<{ userId: string }>("/api/auth/me"),
   netWorth: () => apiFetch<NetWorthResponse>("/api/net-worth"),
   vehicles: (q: string, status: VehicleStatus | null) => {
     const p = new URLSearchParams();

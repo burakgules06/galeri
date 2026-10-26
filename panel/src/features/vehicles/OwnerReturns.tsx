@@ -30,10 +30,7 @@ export function OwnerReturns({ owners, profitCents, shopCutType, shopCutRateBp, 
   return (
     <section className="space-y-3">
       <p className="etiket">Ortağa dönüş</p>
-      <p className="text-[13px] text-murekkep-2">
-        Ortağın alacağı (katkısı + kâr payı) satışla birlikte yazılır, alıcının senetleri beklenmez. Nakit kısım kasadan ya da
-        bankadan sermaye çekişi olarak ödenir.
-      </p>
+
       {partners.map((o) => {
         const draft = value[o.contactId!] ?? { mode: "KEEP", amount: "", accountId: accounts[0]?.id ?? "" };
         const receivable = receivables?.[o.contactId!];

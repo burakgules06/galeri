@@ -1,5 +1,5 @@
 // Sermaye ve ortaklar: halka grafik + ortak listesi. Dukkan sahibi ilk sirada ve rozetli.
-// Her ortak icin: sermayesi, toplamdaki payi ve (sahip disindakiler icin) sahibin sermayesine orani.
+// Her ortak icin isim, sermaye ve toplamdaki pay.
 import { useState } from "react";
 import { percent, SERIES, tl, tlShort } from "../../shared/format";
 import type { PartnerShare } from "../../shared/types";
@@ -7,7 +7,6 @@ import { Donut } from "../../shared/charts/Donut";
 
 export function CapitalCard({ partners, totalCents }: { partners: PartnerShare[]; totalCents: number }) {
   const [active, setActive] = useState<string | null>(null);
-  const owner = partners.find((p) => p.owner);
   const colored = partners.map((p, i) => ({ ...p, color: SERIES[i % SERIES.length] }));
   const focus = colored.find((p) => p.contactId === active);
 
@@ -37,8 +36,6 @@ export function CapitalCard({ partners, totalCents }: { partners: PartnerShare[]
 
             <ul className="grow min-w-0 space-y-1">
               {colored.map((p) => {
-                const ofOwner = owner && !p.owner && owner.capitalCents > 0
-                  ? Math.round((p.capitalCents * 10000) / owner.capitalCents) : null;
                 return (
                   <li key={p.contactId} onMouseEnter={() => setActive(p.contactId)} onMouseLeave={() => setActive(null)}
                     className={`rounded-lg px-2.5 py-2 -mx-1 transition-colors ${active === p.contactId ? "bg-yuzey-2" : ""}`}>
@@ -50,7 +47,6 @@ export function CapitalCard({ partners, totalCents }: { partners: PartnerShare[]
                     </div>
                     <div className="flex items-center justify-between gap-2 pl-[22px] mt-0.5 text-[12.5px] text-murekkep-2">
                       <span className="sayi text-[14px] text-murekkep">{tl(p.capitalCents)}</span>
-                      {ofOwner != null && <span>sahibe oranı <b className="font-semibold text-murekkep">{percent(ofOwner, 0)}</b></span>}
                     </div>
                   </li>
                 );

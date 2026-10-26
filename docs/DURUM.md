@@ -193,6 +193,18 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
 
 ## Sıradaki
 
+Ana ekran yerleşimi: sermaye + alım/satım grafiği ve kompakt alacak/verecek + kâr grafiği bağımsız sütunlarda akar;
+kapalı detay kartı sermaye kartının yüksekliğine gerilmez. Telefonda özet kartları grafiklerden önce gelir.
+Alacak/verecek kartında net rozeti, tam satır detay düğmesi ve kişilerin carisine bağlantı vardır. Panel lint/build başarılı.
+
+Panel sadeleştirmesi (`feat/simplify-ui`, `sadelestirme.md`) uygulandı: açıklama/hint metinleri temizlendi; alacak/verecek
+detayları varsayılan kapalı, sermaye kartında sahibe oranı kaldırıldı. Araç formunda sık kullanılan alanlar öne alındı,
+diğer bilgiler kapalı bölüme taşındı; resmi bedel farklı değilse alış bedeli gönderilir, yeni araçta alan çalışan mevcut kullanıcıdır.
+Yakıt/vites seçilen modelin galerideki kayıtlarında en sık değerden, kayıt yoksa ilk seçenekten gelir; düzenlemede mevcut değerler korunur.
+Dükkân payı girişi kaldırıldı, istek alanları null gönderilir. Varlıklar iki karta indirildi, boyalı parça mavi yapıldı.
+Backend, hesaplar, migration ve seed değişmedi. Panel lint/build ve ekle/düzenle istek gövdesi kontrolleri başarılı.
+Görsel kontrol açık: bilgisayar kullanım aracı Chrome'un mevcut URL'sini doğrulayamadığı için durdu; masaüstü/telefon ekranları elle kontrol edilmeli.
+
 Revizyon PR 5: kâr detayı (`feat/profit-drilldown`); yol haritasının raporlar ve ana ekranın son hali galerici geri bildirimiyle planlanacak.
 
 Adım 5'ten açık sorular:

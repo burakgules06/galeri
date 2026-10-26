@@ -52,7 +52,6 @@ export function PlanBuilder({
       {mode === "INSTITUTION" && (
         <InstitutionGenerator price={baseCents} date={date} account={firstAccount} organizations={orgs} onOrgCreated={orgCreated} downHint={downHint} onBuild={onRows} />
       )}
-      {mode == null && <p className="text-[13.5px] text-murekkep-3">Bir seçenek seç; satırlar oluşur, sonra düzenleyebilirsin.</p>}
 
       {rows.length > 0 && (
         <div className="space-y-2">
@@ -139,7 +138,7 @@ function InstitutionGenerator({ price, date, account, organizations, onOrgCreate
         <Field label="Kurumun ödeme tarihi"><input type="date" className={inputClass} value={due} onChange={(e) => setDue(e.target.value)} /></Field>
       </div>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[13px] text-murekkep-2">{valid ? <>Kurumdan {tl(price - downCents)}; bu kısım {org?.name} carisine yazılır.</> : "Bedel ve kurum gerekli."}</p>
+        <p className="text-sm">{valid ? <>Kurumdan {tl(price - downCents)}</> : "Bedel ve kurum gerekli."}</p>
         <Button type="button" disabled={!valid}
           onClick={() => onBuild(institutionPlan(price, downCents, org, due, date, account))}>
           Planı kur

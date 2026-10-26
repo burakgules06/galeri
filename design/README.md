@@ -28,7 +28,8 @@ Kalınlık, incelik ve renk birlikte hiyerarşi kurar: etiket soluk ve küçük,
 
 - Gelen / olumlu / alacak: **yeşil** (`basari`, çubukta `basari-canli`)
 - Giden / sorunlu / verecek: **kırmızı** (`tehlike`, çubukta `tehlike-canli`)
-- Bekleyen / uyarı (30+ gün stok): **turuncu** (`uyari`, `boyali`)
+- Bekleyen / uyarı (30+ gün stok): **turuncu** (`uyari`)
+- Hasar şeması: **boyalı mavi** (`boyali`), lokal boyalı sarı, değişen kırmızı, orijinal gri.
 - Onaylı / stokta / seçili: **mavi** (`plaka`)
 - İptal / kapandı / pasif: **gri**
 - Durum rengi asla tek başına anlam taşımaz: yanında etiket ya da işaret (+/−) olur.
@@ -50,8 +51,8 @@ Kalınlık, incelik ve renk birlikte hiyerarşi kurar: etiket soluk ve küçük,
 
 - **KPI karesi** (`StatTile`): renkli nokta + etiket, büyük sayı, alt satır; isteğe bağlı mini SplitBar.
 - **Araç kartı** (`VehicleCard`): üstte 3px stok yaşı şeridi (gri < 30 gün, turuncu 30-59, kırmızı 60+), plaka + gün rozeti, marka/model, yıl · km · yakıt, hasar özeti.
-- **Sermaye kartı** (`CapitalCard`): halka + ortak listesi; sahip ilk sırada "Dükkân sahibi" rozetiyle; her ortakta toplamdaki pay ve sahibe oranı. Liste satırına gelince halkada o dilim öne çıkar.
-- **Alacak/verecek kartı** (`BalancesCard`): iki büyük tutar, oran şeridi, en büyük 5 kişi (çubuk + telefon), net durum.
+- **Sermaye kartı** (`CapitalCard`): halka + ortak listesi; sahip ilk sırada "Dükkân sahibi" rozetiyle; isim, sermaye ve yüzde. Liste satırına gelince halkada o dilim öne çıkar.
+- **Alacak/verecek kartı** (`BalancesCard`): toplam alacak, verecek ve net; kişi listeleri varsayılan kapalı, "Detayları göster" ile açılır. Kişi satırı isim ve tutardan oluşur.
 - Kişi seçimi: yatay kayan yuvarlak çipler (baş harf avatarı). Telefonda taşarsa kayar, satır kırılmaz.
 - **Sayı girişi** her zaman `NumberInput` (`shared/ui/NumberInput.tsx`): yazarken basamaklarına ayrılır, Türkçe yazım.
   Tutar `1.250.000,50` (binlik nokta, kuruş virgül, en fazla 2 hane; nokta yazılırsa yok sayılır), kilometre ve adet `64.000`,

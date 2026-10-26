@@ -1,9 +1,9 @@
 // Arac ekleme / duzenleme. Sadece ADMIN acar. Tutarlar TL girilir, kurus gonderilir.
 // Sahiplik: galeri (varsayilan), konsinye (sahibi + komisyon; alis bedeli ve odemesi yok), ortak (Havuz ve/veya ortaklar,
-// katki kaynagi, kar payi orani, dukkan payi: CoOwnersEditor).
+// katki kaynagi ve kar payi orani: CoOwnersEditor).
 import { useState, type FormEvent } from "react";
 import { CoOwnersEditor } from "./CoOwnersEditor";
-import { initialOwners, initialShopCut, ownersProblem, toShareRequests, type OwnerRow, type ShopCut } from "./coOwners";
+import { initialOwners, ownersProblem, toShareRequests, type OwnerRow } from "./coOwners";
 import { MakeModelPicker } from "./MakeModelPicker";
 import type { MakeModelValue } from "./makeModel";
 import { api } from "../../api/galeri";
@@ -36,6 +36,7 @@ export function VehicleForm(props: Props) {
 function VehicleFormLoader(props: Props) {
   const id = props.existing?.vehicle.id;
   const plans = useLoad(() => (id ? api.paymentPlans(id) : Promise.resolve([])), [id]);
+  if (plans.error) return <Modal title="Aracı düzenle" open onClose={props.onClose}><ErrorBox message={plans.error} /></Modal>;
   if (!plans.data && !plans.error) return null;
   return <VehicleFormContent {...props} purchasePlan={plans.data?.find((p) => p.direction === "PURCHASE") ?? null} />;
 }
@@ -65,9 +66,11 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const [notes, setNotes] = useState(v?.notes ?? "");
   const [purchaseDate, setPurchaseDate] = useState(v?.purchaseDate ?? todayIso());
   const [seller, setSeller] = useState<ContactSummary | null>(existing?.seller ?? null);
-  const [boughtBy, setBoughtBy] = useState(existing?.boughtBy?.id ?? "");
+  const [boughtBy, setBoughtBy] = useState<string | null>(existing ? existing.boughtBy?.id ?? "" : null);
   const [actual, setActual] = useState(centsToInput(existing?.actualPurchaseCents));
   const [official, setOfficial] = useState(centsToInput(existing?.officialPurchaseCents));
+  const [officialDiffers, setOfficialDiffers] = useState(() => !!existing && existing.officialPurchaseCents !== existing.actualPurchaseCents);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   // null: henuz secilmedi, yeni aracta kasa varsayilir. "": deftere yazilmaz.
   const [purchaseAccount, setPurchaseAccount] = useState<string | null>(existing ? (existing.purchaseAccountId ?? "") : null);
   const [ownership, setOwnership] = useState<Ownership>(v?.ownership ?? "DEALER");
@@ -77,7 +80,6 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const [commissionFixed, setCommissionFixed] = useState(centsToInput(existing?.commissionCents));
   const [owners, setOwners] = useState<OwnerRow[]>(() => initialOwners(existing));
   const [profitDiffers, setProfitDiffers] = useState(() => (existing?.shares ?? []).some((s) => s.profitShareBp !== s.shareBp));
-  const [shopCut, setShopCut] = useState<ShopCut>(() => initialShopCut(existing));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const consignment = ownership === "CONSIGNMENT";
@@ -87,6 +89,19 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const staff = useLoad(() => api.staff(), []);
   const accounts = useLoad(() => api.accounts(), []);
   const partners = useLoad(() => api.partners(), []);
+  const me = useLoad(() => api.me(), []);
+  const history = useLoad(() => api.vehicles("", null), []);
+  const boughtById = boughtBy ?? me.data?.userId ?? "";
+  const selectModelDefaults = (make: string, model: string) => {
+    const matches = (history.data ?? []).filter(v => v.make === make && (v.model === model || v.model.startsWith(`${model} `)));
+    const frequent = <T extends string,>(values: T[], fallback: T): T => {
+      const counts = new Map<T, number>();
+      values.forEach(value => counts.set(value, (counts.get(value) ?? 0) + 1));
+      return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? fallback;
+    };
+    setFuel(frequent(matches.map(v => v.fuel), "GASOLINE"));
+    setTransmission(frequent(matches.map(v => v.transmission), "MANUAL"));
+  };
   // Duzenlemede ortagin bu araca bagli katkisi nakitteki sermayesine eklenerek gosterilir (kayitta yeniden hesaplanir)
   const boundHere = Object.fromEntries((v?.status === "IN_STOCK" ? existing?.shares ?? [] : [])
     .filter((s) => s.contactId).map((s) => [s.contactId!, s.contributionCents]));
@@ -101,7 +116,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const amounts = [tlToCents(tramer), tlToCents(actual), tlToCents(official)];
+    const amounts = [tlToCents(tramer), tlToCents(actual), tlToCents(officialDiffers ? official : actual)];
     if (amounts.some((a) => Number.isNaN(a))) return setError("Tutarları 1.250.000 gibi yaz.");
     const yearNumber = Number(year), mileageNumber = Number(mileage.replace(/\./g, ""));
     if (!Number.isInteger(yearNumber) || yearNumber < 1950 || yearNumber > 2100) return setError("Model yılını kontrol et.");
@@ -115,7 +130,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       if (commissionType === "FIXED" && (fixed == null || Number.isNaN(fixed))) return setError("Sabit komisyonu 25.000 gibi yaz.");
     }
     if (coOwned) {
-      const problem = ownersProblem(owners, profitDiffers, price, shopCut);
+      const problem = ownersProblem(owners, profitDiffers, price, { enabled: false, type: "RATE", rate: "", fixed: "" });
       if (problem) return setError(problem);
     }
     if (!consignment && payMode === "PLAN") {
@@ -127,7 +142,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
     const request: VehicleRequest = {
       plate, make: makeModel.make, model: makeModel.model, modelYear: yearNumber, fuel, transmission, mileageKm: mileageNumber,
       color: color.trim() || null, tramerCents: amounts[0], notes: notes.trim() || null,
-      purchaseDate, sellerId: seller?.id ?? null, boughtById: boughtBy || null,
+      purchaseDate, sellerId: seller?.id ?? null, boughtById: boughtById || null,
       actualPurchaseCents: amounts[1], officialPurchaseCents: amounts[2],
       purchaseAccountId: !consignment && payMode === "CASH" ? purchaseAccountId || null : null,
       purchasePlan: !consignment && payMode === "PLAN" ? rows.map(toRequest) : null,
@@ -139,9 +154,9 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       shares: coOwned ? toShareRequests(owners, profitDiffers) : null,
       addToCatalog: makeModel.addToCatalog,
       catalogModel: makeModel.catalogModel,
-      shopCutType: coOwned && shopCut.enabled ? shopCut.type : null,
-      shopCutRateBp: coOwned && shopCut.enabled && shopCut.type === "RATE" ? percentToBp(shopCut.rate) : null,
-      shopCutCents: coOwned && shopCut.enabled && shopCut.type === "FIXED" ? tlToCents(shopCut.fixed) : null,
+      shopCutType: null,
+      shopCutRateBp: null,
+      shopCutCents: null,
     };
     setSaving(true);
     setError(null);
@@ -162,11 +177,11 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       onClose={onClose}
       footer={<>
         <Button variant="secondary" type="button" onClick={onClose}>Vazgeç</Button>
-        <Button type="submit" form="vehicle-form" disabled={saving}>{saving ? "Kaydediliyor…" : "Kaydet"}</Button>
+        <Button type="submit" form="vehicle-form" disabled={saving || (!existing && !me.data)}>{saving ? "Kaydediliyor…" : "Kaydet"}</Button>
       </>}
     >
       <form id="vehicle-form" onSubmit={submit} className="space-y-6">
-        <ErrorBox message={error} />
+        <ErrorBox message={error ?? me.error} />
 
         <section className="space-y-3">
           <h3 className="font-cond font-semibold text-[18px]">Araç</h3>
@@ -174,34 +189,42 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
             <input className={`${inputClass} font-cond font-bold tracking-[0.06em] text-[18px]`} value={plate}
               onChange={(e) => setPlate(formatPlate(e.target.value))} required autoCapitalize="characters" placeholder="34 ABC 123" />
           </Field>
-          <MakeModelPicker initial={initialMakeModel} onChange={setMakeModel} />
+          <MakeModelPicker initial={initialMakeModel} onChange={setMakeModel} onModelSelect={selectModelDefaults} />
           <Field label="Model yılı">
             <input className={`${inputClass} max-w-40`} value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))} required inputMode="numeric" placeholder="2021" />
           </Field>
-          <Field label="Yakıt">
-            <Segment<Fuel> value={fuel} onChange={setFuel} options={(Object.keys(FUEL) as Fuel[]).map((f) => ({ value: f, label: FUEL[f] }))} />
-          </Field>
-          <Field label="Vites">
-            <Segment<Transmission> value={transmission} onChange={setTransmission} options={(Object.keys(TRANSMISSION) as Transmission[]).map((t) => ({ value: t, label: TRANSMISSION[t] }))} />
-          </Field>
+          <Field label="Kilometre"><NumberInput kind="integer" value={mileage} onValueChange={setMileage} required placeholder="64.000" /></Field>
+          {!consignment && <>
+            <Field label="Alış bedeli"><NumberInput value={actual} onValueChange={setActual} placeholder="1.250.000" /></Field>
+            <label className="flex items-center gap-2 text-sm min-h-10 cursor-pointer">
+              <input type="checkbox" className="w-4 h-4 accent-plaka" checked={officialDiffers} onChange={e => {
+                setOfficialDiffers(e.target.checked);
+                if (e.target.checked) setDetailsOpen(true);
+              }} />
+              Resmi bedel farklı
+            </label>
+            <Field label="Kimden alındı">
+              <ContactPicker contacts={allContacts} selected={seller} onSelect={setSeller}
+                onCreated={c => setExtraContacts(l => [c, ...l])} placeholder="İsim yaz ya da seç" />
+            </Field>
+          </>}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Kilometre"><NumberInput kind="integer" value={mileage} onValueChange={setMileage} required placeholder="64.000" /></Field>
-            <Field label="Renk"><input className={inputClass} value={color} onChange={(e) => setColor(e.target.value)} placeholder="Beyaz" /></Field>
+            <Field label="Yakıt"><select className={inputClass} value={fuel} onChange={e => setFuel(e.target.value as Fuel)}>
+              {(Object.keys(FUEL) as Fuel[]).map(f => <option key={f} value={f}>{FUEL[f]}</option>)}
+            </select></Field>
+            <Field label="Vites"><select className={inputClass} value={transmission} onChange={e => setTransmission(e.target.value as Transmission)}>
+              {(Object.keys(TRANSMISSION) as Transmission[]).map(t => <option key={t} value={t}>{TRANSMISSION[t]}</option>)}
+            </select></Field>
           </div>
-          <Field label="Tramer (hasar kaydı)" hint="TL, yoksa boş bırak">
-            <NumberInput value={tramer} onValueChange={setTramer} placeholder="18.500" />
-          </Field>
         </section>
 
         <section className="space-y-3">
           <h3 className="font-cond font-semibold text-[18px]">Sahiplik</h3>
           <Segment<Ownership> value={ownership} onChange={setOwnership}
-            options={[{ value: "DEALER", label: "Galeri" }, { value: "CONSIGNMENT", label: "Konsinye" }, { value: "CO_OWNED", label: "Ortak" }]} />
+            options={[{ value: "DEALER", label: "Galeri" }, { value: "CONSIGNMENT", label: "Konsinye" }, { value: "CO_OWNED", label: "Ortaklı" }]} />
           {consignment && (
             <>
-              <p className="text-[13px] text-murekkep-2">
-                Araç galerinin malı değil: alışı kasaya yazılmaz. Satışta satış bedeli eksi komisyon sahibinin carisine borç yazılır.
-              </p>
+
               <Field label="Aracın sahibi">
                 <ContactPicker contacts={allContacts} selected={consignor} onSelect={setConsignor}
                   onCreated={(c) => setExtraContacts((l) => [c, ...l])} placeholder="İsim yaz ya da seç" />
@@ -212,10 +235,10 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
                     options={[{ value: "RATE", label: "Oran %" }, { value: "FIXED", label: "Sabit TL" }]} />
                 </Field>
                 {commissionType === "RATE"
-                  ? <Field label="Oran" hint="Satış bedelinin yüzdesi">
+                  ? <Field label="Oran">
                       <NumberInput value={commissionRate} onValueChange={setCommissionRate} placeholder="3" preview={false} />
                     </Field>
-                  : <Field label="Tutar" hint="TL">
+                  : <Field label="Tutar">
                       <NumberInput value={commissionFixed} onValueChange={setCommissionFixed} placeholder="25.000" />
                     </Field>}
               </div>
@@ -223,36 +246,9 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
           )}
           {coOwned && (
             <CoOwnersEditor rows={owners} onRows={setOwners} profitDiffers={profitDiffers} onProfitDiffers={setProfitDiffers}
-              shopCut={shopCut} onShopCut={setShopCut} priceCents={price} contacts={allContacts}
+              priceCents={price} contacts={allContacts}
               onContactCreated={(c) => setExtraContacts((l) => [c, ...l])} partners={partners.data ?? []} boundHere={boundHere} />
           )}
-        </section>
-
-        <section className="space-y-3">
-          <h3 className="font-cond font-semibold text-[18px]">Alış</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Alış tarihi"><input type="date" className={inputClass} value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} required /></Field>
-            <Field label="Alan çalışan">
-              <select className={inputClass} value={boughtBy} onChange={(e) => setBoughtBy(e.target.value)}>
-                <option value="">Seçilmedi</option>
-                {(staff.data ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </Field>
-          </div>
-          {!consignment && <>
-          <Field label="Kimden alındı">
-            <ContactPicker contacts={allContacts} selected={seller} onSelect={setSeller}
-              onCreated={(c) => setExtraContacts((l) => [c, ...l])} placeholder="İsim yaz ya da seç" />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Gerçek alış bedeli" hint="Kâr bununla hesaplanır">
-              <NumberInput value={actual} onValueChange={setActual} placeholder="1.250.000" />
-            </Field>
-            <Field label="Resmi alış bedeli" hint="Belgedeki tutar">
-              <NumberInput value={official} onValueChange={setOfficial} placeholder="980.000" />
-            </Field>
-          </div>
-          </>}
         </section>
 
         {!consignment && <section className="space-y-3">
@@ -260,7 +256,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
           <Segment<"CASH" | "PLAN"> value={payMode} onChange={setPayMode}
             options={[{ value: "CASH", label: "Peşin" }, { value: "PLAN", label: "Senetli / taksitli" }]} />
           {payMode === "CASH" && (
-            <Field label="Ödeme nereden" hint="Gerçek alış bedeli bu hesaptan düşülür. Değiştirirsen eski kayıt ters hareketle düzeltilir.">
+            <Field label="Ödeme nereden">
               <select className={inputClass} value={purchaseAccountId} onChange={(e) => setPurchaseAccount(e.target.value)}>
                 {(accounts.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                 <option value="">Kasaya işleme</option>
@@ -269,10 +265,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
           )}
           {payMode === "PLAN" && (
             <>
-              <p className="text-[13px] text-murekkep-2">
-                Bedel satıcının carisine borç yazılır; her taksit ödendiğinde kasadan ya da bankadan düşülür.
-                {!seller && <b className="text-uyari"> Kimden alındığını seç.</b>}
-              </p>
+
               {locked.length > 0 && (
                 <div className="rounded-[12px] border border-basari/30 bg-basari-zemin/50 px-3 py-2">
                   <p className="text-[13px] font-semibold text-basari">Ödenmiş taksitler (değiştirilemez): {tl(lockedCents)}</p>
@@ -290,9 +283,22 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
           )}
         </section>}
 
-        <Field label="Notlar">
-          <textarea className={`${inputClass} h-24 py-2`} value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </Field>
+        <details className="border-t border-cizgi pt-3" open={detailsOpen} onToggle={e => setDetailsOpen(e.currentTarget.open)}>
+          <summary className="cursor-pointer min-h-10 font-semibold">Diğer bilgiler</summary>
+          <div className="space-y-3 pt-2">
+            <Field label="Renk"><input className={inputClass} value={color} onChange={e => setColor(e.target.value)} placeholder="Beyaz" /></Field>
+            <Field label="Tramer (hasar kaydı)"><NumberInput value={tramer} onValueChange={setTramer} placeholder="18.500" /></Field>
+            <Field label="Notlar"><textarea className={`${inputClass} h-24 py-2`} value={notes} onChange={e => setNotes(e.target.value)} /></Field>
+            <Field label="Alış tarihi"><input type="date" className={inputClass} value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} required /></Field>
+            <Field label="Alan çalışan"><select className={inputClass} value={boughtById} onChange={e => setBoughtBy(e.target.value)}>
+              <option value="">Seçilmedi</option>
+              {(staff.data ?? []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select></Field>
+            {!consignment && officialDiffers && <Field label="Resmi alış bedeli">
+              <NumberInput value={official} onValueChange={setOfficial} placeholder="980.000" />
+            </Field>}
+          </div>
+        </details>
       </form>
     </Modal>
   );

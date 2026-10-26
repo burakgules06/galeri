@@ -22,7 +22,10 @@ function split(model: string, models: CatalogItem[]): [string, string] | null {
   return best ? [best, model.trim().slice(best.length).trim()] : null;
 }
 
-export function MakeModelPicker({ initial, onChange }: { initial: { make: string; model: string } | null; onChange: (v: MakeModelValue) => void }) {
+export function MakeModelPicker({ initial, onChange, onModelSelect }: {
+  initial: { make: string; model: string } | null; onChange: (v: MakeModelValue) => void;
+  onModelSelect?: (make: string, model: string) => void;
+}) {
   const makes = useLoad(() => api.catalogMakes(), []);
   const [mode, setMode] = useState<Mode>(initial ? "loading" : "catalog");
   const [make, setMake] = useState(initial?.make ?? "");
@@ -78,9 +81,8 @@ export function MakeModelPicker({ initial, onChange }: { initial: { make: string
       <div className="rounded-[12px] border border-cizgi bg-yuzey-2 px-3 py-2.5 flex flex-wrap items-center justify-between gap-2">
         <span className="min-w-0">
           <span className="font-semibold">{initial.make}</span> <span className="text-murekkep-2">{initial.model}</span>
-          <span className="block text-[12.5px] text-murekkep-3">Katalog öncesi kayıt; dokunmadıkça aynen kalır.</span>
         </span>
-        <button type="button" className="text-[14px] font-semibold text-plaka" onClick={() => { setMake(""); setBase(""); setTrim(""); setMode("catalog"); }}>
+        <button type="button" className="text-[14px] font-semibold text-plaka" onClick={() => { setMake(""); setBase(""); setTrim(""); setMode("catalog"); onModelSelect?.("", ""); }}>
           Katalogdan seç
         </button>
       </div>
@@ -96,18 +98,18 @@ export function MakeModelPicker({ initial, onChange }: { initial: { make: string
             ? <input className={inputClass} value={make} onChange={(e) => setMake(e.target.value)} placeholder="Marka adı" required maxLength={40} autoFocus />
             : <Combobox items={(makes.data ?? []).map((m) => m.name)} value={make} placeholder="Marka ara" ariaLabel="Marka"
                 badge={custom(makes.data)}
-                onChange={(v) => { setMake(v); setBase(""); setFreeMake(false); if (mode === "free") setMode("catalog"); }}
-                footer="Listede yok" onFooter={() => { setMode("free"); setFreeMake(true); setMake(""); setBase(""); }} />}
+                onChange={(v) => { setMake(v); setBase(""); setFreeMake(false); onModelSelect?.(v, ""); if (mode === "free") setMode("catalog"); }}
+                footer="Listede yok" onFooter={() => { setMode("free"); setFreeMake(true); setMake(""); setBase(""); onModelSelect?.("", ""); }} />}
         </Field>
         <Field label="Model">
           {free
             ? <input className={inputClass} value={base} onChange={(e) => setBase(e.target.value)} placeholder="Model adı (paketsiz)" required maxLength={60} autoFocus={!freeMake} />
-            : <Combobox items={(models.data ?? []).map((m) => m.name)} value={base} onChange={setBase} disabled={!make}
+            : <Combobox items={(models.data ?? []).map((m) => m.name)} value={base} onChange={v => { setBase(v); onModelSelect?.(make, v); }} disabled={!make}
                 placeholder={make ? "Model ara" : "Önce marka"} ariaLabel="Model" badge={custom(models.data)}
-                footer={make ? "Listede yok" : undefined} onFooter={() => { setMode("free"); setFreeMake(false); setBase(""); }} />}
+                footer={make ? "Listede yok" : undefined} onFooter={() => { setMode("free"); setFreeMake(false); setBase(""); onModelSelect?.(make, ""); }} />}
         </Field>
       </div>
-      <Field label="Paket / motor" hint="İsteğe bağlı, modelin devamına yazılır">
+      <Field label="Paket / motor">
         <input className={inputClass} value={trim} onChange={(e) => setTrim(e.target.value)} placeholder="1.5 TSI Business" maxLength={50} />
       </Field>
       {free && (
@@ -115,7 +117,7 @@ export function MakeModelPicker({ initial, onChange }: { initial: { make: string
           <p className="text-[14px] font-semibold">“{[make, base].filter(Boolean).join(" ") || "…"}” katalogda yok. Kataloğa eklensin mi?</p>
           <label className="flex items-center gap-2 text-[14px] cursor-pointer">
             <input type="checkbox" className="w-4 h-4 accent-plaka" checked={addToCatalog} onChange={(e) => setAddToCatalog(e.target.checked)} />
-            Evet, bu galerinin kataloğuna ekle (sonraki araçlarda listede çıkar)
+            Kataloğa ekle
           </label>
           {!addToCatalog && <p className="text-[13px] text-tehlike">Kataloğa eklenmeden araç kaydedilemez.</p>}
           <button type="button" className="text-[13px] font-semibold text-plaka" onClick={() => { setMode("catalog"); setFreeMake(false); setMake(""); setBase(""); }}>

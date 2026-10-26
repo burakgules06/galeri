@@ -26,7 +26,7 @@ export function InstallCard() {
           </ol>
         ) : (
           <>
-            <p className="text-[14px] text-murekkep-2 mt-1">Tam ekran açılır, ödeme günü bildirimleri telefona gelir.</p>
+
             <Button className="mt-3" onClick={() => { void promptInstall(); }}>Ana ekrana ekle</Button>
           </>
         )}
