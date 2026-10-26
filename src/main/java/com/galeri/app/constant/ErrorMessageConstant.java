@@ -44,4 +44,5 @@ public class ErrorMessageConstant {
     public static final int OPENING_BALANCE_EXISTS = 1038;
     public static final int INVALID_PERIOD = 1039;
     public static final int NOT_AN_EXPENSE = 1040;
+    public static final int CATALOG_UNKNOWN = 1041;
 }

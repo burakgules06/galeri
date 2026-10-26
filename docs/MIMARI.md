@@ -86,6 +86,14 @@ Gösterimde işaret hesap türüne göre çevrilir: `CAPITAL` hesabından 2 mily
 ### Teknik bilgiler
 Plaka, marka, model, model yılı, yakıt tipi, vites, kilometre, renk, tramer (hasar kaydı) tutarı, notlar.
 
+### Marka / model kataloğu
+- Ortak katalog `src/main/resources/catalog/vehicles.json` (Türkiye pazarı, 50 marka); galeri eklemeleri `catalog_entry` tablosunda.
+- `vehicle.model` "temel model + paket" taşır ("Passat 1.5 TSI Business"); kayıtta temel model katalogla eşleşmeli
+  (büyük/küçük harf ve boşluk farkı yok sayılır, katalogdaki yazım kaydedilir). Eşleşmezse 1041.
+- "Listede yok": `addToCatalog = true` + `catalogModel` ile marka/temel model önce galerinin kataloğuna eklenir. Galerici kapalı
+  liste isterse panelden bu seçenek kaldırılır, backend kuralı aynı kalır.
+- Katalog öncesi kayıtlar: marka ve model değişmedikçe doğrulanmaz, aynen kalır.
+
 ### Hasar şeması (Sahibinden'deki gibi)
 Aracın çizimi üzerinde 13 parça, her biri dört durumdan biri:
 
@@ -260,6 +268,7 @@ ADMIN kendini pasifleştiremez. Rol ve aktiflik her istekte DB'den okunur; pasif
 | `expense_category` | parent_id, name, root (VEHICLE/GENERAL), archived |
 | `vehicle` | plate, make, model, model_year, fuel, transmission, mileage_km, color, tramer_cents, notes, ownership, consignor_id, commission_type (RATE/FIXED), commission_rate_bp / commission_cents, purchase_date, seller_id, bought_by_id, actual_purchase_cents, official_purchase_cents, sale_date, buyer_id, sold_by_id, sale_price_cents, status |
 | `vehicle_part` | vehicle_id, part (BodyPart), condition (PartCondition) |
+| `catalog_entry` | make, model (galerinin kataloğa eklediği temel model); unique (tenant_id, lower(make), lower(model)) |
 | `vehicle_share` | vehicle_id, contact_id, share_bp (baz puan, toplam 10000; sadece CO_OWNED) |
 | `payment_plan` | vehicle_id, direction (SALE/PURCHASE), contact_id, total_cents, created_by_id; unique (vehicle_id, direction) |
 | `installment` | plan_id, seq, due_date, amount_cents, method, note_no, payer_contact_id, paid_entry_id, paid_at; index (tenant_id, due_date) ödenmemişler için |
@@ -300,6 +309,7 @@ Her yerde aynı terim kullanılır:
 | araç | `vehicle` |
 | araç parçası, hasar şeması | `vehicle_part`; enum `BodyPart`, `PartCondition` |
 | plaka / marka / model yılı | `plate` / `make` / `model_year` |
+| marka / model kataloğu, galeri eklemesi | `catalog` (`/api/catalog/makes`), `catalog_entry`; "kataloğa ekle" `addToCatalog` |
 | yakıt: benzin, dizel, LPG, benzin+LPG, hibrit, elektrik | `fuel`: `GASOLINE`, `DIESEL`, `LPG`, `GASOLINE_LPG`, `HYBRID`, `ELECTRIC` |
 | vites: manuel, otomatik, yarı otomatik | `transmission`: `MANUAL`, `AUTOMATIC`, `SEMI_AUTOMATIC` |
 | km / renk / notlar | `mileage_km` / `color` / `notes` |

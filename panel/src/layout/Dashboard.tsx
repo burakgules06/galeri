@@ -67,7 +67,7 @@ export function Dashboard() {
   });
 
   const content =
-    route.page === "vehicle" ? <VehicleDetailPage id={route.id} />
+    route.page === "vehicle" ? <VehicleDetailPage key={route.id} id={route.id} />
     : route.page === "vehicles" ? <VehicleList />
     : route.page === "monthly" ? <MonthlyView />
     : route.page === "payments" && isAdmin ? <PaymentsPage />
