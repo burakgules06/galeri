@@ -193,7 +193,10 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
           <Field label="Model yılı">
             <input className={`${inputClass} max-w-40`} value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))} required inputMode="numeric" placeholder="2021" />
           </Field>
-          <Field label="Kilometre"><NumberInput kind="integer" value={mileage} onValueChange={setMileage} required placeholder="64.000" /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Kilometre"><NumberInput kind="integer" value={mileage} onValueChange={setMileage} required placeholder="64.000" /></Field>
+            <Field label="Alış tarihi"><input type="date" className={inputClass} value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} required /></Field>
+          </div>
           {!consignment && <>
             <Field label="Alış bedeli"><NumberInput value={actual} onValueChange={setActual} placeholder="1.250.000" /></Field>
             <label className="flex items-center gap-2 text-sm min-h-10 cursor-pointer">
@@ -289,7 +292,6 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
             <Field label="Renk"><input className={inputClass} value={color} onChange={e => setColor(e.target.value)} placeholder="Beyaz" /></Field>
             <Field label="Tramer (hasar kaydı)"><NumberInput value={tramer} onValueChange={setTramer} placeholder="18.500" /></Field>
             <Field label="Notlar"><textarea className={`${inputClass} h-24 py-2`} value={notes} onChange={e => setNotes(e.target.value)} /></Field>
-            <Field label="Alış tarihi"><input type="date" className={inputClass} value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} required /></Field>
             <Field label="Alan çalışan"><select className={inputClass} value={boughtById} onChange={e => setBoughtBy(e.target.value)}>
               <option value="">Seçilmedi</option>
               {(staff.data ?? []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}

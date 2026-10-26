@@ -10,6 +10,7 @@ import com.galeri.app.repository.ContactRepository;
 import com.galeri.app.security.CurrentUser;
 import com.galeri.app.service.ContactService;
 import com.galeri.app.util.PhoneUtil;
+import com.galeri.app.util.NameUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,7 +50,7 @@ public class ContactServiceImpl implements ContactService {
     }
 
     private static void apply(Contact contact, ContactRequest request) {
-        contact.setName(request.name().trim());
+        contact.setName(NameUtil.normalize(request.name()));
         contact.setPhone(PhoneUtil.normalize(request.phone()));
         contact.setType(request.type() != null ? request.type() : ContactType.PERSON);
         contact.setNotes(request.notes());

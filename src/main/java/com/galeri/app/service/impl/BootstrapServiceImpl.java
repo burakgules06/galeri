@@ -7,6 +7,7 @@ import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.TenantRepository;
 import com.galeri.app.service.BootstrapService;
 import com.galeri.app.util.PhoneUtil;
+import com.galeri.app.util.NameUtil;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +70,7 @@ public class BootstrapServiceImpl implements BootstrapService {
         PanelUser admin = new PanelUser();
         admin.setTenant(tenant);
         admin.setPhone(phone);
-        admin.setFullName(props.adminName().trim());
+        admin.setFullName(NameUtil.normalize(props.adminName()));
         admin.setRole("ADMIN");
         admin.setPasswordHash(passwordEncoder.encode(props.adminPassword()));
         panelUserRepository.save(admin);
