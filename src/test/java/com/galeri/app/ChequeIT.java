@@ -211,7 +211,8 @@ class ChequeIT {
 
         UUID chequeId = open(sold).stream().filter(i -> i.method() == PaymentMethod.CHEQUE).findFirst().orElseThrow().id();
         expectError(1050, () -> paymentPlanService.collect(chequeId, new CollectRequest(cash, today, 50_000 * TL)));
-        expectError(1050, () -> paymentPlanService.collect(note.id(), new CollectRequest(cash, today, 900_000 * TL)));
+        UUID restNote = notes.stream().filter(i -> i.status() != InstallmentStatus.PAID).findFirst().orElseThrow().id();
+        expectError(1050, () -> paymentPlanService.collect(restNote, new CollectRequest(cash, today, 900_000 * TL)));
     }
 
     @Test
