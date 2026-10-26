@@ -206,6 +206,8 @@ public class LedgerServiceImpl implements LedgerService {
         if (original.getType() == LedgerEntryType.VEHICLE_SALE || original.getType() == LedgerEntryType.CONSIGNMENT_SETTLEMENT
                 || plannedPurchase
                 || coOwnershipService.isLinkedEntry(original)
+                || original.getSourceAccount().getType() == AccountType.PORTFOLIO
+                || original.getTargetAccount().getType() == AccountType.PORTFOLIO
                 || installmentRepository.existsByPaidEntryId(original.getId())) {
             throw new LinkedEntryException();
         }
@@ -238,6 +240,21 @@ public class LedgerServiceImpl implements LedgerService {
         e.setVehicle(vehicle);
         e.setDescription(description);
         return entryRepository.save(e);
+    }
+
+    @Override
+    @Transactional
+    public Endorsement writeEndorsement(Vehicle fromVehicle, Contact from, Vehicle toVehicle, Contact to, long amountCents,
+                                        LocalDate date, String inDescription, String outDescription) {
+        UUID tenantId = fromVehicle.getTenantId();
+        Account portfolio = systemAccount(tenantId, AccountType.PORTFOLIO);
+        LedgerEntry in = newEntry(tenantId, LedgerEntryType.COLLECTION, balanceAccount(from), portfolio, amountCents, date);
+        in.setVehicle(fromVehicle);
+        in.setDescription(inDescription);
+        LedgerEntry out = newEntry(tenantId, LedgerEntryType.PAYMENT, portfolio, balanceAccount(to), amountCents, date);
+        out.setVehicle(toVehicle);
+        out.setDescription(outDescription);
+        return new Endorsement(entryRepository.save(in), entryRepository.save(out));
     }
 
     @Override
@@ -553,6 +570,7 @@ public class LedgerServiceImpl implements LedgerService {
                 case CASH -> "Kasa";
                 case EXPENSE -> "Genel giderler";
                 case OPENING -> "Açılış bakiyeleri";
+                case PORTFOLIO -> "Çek / senet portföyü";
                 default -> "Gelirler";
             });
             return accountRepository.save(a);

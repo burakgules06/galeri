@@ -5,6 +5,7 @@ import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.InstallmentStatus;
 import com.galeri.app.model.enums.PlanDirection;
 import com.galeri.app.model.request.CollectRequest;
+import com.galeri.app.model.request.EndorseRequest;
 import com.galeri.app.model.request.InstallmentRequest;
 import com.galeri.app.model.request.InstallmentUpdateRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
@@ -49,6 +50,15 @@ public interface PaymentPlanService {
 
     /** Odenmemis taksitin vadesini ve senet no'sunu degistirir. */
     InstallmentResponse update(UUID installmentId, InstallmentUpdateRequest request);
+
+    /**
+     * Ciro: alinmis, odenmemis cek / senet baska birine odeme olarak verilir. Taksit odenmis olur (portfoye), alan kisinin
+     * carisine ya da secilen acik alis taksitine odeme yazilir. Taksit cekten buyukse bolunur.
+     */
+    InstallmentResponse endorse(UUID installmentId, EndorseRequest request);
+
+    /** Karsiliksiz: tahsil ya da ciro edildiyse geri alinir, borc yeniden acilir, taksit karsiliksiz olarak isaretlenir. */
+    InstallmentResponse bounce(UUID installmentId);
 
     ContactStatement statement(UUID contactId);
 }

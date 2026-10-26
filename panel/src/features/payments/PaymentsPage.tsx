@@ -1,28 +1,31 @@
 // Odemeler. Sekmeler: Geciken, Bu hafta (bugun + 6 gun), Tumu (satis taksitleri, "Tahsil et") ve
-// Odenecekler (senetli / taksitli alis taksitleri, "Ode"). Sadece ADMIN.
+// Odenecekler (senetli / taksitli alis taksitleri, "Ode") ve Cek / Senet (alinan ve verilen evrak; ciro, karsiliksiz). Sadece ADMIN.
 // Satirda kisi, plaka, vade, tutar ve yontem; tahsil / ode hesap ve tarih sorar. Geciken satirlar kirmizi.
 import { useMemo, useState } from "react";
 import { api } from "../../api/galeri";
 import { addDaysIso, tl, todayIso } from "../../shared/format";
 import type { InstallmentResponse } from "../../shared/types";
 import { useLoad } from "../../shared/useLoad";
-import { Empty, ErrorBox, inputClass } from "../../shared/ui/Common";
+import { Empty, ErrorBox, inputClass, Segment } from "../../shared/ui/Common";
 import { StatTile } from "../../shared/ui/StatTile";
 import { InstallmentRow } from "./InstallmentRow";
 
-type Tab = "overdue" | "week" | "all" | "payables";
+type Tab = "overdue" | "week" | "all" | "payables" | "instruments";
+type Side = "SALE" | "PURCHASE";
 
 const TABS: { value: Tab; label: string }[] = [
   { value: "overdue", label: "Geciken" },
   { value: "week", label: "Bu hafta" },
   { value: "all", label: "Tümü" },
   { value: "payables", label: "Ödenecekler" },
+  { value: "instruments", label: "Çek / Senet" },
 ];
 
 export function PaymentsPage() {
   const { data, error, reload } = useLoad(() => api.installments(), []);
   const [tab, setTab] = useState<Tab>("overdue");
   const [q, setQ] = useState("");
+  const [side, setSide] = useState<Side>("SALE");
   const today = todayIso();
   const weekEnd = addDaysIso(today, 6);
 
@@ -32,6 +35,7 @@ export function PaymentsPage() {
   const week = all.filter((i) => i.status !== "PAID" && i.dueDate >= today && i.dueDate <= weekEnd);
   const open = all.filter((i) => i.status !== "PAID");
   const payable = purchases.filter((i) => i.status !== "PAID");
+  const instruments = useMemo(() => (data ?? []).filter((i) => i.method === "CHEQUE" || i.method === "PROMISSORY_NOTE"), [data]);
   const sum = (list: InstallmentResponse[]) => list.reduce((t, i) => t + i.amountCents, 0);
   const openFirst = (list: InstallmentResponse[]) =>
     [...list.filter((i) => i.status !== "PAID"), ...list.filter((i) => i.status === "PAID").reverse()];
@@ -39,15 +43,20 @@ export function PaymentsPage() {
   const base = tab === "overdue" ? [...overdue].sort((a, b) => b.daysLate - a.daysLate)
     : tab === "week" ? week
     : tab === "payables" ? openFirst(purchases)
+    : tab === "instruments" ? openFirst(instruments.filter((i) => i.direction === side))
     : openFirst(all);
   const needle = q.trim().toLocaleLowerCase("tr-TR");
   const digits = q.replace(/\D/g, "").replace(/^0+/, "");
   const rows = needle ? base.filter((i) =>
     i.payer.name.toLocaleLowerCase("tr-TR").includes(needle)
     || (i.vehicle?.plate ?? "").toLocaleLowerCase("tr-TR").replace(/\s/g, "").includes(needle.replace(/\s/g, ""))
+    || (i.noteNo ?? "").toLocaleLowerCase("tr-TR").includes(needle)
     || (digits.length >= 3 && (i.payer.phone ?? "").includes(digits))) : base;
 
-  const counts: Record<Tab, number> = { overdue: overdue.length, week: week.length, all: all.length, payables: payable.length };
+  const counts: Record<Tab, number> = {
+    overdue: overdue.length, week: week.length, all: all.length, payables: payable.length,
+    instruments: instruments.filter((i) => i.status !== "PAID").length,
+  };
   const paidSales = all.filter((i) => i.status === "PAID");
 
   return (
@@ -82,12 +91,19 @@ export function PaymentsPage() {
             ))}
           </div>
           <input className={`${inputClass} md:max-w-[300px]`} value={q} onChange={(e) => setQ(e.target.value)}
-            placeholder="Kişi, plaka ya da telefon" aria-label="Ödemelerde ara" />
+            placeholder="Kişi, plaka, telefon ya da evrak no" aria-label="Ödemelerde ara" />
         </div>
+        {tab === "instruments" && (
+          <div className="px-3 md:px-4 pt-3">
+            <Segment<Side> value={side} onChange={setSide}
+              options={[{ value: "SALE", label: "Alınan" }, { value: "PURCHASE", label: "Verilen" }]} />
+          </div>
+        )}
 
         {data && rows.length === 0 && (
           <Empty title={tab === "overdue" ? "Geciken ödeme yok" : tab === "week" ? "Bu hafta vadesi gelen yok"
-            : tab === "payables" ? "Ödenecek senet ya da taksit yok" : "Kayıt yok"}
+            : tab === "payables" ? "Ödenecek senet ya da taksit yok"
+            : tab === "instruments" ? "Çek ya da senet yok" : "Kayıt yok"}
             description={tab === "overdue" && !q ? "Bütün tahsilatlar zamanında." : undefined} />
         )}
         {rows.length > 0 && (

@@ -179,6 +179,11 @@ function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods,
         {r.method === "PROMISSORY_NOTE" && (
           <input className={`${inputClass} h-9 md:w-32`} value={r.noteNo} onChange={(e) => onChange({ noteNo: e.target.value })} placeholder="Senet no" aria-label="Senet no" />
         )}
+        {r.method === "CHEQUE" && <>
+          <input className={`${inputClass} h-9 md:w-28`} value={r.noteNo} onChange={(e) => onChange({ noteNo: e.target.value })} placeholder="Çek no" aria-label="Çek no" />
+          <input className={`${inputClass} h-9 md:w-28`} value={r.bankName} onChange={(e) => onChange({ bankName: e.target.value })} placeholder="Banka" aria-label="Banka" />
+          <input className={`${inputClass} h-9 md:w-36`} value={r.drawerName} onChange={(e) => onChange({ drawerName: e.target.value })} placeholder="Keşideci" aria-label="Keşideci" />
+        </>}
         <label className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold whitespace-nowrap">
           <input type="checkbox" checked={r.paidNow} className="w-4 h-4 accent-[var(--color-basari)]"
             onChange={(e) => onChange({ paidNow: e.target.checked, accountId: e.target.checked ? (r.accountId || accounts[0]?.id || "") : "" })} />

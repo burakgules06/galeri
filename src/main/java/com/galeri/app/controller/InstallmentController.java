@@ -4,6 +4,7 @@ import com.galeri.app.model.GenericResponse;
 import com.galeri.app.model.enums.InstallmentStatus;
 import com.galeri.app.model.enums.PlanDirection;
 import com.galeri.app.model.request.CollectRequest;
+import com.galeri.app.model.request.EndorseRequest;
 import com.galeri.app.model.request.InstallmentUpdateRequest;
 import com.galeri.app.model.response.InstallmentResponse;
 import com.galeri.app.service.PaymentPlanService;
@@ -18,7 +19,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-// Taksitler: liste (geciken / yaklasan / odenen), tahsil et, geri al, vade ve senet no duzenle. Tamami para, sadece ADMIN.
+// Taksitler: liste (geciken / yaklasan / odenen), tahsil et (kismi olabilir), geri al, vade ve senet / cek bilgisi duzenle,
+// cek / senet ciro et ve karsiliksiz isaretle. Tamami para, sadece ADMIN.
 @RestController
 @RequestMapping("/api/installments")
 @RequiredArgsConstructor
@@ -45,6 +47,16 @@ public class InstallmentController {
     @PostMapping("/{id}/undo")
     public GenericResponse<InstallmentResponse> undo(@PathVariable UUID id) {
         return responseService.success(paymentPlanService.undo(id));
+    }
+
+    @PostMapping("/{id}/endorse")
+    public GenericResponse<InstallmentResponse> endorse(@PathVariable UUID id, @Valid @RequestBody EndorseRequest request) {
+        return responseService.success(paymentPlanService.endorse(id, request));
+    }
+
+    @PostMapping("/{id}/bounce")
+    public GenericResponse<InstallmentResponse> bounce(@PathVariable UUID id) {
+        return responseService.success(paymentPlanService.bounce(id));
     }
 
     @PatchMapping("/{id}")

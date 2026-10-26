@@ -10,6 +10,7 @@ import java.util.UUID;
 
 // Odeme planinin bir satiri. payerId bossa odeyen karsi taraftir (alici); INSTITUTION'da kurum zorunlu.
 // paidNow: pesinat gibi o an alinan kisim, accountId (kasa / banka) ile ayni islemde tahsil edilir.
+// Cekte noteNo cek numarasi, bankName bankasi, drawerName keside eden (bos olabilir).
 public record InstallmentRequest(
         @NotNull LocalDate dueDate,
         @NotNull @Positive Long amountCents,
@@ -17,5 +18,12 @@ public record InstallmentRequest(
         @Size(max = 40) String noteNo,
         UUID payerId,
         boolean paidNow,
-        UUID accountId
-) {}
+        UUID accountId,
+        @Size(max = 60) String bankName,
+        @Size(max = 120) String drawerName
+) {
+    public InstallmentRequest(LocalDate dueDate, Long amountCents, PaymentMethod method, String noteNo, UUID payerId,
+                              boolean paidNow, UUID accountId) {
+        this(dueDate, amountCents, method, noteNo, payerId, paidNow, accountId, null, null);
+    }
+}

@@ -1,9 +1,10 @@
 package com.galeri.app.model.enums;
 
-// Degerler account_type_check kisitiyla (son tanim V8) birebir ayni olmali (bkz. docs/MIMARI.md §3).
-// BALANCE: kisinin carisi, CAPITAL: ortagin sermayesi, VEHICLE: aracin maliyeti, OPENING: acilis bakiyelerinin karsi hesabi.
+// Degerler account_type_check kisitiyla (son tanim V12) birebir ayni olmali (bkz. docs/MIMARI.md §3).
+// BALANCE: kisinin carisi, CAPITAL: ortagin sermayesi, VEHICLE: aracin maliyeti, OPENING: acilis bakiyelerinin karsi hesabi,
+// PORTFOLIO (V12): ciroda cek / senedin gectigi ara hesap (bakiyesi hep 0).
 public enum AccountType {
-    CASH, BANK, BALANCE, CAPITAL, VEHICLE, EXPENSE, INCOME, OPENING;
+    CASH, BANK, BALANCE, CAPITAL, VEHICLE, EXPENSE, INCOME, OPENING, PORTFOLIO;
 
     /** Gercek para tutan hesaplar: masraf bunlardan odenir, bakiyesi ekranda gosterilir. */
     public boolean isMoneyAccount() {

@@ -1,5 +1,9 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.BounceNotAllowedException;
+import com.galeri.app.exception.runtime.EndorseNotAllowedException;
+import com.galeri.app.exception.runtime.InvalidEndorseTargetException;
+import com.galeri.app.exception.runtime.InvalidPartialAmountException;
 import com.galeri.app.exception.runtime.InstallmentAlreadyPaidException;
 import com.galeri.app.exception.runtime.InstallmentNotPaidException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
@@ -23,6 +27,7 @@ import com.galeri.app.model.enums.InstallmentStatus;
 import com.galeri.app.model.enums.PaymentMethod;
 import com.galeri.app.model.enums.PlanDirection;
 import com.galeri.app.model.request.CollectRequest;
+import com.galeri.app.model.request.EndorseRequest;
 import com.galeri.app.model.request.InstallmentRequest;
 import com.galeri.app.model.request.InstallmentUpdateRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
@@ -125,6 +130,8 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             i.setAmountCents(row.amountCents());
             i.setMethod(row.method());
             i.setNoteNo(blankToNull(row.noteNo()));
+            i.setBankName(blankToNull(row.bankName()));
+            i.setDrawerName(blankToNull(row.drawerName()));
             i.setPayer(payers.get(k));
             if (row.paidNow()) {
                 LedgerEntry paid = ledgerService.writeSettlement(PlanDirection.SALE, vehicle, payers.get(k), row.accountId(),
@@ -231,6 +238,8 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             i.setAmountCents(row.amountCents());
             i.setMethod(row.method());
             i.setNoteNo(blankToNull(row.noteNo()));
+            i.setBankName(blankToNull(row.bankName()));
+            i.setDrawerName(blankToNull(row.drawerName()));
             i.setPayer(payees.get(k));
             if (row.paidNow()) {
                 LedgerEntry e = ledgerService.writeSettlement(PlanDirection.PURCHASE, vehicle, payees.get(k), row.accountId(),
@@ -263,6 +272,8 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             InstallmentRequest r = rows.get(k);
             if (!i.getDueDate().equals(r.dueDate()) || i.getAmountCents() != r.amountCents().longValue() || i.getMethod() != r.method()
                     || !Objects.equals(i.getNoteNo(), blankToNull(r.noteNo()))
+                    || !Objects.equals(i.getBankName(), blankToNull(r.bankName()))
+                    || !Objects.equals(i.getDrawerName(), blankToNull(r.drawerName()))
                     || !i.getPayer().getId().equals(payees.get(k).getId())) return false;
         }
         return true;
@@ -316,6 +327,13 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     public InstallmentResponse collect(UUID installmentId, CollectRequest r) {
         Installment i = getInstallment(installmentId);
         if (i.isPaid()) throw new InstallmentAlreadyPaidException();
+        if (r.amountCents() != null && r.amountCents() != i.getAmountCents().longValue()) {
+            // Kismi: taksit bolunur, bu kadari tahsil edilir, kalani ayni vadeyle acik kalir. Cek parca tahsil edilmez.
+            if (r.amountCents() > i.getAmountCents() || i.getMethod() == PaymentMethod.CHEQUE) throw new InvalidPartialAmountException();
+            i = lockInstallment(installmentId);
+            if (i.isPaid()) throw new InstallmentAlreadyPaidException();
+            split(i, r.amountCents());
+        }
         PaymentPlan plan = i.getPlan();
         Vehicle vehicle = vehicleRepository.findById(plan.getVehicleId()).orElseThrow(RecordNotFoundException::new);
         LedgerEntry entry = ledgerService.writeSettlement(plan.getDirection(), vehicle, i.getPayer(), r.accountId(),
@@ -335,6 +353,16 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     public InstallmentResponse undo(UUID installmentId) {
         Installment i = getInstallment(installmentId);
         if (!i.isPaid()) throw new InstallmentNotPaidException();
+        // Ciro iki taksiti birlikte kapatir: hangisinden geri alinirsa alinsin ciro butunuyle geri alinir
+        if (i.isEndorsed()) {
+            undoEndorsement(i);
+            return single(i, null);
+        }
+        Optional<Installment> endorsedSource = installmentRepository.findByEndorseEntryId(i.getPaidEntryId());
+        if (endorsedSource.isPresent()) {
+            undoEndorsement(endorsedSource.get());
+            return single(i, null);
+        }
         ledgerService.reverse(i.getPaidEntryId());
         i.setPaidEntryId(null);
         i.setPaidAt(null);
@@ -352,7 +380,111 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         if (i.isPaid()) throw new InstallmentAlreadyPaidException();
         i.setDueDate(r.dueDate());
         i.setNoteNo(blankToNull(r.noteNo()));
+        if (r.bankName() != null) i.setBankName(blankToNull(r.bankName()));
+        if (r.drawerName() != null) i.setDrawerName(blankToNull(r.drawerName()));
         return single(i, null);
+    }
+
+    // ------------------------------------------------------------------ cek / senet: ciro ve karsiliksiz
+
+    @Override
+    @Transactional
+    public InstallmentResponse endorse(UUID installmentId, EndorseRequest r) {
+        Installment i = lockInstallment(installmentId);
+        if (i.isPaid() || i.getPlan().getDirection() != PlanDirection.SALE || !i.getMethod().isInstrument()) {
+            throw new EndorseNotAllowedException();
+        }
+        Contact to = getContact(r.toContactId(), i.getTenantId());
+        if (to.getId().equals(i.getPayer().getId())) throw new InvalidEndorseTargetException();
+
+        Installment target = null;
+        Vehicle toVehicle = null;
+        if (r.targetInstallmentId() != null) {
+            target = lockInstallment(r.targetInstallmentId());
+            if (target.isPaid() || target.getPlan().getDirection() != PlanDirection.PURCHASE
+                    || !target.getPayer().getId().equals(to.getId()) || target.getAmountCents() < i.getAmountCents()) {
+                throw new InvalidEndorseTargetException();
+            }
+            // Alis taksiti cekten buyukse: cek kadari ciroyla, kalani ayri taksit olarak acik kalir (or. nakitle odenir)
+            if (target.getAmountCents() > i.getAmountCents()) split(target, i.getAmountCents());
+            toVehicle = vehicleRepository.findById(target.getPlan().getVehicleId()).orElseThrow(RecordNotFoundException::new);
+        }
+
+        Vehicle fromVehicle = vehicleRepository.findById(i.getPlan().getVehicleId()).orElseThrow(RecordNotFoundException::new);
+        String what = i.getMethod() == PaymentMethod.CHEQUE ? "Çek" : "Senet";
+        LedgerService.Endorsement e = ledgerService.writeEndorsement(fromVehicle, i.getPayer(), toVehicle, to, i.getAmountCents(),
+                r.date(), what + " ciro edildi: " + to.getName(), what + " cirosu (" + i.getPayer().getName() + ")");
+        OffsetDateTime paidAt = now();
+        if (installmentRepository.markPaid(i.getId(), e.in().getId(), paidAt) == 0) throw new InstallmentAlreadyPaidException();
+        i.setPaidEntryId(e.in().getId());
+        i.setPaidAt(paidAt);
+        i.setEndorsedTo(to);
+        i.setEndorseEntryId(e.out().getId());
+        i.setBouncedAt(null);
+        if (target != null) {
+            if (installmentRepository.markPaid(target.getId(), e.out().getId(), paidAt) == 0) throw new InstallmentAlreadyPaidException();
+            target.setPaidEntryId(e.out().getId());
+            target.setPaidAt(paidAt);
+            installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
+            coOwnershipService.syncContributions(toVehicle);
+        }
+        return single(i, fromVehicle);
+    }
+
+    @Override
+    @Transactional
+    public InstallmentResponse bounce(UUID installmentId) {
+        Installment i = lockInstallment(installmentId);
+        if (i.getPlan().getDirection() != PlanDirection.SALE || !i.getMethod().isInstrument()) throw new BounceNotAllowedException();
+        if (i.isEndorsed()) {
+            undoEndorsement(i);
+        } else if (i.isPaid()) {
+            ledgerService.reverse(i.getPaidEntryId());
+            i.setPaidEntryId(null);
+            i.setPaidAt(null);
+        }
+        i.setBouncedAt(now());
+        return single(i, null);
+    }
+
+    /** Ciroyu geri alir: iki hareket terslenir, ceki veren yeniden borclu, cekle odenen taksit (varsa) yeniden acik olur. */
+    private void undoEndorsement(Installment source) {
+        UUID out = source.getEndorseEntryId();
+        Optional<Installment> target = installmentRepository.findByPaidEntryId(out);
+        ledgerService.reverse(source.getPaidEntryId());
+        ledgerService.reverse(out);
+        source.setPaidEntryId(null);
+        source.setPaidAt(null);
+        source.setEndorsedTo(null);
+        source.setEndorseEntryId(null);
+        target.ifPresent(t -> {
+            t.setPaidEntryId(null);
+            t.setPaidAt(null);
+            installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
+            coOwnershipService.syncContributions(vehicleRepository.findById(t.getPlan().getVehicleId()).orElseThrow(RecordNotFoundException::new));
+        });
+    }
+
+    /**
+     * Taksiti boler: bu taksit firstCents olur, kalani ayni vade, yontem, odeyen ve evrak bilgisiyle yeni taksit. Plan toplami ve
+     * defter degismez (satis / alis hareketi plan toplamiyla yazildi). Taksit kilitli ve odenmemis olmali.
+     */
+    private Installment split(Installment i, long firstCents) {
+        long rest = i.getAmountCents() - firstCents;
+        if (installmentRepository.resize(i.getId(), firstCents) == 0) throw new InstallmentAlreadyPaidException();
+        i.setAmountCents(firstCents);
+        Installment r = new Installment();
+        r.setTenantId(i.getTenantId());
+        r.setPlan(i.getPlan());
+        r.setSeq((short) (installmentRepository.maxSeq(i.getPlan().getId()) + 1));
+        r.setDueDate(i.getDueDate());
+        r.setAmountCents(rest);
+        r.setMethod(i.getMethod());
+        r.setNoteNo(i.getNoteNo());
+        r.setBankName(i.getBankName());
+        r.setDrawerName(i.getDrawerName());
+        r.setPayer(i.getPayer());
+        return installmentRepository.save(r);
     }
 
     // ------------------------------------------------------------------ cari
@@ -398,9 +530,16 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     }
 
     static String description(PlanDirection direction, PaymentMethod method) {
-        if (direction == PlanDirection.PURCHASE) return method == PaymentMethod.PROMISSORY_NOTE ? "Senet ödemesi" : "Ödeme";
+        if (direction == PlanDirection.PURCHASE) {
+            return switch (method) {
+                case PROMISSORY_NOTE -> "Senet ödemesi";
+                case CHEQUE -> "Çek ödemesi";
+                default -> "Ödeme";
+            };
+        }
         return switch (method) {
             case PROMISSORY_NOTE -> "Senet tahsilatı";
+            case CHEQUE -> "Çek tahsilatı";
             case INSTITUTION -> "Kurum ödemesi";
             default -> "Tahsilat";
         };
@@ -420,7 +559,14 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         PaymentPlan p = i.getPlan();
         return new InstallmentResponse(i.getId(), p.getId(), p.getDirection(), vehicle, i.getSeq(), count, i.getDueDate(),
                 i.getAmountCents(), i.getMethod(), i.getNoteNo(), summary(i.getPayer()), summary(p.getContact()),
-                status, daysLate, i.getPaidEntryId(), i.getPaidAt());
+                status, daysLate, i.getPaidEntryId(), i.getPaidAt(), i.getBankName(), i.getDrawerName(), summary(i.getEndorsedTo()),
+                i.getBouncedAt() != null && !i.isPaid());
+    }
+
+    private Installment lockInstallment(UUID id) {
+        Installment i = installmentRepository.lockById(id).orElseThrow(RecordNotFoundException::new);
+        if (!i.getTenantId().equals(CurrentUser.tenantId())) throw new SourceNotBelongToTenantException();
+        return i;
     }
 
     private Installment getInstallment(UUID id) {
