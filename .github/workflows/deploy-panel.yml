@@ -1,0 +1,80 @@
+# Panel prod deploy. main'e merge edilince (panel/ degistiyse) kendiliginden calisir;
+# elle de tetiklenebilir (Actions > Deploy panel (prod) > Run workflow).
+# Akis: npm ci -> lint -> build (.env.production) -> arsiv sunucuya -> naiad-deploy-panel
+# (eski paneli yedekler, yenisini yerine koyar; en yeni 3 yedek tutulur).
+name: Deploy panel (prod)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "panel/**"
+      - ".github/workflows/deploy-panel.yml"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Deploy edilecek branch, tag ya da commit
+        required: true
+        default: main
+
+concurrency:
+  group: deploy-panel-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-panel:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: panel
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: panel/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
+      - name: Arsivle
+        id: pack
+        run: |
+          test -f dist/index.html
+          tar -czf "$RUNNER_TEMP/panel.tgz" -C dist .
+          echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: SSH anahtari
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Sunucuya kopyala
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: scp -i ~/.ssh/deploy_key -o BatchMode=yes "$RUNNER_TEMP/panel.tgz" "deploy@$DEPLOY_HOST:incoming/panel-galeri.tgz"
+
+      - name: Yayina al
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: ssh -i ~/.ssh/deploy_key -o BatchMode=yes "deploy@$DEPLOY_HOST" "sudo /usr/local/bin/naiad-deploy-panel galeri ${{ steps.pack.outputs.sha }}"
+
+      - name: Ozet
+        if: always()
+        run: |
+          echo "### Galeri paneli deploy: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ref: \`${{ inputs.ref || github.ref_name }}\` (${{ steps.pack.outputs.sha }})" >> "$GITHUB_STEP_SUMMARY"

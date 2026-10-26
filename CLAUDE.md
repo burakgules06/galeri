@@ -92,7 +92,7 @@ Panel tarafında `apiFetch<T>()` doğrudan `data`'yı verir; hata olursa `ApiErr
 - Arayüz metinleri Türkçe.
 
 ### Dokunma
-- `.github/workflows/deploy.yml` ve sunucu ayarları: sadece Burak değiştirir.
+- `.github/workflows/deploy.yml`, `.github/workflows/deploy-panel.yml` ve sunucu ayarları: sadece Burak değiştirir.
 
 ## İş akışı (agent'lar için)
 
@@ -101,4 +101,5 @@ Panel tarafında `apiFetch<T>()` doğrudan `data`'yı verir; hata olursa `ApiErr
 3. Commit mesajları İngilizce, kısa ve emir kipinde.
 4. Branch'i push et; PR'ı Burak açar. Bitirdiğinde issue yorumuna Türkçe bir PR özeti yaz:
    ne/neden (`Closes #N`), nasıl test edildi, migration ya da yeni `.env` ayarı var mı, riskler.
-5. Prod'a deploy etme. Deploy her zaman Burak'ın onayıyla, elle tetiklenir.
+5. Prod'a deploy etme. main'e merge edilen her değişiklik otomatik prod'a çıkar (backend ve panel ayrı workflow'lar); merge'ü sadece Burak yapar.
+   Bu yüzden main'e doğrudan push etme, her şey PR ile gelir.
