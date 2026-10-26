@@ -1,6 +1,20 @@
 package com.galeri.app.model.response;
 
+import com.galeri.app.model.enums.ContributionSource;
+
 import java.util.UUID;
 
-// Ortakli aracta bir ortak ve payi (baz puan). profitCents: satilmis aracta kardaki payi (sadece gosterim), yoksa null.
-public record ShareResponse(UUID contactId, String name, int shareBp, Long profitCents) {}
+// Ortak aracin bir sahibi. contactId null = Havuz. contributionCents: o ana kadar odenmis katkisi (planli alista
+// odendikce artar). Satilmis aracta profitCents kar payi (dukkan payi dusulmus), receivableCents alacagi = katki + kar payi;
+// stoktaysa ikisi de null.
+public record ShareResponse(
+        UUID contactId,
+        String name,
+        int shareBp,
+        int profitShareBp,
+        ContributionSource source,
+        Long pocketCents,
+        long contributionCents,
+        Long profitCents,
+        Long receivableCents
+) {}

@@ -45,4 +45,8 @@ public class ErrorMessageConstant {
     public static final int INVALID_PERIOD = 1039;
     public static final int NOT_AN_EXPENSE = 1040;
     public static final int CATALOG_UNKNOWN = 1041;
+    public static final int INSUFFICIENT_CAPITAL = 1042;
+    public static final int OWNER_RETURN_EXISTS = 1043;
+    public static final int INVALID_OWNER_RETURN = 1044;
+    public static final int INVALID_SHOP_CUT = 1045;
 }

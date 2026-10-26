@@ -22,6 +22,7 @@ import com.galeri.app.repository.ContactRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehicleRepository;
+import com.galeri.app.service.CoOwnershipService;
 import com.galeri.app.support.TestSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +34,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +48,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,6 +62,7 @@ class CapitalServiceImplTest {
     @Mock private ContactRepository contactRepository;
     @Mock private VehicleRepository vehicleRepository;
     @Mock private PanelUserRepository panelUserRepository;
+    @Mock private CoOwnershipService coOwnershipService;
 
     private static final LocalDate FROM = LocalDate.of(2026, 7, 1);
     private static final LocalDate TO = LocalDate.of(2026, 9, 30);
@@ -71,7 +77,8 @@ class CapitalServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new CapitalServiceImpl(accountRepository, entryRepository, contactRepository, vehicleRepository, panelUserRepository);
+        service = new CapitalServiceImpl(accountRepository, entryRepository, contactRepository, vehicleRepository, panelUserRepository,
+                coOwnershipService, Clock.fixed(Instant.parse("2026-10-01T06:00:00Z"), ZoneOffset.UTC));
         TestSession.open(userId, tenantId, "ADMIN");
         PanelUser me = new PanelUser();
         me.setId(userId);
@@ -97,24 +104,29 @@ class CapitalServiceImplTest {
     // ------------------------------------------------------------------ donem kari
 
     @Test
-    void donemKari_aracKariArtiKomisyonEksiGenelGider_ortakliNeteGirmez() {
+    void donemKari_aracKariArtiKomisyonEksiGenelGider_ortakAractaSadeceHavuzPayiNeteGirer() {
         Vehicle dealer = sold(Ownership.DEALER, FROM, 130000000L, 100000000L);          // donemin ilk gunu: dahil
         Vehicle consigned = sold(Ownership.CONSIGNMENT, TO, 145000000L, null);           // donemin son gunu: dahil
         consigned.setCommissionType(CommissionType.FIXED);
         consigned.setCommissionCents(4000000L);
-        Vehicle coOwned = sold(Ownership.CO_OWNED, LocalDate.of(2026, 8, 10), 110000000L, 98000000L);
+        Vehicle coOwned = sold(Ownership.CO_OWNED, LocalDate.of(2026, 8, 10), 110000000L, 98000000L);   // kar 120.000
         when(vehicleRepository.findByTenantIdAndSaleDateBetween(tenantId, FROM, TO)).thenReturn(List.of(coOwned, consigned, dealer));
         when(entryRepository.vehicleExpenseTotals(tenantId, LedgerEntryType.VEHICLE_EXPENSE, AccountType.VEHICLE))
                 .thenReturn(List.<Object[]>of(new Object[]{dealer.getId(), 5000000L}));
+        // Ortaga satista yazilan kar payi 72.000 (%60); havuza 48.000 kalir
+        when(entryRepository.partnerProfitShareTotals(tenantId, LedgerEntryType.VEHICLE_PROFIT_SHARE, AccountType.CAPITAL))
+                .thenReturn(List.<Object[]>of(new Object[]{coOwned.getId(), 7200000L}));
         when(entryRepository.netInto(tenantId, AccountType.EXPENSE, FROM, TO)).thenReturn(8000000L);
 
         PeriodProfit p = service.periodProfit(FROM, TO);
 
-        assertThat(p.vehicleProfitCents()).isEqualTo(25000000L);   // 1.300.000 - (1.000.000 + 50.000)
+        assertThat(p.vehicleProfitCents()).isEqualTo(29800000L);   // 1.300.000 - (1.000.000 + 50.000) + havuz payi 48.000
         assertThat(p.commissionCents()).isEqualTo(4000000L);
         assertThat(p.generalExpenseCents()).isEqualTo(8000000L);
-        assertThat(p.netCents()).isEqualTo(21000000L);             // 250.000 + 40.000 - 80.000
-        assertThat(p.coOwnedProfitCents()).isEqualTo(12000000L);   // havuz disi, ayri satir
+        assertThat(p.netCents()).isEqualTo(25800000L);             // 298.000 + 40.000 - 80.000
+        assertThat(p.coOwnedProfitCents()).isEqualTo(7200000L);    // ortaklarin payi: sermayelerine gecti, nete girmez
+        assertThat(p.vehicles()).filteredOn(v -> v.ownership() == Ownership.CO_OWNED).singleElement()
+                .satisfies(v -> assertThat(v.poolProfitCents()).isEqualTo(4800000L));
         assertThat(p.vehicles()).extracting(v -> v.saleDate()).containsExactly(FROM, LocalDate.of(2026, 8, 10), TO);
         verify(entryRepository).netInto(tenantId, AccountType.EXPENSE, FROM, TO);   // genel gider ayni (dahil) sinirlarla
     }
@@ -197,6 +209,37 @@ class CapitalServiceImplTest {
                 new CapitalRequests.Movement(CapitalRequests.Direction.OUT, cash.getId(), FROM, 100001L, null)))
                 .isInstanceOf(CapitalExceededException.class);
         verify(entryRepository, never()).save(any());
+    }
+
+    @Test
+    void sermayeCekisi_araclardaBagliKisimCekilemez_nakittekiKadar() {
+        Account selin = partner("Selin", false);
+        capitalEntries.add(entry(LedgerEntryType.CAPITAL, selin, cash, 100000L, FROM));
+        when(coOwnershipService.boundCapital(eq(tenantId), any())).thenReturn(Map.of(selin.getContactId(), 60000L));
+
+        assertThatThrownBy(() -> service.move(selin.getContactId(),
+                new CapitalRequests.Movement(CapitalRequests.Direction.OUT, cash.getId(), FROM, 40001L, null)))
+                .isInstanceOf(CapitalExceededException.class);
+        Partner p = service.partners().getFirst();
+        assertThat(p.capitalCents()).isEqualTo(100000L);
+        assertThat(p.cashCents()).isEqualTo(40000L);
+        assertThat(p.boundCents()).isEqualTo(60000L);
+    }
+
+    @Test
+    void donemKariAgirligi_araclardaBagliSermayeyiDislar() {
+        Account furkan = partner("Furkan", true);
+        Account burak = partner("Burak", false);
+        capitalEntries.add(entry(LedgerEntryType.CAPITAL, furkan, cash, 1000000L, FROM));
+        capitalEntries.add(entry(LedgerEntryType.CAPITAL, burak, cash, 1000000L, FROM));
+        when(coOwnershipService.boundCapital(tenantId, TO)).thenReturn(Map.of(burak.getContactId(), 500000L));   // yarisi aracta
+        when(vehicleRepository.findByTenantIdAndSaleDateBetween(tenantId, FROM, TO)).thenReturn(List.of());
+        when(entryRepository.netInto(tenantId, AccountType.EXPENSE, FROM, TO)).thenReturn(-300000L);   // net 3.000 TL
+
+        List<PartnerProfit> partners = service.periodProfit(FROM, TO).partners();
+
+        assertThat(partners).extracting(PartnerProfit::capitalCents).containsExactly(1000000L, 500000L);
+        assertThat(partners).extracting(PartnerProfit::suggestedCents).containsExactly(200000L, 100000L);
     }
 
     @Test

@@ -1,10 +1,32 @@
 package com.galeri.app.model.request;
 
+import com.galeri.app.model.enums.ContributionSource;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 import java.util.UUID;
 
-// Ortakli aracta bir ortak: pay baz puan (%50 = 5000). Aracin paylari toplami 10000 olmali.
-public record ShareRequest(@NotNull UUID contactId, @NotNull @Min(1) @Max(10000) Integer shareBp) {}
+// Ortak aracin bir sahibi. contactId bos = Havuz. shareBp sahiplik payi (%50 = 5000), toplam 10000.
+// profitShareBp kar payi orani (bos = sahiplik payi), toplam 10000. source bos = sermayeden; HYBRID'de pocketCents cepten kisim.
+public record ShareRequest(
+        UUID contactId,
+        @NotNull @Min(1) @Max(10000) Integer shareBp,
+        @Min(0) @Max(10000) Integer profitShareBp,
+        ContributionSource source,
+        @Positive Long pocketCents
+) {
+    /** Sadece sahiplik payi: kar payi orani ayni, katki sermayeden. */
+    public ShareRequest(UUID contactId, Integer shareBp) {
+        this(contactId, shareBp, null, null, null);
+    }
+
+    public int profitShareOrDefault() {
+        return profitShareBp == null ? shareBp : profitShareBp;
+    }
+
+    public ContributionSource sourceOrDefault() {
+        return source == null ? ContributionSource.CAPITAL : source;
+    }
+}

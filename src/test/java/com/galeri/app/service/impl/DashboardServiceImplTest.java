@@ -4,22 +4,23 @@ import com.galeri.app.model.entity.Account;
 import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.AccountType;
-import com.galeri.app.model.enums.CommissionType;
 import com.galeri.app.model.enums.InstallmentStatus;
-import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.LedgerEntryType;
+import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.PaymentMethod;
 import com.galeri.app.model.enums.PlanDirection;
-import com.galeri.app.model.response.InstallmentResponse;
-import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.model.enums.VehicleStatus;
-import com.galeri.app.model.response.DashboardResponse;
+import com.galeri.app.model.response.CapitalResponses.PeriodProfit;
 import com.galeri.app.model.response.DashboardResponse.MonthStat;
 import com.galeri.app.model.response.DashboardResponse.PartnerShare;
+import com.galeri.app.model.response.DashboardResponse;
+import com.galeri.app.model.response.InstallmentResponse;
 import com.galeri.app.repository.AccountRepository;
 import com.galeri.app.repository.ContactRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.VehicleRepository;
+import com.galeri.app.service.CapitalService;
+import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.support.TestSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +53,7 @@ class DashboardServiceImplTest {
     @Mock private ContactRepository contactRepository;
     @Mock private VehicleRepository vehicleRepository;
     @Mock private PaymentPlanService paymentPlanService;
+    @Mock private CapitalService capitalService;
 
     // "Su an": 1 Temmuz 2026, Istanbul
     private final Clock clock = Clock.fixed(Instant.parse("2026-07-01T06:00:00Z"), ZoneOffset.UTC);
@@ -72,8 +74,9 @@ class DashboardServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new DashboardServiceImpl(accountRepository, entryRepository, contactRepository, vehicleRepository,
-                paymentPlanService, clock);
+                paymentPlanService, capitalService, clock);
         when(paymentPlanService.list(null, null, null, null)).thenReturn(List.of());
+        when(capitalService.periodProfit(any(), any())).thenReturn(profit(0, 0));
         TestSession.open(UUID.randomUUID(), tenantId, "ADMIN");
 
         when(accountRepository.findByTenantIdAndTypeInOrderByCreatedAtAsc(eq(tenantId), anyCollection()))
@@ -118,7 +121,7 @@ class DashboardServiceImplTest {
     }
 
     @Test
-    void sonAltiAy_satisKariMaliyetDusulerekHesaplanir() {
+    void sonAltiAy_karDonemKariIleAyniTanim_ayinTamami() {
         Vehicle sold = new Vehicle();
         sold.setId(UUID.randomUUID());
         sold.setPurchaseDate(LocalDate.of(2026, 5, 2));
@@ -127,8 +130,9 @@ class DashboardServiceImplTest {
         sold.setSalePriceCents(130000L);
         when(vehicleRepository.findByTenantIdAndPurchaseDateBetween(any(), any(), any())).thenReturn(List.of(sold));
         when(vehicleRepository.findByTenantIdAndSaleDateBetween(any(), any(), any())).thenReturn(List.of(sold));
-        when(entryRepository.vehicleExpenseTotals(tenantId, LedgerEntryType.VEHICLE_EXPENSE, AccountType.VEHICLE))
-                .thenReturn(List.<Object[]>of(new Object[]{sold.getId(), 5000L}));
+        // Haziran: havuzun kari (galeri + ortak araclarda havuz payi + komisyon - genel gider) Donem karindan
+        when(capitalService.periodProfit(LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30)))
+                .thenReturn(profit(25000L, 3900000L));
 
         List<MonthStat> months = service.summary().months();
 
@@ -136,9 +140,15 @@ class DashboardServiceImplTest {
         assertThat(months.get(0).month()).isEqualTo(2);
         MonthStat may = months.get(3), june = months.get(4);
         assertThat(may.bought()).isEqualTo(1);
+        assertThat(may.profitCents()).isZero();
         assertThat(june.sold()).isEqualTo(1);
         assertThat(june.revenueCents()).isEqualTo(130000L);
         assertThat(june.profitCents()).isEqualTo(25000L);
+        assertThat(june.commissionCents()).isEqualTo(3900000L);
+    }
+
+    private static PeriodProfit profit(long net, long commission) {
+        return new PeriodProfit(null, null, List.of(), 0, commission, 0, net, 0, List.of());
     }
 
     @Test
@@ -159,25 +169,6 @@ class DashboardServiceImplTest {
         assertThat(r.consignmentCount()).isEqualTo(1);
         assertThat(r.stockCostCents()).isEqualTo(100000L);
         assertThat(r.averageDaysInStock()).isEqualTo(30);   // sadece galerinin araci (1 Haziran -> 1 Temmuz)
-    }
-
-    @Test
-    void konsinyeSatis_karaDegil_komisyonSatirinaYazilir() {
-        Vehicle consigned = new Vehicle();
-        consigned.setId(UUID.randomUUID());
-        consigned.setOwnership(Ownership.CONSIGNMENT);
-        consigned.setCommissionType(CommissionType.RATE);
-        consigned.setCommissionRateBp(300);
-        consigned.setPurchaseDate(LocalDate.of(2026, 5, 2));
-        consigned.setSaleDate(LocalDate.of(2026, 6, 15));
-        consigned.setSalePriceCents(130000000L);
-        when(vehicleRepository.findByTenantIdAndSaleDateBetween(any(), any(), any())).thenReturn(List.of(consigned));
-
-        MonthStat june = service.summary().months().get(4);
-
-        assertThat(june.revenueCents()).isEqualTo(130000000L);
-        assertThat(june.profitCents()).isZero();
-        assertThat(june.commissionCents()).isEqualTo(3900000L);
     }
 
     @Test

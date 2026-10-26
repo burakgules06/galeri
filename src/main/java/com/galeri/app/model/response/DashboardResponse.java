@@ -33,8 +33,9 @@ public record DashboardResponse(
     public record ContactBalance(UUID contactId, String name, String phone, long amountCents) {}
 
     /**
-     * Son aylar: alinan / satilan adet, satis cirosu (konsinye dahil), satilan galeri araclarinin kari ve
-     * konsinye satislardan komisyon (ayri satir; sermaye karina girip girmeyecegi acik soru, MIMARI §13).
+     * Son aylar: alinan / satilan adet, satis cirosu (konsinye dahil). profitCents Donem kari ile ayni tanim (havuzun
+     * kari: galeri araclari + ortak araclarda havuz payi + komisyon + dukkan paylari - genel giderler); commissionCents
+     * bunun icindeki konsinye komisyonu (bilgi).
      */
     public record MonthStat(int year, int month, int bought, int sold, long revenueCents, long profitCents, long commissionCents) {}
 }

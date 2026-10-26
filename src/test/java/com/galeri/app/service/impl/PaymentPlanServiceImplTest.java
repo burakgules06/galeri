@@ -4,9 +4,9 @@ import com.galeri.app.exception.runtime.InstallmentAlreadyPaidException;
 import com.galeri.app.exception.runtime.InvalidPayerException;
 import com.galeri.app.exception.runtime.PurchaseHasPaymentsException;
 import com.galeri.app.exception.runtime.PurchaseTotalMismatchException;
-import com.galeri.app.exception.runtime.SellerRequiredException;
 import com.galeri.app.exception.runtime.SaleHasPaymentsException;
 import com.galeri.app.exception.runtime.SaleTotalMismatchException;
+import com.galeri.app.exception.runtime.SellerRequiredException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.model.entity.Account;
 import com.galeri.app.model.entity.Contact;
@@ -30,6 +30,7 @@ import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.PaymentPlanRepository;
 import com.galeri.app.repository.VehicleRepository;
+import com.galeri.app.service.CoOwnershipService;
 import com.galeri.app.service.LedgerService;
 import com.galeri.app.support.TestSession;
 import org.junit.jupiter.api.AfterEach;
@@ -73,6 +74,7 @@ class PaymentPlanServiceImplTest {
     @Mock private LedgerEntryRepository entryRepository;
     @Mock private PanelUserRepository panelUserRepository;
     @Mock private LedgerService ledgerService;
+    @Mock private CoOwnershipService coOwnershipService;
 
     // "Su an": 1 Temmuz 2026, 09:00 Istanbul
     private final Clock clock = Clock.fixed(Instant.parse("2026-07-01T06:00:00Z"), ZoneOffset.UTC);
@@ -89,7 +91,7 @@ class PaymentPlanServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new PaymentPlanServiceImpl(planRepository, installmentRepository, contactRepository, vehicleRepository,
-                accountRepository, entryRepository, panelUserRepository, ledgerService, clock);
+                accountRepository, entryRepository, panelUserRepository, ledgerService, coOwnershipService, clock);
         TestSession.open(UUID.randomUUID(), tenantId, "ADMIN");
 
         vehicle = new Vehicle();
