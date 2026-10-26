@@ -77,7 +77,7 @@ export function MonthlyView() {
         <div className="flex flex-wrap items-end justify-between gap-2 mb-1">
           <div>
             <p className="etiket">{personName} · aylık işlem sayısı</p>
-            <p className="text-[13px] text-murekkep-2 mt-1">Çubukların üstündeki yüzde, o ayın yıl içindeki payı. Detay için aya dokun.</p>
+
           </div>
           <Legend items={[
             { label: "Alınan", color: BOUGHT_COLOR, value: String(bought.reduce((a, b) => a + b, 0)) },

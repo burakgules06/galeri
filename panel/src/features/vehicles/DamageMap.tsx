@@ -101,9 +101,6 @@ export function DamageMap({ parts, editable = false, onChange }: {
           );
         })}
       </div>
-      {editable && (
-        <p className="text-[13px] text-murekkep-3 mt-2">Durumu seç, sonra çizimde parçalara dokun. Aynı durumdaki parçaya tekrar dokunmak orijinale çevirir.</p>
-      )}
 
       {damaged.length > 0 && (
         <ul className="mt-4 divide-y divide-cizgi border-t border-cizgi">

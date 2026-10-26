@@ -81,7 +81,6 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing 
       </>}>
       <form id="expense-form" onSubmit={submit} className="space-y-4">
         <ErrorBox message={error} />
-        {locked && <p className="text-[13.5px] text-murekkep-2">Kaydedince eski kayıt ters kayıtla kapanır, yeni değerlerle yeni kayıt yazılır.</p>}
 
         {!vehicle && !locked && (
           <Field label="Masraf türü">
@@ -91,7 +90,7 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing 
         )}
 
         {!vehicle && root === "VEHICLE" && (
-          <Field label="Araç" hint={consignment ? undefined : "Masraf aracın maliyetine eklenir"}>
+          <Field label="Araç">
             <select className={inputClass} value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
               <option value="">Seç</option>
               {(stock.data ?? []).map((v) => <option key={v.id} value={v.id}>{v.plate} · {v.make} {v.model}</option>)}
@@ -100,14 +99,13 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing 
         )}
 
         {consignment && (
-          <Field label="Konsinye araç: masrafı kim üstleniyor?"
-            hint={chargeToOwner ? "Aracın sahibinin carisine yazılır; sahibi galeriye borçlanır." : "Galerinin genel gideri olur; komisyondan düşülerek araç kârında görünür."}>
+          <Field label="Konsinye araç: masrafı kim üstleniyor?">
             <Segment<"owner" | "dealer"> value={chargeToOwner ? "owner" : "dealer"} onChange={(v) => setChargeToOwner(v === "owner")}
               options={[{ value: "dealer", label: "Galeri üstlenir" }, { value: "owner", label: "Sahibine yansıt" }]} />
           </Field>
         )}
 
-        <Field label="Tutar" hint="TL">
+        <Field label="Tutar">
           <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount}
             placeholder="5.000" autoFocus />
         </Field>

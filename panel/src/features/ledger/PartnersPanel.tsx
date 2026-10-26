@@ -121,11 +121,8 @@ function CapitalMovementForm({ partner, direction, onClose, onSaved }: {
       </>}>
       <form id="capital-form" onSubmit={submit} className="space-y-4">
         <ErrorBox message={error} />
-        <p className="text-[14px] text-murekkep-2">
-          Şu anki sermayesi <b className="sayi text-[16px] text-murekkep">{tl(partner.capitalCents)}</b> ({percent(partner.shareBp)}).
-          {into ? " Para seçilen hesaba girer, ortağın payı artar." : " Para seçilen hesaptan çıkar, ortağın payı azalır."}
-        </p>
-        <Field label="Tutar" hint="TL">
+
+        <Field label="Tutar">
           <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount}
             placeholder="1.000.000" autoFocus />
         </Field>

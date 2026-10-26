@@ -169,7 +169,7 @@ function EditPanel({ i, onClose, onDone }: { i: InstallmentResponse; onClose: ()
         <Field label="Vade"><input type="date" className={inputClass} value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
         <Field label="Senet no"><input className={inputClass} value={noteNo} onChange={(e) => setNoteNo(e.target.value)} placeholder="İsteğe bağlı" /></Field>
       </div>
-      <p className="text-[12.5px] text-murekkep-3">Tutar ve ödeyen değiştirilemez; gerekirse satışı geri alıp yeniden girin.</p>
+
       <div className="flex justify-end gap-2">
         <Button variant="quiet" onClick={onClose}>Vazgeç</Button>
         <Button onClick={submit}>Kaydet</Button>

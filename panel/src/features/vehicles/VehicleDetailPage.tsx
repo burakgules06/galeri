@@ -111,7 +111,7 @@ export function VehicleDetailPage({ id }: { id: string }) {
 
           {admin && (
             <CostCard key={`${admin.actualPurchaseCents}-${admin.salePriceCents}-${admin.purchaseAccountId}-${v.ownership}-${admin.commissionRateBp}-${admin.commissionCents}`}
-              vehicle={v} consignor={admin.consignor} />
+              vehicle={v} />
           )}
 
           {admin && v.ownership !== "CONSIGNMENT" && (
@@ -147,7 +147,7 @@ export function VehicleDetailPage({ id }: { id: string }) {
 // Maliyet = gercek alis + araca bagli masraflar (defterden). Kar sadece satilmis aracta.
 // Konsinye: alis yok; kar = komisyon - galerinin ustlendigi masraflar, sahibine borc ve yansitilan masraf ayri.
 // Ortakli: kar, ortaklarin payina gore bolunur (sadece gosterim).
-function CostCard({ vehicle, consignor }: { vehicle: VehicleDetail; consignor: ContactSummary | null }) {
+function CostCard({ vehicle }: { vehicle: VehicleDetail }) {
   const { data, error, reload } = useLoad(() => api.vehicleCost(vehicle.id), [vehicle.id]);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const expenses = (data?.entries ?? []).filter((e) => e.type === "VEHICLE_EXPENSE");
@@ -169,11 +169,7 @@ function CostCard({ vehicle, consignor }: { vehicle: VehicleDetail; consignor: C
               <ProfitInfo cents={data.profitCents} />
             </>}
           </dl>
-          {consignor && (
-            <p className="mt-3 text-[13.5px] text-murekkep-2">
-              Sahibine ödeme ve yansıtılan masraflar <a href={`#/contacts/${consignor.id}`} className="font-semibold text-plaka hover:underline">{consignor.name}</a> carisinde.
-            </p>
-          )}
+
         </>
       )}
       {data && !consignment && (
@@ -207,7 +203,7 @@ function CostCard({ vehicle, consignor }: { vehicle: VehicleDetail; consignor: C
                   </li>
                 ))}
               </ul>
-              <p className="text-[12.5px] text-murekkep-3 mt-2">Sadece bilgi: sistem kârı dağıtmaz.</p>
+
             </div>
           )}
         </>

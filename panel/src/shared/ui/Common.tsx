@@ -81,7 +81,7 @@ export function Modal({ title, open, onClose, children, footer, wide = false }: 
           </button>
         </div>
         <div className="overflow-y-auto px-5 py-4 grow">{children}</div>
-        {footer && <div className="px-5 py-3 border-t border-cizgi flex justify-end gap-2 shrink-0">{footer}</div>}
+        {footer && <div className="px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-cizgi flex justify-end gap-2 shrink-0 bg-yuzey sticky bottom-0">{footer}</div>}
       </div>
     </div>
   );

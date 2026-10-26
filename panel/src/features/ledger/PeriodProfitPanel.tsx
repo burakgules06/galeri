@@ -55,7 +55,7 @@ export function PeriodProfitPanel({ onChange }: { onChange: () => void }) {
             <Field label="Bitiş"><input type="date" className={inputClass} value={to} onChange={(e) => setPeriod([from, e.target.value])} /></Field>
           </div>
         )}
-        <p className="text-[13px] text-murekkep-2 ml-auto">{formatDate(from)} – {formatDate(to)} (iki gün de dahil)</p>
+        <p className="text-[13px] text-murekkep-2 ml-auto">{formatDate(from)} – {formatDate(to)}</p>
       </section>
 
       <ErrorBox message={error} />
@@ -81,15 +81,11 @@ function ProfitSummary({ p }: { p: PeriodProfit }) {
         <StatTile label="Konsinye komisyonu" value={tl(p.commissionCents)} tone={p.commissionCents > 0 ? "positive" : "neutral"}
           sub={`${p.vehicles.filter((v) => v.ownership === "CONSIGNMENT").length} konsinye satış`} />
         <StatTile label="Genel giderler" value={tl(p.generalExpenseCents)} tone={p.generalExpenseCents > 0 ? "negative" : "neutral"}
-          sub="Kira, maaş, galerinin üstlendiği konsinye masrafları" />
+          />
         <StatTile label={p.netCents >= 0 ? "Net kâr" : "Net zarar"} value={tl(Math.abs(p.netCents))} tone={p.netCents >= 0 ? "positive" : "negative"}
-          sub="Araç / Havuz kârı + komisyon − genel gider" />
+          />
       </div>
-      {p.coOwnedProfitCents !== 0 && (
-        <p className="text-[13.5px] text-murekkep-2">
-          Ortaklara sermayeye yazılan kâr / zarar <b className="sayi text-[15px] text-ortakli">{tl(p.coOwnedProfitCents)}</b>; bu tutar Havuz net kârına dahil değildir.
-        </p>
-      )}
+
     </>
   );
 }
@@ -131,10 +127,7 @@ function PartnersTable({ p, onAllocate }: { p: PeriodProfit; onAllocate: (x: Par
     <section className="kart overflow-hidden">
       <div className="px-4 md:px-5 pt-4 pb-3 border-b border-cizgi">
         <h2 className="font-cond font-bold text-[21px] tracking-tight">Ortakların payı</h2>
-        <p className="text-[13px] text-murekkep-2 mt-0.5">
-          Dönem sonundaki nakit sermaye ağırlıklarıyla öneri (bu dönemin kârından eklenenler hariç), sadece bilgi. Genel dönem kârı
-          "Sermayeye ekle" ile elle aktarılır; ortak araç kâr payı ise satışta otomatik sermayeye yazılır.
-        </p>
+
       </div>
       {p.partners.length === 0
         ? <Empty title="Sermaye ortağı yok" description="Ortaklar sekmesinden ortak ekleyin." />
@@ -200,11 +193,8 @@ function AllocationForm({ partner, period, onClose, onSaved }: {
       </>}>
       <form id="allocation-form" onSubmit={submit} className="space-y-4">
         <ErrorBox message={error} />
-        <p className="text-[14px] text-murekkep-2">
-          Dönem {formatDate(period.from)} – {formatDate(period.to)}. Önerilen <b className="sayi text-[16px] text-murekkep">{tl(partner.suggestedCents)}</b>,
-          bu dönem eklenen <b className="sayi text-[16px] text-murekkep">{tl(partner.allocatedCents)}</b>. Tutarı ortaklar belirler.
-        </p>
-        <Field label="Sermayeye eklenecek tutar" hint="Gelirdeki kâr ortağın sermayesine geçer; payı buna göre değişir.">
+
+        <Field label="Sermayeye eklenecek tutar">
           <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount}
             placeholder="250.000" autoFocus />
         </Field>

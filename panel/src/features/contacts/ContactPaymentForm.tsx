@@ -49,12 +49,12 @@ export function ContactPaymentForm({ contact, debtCents, onClose, onSaved }: {
         <ErrorBox message={error} />
         {debtCents > 0 && (
           <p className="rounded-lg bg-tehlike-zemin px-3 py-2 text-[14px]">
-            Bu kişiye borcumuz <b className="sayi text-[16px] text-tehlike">{tl(debtCents)}</b>. Kısmi ödeme yapabilirsiniz.
+            Borcumuz <b className="sayi text-[16px] text-tehlike">{tl(debtCents)}</b>
           </p>
         )}
         <Field label="Tutar" hint={debtCents > 0 && cents && !Number.isNaN(cents)
           ? after > 0 ? `Ödemeden sonra kalan borç: ${tl(after)}` : after === 0 ? "Borç kapanır." : `Fazla ödeme: ${tl(-after)} (kişi bize borçlanır)`
-          : "TL"}>
+          : undefined}>
           <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount}
             placeholder="250.000" autoFocus />
         </Field>

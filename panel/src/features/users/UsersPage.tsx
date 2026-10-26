@@ -29,9 +29,6 @@ export function UsersPage() {
         </div>
         <Button onClick={() => setEditing("new")}>Kullanıcı ekle</Button>
       </div>
-      <p className="text-[14px] text-murekkep-2 mb-4">
-        Yönetici para defterini, ödemeleri ve tutarları görür. Çalışan sadece araçları ve kendi alım-satımını görür, tutar görmez.
-      </p>
       <ErrorBox message={error} />
       {data && data.length === 0 && <Empty title="Henüz kullanıcı yok" />}
       {active.length > 0 && <UserList users={active} onEdit={setEditing} onReset={setResetting} />}
@@ -118,7 +115,7 @@ function UserForm({ existing, onClose, onSaved }: { existing: UserResponse | nul
         <ErrorBox message={error} />
         <Field label="Ad soyad"><input className={inputClass} value={fullName} onChange={(e) => setFullName(e.target.value)} required maxLength={120} /></Field>
         {existing
-          ? <Field label="Telefon (giriş)" hint="Telefon değiştirilemez; gerekirse yeni kullanıcı ekleyip bunu pasifleştirin.">
+          ? <Field label="Telefon (giriş)">
               <p className="sayi text-[18px] text-murekkep-2">{formatPhone(existing.phone)}</p>
             </Field>
           : <Field label="Cep telefonu (giriş için)">
@@ -128,13 +125,13 @@ function UserForm({ existing, onClose, onSaved }: { existing: UserResponse | nul
           {self ? <p className="font-semibold">Yönetici</p> : <Segment<UserRole> value={role} onChange={setRole} options={ROLE_OPTIONS} />}
         </Field>
         {existing && !self && (
-          <Field label="Durum" hint={active ? undefined : "Pasif kullanıcı giriş yapamaz; açık oturumu da hemen kapanır."}>
+          <Field label="Durum">
             <Segment<"on" | "off"> value={active ? "on" : "off"} onChange={(v) => setActive(v === "on")}
               options={[{ value: "on", label: "Aktif" }, { value: "off", label: "Pasif" }]} />
           </Field>
         )}
         {!existing && (
-          <Field label="İlk şifre" hint="En az 8 karakter. Kullanıcı girişten sonra Hesabım'dan değiştirebilir.">
+          <Field label="İlk şifre" hint="En az 8 karakter">
             <input className={inputClass} type="password" autoComplete="new-password" value={password}
               onChange={(e) => setPassword(e.target.value)} minLength={8} maxLength={72} required />
           </Field>
