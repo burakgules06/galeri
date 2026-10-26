@@ -1,9 +1,18 @@
-# Prod deploy: SADECE elle tetiklenir (Actions > Deploy (prod) > Run workflow).
+# Backend prod deploy. main'e merge edilince (backend dosyalari degistiyse) kendiliginden calisir;
+# elle de tetiklenebilir (Actions > Deploy (prod) > Run workflow), or. geri donus icin eski bir commit.
 # Akis: testler -> jar -> sunucuya kopyala -> naiad-deploy (yedek, restart, health check,
 # saglik kontrolu gecmezse otomatik geri donus).
 name: Deploy (prod)
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "pom.xml"
+      - "mvnw"
+      - ".mvn/**"
+      - ".github/workflows/deploy.yml"
   workflow_dispatch:
     inputs:
       ref:
@@ -43,7 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -85,4 +94,4 @@ jobs:
         if: always()
         run: |
           echo "### Galeri deploy: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Ref: \`${{ inputs.ref }}\` (${{ steps.jar.outputs.sha }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Ref: \`${{ inputs.ref || github.ref_name }}\` (${{ steps.jar.outputs.sha }})" >> "$GITHUB_STEP_SUMMARY"
