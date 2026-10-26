@@ -13,13 +13,15 @@ import { ExpenseForm } from "./ExpenseForm";
 import { LedgerEntryList } from "./LedgerEntryList";
 import { PartnersPanel } from "./PartnersPanel";
 import { PeriodProfitPanel } from "./PeriodProfitPanel";
+import { NetWorthPanel } from "./NetWorthPanel";
 import { OpeningBalanceForm, TransferForm } from "./TreasuryForms";
 
-type Tab = "entries" | "partners" | "profit";
+type Tab = "entries" | "partners" | "profit" | "assets";
 
 export function LedgerPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("entries");
+  const [revision, setRevision] = useState(0);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [bankOpen, setBankOpen] = useState(false);
   const [dialog, setDialog] = useState<"transfer" | "opening" | null>(null);
@@ -27,7 +29,7 @@ export function LedgerPage() {
   const summary = useLoad(() => api.dashboard(), []);
   const entries = useLoad(() => api.ledgerEntries(selected), [selected]);
 
-  const reload = () => { accounts.reload(); entries.reload(); summary.reload(); };
+  const reload = () => { accounts.reload(); entries.reload(); summary.reload(); setRevision(r => r + 1); };
   const list = accounts.data ?? [];
   const total = list.reduce((t, a) => t + a.balanceCents, 0);
   const selectedName = list.find((a) => a.id === selected)?.name;
@@ -75,10 +77,12 @@ export function LedgerPage() {
 
       <Segment<Tab> value={tab} onChange={setTab} options={[
         { value: "entries", label: "Hareketler" }, { value: "partners", label: "Ortaklar ve sermaye" }, { value: "profit", label: "Dönem kârı" },
+        { value: "assets", label: "Varlıklar" },
       ]} />
 
       {tab === "partners" && <PartnersPanel onChange={reload} />}
       {tab === "profit" && <PeriodProfitPanel onChange={reload} />}
+      {tab === "assets" && <NetWorthPanel revision={revision} />}
 
       {tab === "entries" && summary.data && (
         <div className="grid gap-4 lg:grid-cols-2">

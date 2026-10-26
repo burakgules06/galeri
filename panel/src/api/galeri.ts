@@ -1,6 +1,6 @@
 import { apiFetch } from "./client";
 import type {
-  AccountResponse, BodyPart, CategoryResponse, ContactRequest, ContactResponse, DashboardResponse, ExpenseRequest, ExpenseRoot,
+  NetWorthResponse, AccountResponse, BodyPart, CategoryResponse, ContactRequest, ContactResponse, DashboardResponse, ExpenseRequest, ExpenseRoot,
   YearlyTrades, PaymentPlanResponse, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
   LedgerEntryResponse, MonthlyTrades, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
   VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary, UserResponse, UserRole, ContactPaymentRequest,
@@ -10,6 +10,7 @@ import type {
 const json = (body: unknown, method = "POST"): RequestInit => ({ method, body: JSON.stringify(body) });
 
 export const api = {
+  netWorth: () => apiFetch<NetWorthResponse>("/api/net-worth"),
   vehicles: (q: string, status: VehicleStatus | null) => {
     const p = new URLSearchParams();
     if (q.trim()) p.set("q", q.trim());

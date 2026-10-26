@@ -179,9 +179,21 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
     `MoneyInvariantsIT`); panel `npm run lint` ve `npm run build` başarılı. Satış payı zamanlaması bilinçli olarak satış anıdır;
     PR açıklamasında değiştirilebilir `AT_SALE` kararı belirtilecek.
 
+- **Revizyon PR 4: toplam mal ve dağılım** (`feat/net-worth`). Migration, yeni ortam değişkeni ve seed değişikliği yok.
+  - ADMIN için `GET /api/net-worth`; hareketlerden kasa/banka, brüt stok maliyeti, alacak/verecek, sermaye, dağıtılmamış kâr,
+    açılış karşılığı ve denge farkı hesaplanır. Okuma aynı veritabanı görünümüyle (`REPEATABLE_READ`) yapılır.
+  - Kasa > Varlıklar: sermaye halkası, nakit/bağlı sermaye şeritleri, ortakların hangi araçta ne kadar katkısı olduğu,
+    araç sahiplerinin brüt mal / ödenmemiş senet / net payları. Konsinye stok maliyetine girmez. Denge farkı kırmızı gösterilir.
+  - Açılış bakiyesi ayrı denge kalemidir; masraf dahil net araç varlığı, masraf hariç bağlı sermayeden ayrı gösterilir.
+  - Testler: senetli 2M araçta başlangıçta kişi başına 1M mal / 1M borç / 0 net; 800K ödeme sonrasında 1M / 600K / 400K;
+    tenant izolasyonu, ADMIN/STAFF yetkisi; altın senaryo ve para değişmezlerinin her adımında yeni uç için denge kontrolü.
+  - Görsel tarayıcı kontrolü bekliyor: oturumda bağlı tarayıcı bulunamadı.
+  - Doğrulama: izole `galeri_codex_test` üzerinde `./mvnw -B verify` başarılı (173 test + 19 entegrasyon testi);
+    panel `npm run lint` ve `npm run build` başarılı. Kuruşlu taksitlerin tamamı ödendiğinde sahip borçlarının sıfırlandığı da sınandı.
+
 ## Sıradaki
 
-Revizyon PR 4: toplam mal ve dağılım ekranı (`feat/net-worth`). Ardından PR 5 kâr detayı; yol haritasının raporlar ve ana ekranın son hali galerici geri bildirimiyle planlanacak.
+Revizyon PR 5: kâr detayı (`feat/profit-drilldown`); yol haritasının raporlar ve ana ekranın son hali galerici geri bildirimiyle planlanacak.
 
 Adım 5'ten açık sorular:
 - Komisyon şimdilik dönem net kârına dahil (MIMARI §13); ayrı satırda gösteriliyor.

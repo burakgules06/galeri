@@ -81,6 +81,7 @@ class GoldenScenarioIT {
     @Autowired private VehicleService vehicleService;
     @Autowired private PaymentPlanService paymentPlanService;
     @Autowired private DashboardService dashboardService;
+    @Autowired private com.galeri.app.service.NetWorthService netWorthService;
 
     private final LocalDate today = LocalDate.of(2026, 3, 15);
     private UUID tenant;
@@ -479,6 +480,10 @@ class GoldenScenarioIT {
 
     private void check(String step) {
         new LedgerInvariants(jdbc, capitalService).check(tenant, step);
+        var worth = netWorthService.summary();
+        assertThat(worth.differenceCents()).as("%s: varlik ekrani dengesi", step).isZero();
+        assertThat(worth.cashCents()).isEqualTo(cashBalance());
+        assertThat(worth.bankCents()).isEqualTo(bankBalance());
     }
 
     private void expectMoney(String step, long cashCents, long bankCents) {
