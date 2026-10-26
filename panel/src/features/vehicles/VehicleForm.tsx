@@ -1,6 +1,9 @@
 // Arac ekleme / duzenleme. Sadece ADMIN acar. Tutarlar TL girilir, kurus gonderilir.
-// Sahiplik: galeri (varsayilan), konsinye (sahibi + komisyon; alis bedeli ve odemesi yok), ortakli (ortaklar, toplam %100).
+// Sahiplik: galeri (varsayilan), konsinye (sahibi + komisyon; alis bedeli ve odemesi yok), ortak (Havuz ve/veya ortaklar,
+// katki kaynagi, kar payi orani, dukkan payi: CoOwnersEditor).
 import { useState, type FormEvent } from "react";
+import { CoOwnersEditor } from "./CoOwnersEditor";
+import { initialOwners, initialShopCut, ownersProblem, toShareRequests, type OwnerRow, type ShopCut } from "./coOwners";
 import { MakeModelPicker } from "./MakeModelPicker";
 import type { MakeModelValue } from "./makeModel";
 import { api } from "../../api/galeri";
@@ -17,10 +20,6 @@ import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../share
 import { ContactPicker } from "../contacts/ContactPicker";
 import { row, rowProblem, toRequest, type PlanMode, type PlanRow } from "../payments/plan";
 import { PlanBuilder, PlanSummary } from "../payments/PlanBuilder";
-
-interface ShareRow { key: number; contact: ContactSummary | null; percent: string }
-let shareKey = 0;
-const shareRow = (contact: ContactSummary | null = null, percent = ""): ShareRow => ({ key: ++shareKey, contact, percent });
 
 interface Props {
   open: boolean;
@@ -76,19 +75,21 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const [commissionType, setCommissionType] = useState<CommissionType>(existing?.commissionType ?? "RATE");
   const [commissionRate, setCommissionRate] = useState(bpToInput(existing?.commissionRateBp));
   const [commissionFixed, setCommissionFixed] = useState(centsToInput(existing?.commissionCents));
-  const [shares, setShares] = useState<ShareRow[]>(() => existing?.shares.length
-    ? existing.shares.map((s) => shareRow({ id: s.contactId, name: s.name, phone: null }, bpToInput(s.shareBp)))
-    : [shareRow(), shareRow()]);
+  const [owners, setOwners] = useState<OwnerRow[]>(() => initialOwners(existing));
+  const [profitDiffers, setProfitDiffers] = useState(() => (existing?.shares ?? []).some((s) => s.profitShareBp !== s.shareBp));
+  const [shopCut, setShopCut] = useState<ShopCut>(() => initialShopCut(existing));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const consignment = ownership === "CONSIGNMENT";
-  const shareBps = shares.map((r) => percentToBp(r.percent));
-  const shareTotal = shareBps.reduce<number>((t, b) => t + (b != null && !Number.isNaN(b) ? b : 0), 0);
-  const updateShare = (key: number, change: Partial<ShareRow>) => setShares((l) => l.map((x) => (x.key === key ? { ...x, ...change } : x)));
+  const coOwned = ownership === "CO_OWNED";
 
   const contacts = useLoad(() => api.contacts(), []);
   const staff = useLoad(() => api.staff(), []);
   const accounts = useLoad(() => api.accounts(), []);
+  const partners = useLoad(() => api.partners(), []);
+  // Duzenlemede ortagin bu araca bagli katkisi nakitteki sermayesine eklenerek gosterilir (kayitta yeniden hesaplanir)
+  const boundHere = Object.fromEntries((v?.status === "IN_STOCK" ? existing?.shares ?? [] : [])
+    .filter((s) => s.contactId).map((s) => [s.contactId!, s.contributionCents]));
   const purchaseAccountId = purchaseAccount ?? accounts.data?.[0]?.id ?? "";
   const [extraContacts, setExtraContacts] = useState<ContactResponse[]>([]);
   const allContacts = [...extraContacts, ...(contacts.data ?? [])];
@@ -113,11 +114,9 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       if (commissionType === "RATE" && (rate == null || Number.isNaN(rate))) return setError("Komisyon oranını 3 ya da 2,5 gibi yaz.");
       if (commissionType === "FIXED" && (fixed == null || Number.isNaN(fixed))) return setError("Sabit komisyonu 25.000 gibi yaz.");
     }
-    if (ownership === "CO_OWNED") {
-      if (shares.some((r) => !r.contact)) return setError("Her ortak satırında kişi seç.");
-      if (shareBps.some((b) => b == null || Number.isNaN(b) || b <= 0)) return setError("Ortak paylarını 50 ya da 33,34 gibi yaz.");
-      if (new Set(shares.map((r) => r.contact?.id)).size !== shares.length) return setError("Bir kişi bir kez yazılabilir.");
-      if (shareTotal !== 10000) return setError("Ortak payları toplamı %100 olmalı.");
+    if (coOwned) {
+      const problem = ownersProblem(owners, profitDiffers, price, shopCut);
+      if (problem) return setError(problem);
     }
     if (!consignment && payMode === "PLAN") {
       if (!seller) return setError("Senetli alışta kimden alındığını seç.");
@@ -137,9 +136,12 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       commissionType: consignment ? commissionType : null,
       commissionRateBp: consignment && commissionType === "RATE" ? percentToBp(commissionRate) : null,
       commissionCents: consignment && commissionType === "FIXED" ? tlToCents(commissionFixed) : null,
-      shares: ownership === "CO_OWNED" ? shares.map((r, k) => ({ contactId: r.contact!.id, shareBp: shareBps[k]! })) : null,
+      shares: coOwned ? toShareRequests(owners, profitDiffers) : null,
       addToCatalog: makeModel.addToCatalog,
       catalogModel: makeModel.catalogModel,
+      shopCutType: coOwned && shopCut.enabled ? shopCut.type : null,
+      shopCutRateBp: coOwned && shopCut.enabled && shopCut.type === "RATE" ? percentToBp(shopCut.rate) : null,
+      shopCutCents: coOwned && shopCut.enabled && shopCut.type === "FIXED" ? tlToCents(shopCut.fixed) : null,
     };
     setSaving(true);
     setError(null);
@@ -194,7 +196,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
         <section className="space-y-3">
           <h3 className="font-cond font-semibold text-[18px]">Sahiplik</h3>
           <Segment<Ownership> value={ownership} onChange={setOwnership}
-            options={[{ value: "DEALER", label: "Galeri" }, { value: "CONSIGNMENT", label: "Konsinye" }, { value: "CO_OWNED", label: "Ortaklı" }]} />
+            options={[{ value: "DEALER", label: "Galeri" }, { value: "CONSIGNMENT", label: "Konsinye" }, { value: "CO_OWNED", label: "Ortak" }]} />
           {consignment && (
             <>
               <p className="text-[13px] text-murekkep-2">
@@ -219,32 +221,10 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
               </div>
             </>
           )}
-          {ownership === "CO_OWNED" && (
-            <div className="space-y-2">
-              <p className="text-[13px] text-murekkep-2">Defter galeri aracı gibi işler; satış kârı bu paylarla bölünerek gösterilir.</p>
-              {shares.map((r) => (
-                <div key={r.key} className="grid grid-cols-[1fr_92px_40px] gap-2 items-start">
-                  <ContactPicker contacts={allContacts} selected={r.contact} onSelect={(c) => updateShare(r.key, { contact: c })}
-                    onCreated={(c) => setExtraContacts((l) => [c, ...l])} placeholder="Ortak" />
-                  <div className="relative">
-                    <NumberInput className={`${inputClass} pr-7 text-right`} value={r.percent} placeholder="50" aria-label="Pay yüzdesi" preview={false}
-                      onValueChange={(percent) => updateShare(r.key, { percent })} />
-                    <span className="absolute right-2.5 top-2 text-murekkep-3">%</span>
-                  </div>
-                  <button type="button" aria-label="Ortağı kaldır" disabled={shares.length <= 1}
-                    onClick={() => setShares((l) => l.filter((x) => x.key !== r.key))}
-                    className="basilir h-10 w-10 rounded-lg grid place-items-center text-murekkep-3 hover:bg-yuzey-2 hover:text-tehlike disabled:opacity-30">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-                  </button>
-                </div>
-              ))}
-              <div className="flex items-center justify-between">
-                <Button type="button" variant="quiet" className="h-9 px-2 text-plaka" onClick={() => setShares((l) => [...l, shareRow()])}>+ Ortak ekle</Button>
-                <span className={`text-[14px] font-semibold ${shareTotal === 10000 ? "text-basari" : "text-uyari"}`}>
-                  Toplam %{bpToInput(shareTotal) || "0"}{shareTotal === 10000 ? " ✓" : " · %100 olmalı"}
-                </span>
-              </div>
-            </div>
+          {coOwned && (
+            <CoOwnersEditor rows={owners} onRows={setOwners} profitDiffers={profitDiffers} onProfitDiffers={setProfitDiffers}
+              shopCut={shopCut} onShopCut={setShopCut} priceCents={price} contacts={allContacts}
+              onContactCreated={(c) => setExtraContacts((l) => [c, ...l])} partners={partners.data ?? []} boundHere={boundHere} />
           )}
         </section>
 

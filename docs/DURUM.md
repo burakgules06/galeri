@@ -159,21 +159,36 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
     masraf ekle/düzenle/sil, taksitli satış, tahsilat/geri al, satışı geri al, konsinye, genel gider, kâr payı, sermaye çekişi, düzeltme;
     her adımdan sonra: bakiyeler toplamı 0, toplam mal = sermaye + açılış + dağıtılmamış kâr, rapor kârı − eklenen = defter,
     ortak sermayeleri = defter, plan toplamı = taksitler, ödenmiş taksitin hareketi geçerli ve aynı tutarda, bağsız tahsilat yok.
-  - Eksik: TC0-TC13 altın senaryo (sabit beklenen değerlerle) "Galeri: alım-satım, ödeme ve sermaye senaryoları" belgesi bekleniyor.
-    Ortak bazında "nakitte + araçta bağlı" kontrolü PR 4 (net değer) ile eklenecek; ortaklı araç senaryosu PR 3 ile.
+  - TC0-TC13 altın senaryosu `GoldenScenarioIT` ile gerçek Postgres'te çalışıyor; PR 3 ortak araç adımları ayrıca `CoFinancingIT`'de.
+    PR 3, PR 4'teki varlık/borç denge ekranından bağımsız olarak her ortakta sermaye = nakit + araçta bağlı katkı invariant'ını da sınar.
+
+- **Revizyon PR 3: ortak finansmanı** (`feat/co-financing`). Migration `V10__co_financing.sql`; dev seed ortak sahipleri/kaynaklarıyla güncellendi.
+  Lokal DB'yi sıfırla: `docker compose down -v`, ardından `docker compose up -d`.
+  - `CO_OWNED` artık Havuz ve/veya ortak sahip satırlarından oluşur. Sahiplik ve kâr payı oranları ayrı ayrı toplam 10000 baz puan;
+    Havuz için kişi/cari/sermaye hesabı açılmaz. Eski paylar kâr oranına taşınır, mevcut ortak kayıtları korunur.
+  - Katkı kaynağı `CAPITAL` / `POCKET` / `HYBRID`; katkı ödenmiş alış hareketlerinden hesaplanır. Cepten kısım aynı işlemde
+    `CAPITAL(ortak) → CASH/BANK` olarak yazılır; taksitli alışta her ödeme sahiplik payına göre bölünür, kuruş farkı Havuz'a gider.
+    Nakit sermaye yetersizse 1042. Bağlı sermaye saklanmaz; `ortak sermayesi − stoktaki ortak araç katkısı` ile nakit sermaye bulunur.
+  - Satışta politika `CoOwnerSettlementPolicy` üzerinden `AT_SALE`: alıcı taksitleri beklenmeden `VEHICLE_PROFIT_SHARE` hareketleri
+    yazılır. Ortak kârı sermayeye, zarar katkıya kadar sermayeden; katkıyı aşan zarar ortağın carisine yansır. Havuz payı ve dükkân payı
+    dönem net kârına katılır; ortaklara yazılan kâr payı katılmaz. Satışta ortak başına sermayede bırak / nakit öde / hibrit dönüş seçilir.
+    Satışı geri almadan önce nakit dönüş hareketi düzeltilmeli (1043); geçersiz dönüş 1044.
+  - Havuz kâr ağırlığı sadece ortakların nakitteki sermayesinden hesaplanır. Yeni ortak seçilirse otomatik ortak yapılır. Panel araç formu
+    sahiplik, katkı kaynağı, farklı kâr oranı ve dükkân payını; satış formu ortak dönüşünü sunar.
+  - Doğrulama: izole PostgreSQL `galeri_codex_test` üzerinde `./mvnw -B verify` başarılı (14 `CoFinancingIT`, `GoldenScenarioIT`,
+    `MoneyInvariantsIT`); panel `npm run lint` ve `npm run build` başarılı. Satış payı zamanlaması bilinçli olarak satış anıdır;
+    PR açıklamasında değiştirilebilir `AT_SALE` kararı belirtilecek.
 
 ## Sıradaki
 
-Yol haritasının 6. adımı (raporlar ve ana ekranın son hali) galericiden geri bildirim gelince planlanacak.
+Revizyon PR 4: toplam mal ve dağılım ekranı (`feat/net-worth`). Ardından PR 5 kâr detayı; yol haritasının raporlar ve ana ekranın son hali galerici geri bildirimiyle planlanacak.
 
 Adım 5'ten açık sorular:
-- Özel ortaklı araçların kârı havuz dışı sayıldı (dönem net kârına girmiyor). Galerici farklı düşünüyorsa tek satır değişir.
 - Komisyon şimdilik dönem net kârına dahil (MIMARI §13); ayrı satırda gösteriliyor.
 - Açılış bakiyesi sermaye için yok: sermaye girişi zaten "Sermaye girişi" ile yapılır.
 
 Adım 4B'den açık sorular:
 - Konsinye sahibinin galeriye borcu (yansıtılan masraf) için ayrı "tahsil et" yok; satışta sahibine borçla netleşir. Gerekirse eklenir.
-- Ortaklı aracın ortaklara kâr ödemesi yok (sadece gösterim); ödenirse kişiye "Öde" ile yapılabilir.
 
 Adım 4A'dan açık sorular:
 - Şifre sıfırlama/değiştirme açık oturumları kapatmıyor (token 24 saat geçerli). Gerekirse `panel_user.token_version` ile yapılır.

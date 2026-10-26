@@ -26,11 +26,23 @@ export type BodyPart =
   | "LEFT_FRONT_FENDER" | "LEFT_FRONT_DOOR" | "LEFT_REAR_DOOR" | "LEFT_REAR_FENDER"
   | "RIGHT_FRONT_FENDER" | "RIGHT_FRONT_DOOR" | "RIGHT_REAR_DOOR" | "RIGHT_REAR_FENDER";
 export type ContactType = "PERSON" | "ORGANIZATION";
-// Sahiplik: galeri (varsayilan), konsinye (sahibi bir kisi, galeri komisyon alir), ozel ortakli (paylar).
+// Sahiplik: galeri (varsayilan), konsinye (sahibi bir kisi, galeri komisyon alir), ortak (Havuz ve/veya ortaklar).
 export type Ownership = "DEALER" | "CONSIGNMENT" | "CO_OWNED";
 export type CommissionType = "RATE" | "FIXED";   // RATE: baz puan (%3 = 300), FIXED: kurus
-export interface ShareRequest { contactId: string; shareBp: number }
-export interface ShareResponse { contactId: string; name: string; shareBp: number; profitCents: number | null }
+// Ortak aracta katkinin kaynagi: sermayeden (nakitteki sermaye araca baglanir), cepten (otomatik sermaye girisi), hibrit.
+export type ContributionSource = "CAPITAL" | "POCKET" | "HYBRID";
+/** Ortak aracin sahibi. contactId null = Havuz. profitShareBp null = sahiplik payi. HYBRID'de pocketCents cepten kisim. */
+export interface ShareRequest {
+  contactId: string | null; shareBp: number; profitShareBp: number | null; source: ContributionSource | null; pocketCents: number | null;
+}
+/** contributionCents: odenmis katki. Satilmis aracta profitCents kar payi (dukkan payi dusulmus), receivableCents = katki + kar payi. */
+export interface ShareResponse {
+  contactId: string | null; name: string; shareBp: number; profitShareBp: number; source: ContributionSource; pocketCents: number | null;
+  contributionCents: number; profitCents: number | null; receivableCents: number | null;
+}
+// Ortak arac satisinda ortagin alacagi: sermayede kalsin / nakit ode (tamami) / hibrit (amountCents kadari nakit)
+export type OwnerReturnMode = "KEEP" | "CASH" | "HYBRID";
+export interface OwnerReturnRequest { contactId: string; mode: OwnerReturnMode; amountCents: number | null; accountId: string | null }
 
 export interface DamageSummary { locallyPainted: number; painted: number; replaced: number }
 
@@ -98,7 +110,10 @@ export interface VehicleDetailAdmin {
   commissionType: CommissionType | null;
   commissionRateBp: number | null;
   commissionCents: number | null;
-  shares: ShareResponse[];               // ortakli: ortaklar ve paylari
+  shares: ShareResponse[];               // ortak arac: sahipler (Havuz dahil), paylari ve katkilari
+  shopCutType: CommissionType | null;    // ortak arac: istege bagli dukkan payi
+  shopCutRateBp: number | null;
+  shopCutCents: number | null;
 }
 
 export interface ContactResponse { id: string; name: string; phone: string | null; type: ContactType; notes: string | null }
@@ -165,6 +180,9 @@ export interface VehicleRequest {
   shares: ShareRequest[] | null;
   addToCatalog: boolean | null;   // "Listede yok": once galerinin katalogune eklenir
   catalogModel: string | null;    // kataloga eklenecek temel model (paketsiz)
+  shopCutType: CommissionType | null;   // ortak arac: dukkan payi (ortaklarin kar payindan havuza)
+  shopCutRateBp: number | null;
+  shopCutCents: number | null;
 }
 
 export interface SaleRequest {
@@ -173,6 +191,7 @@ export interface SaleRequest {
   soldById: string | null;
   salePriceCents: number;
   installments: InstallmentRequest[];   // toplami salePriceCents'e kurusu kurusuna esit
+  ownerReturns: OwnerReturnRequest[] | null;   // ortak arac: ortaga donus (bos = sermayede kalir)
 }
 
 // ---- Odeme plani ve taksitler (sadece ADMIN). Tutarlar kurus. ----
@@ -244,7 +263,7 @@ export interface ContactRequest { name: string; phone: string | null; type: Cont
 export type AccountType = "CASH" | "BANK" | "BALANCE" | "CAPITAL" | "VEHICLE" | "EXPENSE" | "INCOME" | "OPENING";
 export type LedgerEntryType =
   | "VEHICLE_PURCHASE" | "VEHICLE_EXPENSE" | "GENERAL_EXPENSE" | "CAPITAL" | "VEHICLE_SALE" | "COLLECTION" | "PAYMENT"
-  | "CONSIGNMENT_SETTLEMENT" | "PROFIT_ALLOCATION" | "TRANSFER" | "OPENING_BALANCE";
+  | "CONSIGNMENT_SETTLEMENT" | "PROFIT_ALLOCATION" | "TRANSFER" | "OPENING_BALANCE" | "VEHICLE_PROFIT_SHARE";
 export type ExpenseRoot = "VEHICLE" | "GENERAL";
 
 export interface AccountSummary { id: string; type: AccountType; name: string }
@@ -281,7 +300,7 @@ export interface VehicleCost {
   commissionCents: number | null;
   ownerPayoutCents: number | null;   // konsinye: sahibine borc (satis - komisyon)
   ownerChargedCents: number;         // konsinye: sahibine yansitilan masraf
-  shares: ShareResponse[];           // ortakli: kardaki paylari
+  shares: ShareResponse[];           // ortak arac: sahipler, katkilar, kar paylari
   entries: LedgerEntryResponse[];
 }
 
@@ -299,8 +318,11 @@ export interface ExpenseRequest {
 export interface ContactPaymentRequest { accountId: string; date: string; amountCents: number; description: string | null }
 
 // ---- Sermaye, donem kari, kasa islemleri (sadece ADMIN). Tutarlar kurus, paylar baz puan. ----
-// Sermaye CAPITAL hareketlerinden hesaplanir, hicbir yerde saklanmaz.
-export interface Partner { contactId: string; name: string; phone: string | null; owner: boolean; capitalCents: number; shareBp: number }
+// Sermaye CAPITAL hareketlerinden hesaplanir, hicbir yerde saklanmaz. Sermaye = nakitteki + araclarda bagli (ortak araclar).
+export interface Partner {
+  contactId: string; name: string; phone: string | null; owner: boolean; capitalCents: number;
+  cashCents: number; boundCents: number; shareBp: number;
+}
 export type CapitalDirection = "IN" | "OUT";
 export interface CapitalMovementRequest { direction: CapitalDirection; accountId: string; date: string; amountCents: number; description: string | null }
 export interface ProfitAllocationRequest { contactId: string; date: string; amountCents: number; periodFrom: string; periodTo: string }
@@ -308,15 +330,22 @@ export interface TransferRequest { fromAccountId: string; toAccountId: string; d
 export type OpeningSide = "RECEIVABLE" | "PAYABLE";
 export interface OpeningBalanceRequest { accountId: string | null; contactId: string | null; side: OpeningSide | null; date: string; amountCents: number }
 
-/** CONSIGNMENT'ta profitCents komisyondur (costCents null). CO_OWNED havuz disi: nete girmez. */
+/**
+ * CONSIGNMENT'ta profitCents komisyondur (costCents null). poolProfitCents havuza kalan: ortak aracta havuz payi + dukkan payi
+ * (ortaklarin payi satista sermayelerine gecti).
+ */
 export interface SoldVehicleProfit {
   vehicle: VehicleRef; ownership: Ownership; saleDate: string; salePriceCents: number; costCents: number | null; profitCents: number;
+  poolProfitCents: number;
 }
 export interface PartnerProfit {
-  contactId: string; name: string; owner: boolean; capitalCents: number; shareBp: number;
+  contactId: string; name: string; owner: boolean;
+  capitalCents: number;     // agirlik: donem sonu nakitteki sermaye (araclarda bagli kisim haric)
+  shareBp: number;
   suggestedCents: number;   // net kar x pay (sadece bilgi)
   allocatedCents: number;   // donem icinde sermayeye eklenen
 }
+/** Havuzun kari: galeri araclari + ortak araclarda havuz payi + komisyon - genel giderler. coOwned: ortaklara yazilan paylar (nete girmez). */
 export interface PeriodProfit {
   from: string; to: string; vehicles: SoldVehicleProfit[];
   vehicleProfitCents: number; commissionCents: number; generalExpenseCents: number; netCents: number;

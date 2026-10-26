@@ -1,5 +1,5 @@
-// Donem kari (MIMARI §5): satilan galeri araclarinin kari + konsinye komisyonu - genel giderler = net.
-// Altinda ortaklarin sermaye payina dusen kisim (sadece bilgi; sistem kar dagitmaz). "Sermayeye ekle" elle girilir.
+// Donem Havuz kari (MIMARI §5): galeri araci kari + ortak aractaki Havuz payi + konsinye komisyonu - genel giderler.
+// Genel donem kari sermayeye otomatik dagitilmaz; ortak aracin ortak payi satis aninda otomatik sermayeye yazilir.
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
 import { addDaysIso, formatDate, percent, shortDate, tl, tlToCents, todayIso, centsToInput } from "../../shared/format";
@@ -76,18 +76,18 @@ function ProfitSummary({ p }: { p: PeriodProfit }) {
     <>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatTile label="Araç kârı" value={tl(p.vehicleProfitCents)} tone={p.vehicleProfitCents >= 0 ? "positive" : "negative"}
-          sub={`${p.vehicles.filter((v) => v.ownership === "DEALER").length} galeri aracı satıldı`} />
+          sub={`${p.vehicles.filter((v) => v.ownership === "DEALER").length} galeri aracı · ${p.vehicles.filter((v) => v.ownership === "CO_OWNED").length} ortak araç Havuz payı`} />
         {/* Komisyon ayri satir: sermaye karina girip girmeyecegi acik soru (MIMARI §13) */}
         <StatTile label="Konsinye komisyonu" value={tl(p.commissionCents)} tone={p.commissionCents > 0 ? "positive" : "neutral"}
           sub={`${p.vehicles.filter((v) => v.ownership === "CONSIGNMENT").length} konsinye satış`} />
         <StatTile label="Genel giderler" value={tl(p.generalExpenseCents)} tone={p.generalExpenseCents > 0 ? "negative" : "neutral"}
           sub="Kira, maaş, galerinin üstlendiği konsinye masrafları" />
         <StatTile label={p.netCents >= 0 ? "Net kâr" : "Net zarar"} value={tl(Math.abs(p.netCents))} tone={p.netCents >= 0 ? "positive" : "negative"}
-          sub="Araç kârı + komisyon − genel gider" />
+          sub="Araç / Havuz kârı + komisyon − genel gider" />
       </div>
       {p.coOwnedProfitCents !== 0 && (
         <p className="text-[13.5px] text-murekkep-2">
-          Özel ortaklı araçların kârı <b className="sayi text-[15px] text-ortakli">{tl(p.coOwnedProfitCents)}</b> ayrı tutulur, net kâra girmez (havuz dışı).
+          Ortaklara sermayeye yazılan kâr / zarar <b className="sayi text-[15px] text-ortakli">{tl(p.coOwnedProfitCents)}</b>; bu tutar Havuz net kârına dahil değildir.
         </p>
       )}
     </>
@@ -132,8 +132,8 @@ function PartnersTable({ p, onAllocate }: { p: PeriodProfit; onAllocate: (x: Par
       <div className="px-4 md:px-5 pt-4 pb-3 border-b border-cizgi">
         <h2 className="font-cond font-bold text-[21px] tracking-tight">Ortakların payı</h2>
         <p className="text-[13px] text-murekkep-2 mt-0.5">
-          Dönem sonundaki sermaye paylarıyla (bu dönemin kârından eklenenler hariç), sadece bilgi. Sistem kâr dağıtmaz;
-          ortaklar karar verince "Sermayeye ekle" ile elle girilir.
+          Dönem sonundaki nakit sermaye ağırlıklarıyla öneri (bu dönemin kârından eklenenler hariç), sadece bilgi. Genel dönem kârı
+          "Sermayeye ekle" ile elle aktarılır; ortak araç kâr payı ise satışta otomatik sermayeye yazılır.
         </p>
       </div>
       {p.partners.length === 0
