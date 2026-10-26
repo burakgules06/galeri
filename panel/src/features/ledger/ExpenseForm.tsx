@@ -1,8 +1,9 @@
 // Masraf girisi: araca bagliysa aracin maliyetine eklenir, degilse genel gider. Odeme kasadan ya da bankadan.
 // Konsinye aracta maliyet yok: masraf ya sahibine yansitilir (sahibi galeriye borclanir) ya da galerinin genel gideridir.
+// existing verilirse duzenleme: form mevcut degerlerle acilir, kaydedince eski kayit terslenir, yenisi yazilir (PUT /api/expenses/{id}).
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
-import { tl, tlToCents, todayIso } from "../../shared/format";
+import { centsToInput, tl, tlToCents, todayIso } from "../../shared/format";
 import type { ExpenseRoot, LedgerEntryResponse, Ownership } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
@@ -17,21 +18,28 @@ interface Props {
   onSaved: (e: LedgerEntryResponse) => void;
   /** Arac detayindan acilinca arac sabittir. */
   vehicle?: VehicleChoice;
+  /** Duzenlenecek masraf (arac ve masraf turu sabit kalir). */
+  existing?: LedgerEntryResponse;
 }
 
 export function ExpenseForm(props: Props) {
   return props.open ? <ExpenseFormContent {...props} /> : null;
 }
 
-function ExpenseFormContent({ onClose, onSaved, vehicle }: Props) {
+function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing }: Props) {
+  // Duzenlemede arac kaydin kendisinden; aracin maliyet hesabina gitmeyen arac masrafi konsinye aractadir
+  const vehicle: VehicleChoice | undefined = existing?.vehicle
+    ? { ...existing.vehicle, ownership: fixedVehicle?.ownership ?? (existing.target.type !== "VEHICLE" ? "CONSIGNMENT" : undefined) }
+    : fixedVehicle;
+  const locked = !!existing;
   const [root, setRoot] = useState<ExpenseRoot>(vehicle ? "VEHICLE" : "GENERAL");
   const [vehicleId, setVehicleId] = useState(vehicle?.id ?? "");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("");
-  const [accountId, setAccountId] = useState("");
-  const [date, setDate] = useState(todayIso());
-  const [description, setDescription] = useState("");
-  const [chargeToOwner, setChargeToOwner] = useState(false);
+  const [amount, setAmount] = useState(existing ? centsToInput(existing.amountCents) : "");
+  const [category, setCategory] = useState(existing?.category ?? "");
+  const [accountId, setAccountId] = useState(existing?.source.id ?? "");
+  const [date, setDate] = useState(existing?.date ?? todayIso());
+  const [description, setDescription] = useState(existing?.description ?? "");
+  const [chargeToOwner, setChargeToOwner] = useState(existing?.target.type === "BALANCE");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -51,12 +59,13 @@ function ExpenseFormContent({ onClose, onSaved, vehicle }: Props) {
     setSaving(true);
     setError(null);
     try {
-      onSaved(await api.addExpense({
+      const request = {
         date, sourceAccountId: selectedAccount, amountCents: cents,
         vehicleId: root === "VEHICLE" ? vehicleId : null, categoryId: null, categoryName: category.trim(),
         description: description.trim() || null,
         chargeToOwner: consignment ? chargeToOwner : null,
-      }));
+      };
+      onSaved(await (existing ? api.updateExpense(existing.id, request) : api.addExpense(request)));
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -65,15 +74,16 @@ function ExpenseFormContent({ onClose, onSaved, vehicle }: Props) {
   };
 
   return (
-    <Modal title={vehicle ? `Masraf ekle · ${vehicle.plate}` : "Masraf ekle"} open onClose={onClose}
+    <Modal title={`${locked ? "Masrafı düzenle" : "Masraf ekle"}${vehicle ? ` · ${vehicle.plate}` : ""}`} open onClose={onClose}
       footer={<>
         <Button variant="secondary" type="button" onClick={onClose}>Vazgeç</Button>
-        <Button type="submit" form="expense-form" disabled={saving}>{saving ? "Kaydediliyor…" : "Masrafı kaydet"}</Button>
+        <Button type="submit" form="expense-form" disabled={saving}>{saving ? "Kaydediliyor…" : locked ? "Değişikliği kaydet" : "Masrafı kaydet"}</Button>
       </>}>
       <form id="expense-form" onSubmit={submit} className="space-y-4">
         <ErrorBox message={error} />
+        {locked && <p className="text-[13.5px] text-murekkep-2">Kaydedince eski kayıt ters kayıtla kapanır, yeni değerlerle yeni kayıt yazılır.</p>}
 
-        {!vehicle && (
+        {!vehicle && !locked && (
           <Field label="Masraf türü">
             <Segment<ExpenseRoot> value={root} onChange={(r) => { setRoot(r); setCategory(""); }}
               options={[{ value: "GENERAL", label: "Genel gider" }, { value: "VEHICLE", label: "Araca bağlı" }]} />

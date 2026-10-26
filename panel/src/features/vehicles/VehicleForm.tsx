@@ -205,7 +205,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
                 </Field>
                 {commissionType === "RATE"
                   ? <Field label="Oran" hint="Satış bedelinin yüzdesi">
-                      <NumberInput value={commissionRate} onValueChange={setCommissionRate} placeholder="3" />
+                      <NumberInput value={commissionRate} onValueChange={setCommissionRate} placeholder="3" preview={false} />
                     </Field>
                   : <Field label="Tutar" hint="TL">
                       <NumberInput value={commissionFixed} onValueChange={setCommissionFixed} placeholder="25.000" />
@@ -221,7 +221,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
                   <ContactPicker contacts={allContacts} selected={r.contact} onSelect={(c) => updateShare(r.key, { contact: c })}
                     onCreated={(c) => setExtraContacts((l) => [c, ...l])} placeholder="Ortak" />
                   <div className="relative">
-                    <NumberInput className={`${inputClass} pr-7 text-right`} value={r.percent} placeholder="50" aria-label="Pay yüzdesi"
+                    <NumberInput className={`${inputClass} pr-7 text-right`} value={r.percent} placeholder="50" aria-label="Pay yüzdesi" preview={false}
                       onValueChange={(percent) => updateShare(r.key, { percent })} />
                     <span className="absolute right-2.5 top-2 text-murekkep-3">%</span>
                   </div>

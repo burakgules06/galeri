@@ -137,6 +137,18 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
   yazarken `1.250.000,50` / `64.000` / `0530 111 22 33`. Önceden "1250.50" yazılınca noktalar silinip 125.050 TL oluyordu;
   artık nokta yok sayılır ve kullanıcı farkı ekranda görür. Kuralı `design/README.md` "Sayı girişi". Sadece panel.
 
+- **Revizyon PR 1: hızlı düzeltmeler** (`fix/quick-fixes`; talimat `revizyon-ortak-finansman.md`). Migration yok, seed değişmedi.
+  - Masraf düzenle / sil: `PUT /api/expenses/{id}` (eski kayıt terslenir + yeni kayıt, tek transaction), `DELETE /api/expenses/{id}`
+    (ters kayıt). Sadece geçerli `VEHICLE_EXPENSE` / `GENERAL_EXPENSE`; başka hareket 1040, iki kez silme 1015. Defter değişmez.
+    Panelde masraflarda "Düzenle / Sil", düzeltme çiftleri varsayılan gizli ("Düzeltmeleri göster"), Maliyet kartı ve Kasa aynı.
+  - Eşzamanlılık: taksit tahsilatı koşullu güncelleme (`markPaid ... where paid_entry_id is null`; 0 satır → 1019, transaction geri
+    alınır). Sermaye çekişinde sermaye hesabı `SELECT … FOR UPDATE`. Ters kayıtta hareket satırı kilitlenir (aynı kayıt iki kez terslenmez).
+    Gerçek Postgres testi: `ConcurrentCollectTest`.
+  - Kişi / kurum seçicide "+ Yeni kişi / kurum" (plan kurucudaki kurum seçicileri dahil).
+  - Tutar alanında önizleme ve "Kuruş için virgül kullanın" uyarısı. `NumberInput`'ta tümü değiştirilen değerden rakam silen hata düzeltildi.
+  - Not: iki istek aynı kişinin carisini ilk kez aynı anda açarsa tekillik kısıtı ikincisini 500 ile reddeder (veri bozulmaz). Gerçek
+    akışta cari satışta açıldığı için tahsilatta görülmez; gerekirse "insert … on conflict" ile çözülür.
+
 ## Sıradaki
 
 Yol haritasının 6. adımı (raporlar ve ana ekranın son hali) galericiden geri bildirim gelince planlanacak.

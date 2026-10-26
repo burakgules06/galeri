@@ -62,6 +62,9 @@ export const api = {
     apiFetch<LedgerEntryResponse[]>(`/api/ledger-entries${accountId ? `?accountId=${accountId}` : ""}`),
   correctEntry: (id: string) => apiFetch<LedgerEntryResponse>(`/api/ledger-entries/${id}/correct`, { method: "POST" }),
   addExpense: (request: ExpenseRequest) => apiFetch<LedgerEntryResponse>("/api/expenses", json(request)),
+  // Duzenle: eski kayit terslenir + yeni kayit; sil: ters kayit (defter degismez)
+  updateExpense: (id: string, request: ExpenseRequest) => apiFetch<LedgerEntryResponse>(`/api/expenses/${id}`, json(request, "PUT")),
+  deleteExpense: (id: string) => apiFetch<LedgerEntryResponse>(`/api/expenses/${id}`, { method: "DELETE" }),
   categories: (root: ExpenseRoot) => apiFetch<CategoryResponse[]>(`/api/expense-categories?root=${root}`),
   vehicleCost: (vehicleId: string) => apiFetch<VehicleCost>(`/api/vehicles/${vehicleId}/cost`),
   // Kullanicilar (sadece ADMIN) ve herkesin kendi sifresi

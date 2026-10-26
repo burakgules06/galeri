@@ -57,6 +57,12 @@ Kalınlık, incelik ve renk birlikte hiyerarşi kurar: etiket soluk ve küçük,
   Tutar `1.250.000,50` (binlik nokta, kuruş virgül, en fazla 2 hane; nokta yazılırsa yok sayılır), kilometre ve adet `64.000`,
   telefon `0530 111 22 33`. Değer biçimli metindir; tutar `tlToCents`, sayı noktaları atılarak okunur. Model yılı gruplanmaz.
   Düz `<input inputMode="decimal">` ile tutar alanı yazılmaz.
+  Tutarın altında soluk önizleme (`125.050,00 TL`); noktadan sonra 1-2 rakam yazılıp bırakıldıysa turuncu uyarı
+  ("Kuruş için virgül kullanın"). Yüzde gibi tutar olmayan alanlarda `preview={false}`.
+- **Kişi / kurum seçici** (`ContactPicker`): listenin altında her zaman "+ Yeni kişi" (kurumda "+ Yeni kurum"); ad yazılır, kayıt
+  oluşur ve seçilir, form kapanmaz. Kurum seçimi `kind="ORGANIZATION"`.
+- **Defter listesi** (`LedgerEntryList`): masrafta "Düzenle / Sil", diğer hareketlerde "Düzelt". Düzeltilmiş kayıt + düzeltmesi
+  varsayılan gizli, "Düzeltmeleri göster" ile görünür. Silme onayı satır içinde (tarayıcı `confirm` kullanılmaz).
 
 ## Yerleşim ve mobil
 
