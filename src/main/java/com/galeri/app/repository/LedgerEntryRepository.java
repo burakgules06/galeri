@@ -4,13 +4,16 @@ import com.galeri.app.model.entity.LedgerEntry;
 import com.galeri.app.model.enums.AccountType;
 import com.galeri.app.model.enums.LedgerEntryType;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> {
@@ -72,6 +75,14 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> 
     List<LedgerEntry> vehicleEntries(@Param("vehicleId") UUID vehicleId);
 
     boolean existsByCorrectedEntryId(UUID entryId);
+
+    /**
+     * Hareketi satir kilidiyle okur (SELECT ... FOR UPDATE): ayni hareket iki istekte birden terslenmesin.
+     * Kilit satiri degistirmez; hareket tablosunun UPDATE/DELETE yasagi (trigger) etkilenmez.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select e from LedgerEntry e where e.id = :id")
+    Optional<LedgerEntry> lockById(@Param("id") UUID id);
 
     @Query("select e.correctedEntryId from LedgerEntry e where e.correctedEntryId in :ids")
     List<UUID> correctedIds(@Param("ids") Collection<UUID> ids);

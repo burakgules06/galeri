@@ -2,7 +2,8 @@
 // arac formundaki planli alis ayni bileseni kullanir; fark sadece etiketler ve izin verilen secenekler.
 import { useState } from "react";
 import { addMonthsIso, centsToInput, METHOD, tl, tlToCents } from "../../shared/format";
-import type { AccountResponse, ContactResponse, PaymentMethod } from "../../shared/types";
+import type { AccountResponse, ContactResponse, ContactSummary, PaymentMethod } from "../../shared/types";
+import { ContactPicker } from "../contacts/ContactPicker";
 import { Button, Field, inputClass, Segment } from "../../shared/ui/Common";
 import { cashPlan, installmentPlan, institutionPlan, row, rowProblem, type PlanMode, type PlanRow } from "./plan";
 import { NumberInput } from "../../shared/ui/NumberInput";
@@ -30,6 +31,10 @@ export function PlanBuilder({
 }) {
   const firstAccount = accounts[0]?.id ?? "";
   const problems = rows.map(rowProblem);
+  // "+ Yeni kurum" ile eklenenler hemen listede olsun (form kapanmaz)
+  const [newOrgs, setNewOrgs] = useState<ContactResponse[]>([]);
+  const orgs = [...newOrgs, ...organizations.filter((o) => !newOrgs.some((n) => n.id === o.id))];
+  const orgCreated = (c: ContactResponse) => setNewOrgs((l) => [c, ...l]);
 
   const choose = (m: PlanMode) => {
     onMode(m);
@@ -45,7 +50,7 @@ export function PlanBuilder({
         <InstallmentGenerator price={baseCents} date={date} account={firstAccount} methods={methods} downHint={downHint} onBuild={onRows} />
       )}
       {mode === "INSTITUTION" && (
-        <InstitutionGenerator price={baseCents} date={date} account={firstAccount} organizations={organizations} downHint={downHint} onBuild={onRows} />
+        <InstitutionGenerator price={baseCents} date={date} account={firstAccount} organizations={orgs} onOrgCreated={orgCreated} downHint={downHint} onBuild={onRows} />
       )}
       {mode == null && <p className="text-[13.5px] text-murekkep-3">Bir seçenek seç; satırlar oluşur, sonra düzenleyebilirsin.</p>}
 
@@ -55,7 +60,7 @@ export function PlanBuilder({
             <span>Vade</span><span>Tutar</span><span>Yöntem</span><span>Ayrıntı</span><span />
           </div>
           {rows.map((r, k) => (
-            <RowEditor key={r.key} r={r} problem={problems[k]} accounts={accounts} organizations={organizations} methods={methods}
+            <RowEditor key={r.key} r={r} problem={problems[k]} accounts={accounts} organizations={orgs} onOrgCreated={orgCreated} methods={methods}
               paidNowLabel={paidNowLabel} onChange={(patch) => update(r.key, patch)} onRemove={() => onRows(rows.filter((x) => x.key !== r.key))} />
           ))}
         </div>
@@ -114,32 +119,29 @@ function InstallmentGenerator({ price, date, account, methods, downHint, onBuild
   );
 }
 
-function InstitutionGenerator({ price, date, account, organizations, downHint, onBuild }: {
-  price: number; date: string; account: string; organizations: ContactResponse[]; downHint: string; onBuild: (rows: PlanRow[]) => void;
+function InstitutionGenerator({ price, date, account, organizations, onOrgCreated, downHint, onBuild }: {
+  price: number; date: string; account: string; organizations: ContactResponse[]; onOrgCreated: (c: ContactResponse) => void;
+  downHint: string; onBuild: (rows: PlanRow[]) => void;
 }) {
   const [down, setDown] = useState("");
-  const [orgId, setOrgId] = useState("");
+  const [org, setOrg] = useState<ContactSummary | null>(null);
   const [due, setDue] = useState(date);
   const downCents = tlToCents(down) ?? 0;
-  const org = organizations.find((o) => o.id === orgId) ?? null;
   const valid = price > 0 && !Number.isNaN(downCents) && downCents < price && !!org;
 
   return (
     <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
       <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
         <Field label="Peşinat (alıcıdan)" hint={downHint}><NumberInput value={down} onValueChange={setDown} placeholder="290.000" /></Field>
-        <Field label="Kurum" hint={organizations.length ? undefined : "Kişiler'de kurum ekle"}>
-          <select className={inputClass} value={orgId} onChange={(e) => setOrgId(e.target.value)}>
-            <option value="">Seç</option>
-            {organizations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-          </select>
+        <Field label="Kurum">
+          <ContactPicker kind="ORGANIZATION" contacts={organizations} selected={org} onSelect={setOrg} onCreated={onOrgCreated} placeholder="Evim şirketi, banka…" />
         </Field>
         <Field label="Kurumun ödeme tarihi"><input type="date" className={inputClass} value={due} onChange={(e) => setDue(e.target.value)} /></Field>
       </div>
       <div className="flex items-center justify-between gap-2">
         <p className="text-[13px] text-murekkep-2">{valid ? <>Kurumdan {tl(price - downCents)}; bu kısım {org?.name} carisine yazılır.</> : "Bedel ve kurum gerekli."}</p>
         <Button type="button" disabled={!valid}
-          onClick={() => onBuild(institutionPlan(price, downCents, org && { id: org.id, name: org.name, phone: org.phone }, due, date, account))}>
+          onClick={() => onBuild(institutionPlan(price, downCents, org, due, date, account))}>
           Planı kur
         </Button>
       </div>
@@ -147,8 +149,9 @@ function InstitutionGenerator({ price, date, account, organizations, downHint, o
   );
 }
 
-function RowEditor({ r, problem, accounts, organizations, methods, paidNowLabel, onChange, onRemove }: {
-  r: PlanRow; problem: string | null; accounts: AccountResponse[]; organizations: ContactResponse[]; methods: PaymentMethod[];
+function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods, paidNowLabel, onChange, onRemove }: {
+  r: PlanRow; problem: string | null; accounts: AccountResponse[]; organizations: ContactResponse[];
+  onOrgCreated: (c: ContactResponse) => void; methods: PaymentMethod[];
   paidNowLabel: string; onChange: (patch: Partial<PlanRow>) => void; onRemove: () => void;
 }) {
   const [text, setText] = useState(centsToInput(r.amountCents));
@@ -169,11 +172,10 @@ function RowEditor({ r, problem, accounts, organizations, methods, paidNowLabel,
       </select>
       <div className="col-span-2 md:col-span-1 flex flex-wrap items-center gap-2 min-w-0">
         {r.method === "INSTITUTION" && (
-          <select className={`${inputClass} h-9 md:w-40`} value={r.payer?.id ?? ""} aria-label="Kurum"
-            onChange={(e) => { const o = organizations.find((x) => x.id === e.target.value); onChange({ payer: o ? { id: o.id, name: o.name, phone: o.phone } : null }); }}>
-            <option value="">Kurum seç</option>
-            {organizations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-          </select>
+          <div className="w-full md:w-48">
+            <ContactPicker kind="ORGANIZATION" className={`${inputClass} h-9`} contacts={organizations} selected={r.payer}
+              onSelect={(c) => onChange({ payer: c })} onCreated={onOrgCreated} placeholder="Kurum seç" />
+          </div>
         )}
         {r.method === "PROMISSORY_NOTE" && (
           <input className={`${inputClass} h-9 md:w-32`} value={r.noteNo} onChange={(e) => onChange({ noteNo: e.target.value })} placeholder="Senet no" aria-label="Senet no" />

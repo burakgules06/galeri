@@ -7,6 +7,7 @@ import com.galeri.app.exception.runtime.EntryAlreadyCorrectedException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidCategoryException;
 import com.galeri.app.exception.runtime.LinkedEntryException;
+import com.galeri.app.exception.runtime.NotAnExpenseException;
 import com.galeri.app.exception.runtime.OpeningBalanceExistsException;
 import com.galeri.app.exception.runtime.SameAccountException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
@@ -237,7 +238,7 @@ class LedgerServiceImplTest {
     @Test
     void duzelt_tersYondeAyniTutardaHareketAtar() {
         LedgerEntry original = entry(LedgerEntryType.GENERAL_EXPENSE, cash, expense, 4000000L);
-        when(entryRepository.findById(original.getId())).thenReturn(Optional.of(original));
+        when(entryRepository.lockById(original.getId())).thenReturn(Optional.of(original));
         when(entryRepository.existsByCorrectedEntryId(original.getId())).thenReturn(false);
 
         LedgerEntryResponse reversal = service.correct(original.getId());
@@ -253,7 +254,7 @@ class LedgerServiceImplTest {
     @Test
     void duzeltilmisHareket_tekrarDuzeltilemez() {
         LedgerEntry original = entry(LedgerEntryType.GENERAL_EXPENSE, cash, expense, 100L);
-        when(entryRepository.findById(original.getId())).thenReturn(Optional.of(original));
+        when(entryRepository.lockById(original.getId())).thenReturn(Optional.of(original));
         when(entryRepository.existsByCorrectedEntryId(original.getId())).thenReturn(true);
 
         assertThatThrownBy(() -> service.correct(original.getId())).isInstanceOf(EntryAlreadyCorrectedException.class);
@@ -264,7 +265,7 @@ class LedgerServiceImplTest {
     void duzeltmeHareketi_duzeltilemez() {
         LedgerEntry reversal = entry(LedgerEntryType.GENERAL_EXPENSE, expense, cash, 100L);
         reversal.setCorrectedEntryId(UUID.randomUUID());
-        when(entryRepository.findById(reversal.getId())).thenReturn(Optional.of(reversal));
+        when(entryRepository.lockById(reversal.getId())).thenReturn(Optional.of(reversal));
 
         assertThatThrownBy(() -> service.correct(reversal.getId())).isInstanceOf(CorrectionNotCorrectableException.class);
     }
@@ -272,7 +273,7 @@ class LedgerServiceImplTest {
     @Test
     void satisHareketi_kasaEkranindanDuzeltilemez() {
         LedgerEntry sale = entry(LedgerEntryType.VEHICLE_SALE, expense, cash, 100L);
-        when(entryRepository.findById(sale.getId())).thenReturn(Optional.of(sale));
+        when(entryRepository.lockById(sale.getId())).thenReturn(Optional.of(sale));
 
         assertThatThrownBy(() -> service.correct(sale.getId())).isInstanceOf(LinkedEntryException.class);
         verify(entryRepository, never()).save(any());
@@ -281,7 +282,7 @@ class LedgerServiceImplTest {
     @Test
     void taksiteBagliTahsilat_kasaEkranindanDuzeltilemez() {
         LedgerEntry collection = entry(LedgerEntryType.COLLECTION, expense, cash, 100L);
-        when(entryRepository.findById(collection.getId())).thenReturn(Optional.of(collection));
+        when(entryRepository.lockById(collection.getId())).thenReturn(Optional.of(collection));
         when(installmentRepository.existsByPaidEntryId(collection.getId())).thenReturn(true);
 
         assertThatThrownBy(() -> service.correct(collection.getId())).isInstanceOf(LinkedEntryException.class);
@@ -291,7 +292,7 @@ class LedgerServiceImplTest {
     void planliAlisHareketi_kasaEkranindanDuzeltilemez() {
         Account sellerBalance = account(AccountType.BALANCE, tenantId);
         LedgerEntry purchase = entry(LedgerEntryType.VEHICLE_PURCHASE, sellerBalance, cash, 100L);
-        when(entryRepository.findById(purchase.getId())).thenReturn(Optional.of(purchase));
+        when(entryRepository.lockById(purchase.getId())).thenReturn(Optional.of(purchase));
 
         assertThatThrownBy(() -> service.correct(purchase.getId())).isInstanceOf(LinkedEntryException.class);
     }
@@ -613,9 +614,81 @@ class LedgerServiceImplTest {
     void konsinyeBorcHareketi_kasaEkranindanDuzeltilemez() {
         Account ownerBalance = account(AccountType.BALANCE, tenantId);
         LedgerEntry e = entry(LedgerEntryType.CONSIGNMENT_SETTLEMENT, ownerBalance, account(AccountType.INCOME, tenantId), 100L);
-        when(entryRepository.findById(e.getId())).thenReturn(Optional.of(e));
+        when(entryRepository.lockById(e.getId())).thenReturn(Optional.of(e));
 
         assertThatThrownBy(() -> service.correct(e.getId())).isInstanceOf(LinkedEntryException.class);
+    }
+
+    // ------------------------------------------------------------------ masraf duzenle / sil
+
+    /** Hareketlerin bir hesaba etkisi: giren arti, cikan eksi. */
+    private static long effectOn(List<LedgerEntry> entries, Account account) {
+        long sum = 0;
+        for (LedgerEntry e : entries) {
+            if (e.getTargetAccount() == account) sum += e.getAmountCents();
+            if (e.getSourceAccount() == account) sum -= e.getAmountCents();
+        }
+        return sum;
+    }
+
+    @Test
+    void masrafDuzenleme_eskiTerslenirYeniYazilir_maliyetVeKasaDogruDegisir() {
+        Vehicle vehicle = vehicle();
+        Account vehicleAcc = vehicleAccount(vehicle);
+        Account bank = account(AccountType.BANK, tenantId);
+        when(accountRepository.findById(bank.getId())).thenReturn(Optional.of(bank));
+        when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
+        when(accountRepository.findByVehicleId(vehicle.getId())).thenReturn(Optional.of(vehicleAcc));
+        when(categoryRepository.findFirstByTenantIdAndRootAndParentIdIsNullAndNameIgnoreCase(tenantId, ExpenseRoot.VEHICLE, "Boya"))
+                .thenReturn(Optional.of(category(ExpenseRoot.VEHICLE, "Boya", null)));
+        LedgerEntry original = entry(LedgerEntryType.VEHICLE_EXPENSE, cash, vehicleAcc, 500000L);
+        original.setVehicle(vehicle);
+        when(entryRepository.lockById(original.getId())).thenReturn(Optional.of(original));
+
+        // 5.000 TL kasadan -> 3.000 TL bankadan
+        service.updateExpense(original.getId(), expenseRequest(bank.getId(), 300000L, vehicle.getId(), "Boya"));
+
+        ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
+        verify(entryRepository, times(2)).save(saved.capture());
+        List<LedgerEntry> written = saved.getAllValues();
+        assertThat(written.get(0).getCorrectedEntryId()).isEqualTo(original.getId());   // once ters kayit
+        assertThat(written.get(1).getCorrectedEntryId()).isNull();                      // sonra yeni masraf
+        List<LedgerEntry> all = new java.util.ArrayList<>(written);
+        all.add(original);
+        assertThat(effectOn(all, vehicleAcc)).isEqualTo(300000L);   // aracin maliyetinde artik 3.000
+        assertThat(effectOn(all, cash)).isZero();                   // kasaya 5.000 geri dondu
+        assertThat(effectOn(all, bank)).isEqualTo(-300000L);        // bankadan 3.000 cikti
+    }
+
+    @Test
+    void masrafSilme_tersKayitla_maliyetVeKasaGeriAlinir_ikinciSilmeReddedilir() {
+        Vehicle vehicle = vehicle();
+        Account vehicleAcc = vehicleAccount(vehicle);
+        LedgerEntry original = entry(LedgerEntryType.VEHICLE_EXPENSE, cash, vehicleAcc, 500000L);
+        when(entryRepository.lockById(original.getId())).thenReturn(Optional.of(original));
+
+        service.deleteExpense(original.getId());
+
+        ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
+        verify(entryRepository).save(saved.capture());
+        LedgerEntry reversal = saved.getValue();
+        assertThat(reversal.getCorrectedEntryId()).isEqualTo(original.getId());
+        assertThat(effectOn(List.of(original, reversal), vehicleAcc)).isZero();
+        assertThat(effectOn(List.of(original, reversal), cash)).isZero();
+
+        when(entryRepository.existsByCorrectedEntryId(original.getId())).thenReturn(true);
+        assertThatThrownBy(() -> service.deleteExpense(original.getId())).isInstanceOf(EntryAlreadyCorrectedException.class);
+        assertThatThrownBy(() -> service.updateExpense(original.getId(), expenseRequest(cash.getId(), 1L, null, "Kira")))
+                .isInstanceOf(EntryAlreadyCorrectedException.class);
+    }
+
+    @Test
+    void masrafOlmayanHareket_duzenlenipSilinemez() {
+        LedgerEntry sale = entry(LedgerEntryType.VEHICLE_SALE, account(AccountType.INCOME, tenantId), account(AccountType.BALANCE, tenantId), 100L);
+        when(entryRepository.lockById(sale.getId())).thenReturn(Optional.of(sale));
+
+        assertThatThrownBy(() -> service.deleteExpense(sale.getId())).isInstanceOf(NotAnExpenseException.class);
+        verify(entryRepository, never()).save(any());
     }
 
     // ------------------------------------------------------------------ kasa islemleri

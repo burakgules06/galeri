@@ -318,8 +318,11 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         Vehicle vehicle = vehicleRepository.findById(plan.getVehicleId()).orElseThrow(RecordNotFoundException::new);
         LedgerEntry entry = ledgerService.writeSettlement(plan.getDirection(), vehicle, i.getPayer(), r.accountId(),
                 i.getAmountCents(), r.date(), description(plan.getDirection(), i.getMethod()));
-        i.setPaidEntryId(entry.getId());
-        i.setPaidAt(now());
+        OffsetDateTime paidAt = now();
+        // Kosullu guncelleme: baska bir istek ayni anda tahsil ettiyse 0 satir; hata transaction'i (tahsilat hareketiyle) geri alir
+        if (installmentRepository.markPaid(i.getId(), entry.getId(), paidAt) == 0) throw new InstallmentAlreadyPaidException();
+        i.setPaidEntryId(entry.getId());   // bellekteki nesne de guncel (ayni degerler; ek UPDATE zararsiz)
+        i.setPaidAt(paidAt);
         return single(i, vehicle);
     }
 

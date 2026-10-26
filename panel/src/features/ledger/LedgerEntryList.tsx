@@ -1,4 +1,6 @@
-// Defter hareketleri. Hareket silinmez: "Düzelt" ayni tutarda ters hareket atar, asil satir gri ve ustu cizili kalir.
+// Defter hareketleri. Hareket silinmez: masrafta "Düzenle" eski kaydi tersleyip yenisini yazar, "Sil" ters kayit atar;
+// diger hareketlerde "Düzelt" ayni tutarda ters hareket atar. Duzeltilmis kayit + duzeltmesi varsayilan olarak gizli,
+// "Düzeltmeleri göster" ile gri ve ustu cizili gorunur. Maliyet karti ve Kasa listesi bu bileseni kullanir.
 import { useState } from "react";
 import { api } from "../../api/galeri";
 import { ENTRY_TYPE, shortDate, tl } from "../../shared/format";
@@ -6,9 +8,11 @@ import type { LedgerEntryResponse, LedgerEntryType } from "../../shared/types";
 import { errorMessage } from "../../shared/useLoad";
 import { Plate } from "../../shared/ui/Plate";
 import { Button, ErrorBox } from "../../shared/ui/Common";
+import { ExpenseForm } from "./ExpenseForm";
 
 // Satis ve taksit hareketleri plana bagli: arac detayindan / odemeler ekranindan geri alinir, burada duzeltilmez.
-const LINKED: LedgerEntryType[] = ["VEHICLE_SALE", "COLLECTION", "PAYMENT"];
+const LINKED: LedgerEntryType[] = ["VEHICLE_SALE", "COLLECTION", "PAYMENT", "CONSIGNMENT_SETTLEMENT"];
+const EXPENSE: LedgerEntryType[] = ["VEHICLE_EXPENSE", "GENERAL_EXPENSE"];
 
 export function LedgerEntryList({ entries, direction, onChange, showVehicle = true }: {
   entries: LedgerEntryResponse[];
@@ -17,26 +21,46 @@ export function LedgerEntryList({ entries, direction, onChange, showVehicle = tr
   onChange: () => void;
   showVehicle?: boolean;
 }) {
+  const [showCorrections, setShowCorrections] = useState(false);
+  const hidden = entries.filter((e) => e.corrected || e.correctedEntryId != null).length;
+  const visible = showCorrections ? entries : entries.filter((e) => !e.corrected && e.correctedEntryId == null);
+
   return (
-    <ul className="divide-y divide-cizgi">
-      {entries.map((e) => <Row key={e.id} e={e} direction={direction(e)} onChange={onChange} showVehicle={showVehicle} />)}
-    </ul>
+    <div>
+      {hidden > 0 && (
+        <label className="mb-2 inline-flex items-center gap-2 text-[13px] font-semibold text-murekkep-2 cursor-pointer select-none">
+          <input type="checkbox" className="accent-plaka w-4 h-4" checked={showCorrections} onChange={(e) => setShowCorrections(e.target.checked)} />
+          Düzeltmeleri göster ({hidden})
+        </label>
+      )}
+      {visible.length === 0
+        ? <p className="text-[14px] text-murekkep-3">Gösterilecek kayıt yok.</p>
+        : (
+          <ul className="divide-y divide-cizgi">
+            {visible.map((e) => <Row key={e.id} e={e} direction={direction(e)} onChange={onChange} showVehicle={showVehicle} />)}
+          </ul>
+        )}
+    </div>
   );
 }
 
 function Row({ e, direction, onChange, showVehicle }: { e: LedgerEntryResponse; direction: number; onChange: () => void; showVehicle: boolean }) {
   const [confirming, setConfirming] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isReversal = e.correctedEntryId != null;
   const cancelled = e.corrected;
+  const active = !isReversal && !cancelled;
+  const expense = EXPENSE.includes(e.type);
+  const correctable = active && !expense && !LINKED.includes(e.type) && !(e.type === "VEHICLE_PURCHASE" && e.source.type === "BALANCE");
   const title = e.category ?? (e.type === "CAPITAL" ? `Sermaye · ${e.source.name}` : ENTRY_TYPE[e.type]);
 
-  const correct = async () => {
+  const reverse = async () => {
     setWorking(true);
     setError(null);
     try {
-      await api.correctEntry(e.id);
+      await (expense ? api.deleteExpense(e.id) : api.correctEntry(e.id));
       setConfirming(false);
       onChange();
     } catch (err) {
@@ -73,8 +97,13 @@ function Row({ e, direction, onChange, showVehicle }: { e: LedgerEntryResponse; 
           <p className={`font-cond font-semibold text-[19px] whitespace-nowrap ${amountColor} ${cancelled ? "line-through" : ""}`}>
             {sign}{sign && " "}{tl(e.amountCents)}
           </p>
-          {!isReversal && !cancelled && !confirming && !LINKED.includes(e.type)
-            && !(e.type === "VEHICLE_PURCHASE" && e.source.type === "BALANCE") && (
+          {active && expense && !confirming && (
+            <span className="inline-flex gap-3">
+              <button type="button" onClick={() => setEditing(true)} className="text-[13px] font-semibold text-plaka hover:underline">Düzenle</button>
+              <button type="button" onClick={() => setConfirming(true)} className="text-[13px] font-semibold text-tehlike hover:underline">Sil</button>
+            </span>
+          )}
+          {correctable && !confirming && (
             <button type="button" onClick={() => setConfirming(true)} className="text-[13px] font-semibold text-murekkep-2 hover:text-murekkep">
               Düzelt
             </button>
@@ -83,14 +112,17 @@ function Row({ e, direction, onChange, showVehicle }: { e: LedgerEntryResponse; 
       </div>
       {confirming && (
         <div className="mt-2 rounded-lg bg-yuzey-2 border border-cizgi px-3 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <span className="text-[14px]">Aynı tutarda ters hareket atılacak, bu kayıt iptal görünecek.</span>
+          <span className="text-[14px]">
+            {expense ? `Masraf silinecek, ${tl(e.amountCents)} ${e.source.name} hesabına geri eklenecek.` : "Aynı tutarda ters hareket atılacak, bu kayıt iptal görünecek."}
+          </span>
           <div className="flex gap-2 shrink-0">
             <Button variant="quiet" className="h-9" onClick={() => setConfirming(false)}>Vazgeç</Button>
-            <Button variant="danger" className="h-9" onClick={correct} disabled={working}>Düzelt</Button>
+            <Button variant="danger" className="h-9" onClick={reverse} disabled={working}>{expense ? "Sil" : "Düzelt"}</Button>
           </div>
         </div>
       )}
       {error && <div className="mt-2"><ErrorBox message={error} /></div>}
+      <ExpenseForm open={editing} existing={e} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onChange(); }} />
     </li>
   );
 }

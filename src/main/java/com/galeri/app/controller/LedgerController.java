@@ -53,6 +53,16 @@ public class LedgerController {
         return responseService.success(ledgerService.addExpense(request));
     }
 
+    @PutMapping("/expenses/{id}")
+    public GenericResponse<LedgerEntryResponse> updateExpense(@PathVariable UUID id, @Valid @RequestBody ExpenseRequest request) {
+        return responseService.success(ledgerService.updateExpense(id, request));
+    }
+
+    @DeleteMapping("/expenses/{id}")
+    public GenericResponse<LedgerEntryResponse> deleteExpense(@PathVariable UUID id) {
+        return responseService.success(ledgerService.deleteExpense(id));
+    }
+
     @GetMapping("/expense-categories")
     public GenericResponse<List<CategoryResponse>> categories(@RequestParam ExpenseRoot root) {
         return responseService.success(ledgerService.categories(root));

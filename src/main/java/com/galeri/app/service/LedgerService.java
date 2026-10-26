@@ -31,6 +31,12 @@ public interface LedgerService {
 
     LedgerEntryResponse addExpense(ExpenseRequest request);
 
+    /** Masrafi duzenle: eski kayit terslenir, yeni degerlerle yeni kayit yazilir (tek transaction). */
+    LedgerEntryResponse updateExpense(UUID entryId, ExpenseRequest request);
+
+    /** Masrafi sil: ters kayit yazilir, para kasaya / bankaya geri doner. Ayni masraf iki kez silinemez. */
+    LedgerEntryResponse deleteExpense(UUID entryId);
+
     /** Ayni tutarda ters yonde hareket atar; asil hareket silinmez. */
     LedgerEntryResponse correct(UUID entryId);
 

@@ -12,6 +12,13 @@ export function tl(cents: number | null | undefined): string {
   return `${tlFormat.format(cents / 100)} TL`;
 }
 
+const tlExactFormat = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Kurus hep gorunur: 12505000 -> "125.050,00 TL" (tutar alani onizlemesi). */
+export function tlExact(cents: number): string {
+  return `${tlExactFormat.format(cents / 100)} TL`;
+}
+
 export function formatNumber(n: number): string {
   return numberFormat.format(n);
 }
