@@ -3,6 +3,7 @@ package com.galeri.app.controller;
 import com.galeri.app.model.GenericResponse;
 import com.galeri.app.model.enums.ExpenseRoot;
 import com.galeri.app.model.request.AccountRequest;
+import com.galeri.app.model.request.BulkExpenseRequest;
 import com.galeri.app.model.request.ExpenseRequest;
 import com.galeri.app.model.response.AccountResponse;
 import com.galeri.app.model.response.CategoryResponse;
@@ -51,6 +52,11 @@ public class LedgerController {
     @PostMapping("/expenses")
     public GenericResponse<LedgerEntryResponse> addExpense(@Valid @RequestBody ExpenseRequest request) {
         return responseService.success(ledgerService.addExpense(request));
+    }
+
+    @PostMapping("/expenses/bulk")
+    public GenericResponse<List<LedgerEntryResponse>> addExpenses(@Valid @RequestBody BulkExpenseRequest request) {
+        return responseService.success(ledgerService.addExpenses(request.items()));
     }
 
     @PutMapping("/expenses/{id}")

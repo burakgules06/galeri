@@ -208,6 +208,11 @@ kişinin carisine ödeme. Ciro iki taraftan da geri alınır (ikisi birlikte). K
 borç açılır. Kısmi tahsilat: `collect` { amountCents } taksitten azsa taksit bölünür (çek bölünmez). Hata kodları 1048-1051.
 Panel: plan kurucuda Çek (no, banka, keşideci), Ödemeler'de "Çek / Senet" sekmesi (Alınan / Verilen), satırda Ciro et / Karşılıksız,
 tahsilde tutar. Test: `ChequeIT` (gerçek Postgres, her adımda `LedgerInvariants` + portföy bakiyesi 0).
+Galerici geri bildirimi 1 (`feat/bulk-expense`): Kasa > "Masraf ekle" artık toplu giriş (tarih ve hesap üstte bir kez,
+satırlarda araç / kategori / tutar / açıklama, Enter yeni satır). `POST /api/expenses/bulk` hepsini tek transaction'da yazar.
+`NameUtil`: tamamı büyük ya da tamamı küçük yazılmış kişi adı, kullanıcı adı ve renk kelime başı büyük kaydedilir (karışık yazıma dokunulmaz;
+mevcut kayıtlar değişmedi). Alış tarihi araç formunda tekrar görünür; satış formunda tarih alıştan önceyse açık uyarı.
+Migration yok.
 
 Bildirim saati (`feat/reminder-time`, `bildirim-saati.md`): `V11__reminder_time.sql` ile tenant'a `reminder_time` (varsayılan 09:00)
 ve `reminder_sent_on` eklendi. Görev her dakika Europe/Istanbul'a göre saati gelen galerileri günde bir kez işler; taksit/abone/VAPID

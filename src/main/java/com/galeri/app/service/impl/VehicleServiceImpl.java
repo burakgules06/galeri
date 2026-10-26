@@ -38,6 +38,7 @@ import com.galeri.app.service.LedgerService;
 import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.service.VehicleService;
 import com.galeri.app.util.PlateUtil;
+import com.galeri.app.util.NameUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -229,7 +230,7 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setFuel(r.fuel());
         vehicle.setTransmission(r.transmission());
         vehicle.setMileageKm(r.mileageKm());
-        vehicle.setColor(blankToNull(r.color()));
+        vehicle.setColor(NameUtil.normalize(blankToNull(r.color())));
         vehicle.setTramerCents(r.tramerCents());
         vehicle.setNotes(blankToNull(r.notes()));
         vehicle.setPurchaseDate(r.purchaseDate());
