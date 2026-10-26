@@ -193,6 +193,13 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
 
 ## Sıradaki
 
+Galerici geri bildirimi 3 (`feat/open-items`): geçmiş senet / çek aktarımı. `V13__open_items.sql`: `payment_plan.vehicle_id`
+boş olabilir, `opening_entry_id` (plan toplamını cariye yazan `OPENING_BALANCE`). `POST /api/contacts/{id}/open-items`
+{ direction SALE (bize borçlu) | PURCHASE (biz borçluyuz), date, installments } → OPENING → BALANCE ya da BALANCE → OPENING,
+taksitler açık girer ve aracı olanlarla aynı tahsil / öde / ciro / karşılıksız akışını kullanır. `DELETE /api/contacts/open-items/{planId}`
+hiç ödenmemişse açılış hareketini tersler, planı siler (1052). Bu açılış hareketi Kasa'dan düzeltilemez ve kişinin ayrı
+açılış bakiyesini engellemez. Panel: kişi detayında "Geçmiş senet / çek" formu ve "Kaydı sil". Test: `OpenItemsIT`.
+
 Galerici geri bildirimi 2 (`feat/cheques`): çek ve senet takibi. `V12__cheques_and_endorsement.sql`: ödeme yöntemine `CHEQUE`
 (banka, keşideci), taksite ciro (`endorsed_to_contact_id`, `endorse_entry_id`) ve karşılıksız (`bounced_at`), hesap türüne
 `PORTFOLIO` (ciroda ara hesap, bakiyesi hep 0). Ciro: `POST /api/installments/{id}/endorse` { toContactId, targetInstallmentId?, date }

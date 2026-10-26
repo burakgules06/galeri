@@ -7,7 +7,7 @@ import lombok.Setter;
 
 import java.util.UUID;
 
-// Aracin satis ya da alis odeme plani. Para hareketi burada degil defterde; plan sadece "ne zaman, kimden, ne kadar".
+// Aracin satis ya da alis odeme plani; aracsiz plan kisinin gecmis senet / cekleridir (V13). Para hareketi burada degil defterde; plan sadece "ne zaman, kimden, ne kadar".
 @Entity
 @Table(name = "payment_plan")
 @Getter
@@ -22,8 +22,13 @@ public class PaymentPlan extends BaseModel {
     @Column(name = "tenant_id", nullable = false, updatable = false)
     private UUID tenantId;
 
-    @Column(name = "vehicle_id", nullable = false, updatable = false)
+    // Bos: aracsiz plan (gecmis senet / cek aktarimi, V13)
+    @Column(name = "vehicle_id", updatable = false)
     private UUID vehicleId;
+
+    // Aracsiz planda plan toplamini cariye yazan acilis hareketi (V13)
+    @Column(name = "opening_entry_id", updatable = false)
+    private UUID openingEntryId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10, updatable = false)

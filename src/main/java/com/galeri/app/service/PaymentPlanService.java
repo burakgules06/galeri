@@ -8,6 +8,7 @@ import com.galeri.app.model.request.CollectRequest;
 import com.galeri.app.model.request.EndorseRequest;
 import com.galeri.app.model.request.InstallmentRequest;
 import com.galeri.app.model.request.InstallmentUpdateRequest;
+import com.galeri.app.model.request.OpenItemsRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
 import com.galeri.app.model.response.ContactStatement;
 import com.galeri.app.model.response.InstallmentResponse;
@@ -56,6 +57,15 @@ public interface PaymentPlanService {
      * carisine ya da secilen acik alis taksitine odeme yazilir. Taksit cekten buyukse bolunur.
      */
     InstallmentResponse endorse(UUID installmentId, EndorseRequest request);
+
+    /**
+     * Gecmis senet / cek aktarimi: kisinin carisine aracsiz plan. Toplam acilis hareketiyle cariye yazilir, taksitler acik girer
+     * (tahsil / ode / ciro / karsiliksiz aracli planlardaki gibi).
+     */
+    PaymentPlanResponse addOpenItems(UUID contactId, OpenItemsRequest request);
+
+    /** Aracsiz plani siler (hicbir taksiti odenmemisse): acilis hareketi terslenir. Hata yapan sifirdan girer. */
+    void removeOpenItems(UUID planId);
 
     /** Karsiliksiz: tahsil ya da ciro edildiyse geri alinir, borc yeniden acilir, taksit karsiliksiz olarak isaretlenir. */
     InstallmentResponse bounce(UUID installmentId);

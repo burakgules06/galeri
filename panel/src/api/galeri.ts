@@ -1,7 +1,7 @@
 import { apiFetch } from "./client";
 import type {
   NetWorthResponse, AccountResponse, BodyPart, CategoryResponse, ContactRequest, ContactResponse, DashboardResponse, ExpenseRequest, ExpenseRoot,
-  YearlyTrades, PaymentPlanResponse, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
+  YearlyTrades, PaymentPlanResponse, OpenItemsRequest, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
   LedgerEntryResponse, MonthlyTrades, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
   VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary, UserResponse, UserRole, ContactPaymentRequest,
   CapitalMovementRequest, OpeningBalanceRequest, Partner, PeriodProfit, ProfitAllocationRequest, TransferRequest, CatalogItem,
@@ -37,6 +37,9 @@ export const api = {
   },
   collect: (id: string, accountId: string, date: string, amountCents: number | null = null) =>
     apiFetch<InstallmentResponse>(`/api/installments/${id}/collect`, json({ accountId, date, amountCents })),
+  addOpenItems: (contactId: string, request: OpenItemsRequest) =>
+    apiFetch<PaymentPlanResponse>(`/api/contacts/${contactId}/open-items`, json(request)),
+  removeOpenItems: (planId: string) => apiFetch<void>(`/api/contacts/open-items/${planId}`, { method: "DELETE" }),
   endorse: (id: string, toContactId: string, targetInstallmentId: string | null, date: string) =>
     apiFetch<InstallmentResponse>(`/api/installments/${id}/endorse`, json({ toContactId, targetInstallmentId, date })),
   bounce: (id: string) => apiFetch<InstallmentResponse>(`/api/installments/${id}/bounce`, { method: "POST" }),
