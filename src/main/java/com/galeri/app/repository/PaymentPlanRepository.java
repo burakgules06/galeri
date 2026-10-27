@@ -13,4 +13,6 @@ public interface PaymentPlanRepository extends JpaRepository<PaymentPlan, UUID> 
     Optional<PaymentPlan> findByVehicleIdAndDirection(UUID vehicleId, PlanDirection direction);
 
     List<PaymentPlan> findByVehicleIdOrderByDirection(UUID vehicleId);
+
+    boolean existsByOpeningEntryId(UUID entryId);
 }

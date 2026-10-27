@@ -40,6 +40,7 @@ import com.galeri.app.repository.ExpenseCategoryRepository;
 import com.galeri.app.repository.InstallmentRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
+import com.galeri.app.repository.PaymentPlanRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.security.CurrentUser;
 import com.galeri.app.service.CoOwnershipService;
@@ -77,6 +78,7 @@ public class LedgerServiceImpl implements LedgerService {
     private final InstallmentRepository installmentRepository;
     private final ContactRepository contactRepository;
     private final CoOwnershipService coOwnershipService;
+    private final PaymentPlanRepository planRepository;
 
     // ------------------------------------------------------------------ hesaplar
 
@@ -215,6 +217,7 @@ public class LedgerServiceImpl implements LedgerService {
         if (original.getType() == LedgerEntryType.VEHICLE_SALE || original.getType() == LedgerEntryType.CONSIGNMENT_SETTLEMENT
                 || plannedPurchase
                 || coOwnershipService.isLinkedEntry(original)
+                || (original.getType() == LedgerEntryType.OPENING_BALANCE && planRepository.existsByOpeningEntryId(original.getId()))
                 || original.getSourceAccount().getType() == AccountType.PORTFOLIO
                 || original.getTargetAccount().getType() == AccountType.PORTFOLIO
                 || installmentRepository.existsByPaidEntryId(original.getId())) {
@@ -244,8 +247,8 @@ public class LedgerServiceImpl implements LedgerService {
         Account money = getMoneyAccount(accountId);
         Account balance = balanceAccount(payer);
         LedgerEntry e = direction == PlanDirection.SALE
-                ? newEntry(vehicle.getTenantId(), LedgerEntryType.COLLECTION, balance, money, amountCents, date)
-                : newEntry(vehicle.getTenantId(), LedgerEntryType.PAYMENT, money, balance, amountCents, date);
+                ? newEntry(payer.getTenantId(), LedgerEntryType.COLLECTION, balance, money, amountCents, date)
+                : newEntry(payer.getTenantId(), LedgerEntryType.PAYMENT, money, balance, amountCents, date);
         e.setVehicle(vehicle);
         e.setDescription(description);
         return entryRepository.save(e);
@@ -253,9 +256,21 @@ public class LedgerServiceImpl implements LedgerService {
 
     @Override
     @Transactional
+    public LedgerEntry writeOpenItems(Contact contact, PlanDirection direction, long amountCents, LocalDate date) {
+        Account opening = systemAccount(contact.getTenantId(), AccountType.OPENING);
+        Account balance = balanceAccount(contact);
+        LedgerEntry e = direction == PlanDirection.SALE
+                ? newEntry(contact.getTenantId(), LedgerEntryType.OPENING_BALANCE, opening, balance, amountCents, date)
+                : newEntry(contact.getTenantId(), LedgerEntryType.OPENING_BALANCE, balance, opening, amountCents, date);
+        e.setDescription(direction == PlanDirection.SALE ? "Geçmiş alacak (senet / çek)" : "Geçmiş borç (senet / çek)");
+        return entryRepository.save(e);
+    }
+
+    @Override
+    @Transactional
     public Endorsement writeEndorsement(Vehicle fromVehicle, Contact from, Vehicle toVehicle, Contact to, long amountCents,
                                         LocalDate date, String inDescription, String outDescription) {
-        UUID tenantId = fromVehicle.getTenantId();
+        UUID tenantId = from.getTenantId();
         Account portfolio = systemAccount(tenantId, AccountType.PORTFOLIO);
         LedgerEntry in = newEntry(tenantId, LedgerEntryType.COLLECTION, balanceAccount(from), portfolio, amountCents, date);
         in.setVehicle(fromVehicle);
@@ -450,7 +465,9 @@ public class LedgerServiceImpl implements LedgerService {
             account = balanceAccount(contact);
             intoAccount = r.side() == CapitalRequests.OpeningSide.RECEIVABLE;
         }
-        if (!activeEntries(entryRepository.byTypeTouching(LedgerEntryType.OPENING_BALANCE, account.getId())).isEmpty()) {
+        // Gecmis senet / cek planlarinin acilis hareketleri sayilmaz (kisiye ayrica acilis bakiyesi girilebilir)
+        if (activeEntries(entryRepository.byTypeTouching(LedgerEntryType.OPENING_BALANCE, account.getId())).stream()
+                .anyMatch(e -> !planRepository.existsByOpeningEntryId(e.getId()))) {
             throw new OpeningBalanceExistsException();
         }
         LedgerEntry e = intoAccount

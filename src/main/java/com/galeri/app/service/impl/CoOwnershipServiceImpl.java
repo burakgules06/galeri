@@ -164,6 +164,7 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
     @Override
     @Transactional
     public void syncContributions(Vehicle vehicle) {
+        if (vehicle == null) return;   // aracsiz plan (gecmis senet / cek)
         List<VehicleShare> owners = owners(vehicle.getId(), vehicle.getOwnership());
         List<Wanted> wanted = new ArrayList<>();
         if (!owners.isEmpty()) {

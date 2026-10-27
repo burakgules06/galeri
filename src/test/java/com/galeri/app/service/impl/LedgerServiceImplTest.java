@@ -37,6 +37,7 @@ import com.galeri.app.repository.ExpenseCategoryRepository;
 import com.galeri.app.repository.InstallmentRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
+import com.galeri.app.repository.PaymentPlanRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.service.CoOwnershipService;
 import com.galeri.app.support.TestSession;
@@ -76,6 +77,7 @@ class LedgerServiceImplTest {
     @Mock private InstallmentRepository installmentRepository;
     @Mock private CoOwnershipService coOwnershipService;
     @Mock private ContactRepository contactRepository;
+    @Mock private PaymentPlanRepository planRepository;
 
     private static final LocalDate DAY = LocalDate.of(2026, 7, 1);
 
@@ -89,7 +91,7 @@ class LedgerServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new LedgerServiceImpl(accountRepository, entryRepository, categoryRepository, vehicleRepository, panelUserRepository,
-                installmentRepository, contactRepository, coOwnershipService);
+                installmentRepository, contactRepository, coOwnershipService, planRepository);
         TestSession.open(userId, tenantId, "ADMIN");
 
         cash = account(AccountType.CASH, tenantId);

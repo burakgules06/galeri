@@ -61,6 +61,12 @@ public interface LedgerService {
     /** Satis: INCOME -> BALANCE(odeyen). Odeyenin carisi yoksa acilir. */
     LedgerEntry writeSale(Vehicle vehicle, Contact payer, long amountCents, LocalDate date);
 
+    /**
+     * Gecmis senet / cek aktarimi: plan toplami cariye acilis hareketiyle (OPENING_BALANCE) yazilir.
+     * SALE: OPENING -> BALANCE(kisi) (bize borclu), PURCHASE: BALANCE(kisi) -> OPENING (biz borcluyuz).
+     */
+    LedgerEntry writeOpenItems(Contact contact, PlanDirection direction, long amountCents, LocalDate date);
+
     /** Ciro hareketleri: cekin / senedin alindigi kisiden portfoye (tahsilat), portfoyden verildigi kisiye (odeme). */
     record Endorsement(LedgerEntry in, LedgerEntry out) {}
 

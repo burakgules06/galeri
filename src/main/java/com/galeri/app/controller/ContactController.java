@@ -2,6 +2,8 @@ package com.galeri.app.controller;
 
 import com.galeri.app.model.GenericResponse;
 import com.galeri.app.model.request.ContactRequest;
+import com.galeri.app.model.request.OpenItemsRequest;
+import com.galeri.app.model.response.PaymentPlanResponse;
 import com.galeri.app.model.response.ContactResponse;
 import com.galeri.app.model.response.ContactStatement;
 import com.galeri.app.service.ContactService;
@@ -45,6 +47,17 @@ public class ContactController {
     @PostMapping("/{id}/payments")
     public GenericResponse<LedgerEntryResponse> pay(@PathVariable UUID id, @Valid @RequestBody ContactPaymentRequest request) {
         return responseService.success(ledgerService.payContact(id, request));
+    }
+
+    @PostMapping("/{id}/open-items")
+    public GenericResponse<PaymentPlanResponse> addOpenItems(@PathVariable UUID id, @Valid @RequestBody OpenItemsRequest request) {
+        return responseService.success(paymentPlanService.addOpenItems(id, request));
+    }
+
+    @DeleteMapping("/open-items/{planId}")
+    public GenericResponse<Void> removeOpenItems(@PathVariable UUID planId) {
+        paymentPlanService.removeOpenItems(planId);
+        return responseService.success(null);
     }
 
     @PostMapping

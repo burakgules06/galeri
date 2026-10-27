@@ -3,18 +3,21 @@
 import { useState } from "react";
 import { api } from "../../api/galeri";
 import { ENTRY_TYPE, formatPhone, shortDate, tl } from "../../shared/format";
-import { useLoad } from "../../shared/useLoad";
+import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, Empty, ErrorBox } from "../../shared/ui/Common";
 import { Plate } from "../../shared/ui/Plate";
 import { StatTile } from "../../shared/ui/StatTile";
 import { InstallmentRow } from "../payments/InstallmentRow";
 import { ContactForm } from "./ContactList";
 import { ContactPaymentForm } from "./ContactPaymentForm";
+import { OpenItemsForm } from "./OpenItemsForm";
 
 export function ContactDetailPage({ id }: { id: string }) {
   const { data, error, reload } = useLoad(() => api.statement(id), [id]);
   const [editing, setEditing] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   if (error) return <ErrorBox message={error} />;
   if (!data) return <p className="text-murekkep-2 py-10 text-center">Yükleniyor…</p>;
@@ -24,6 +27,18 @@ export function ContactDetailPage({ id }: { id: string }) {
   const openTotal = data.openInstallments.reduce((t, i) => t + i.amountCents, 0);
   const overdue = data.openInstallments.filter((i) => i.status === "OVERDUE");
   const lines = [...data.lines].reverse();   // ekranda yeniden eskiye
+  // Aracsiz (gecmis senet / cek) kayitlar: hic odenmemisse plan butunuyle silinebilir
+  const openItemPlans = [...new Set(data.openInstallments.filter((i) => !i.vehicle).map((i) => i.planId))];
+  const removePlan = async (planId: string) => {
+    if (!window.confirm("Bu geçmiş kayıt (bütün senet / çekleriyle) silinsin mi?")) return;
+    setRemoveError(null);
+    try {
+      await api.removeOpenItems(planId);
+      reload();
+    } catch (e) {
+      setRemoveError(errorMessage(e));
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -41,6 +56,7 @@ export function ContactDetailPage({ id }: { id: string }) {
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => setEditing(true)}>Düzenle</Button>
+          <Button variant="secondary" onClick={() => setImporting(true)}>Geçmiş senet / çek</Button>
           <Button variant={balance < 0 ? "primary" : "secondary"} onClick={() => setPaying(true)}>Öde</Button>
         </div>
       </header>
@@ -60,6 +76,16 @@ export function ContactDetailPage({ id }: { id: string }) {
           <ul className="divide-y divide-cizgi -mx-1">
             {data.openInstallments.map((i) => <InstallmentRow key={i.id} i={i} onChange={reload} showPayer={false} />)}
           </ul>
+          <ErrorBox message={removeError} />
+          {openItemPlans.map((planId) => {
+            const items = data.openInstallments.filter((i) => i.planId === planId);
+            return (
+              <div key={planId} className="flex items-center justify-between gap-2 pt-3 text-[14px] text-murekkep-2">
+                <span>Geçmiş kayıt · {items.length} adet · <b className="sayi text-murekkep">{tl(items.reduce((t, i) => t + i.amountCents, 0))}</b></span>
+                <Button variant="quiet" className="h-9 text-tehlike" onClick={() => removePlan(planId)}>Kaydı sil</Button>
+              </div>
+            );
+          })}
         </section>
       )}
 
@@ -98,6 +124,7 @@ export function ContactDetailPage({ id }: { id: string }) {
 
       {paying && <ContactPaymentForm contact={c} debtCents={balance < 0 ? -balance : 0} onClose={() => setPaying(false)}
         onSaved={() => { setPaying(false); reload(); }} />}
+      {importing && <OpenItemsForm contact={c} onClose={() => setImporting(false)} onSaved={() => { setImporting(false); reload(); }} />}
       {editing && <ContactForm existing={c} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); reload(); }} />}
     </div>
   );
