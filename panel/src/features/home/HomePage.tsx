@@ -68,7 +68,7 @@ function AdminSummary() {
 
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid w-full grid-cols-1 sm:grid-cols-2 gap-4">
         <StatTile label="Kasa ve banka" value={tlShort(money)} tone="brand"
           sub={<span>Kasa <b className="sayi font-semibold text-murekkep text-[14px]">{tlShort(data.cashCents)}</b> · Banka <b className="sayi font-semibold text-murekkep text-[14px]">{tlShort(data.bankCents)}</b></span>}>
           <SplitBar height={6} parts={[
@@ -87,44 +87,40 @@ function AdminSummary() {
 
       <PartnerCapitalCard />
 
-      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
-        <div className="flex min-w-0 flex-col gap-4">
-          <HoldersShareCard />
-          <section className="kart p-4 md:p-5">
-            <div className="flex flex-wrap items-end justify-between gap-2 mb-2">
-              <div>
-                <p className="etiket">Son 6 ay · alım ve satım</p>
-                <p className="font-cond font-bold text-[22px] leading-tight mt-0.5"><span className="sayi">{totalSold}</span> araç satıldı</p>
-              </div>
-              <Legend items={[{ label: "Alınan", color: BOUGHT_COLOR }, { label: "Satılan", color: SOLD_COLOR }]} />
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
+        <HoldersShareCard />
+        <section className="kart p-4 md:p-5">
+          <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <p className="etiket">Son 6 ay · net kâr/zarar</p>
+              <p className={totalProfit >= 0 ? "sayi font-bold text-[22px] leading-tight mt-0.5 text-basari" : "sayi font-bold text-[22px] leading-tight mt-0.5 text-tehlike"}>{tl(totalProfit)}</p>
             </div>
-            <BarChart ariaLabel="Son 6 ayda alınan ve satılan araç sayısı" categories={months} height={230}
-              series={[
-                { name: "Alınan", color: BOUGHT_COLOR, values: data.months.map((m) => m.bought) },
-                { name: "Satılan", color: SOLD_COLOR, values: data.months.map((m) => m.sold) },
-              ]} />
-          </section>
-        </div>
-        <div className="flex min-w-0 flex-col gap-4">
-          <section className="kart p-4 md:p-5">
-            <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <p className="etiket">Son 6 ay · net kâr/zarar</p>
-                <p className={`sayi font-bold text-[22px] leading-tight mt-0.5 ${totalProfit >= 0 ? "text-basari" : "text-tehlike"}`}>{tl(totalProfit)}</p>
-              </div>
-              {/* Konsinye komisyonu arac karindan ayri: sermaye karina girip girmeyecegi acik soru (MIMARI §13) */}
-              {totalCommission > 0 && (
-                <p className="text-right">
-                  <span className="etiket block">Konsinye komisyonu</span>
-                  <span className="sayi font-semibold text-[18px] text-konsinye">{tl(totalCommission)}</span>
-                </p>
-              )}
+            {/* Konsinye komisyonu arac karindan ayri: sermaye karina girip girmeyecegi acik soru (MIMARI §13) */}
+            {totalCommission > 0 && (
+              <p className="text-right">
+                <span className="etiket block">Konsinye komisyonu</span>
+                <span className="sayi font-semibold text-[18px] text-konsinye">{tl(totalCommission)}</span>
+              </p>
+            )}
+          </div>
+          <BarChart ariaLabel="Son 6 ayda satılan araçların kârı" categories={months} height={230} minMax={0}
+            format={(n) => (n === 0 ? "0" : tlShort(n * 100).replace(" ₺", ""))}
+            series={[{ name: "Kâr", color: "var(--color-basari-canli)", values: data.months.map((m) => Math.max(0, m.profitCents) / 100) }]} />
+        </section>
+        <section className="kart p-4 md:p-5 lg:col-span-2">
+          <div className="flex flex-wrap items-end justify-between gap-2 mb-2">
+            <div>
+              <p className="etiket">Son 6 ay · alım ve satım</p>
+              <p className="font-cond font-bold text-[22px] leading-tight mt-0.5"><span className="sayi">{totalSold}</span> araç satıldı</p>
             </div>
-            <BarChart ariaLabel="Son 6 ayda satılan araçların kârı" categories={months} height={230} minMax={0}
-              format={(n) => (n === 0 ? "0" : tlShort(n * 100).replace(" ₺", ""))}
-              series={[{ name: "Kâr", color: "var(--color-basari-canli)", values: data.months.map((m) => Math.max(0, m.profitCents) / 100) }]} />
-          </section>
-        </div>
+            <Legend items={[{ label: "Alınan", color: BOUGHT_COLOR }, { label: "Satılan", color: SOLD_COLOR }]} />
+          </div>
+          <BarChart ariaLabel="Son 6 ayda alınan ve satılan araç sayısı" categories={months} height={230}
+            series={[
+              { name: "Alınan", color: BOUGHT_COLOR, values: data.months.map((m) => m.bought) },
+              { name: "Satılan", color: SOLD_COLOR, values: data.months.map((m) => m.sold) },
+            ]} />
+        </section>
       </div>
     </>
   );
