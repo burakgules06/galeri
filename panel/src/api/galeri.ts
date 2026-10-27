@@ -4,7 +4,7 @@ import type {
   YearlyTrades, PaymentPlanResponse, OpenItemsRequest, BasketSaleRequest, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
   LedgerEntryResponse, MonthlyTrades, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
   VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary, UserResponse, UserRole, ContactPaymentRequest,
-  CapitalMovementRequest, OpeningBalanceRequest, Partner, PeriodProfit, ProfitAllocationRequest, TransferRequest, CatalogItem,
+  CapitalMovementRequest, CapitalBase, CapitalTransferRequest, Holder, OpeningBalanceRequest, Partner, PeriodProfit, ProfitAllocationRequest, TransferRequest, CatalogItem,
 } from "../shared/types";
 
 const json = (body: unknown, method = "POST"): RequestInit => ({ method, body: JSON.stringify(body) });
@@ -49,7 +49,10 @@ export const api = {
     apiFetch<InstallmentResponse>(`/api/installments/${id}`, json({ dueDate, noteNo, bankName, drawerName }, "PATCH")),
   // Sermaye ve kasa islemleri (sadece ADMIN)
   partners: () => apiFetch<Partner[]>("/api/partners"),
-  addPartner: (contactId: string) => apiFetch<Partner>("/api/partners", json({ contactId })),
+  addPartner: (contactId: string, base: CapitalBase) => apiFetch<Partner>("/api/partners", json({ contactId, base })),
+  setPartnerBase: (contactId: string, base: CapitalBase) => apiFetch<Partner>(`/api/partners/${contactId}/base`, json({ base }, "PUT")),
+  holders: () => apiFetch<Holder[]>("/api/holders"),
+  capitalTransfer: (request: CapitalTransferRequest) => apiFetch<LedgerEntryResponse>("/api/capital-transfers", json(request)),
   setOwner: (contactId: string) => apiFetch<Partner>(`/api/partners/${contactId}/owner`, { method: "PUT" }),
   moveCapital: (contactId: string, request: CapitalMovementRequest) =>
     apiFetch<LedgerEntryResponse>(`/api/partners/${contactId}/capital`, json(request)),

@@ -1,15 +1,14 @@
 // Donem Havuz kari (MIMARI §5): galeri araci kari + ortak aractaki Havuz payi + konsinye komisyonu - genel giderler.
-// Genel donem kari sermayeye otomatik dagitilmaz; ortak aracin ortak payi satis aninda otomatik sermayeye yazilir.
-import { useState, type FormEvent } from "react";
+// Kar dagitimi yok: galeri aracinin kari dukkan sahibinin, ortak aracin ortak payi satis aninda sermayedara yazilir.
+import { useState } from "react";
 import { api } from "../../api/galeri";
-import { addDaysIso, formatDate, percent, shortDate, tl, tlToCents, todayIso, centsToInput } from "../../shared/format";
-import type { PartnerProfit, PeriodProfit } from "../../shared/types";
-import { errorMessage, useLoad } from "../../shared/useLoad";
-import { Button, Empty, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
+import { addDaysIso, formatDate, shortDate, tl, todayIso } from "../../shared/format";
+import type { PeriodProfit } from "../../shared/types";
+import { useLoad } from "../../shared/useLoad";
+import { Empty, ErrorBox, Field, inputClass, Segment } from "../../shared/ui/Common";
 import { Plate } from "../../shared/ui/Plate";
 import { StatTile } from "../../shared/ui/StatTile";
 import { OwnershipBadge } from "../vehicles/OwnershipBadge";
-import { NumberInput } from "../../shared/ui/NumberInput";
 
 type Preset = "month" | "lastMonth" | "quarter" | "year" | "custom";
 
@@ -29,11 +28,10 @@ function range(preset: Exclude<Preset, "custom">): [string, string] {
   }
 }
 
-export function PeriodProfitPanel({ onChange }: { onChange: () => void }) {
+export function PeriodProfitPanel() {
   const [preset, setPreset] = useState<Preset>("year");
   const [[from, to], setPeriod] = useState<[string, string]>(() => range("year"));
-  const { data, error, reload } = useLoad(() => api.periodProfit(from, to), [from, to]);
-  const [allocating, setAllocating] = useState<PartnerProfit | null>(null);
+  const { data, error } = useLoad(() => api.periodProfit(from, to), [from, to]);
 
   const choose = (p: Preset) => {
     setPreset(p);
@@ -61,12 +59,6 @@ export function PeriodProfitPanel({ onChange }: { onChange: () => void }) {
       <ErrorBox message={error} />
       {data && <ProfitSummary p={data} />}
       {data && <SoldList p={data} />}
-      {data && <PartnersTable p={data} onAllocate={setAllocating} />}
-
-      {allocating && data && (
-        <AllocationForm partner={allocating} period={data} onClose={() => setAllocating(null)}
-          onSaved={() => { setAllocating(null); reload(); onChange(); }} />
-      )}
     </div>
   );
 }
@@ -119,87 +111,5 @@ function SoldList({ p }: { p: PeriodProfit }) {
           </ul>
         )}
     </section>
-  );
-}
-
-function PartnersTable({ p, onAllocate }: { p: PeriodProfit; onAllocate: (x: PartnerProfit) => void }) {
-  return (
-    <section className="kart overflow-hidden">
-      <div className="px-4 md:px-5 pt-4 pb-3 border-b border-cizgi">
-        <h2 className="font-cond font-bold text-[21px] tracking-tight">Ortakların payı</h2>
-
-      </div>
-      {p.partners.length === 0
-        ? <Empty title="Sermaye ortağı yok" description="Ortaklar sekmesinden ortak ekleyin." />
-        : (
-          <ul className="divide-y divide-cizgi">
-            {p.partners.map((x) => {
-              const remaining = x.suggestedCents - x.allocatedCents;
-              return (
-                <li key={x.contactId} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 md:px-5 py-3">
-                  <span className="grow min-w-0 basis-40">
-                    <span className="font-semibold">{x.name}</span>
-                    {x.owner && <span className="ml-2 text-[12px] font-semibold text-plaka bg-plaka-acik rounded px-1.5 py-0.5">Dükkân sahibi</span>}
-                    <span className="block text-[13px] text-murekkep-2">Sermaye {tl(x.capitalCents)} · {percent(x.shareBp)}</span>
-                  </span>
-                  <span className="text-right">
-                    <span className="etiket block">Önerilen</span>
-                    <span className={`sayi font-bold text-[18px] ${x.suggestedCents >= 0 ? "text-murekkep" : "text-tehlike"}`}>{tl(x.suggestedCents)}</span>
-                  </span>
-                  <span className="text-right">
-                    <span className="etiket block">Eklenen</span>
-                    <span className="sayi font-semibold text-[18px] text-basari">{tl(x.allocatedCents)}</span>
-                  </span>
-                  <Button variant={remaining > 0 ? "primary" : "secondary"} className="h-9 px-3 text-[14px]" onClick={() => onAllocate(x)}>Sermayeye ekle</Button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-    </section>
-  );
-}
-
-function AllocationForm({ partner, period, onClose, onSaved }: {
-  partner: PartnerProfit; period: PeriodProfit; onClose: () => void; onSaved: () => void;
-}) {
-  const suggestion = Math.max(0, partner.suggestedCents - partner.allocatedCents);
-  const [amount, setAmount] = useState(suggestion > 0 ? centsToInput(suggestion) : "");
-  const [date, setDate] = useState(period.to < todayIso() ? period.to : todayIso());
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    const cents = tlToCents(amount);
-    if (cents == null || Number.isNaN(cents) || cents <= 0) return setError("Tutarı 250.000 gibi yaz.");
-    setSaving(true);
-    setError(null);
-    try {
-      await api.allocateProfit({ contactId: partner.contactId, date, amountCents: cents, periodFrom: period.from, periodTo: period.to });
-      onSaved();
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal title={`${partner.name} · kâr payını sermayeye ekle`} open onClose={onClose}
-      footer={<>
-        <Button variant="secondary" type="button" onClick={onClose}>Vazgeç</Button>
-        <Button type="submit" form="allocation-form" disabled={saving}>{saving ? "Kaydediliyor…" : "Sermayeye ekle"}</Button>
-      </>}>
-      <form id="allocation-form" onSubmit={submit} className="space-y-4">
-        <ErrorBox message={error} />
-
-        <Field label="Sermayeye eklenecek tutar">
-          <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount}
-            placeholder="250.000" autoFocus />
-        </Field>
-        <Field label="Tarih"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
-      </form>
-    </Modal>
   );
 }

@@ -8,7 +8,7 @@ import { entryDirection, percent, SERIES, tl } from "../../shared/format";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, Empty, ErrorBox, inputClass, Segment } from "../../shared/ui/Common";
 import { BalancesCard } from "./BalancesCard";
-import { CapitalCard } from "./CapitalCard";
+import { PartnerCapitalCard } from "../home/PartnerCapitalCard";
 import { BulkExpenseForm } from "./BulkExpenseForm";
 import { LedgerEntryList } from "./LedgerEntryList";
 import { PartnersPanel } from "./PartnersPanel";
@@ -81,12 +81,12 @@ export function LedgerPage() {
       ]} />
 
       {tab === "partners" && <PartnersPanel onChange={reload} />}
-      {tab === "profit" && <PeriodProfitPanel onChange={reload} />}
+      {tab === "profit" && <PeriodProfitPanel />}
       {tab === "assets" && <NetWorthPanel revision={revision} />}
 
       {tab === "entries" && summary.data && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <CapitalCard partners={summary.data.partners} totalCents={summary.data.capitalCents} />
+          <PartnerCapitalCard revision={revision} />
           <BalancesCard receivableCents={summary.data.receivableCents} payableCents={summary.data.payableCents}
             receivables={summary.data.receivables} payables={summary.data.payables} />
         </div>
