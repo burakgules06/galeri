@@ -31,6 +31,7 @@ import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.PaymentPlanRepository;
 import com.galeri.app.repository.PaymentPlanVehicleRepository;
 import com.galeri.app.repository.VehicleRepository;
+import com.galeri.app.service.CapitalService;
 import com.galeri.app.service.CoOwnershipService;
 import com.galeri.app.service.LedgerService;
 import com.galeri.app.support.TestSession;
@@ -76,6 +77,7 @@ class PaymentPlanServiceImplTest {
     @Mock private PanelUserRepository panelUserRepository;
     @Mock private LedgerService ledgerService;
     @Mock private CoOwnershipService coOwnershipService;
+    @Mock private CapitalService capitalService;
     @Mock private PaymentPlanVehicleRepository basketRepository;
 
     // "Su an": 1 Temmuz 2026, 09:00 Istanbul
@@ -93,7 +95,7 @@ class PaymentPlanServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new PaymentPlanServiceImpl(planRepository, installmentRepository, contactRepository, vehicleRepository,
-                accountRepository, entryRepository, panelUserRepository, ledgerService, coOwnershipService, clock, basketRepository);
+                accountRepository, entryRepository, panelUserRepository, ledgerService, coOwnershipService, capitalService, clock, basketRepository);
         TestSession.open(UUID.randomUUID(), tenantId, "ADMIN");
 
         vehicle = new Vehicle();
