@@ -216,6 +216,9 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
   - Sermayedarın evrakı tahsil edildikçe (ya da ciro edilince) tutar onun sermayesine yazılır: sermaye hesabı → açılış hesabı
     (`CAPITAL_TRANSFER`, taksitte `holder_entry_id`). Ödeme geri alınınca / karşılıksız çıkınca terslenir. Tahsil edilene kadar
     alacak dükkân sahibinin payında görünür. Dükkân sahibi ya da ortak olmayan seçilemez (1035). Test: `HolderItemsIT`.
+  - Güncelleme: tahsil edilmemiş evrak sermayedarın kartında "Alacak" olarak görünür ve sermayesine sayılır (riski onda;
+    dükkân sahibinin payı etkilenmez). Tahsilde alacaktan nakde geçer, geri alınınca / karşılıksız çıkınca yine alacak olur.
+    Adına tahsil edilmemiş evrak olan ortak kaldırılamaz (1055).
 
 ## Sıradaki
 

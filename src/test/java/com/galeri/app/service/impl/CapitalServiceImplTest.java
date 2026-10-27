@@ -19,6 +19,7 @@ import com.galeri.app.model.response.CapitalResponses.PartnerProfit;
 import com.galeri.app.model.response.CapitalResponses.PeriodProfit;
 import com.galeri.app.repository.AccountRepository;
 import com.galeri.app.repository.ContactRepository;
+import com.galeri.app.repository.InstallmentRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehicleRepository;
@@ -59,6 +60,7 @@ class CapitalServiceImplTest {
 
     @Mock private AccountRepository accountRepository;
     @Mock private LedgerEntryRepository entryRepository;
+    @Mock private InstallmentRepository installmentRepository;
     @Mock private ContactRepository contactRepository;
     @Mock private VehicleRepository vehicleRepository;
     @Mock private PanelUserRepository panelUserRepository;
@@ -77,7 +79,7 @@ class CapitalServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new CapitalServiceImpl(accountRepository, entryRepository, contactRepository, vehicleRepository, panelUserRepository,
+        service = new CapitalServiceImpl(accountRepository, entryRepository, installmentRepository, contactRepository, vehicleRepository, panelUserRepository,
                 coOwnershipService, Clock.fixed(Instant.parse("2026-10-01T06:00:00Z"), ZoneOffset.UTC));
         TestSession.open(userId, tenantId, "ADMIN");
         PanelUser me = new PanelUser();

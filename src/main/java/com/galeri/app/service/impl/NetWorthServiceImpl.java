@@ -91,15 +91,20 @@ public class NetWorthServiceImpl implements NetWorthService {
         UUID ownerId = owner.map(com.galeri.app.model.entity.Contact::getId).orElse(null);
         long money = w.cashCents() + w.bankCents();
 
+        // Sermayedara ait tahsil edilmemis evrak: onun alacagi (riski onda), dukkan sahibinin payinda sayilmaz
+        Map<UUID, Long> pending = new java.util.HashMap<>();
+        for (Object[] row : installments.pendingByHolder(tenant)) pending.put((UUID) row[0], ((Number) row[1]).longValue());
+
         List<CapitalResponses.Holder> raw = new ArrayList<>();
         long investorsCapital = 0, investorsCash = 0;
         for (CapitalResponses.Partner p : w.partners()) {
             if (p.contactId().equals(ownerId)) continue;
             List<CapitalResponses.HolderVehicle> list = vehiclesOf(w, o -> p.contactId().equals(o.contactId()));
             CapitalBase base = contacts.findById(p.contactId()).map(com.galeri.app.model.entity.Contact::getCapitalBase).orElse(CapitalBase.ALL);
-            raw.add(new CapitalResponses.Holder(p.contactId(), p.name(), false, base, p.capitalCents(), p.cashCents(), p.boundCents(), 0,
-                    0, list));
-            investorsCapital += p.capitalCents();
+            long receivable = pending.getOrDefault(p.contactId(), 0L);
+            raw.add(new CapitalResponses.Holder(p.contactId(), p.name(), false, base, p.capitalCents() + receivable, p.cashCents(),
+                    p.boundCents(), receivable, 0, list));
+            investorsCapital += p.capitalCents() + receivable;
             investorsCash += p.cashCents();
         }
         // Dukkan sahibi: havuzdan sermayedarlar cikinca kalan; kasayla (Havuz) alinan araclarin odenmis kismi onun malidir

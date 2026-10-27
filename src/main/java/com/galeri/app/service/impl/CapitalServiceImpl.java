@@ -25,6 +25,7 @@ import com.galeri.app.model.response.LedgerEntryResponse;
 import com.galeri.app.model.response.VehicleRef;
 import com.galeri.app.repository.AccountRepository;
 import com.galeri.app.repository.ContactRepository;
+import com.galeri.app.repository.InstallmentRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehicleRepository;
@@ -58,6 +59,7 @@ public class CapitalServiceImpl implements CapitalService {
 
     private final AccountRepository accountRepository;
     private final LedgerEntryRepository entryRepository;
+    private final InstallmentRepository installmentRepository;
     private final ContactRepository contactRepository;
     private final VehicleRepository vehicleRepository;
     private final PanelUserRepository panelUserRepository;
@@ -137,6 +139,8 @@ public class CapitalServiceImpl implements CapitalService {
         if (coOwnershipService.boundCapital(tenantId, today()).getOrDefault(contactId, 0L) > 0) {
             throw new PartnerNotRemovableException("Araçta parası var. Önce o araçlar satılmalı.");
         }
+        boolean pendingItems = installmentRepository.pendingByHolder(tenantId).stream().anyMatch(r -> contactId.equals(r[0]));
+        if (pendingItems) throw new PartnerNotRemovableException("Adına tahsil edilmemiş çek / senet var. Önce tahsil edilmeli ya da silinmeli.");
         List<LedgerEntry> touching = entryRepository.touchingType(tenantId, AccountType.CAPITAL);
         long remaining = capitalByAccount(touching, null).getOrDefault(capital.getId(), 0L);
 
