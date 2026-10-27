@@ -51,6 +51,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -124,6 +125,14 @@ public class LedgerServiceImpl implements LedgerService {
     @Transactional
     public LedgerEntryResponse addExpense(ExpenseRequest r) {
         return toResponse(afterExpense(writeExpense(r)), false);
+    }
+
+    @Override
+    @Transactional
+    public List<LedgerEntryResponse> addExpenses(List<ExpenseRequest> requests) {
+        List<LedgerEntryResponse> result = new ArrayList<>(requests.size());
+        for (ExpenseRequest r : requests) result.add(toResponse(afterExpense(writeExpense(r)), false));
+        return result;
     }
 
     @Override
