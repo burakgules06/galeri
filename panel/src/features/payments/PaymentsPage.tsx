@@ -24,7 +24,7 @@ const TABS: { value: Tab; label: string }[] = [
 
 export function PaymentsPage() {
   const { data, error, reload } = useLoad(() => api.installments(), []);
-  const [tab, setTab] = useState<Tab>("overdue");
+  const [tab, setTab] = useState<Tab>("all");
   const [q, setQ] = useState("");
   const [side, setSide] = useState<Side>("SALE");
   const [importing, setImporting] = useState(false);
