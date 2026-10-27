@@ -10,13 +10,11 @@ import { StatTile } from "../../shared/ui/StatTile";
 import { InstallmentRow } from "../payments/InstallmentRow";
 import { ContactForm } from "./ContactList";
 import { ContactPaymentForm } from "./ContactPaymentForm";
-import { OpenItemsForm } from "./OpenItemsForm";
 
 export function ContactDetailPage({ id }: { id: string }) {
   const { data, error, reload } = useLoad(() => api.statement(id), [id]);
   const [editing, setEditing] = useState(false);
   const [paying, setPaying] = useState(false);
-  const [importing, setImporting] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
   if (error) return <ErrorBox message={error} />;
@@ -56,7 +54,6 @@ export function ContactDetailPage({ id }: { id: string }) {
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => setEditing(true)}>Düzenle</Button>
-          <Button variant="secondary" onClick={() => setImporting(true)}>Geçmiş senet / çek</Button>
           <Button variant={balance < 0 ? "primary" : "secondary"} onClick={() => setPaying(true)}>Öde</Button>
         </div>
       </header>
@@ -124,7 +121,6 @@ export function ContactDetailPage({ id }: { id: string }) {
 
       {paying && <ContactPaymentForm contact={c} debtCents={balance < 0 ? -balance : 0} onClose={() => setPaying(false)}
         onSaved={() => { setPaying(false); reload(); }} />}
-      {importing && <OpenItemsForm contact={c} onClose={() => setImporting(false)} onSaved={() => { setImporting(false); reload(); }} />}
       {editing && <ContactForm existing={c} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); reload(); }} />}
     </div>
   );

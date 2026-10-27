@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { api } from "../../api/galeri";
 import { addMonthsIso, METHOD, tl, tlToCents, todayIso } from "../../shared/format";
-import type { ContactResponse, PaymentMethod, PlanDirection } from "../../shared/types";
-import { errorMessage } from "../../shared/useLoad";
-import { Button, ErrorBox, inputClass, Modal, Segment } from "../../shared/ui/Common";
+import type { ContactResponse, ContactSummary, PaymentMethod, PlanDirection } from "../../shared/types";
+import { errorMessage, useLoad } from "../../shared/useLoad";
+import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
+import { ContactPicker } from "./ContactPicker";
 import { NumberInput } from "../../shared/ui/NumberInput";
 
 interface Row { key: number; dueDate: string; amount: string; method: PaymentMethod; noteNo: string; bankName: string; drawerName: string }
@@ -15,7 +16,14 @@ let nextKey = 1;
 const emptyRow = (dueDate: string, method: PaymentMethod = "PROMISSORY_NOTE"): Row =>
   ({ key: nextKey++, dueDate, amount: "", method, noteNo: "", bankName: "", drawerName: "" });
 
-export function OpenItemsForm({ contact, onClose, onSaved }: { contact: ContactResponse; onClose: () => void; onSaved: () => void }) {
+// contact verilmezse (Odemeler ekranindan) kisi formun basinda secilir.
+export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
+  contact?: ContactResponse; onClose: () => void; onSaved: () => void;
+}) {
+  const contacts = useLoad(() => (fixedContact ? Promise.resolve([] as ContactResponse[]) : api.contacts()), [fixedContact?.id]);
+  const [extra, setExtra] = useState<ContactResponse[]>([]);
+  const [picked, setPicked] = useState<ContactSummary | null>(null);
+  const contact: ContactSummary | null = fixedContact ?? picked;
   const [direction, setDirection] = useState<PlanDirection>("SALE");
   const [rows, setRows] = useState<Row[]>([emptyRow(todayIso())]);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +44,7 @@ export function OpenItemsForm({ contact, onClose, onSaved }: { contact: ContactR
     setSaving(true);
     setError(null);
     try {
+      if (!contact) { setSaving(false); return setError("Kişiyi seç."); }
       await api.addOpenItems(contact.id, {
         direction, date: todayIso(),
         installments: filled.map((r) => ({
@@ -54,7 +63,7 @@ export function OpenItemsForm({ contact, onClose, onSaved }: { contact: ContactR
   };
 
   return (
-    <Modal title={`Geçmiş senet / çek · ${contact.name}`} open onClose={onClose} wide
+    <Modal title={fixedContact ? `Geçmiş senet / çek · ${fixedContact.name}` : "Geçmiş senet / çek"} open onClose={onClose} wide
       footer={<>
         <span className="mr-auto self-center text-[14px] text-murekkep-2">
           {filled.length} kayıt · <b className="sayi text-murekkep text-[16px]">{tl(total)}</b>
@@ -64,8 +73,14 @@ export function OpenItemsForm({ contact, onClose, onSaved }: { contact: ContactR
       </>}>
       <div className="space-y-4">
         <ErrorBox message={error} />
+        {!fixedContact && (
+          <Field label="Kişi">
+            <ContactPicker contacts={[...extra, ...(contacts.data ?? [])]} selected={picked} onSelect={setPicked}
+              onCreated={(c) => setExtra((l) => [c, ...l])} placeholder="İsim yaz ya da seç" />
+          </Field>
+        )}
         <Segment<PlanDirection> value={direction} onChange={setDirection}
-          options={[{ value: "SALE", label: `${contact.name} bize borçlu` }, { value: "PURCHASE", label: "Biz borçluyuz" }]} />
+          options={[{ value: "SALE", label: contact ? `${contact.name} bize borçlu` : "Bize borçlu" }, { value: "PURCHASE", label: "Biz borçluyuz" }]} />
 
         <div className="space-y-2">
           {rows.map((r) => (
