@@ -70,6 +70,10 @@ public class Installment extends BaseModel {
     @Column(name = "endorse_entry_id")
     private UUID endorseEntryId;
 
+    // Pesinat (V15): plan kurulurken ayni islemde tahsil / odendi ("simdi alindi")
+    @Column(name = "down_payment", nullable = false)
+    private boolean downPayment;
+
     // Karsiliksiz cikti (V12): odemesi geri alindi, borc yeniden acik
     @Column(name = "bounced_at")
     private OffsetDateTime bouncedAt;
