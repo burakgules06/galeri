@@ -175,6 +175,15 @@ public class CapitalServiceImpl implements CapitalService {
 
     @Override
     @Transactional
+    public LedgerEntry creditFromOwner(Contact to, long amountCents, LocalDate date, String description) {
+        Contact owner = contactRepository.findFirstByTenantIdAndOwnerTrue(to.getTenantId()).orElseThrow(NotAPartnerException::new);
+        LedgerEntry e = newEntry(LedgerEntryType.CAPITAL_TRANSFER, capitalAccount(to, true), capitalAccount(owner, true), amountCents, date);
+        e.setDescription(description);
+        return entryRepository.save(e);
+    }
+
+    @Override
+    @Transactional
     public LedgerEntryResponse transferCapital(CapitalRequests.CapitalTransfer r) {
         if (r.fromContactId().equals(r.toContactId())) throw new SameAccountException();
         Contact from = getContact(r.fromContactId());

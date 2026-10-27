@@ -1,5 +1,7 @@
 package com.galeri.app.service;
 
+import com.galeri.app.model.entity.Contact;
+import com.galeri.app.model.entity.LedgerEntry;
 import com.galeri.app.model.request.CapitalRequests;
 import com.galeri.app.model.response.CapitalResponses;
 import com.galeri.app.model.response.LedgerEntryResponse;
@@ -25,6 +27,12 @@ public interface CapitalService {
      * kalan kasadan; sonra sermaye hesabi kapanir. Dukkan sahibi ve aracta parasi olan kaldirilamaz (1055).
      */
     void removePartner(UUID contactId);
+
+    /**
+     * Sermayedarin senedi / ceki tahsil edildi: tutar dukkan sahibinden ona aktarilir (CAPITAL_TRANSFER). Dukkan sahibi yoksa 1035.
+     * Donen hareket taksitte tutulur, geri almada terslenir.
+     */
+    LedgerEntry creditFromOwner(Contact to, long amountCents, LocalDate date, String description);
 
     /** Sermayedarin havuzdaki yuzdesinin (bilgi) tabanini degistirir. */
     CapitalResponses.Partner setBase(UUID contactId, CapitalRequests.Base request);

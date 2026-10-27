@@ -113,6 +113,53 @@ class OpenItemsIT {
     }
 
     @Test
+    void sermayedarinSenedi_tahsilEdildikceOnunSermayesineYazilir_geriAlininca_duser() {
+        UUID furkan = contactService.create(new ContactRequest("Furkan Sahip", null, ContactType.PERSON, null)).id();
+        UUID burak = contactService.create(new ContactRequest("Burak", null, ContactType.PERSON, null)).id();
+        capitalService.addPartner(new CapitalRequests.Partner(furkan));
+        capitalService.setOwner(furkan);
+        capitalService.move(burak, new CapitalRequests.Movement(CapitalRequests.Direction.IN, cash, today, 500_000 * TL, null));
+
+        PaymentPlanResponse plan = paymentPlanService.addOpenItems(ali, new OpenItemsRequest(PlanDirection.SALE, today, List.of(
+                note(today.plusDays(10), 100_000 * TL, "B-1"), cheque(today.plusDays(20), 200_000 * TL)), burak));
+        assertThat(plan.installments()).allSatisfy(i -> assertThat(i.beneficiary().id()).isEqualTo(burak));
+        assertThat(capitalOf(burak)).as("tahsil edilmeden sermaye degismez").isEqualTo(500_000 * TL);
+        check("eklendi");
+
+        UUID note = plan.installments().stream().filter(i -> i.method() == PaymentMethod.PROMISSORY_NOTE).findFirst().orElseThrow().id();
+        UUID cheque = plan.installments().stream().filter(i -> i.method() == PaymentMethod.CHEQUE).findFirst().orElseThrow().id();
+        paymentPlanService.collect(note, new CollectRequest(cash, today));
+        assertThat(capitalOf(burak)).isEqualTo(600_000 * TL);
+        check("senet tahsil");
+
+        // Ciro da odeme: cek borca verildi
+        PaymentPlanResponse payable = paymentPlanService.addOpenItems(mehmet, new OpenItemsRequest(PlanDirection.PURCHASE, today, List.of(
+                note(today.plusDays(15), 200_000 * TL, "V-3"))));
+        paymentPlanService.endorse(cheque, new EndorseRequest(mehmet, payable.installments().getFirst().id(), today));
+        assertThat(capitalOf(burak)).isEqualTo(800_000 * TL);
+        check("ciro");
+
+        paymentPlanService.undo(cheque);
+        assertThat(capitalOf(burak)).isEqualTo(600_000 * TL);
+        paymentPlanService.collect(cheque, new CollectRequest(cash, today));
+        assertThat(capitalOf(burak)).isEqualTo(800_000 * TL);
+        paymentPlanService.bounce(cheque);
+        assertThat(capitalOf(burak)).as("karsiliksiz: yazilan geri alinir").isEqualTo(600_000 * TL);
+        paymentPlanService.undo(note);
+        assertThat(capitalOf(burak)).isEqualTo(500_000 * TL);
+        check("geri alindi");
+
+        // Dukkan sahibi secilirse havuzda kalir
+        PaymentPlanResponse own = paymentPlanService.addOpenItems(ali, new OpenItemsRequest(PlanDirection.SALE, today, List.of(
+                note(today, 50_000 * TL, null)), furkan));
+        assertThat(own.installments().getFirst().beneficiary()).isNull();
+    }
+
+    private long capitalOf(UUID contact) {
+        return capitalService.partners().stream().filter(p -> p.contactId().equals(contact)).findFirst().orElseThrow().capitalCents();
+    }
+
+    @Test
     void gecmisBorc_verilenSenetOdenir() {
         PaymentPlanResponse plan = paymentPlanService.addOpenItems(mehmet, new OpenItemsRequest(PlanDirection.PURCHASE, today, List.of(
                 note(today.plusDays(10), 300_000 * TL, "V-1"))));

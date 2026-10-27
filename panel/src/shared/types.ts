@@ -236,6 +236,7 @@ export interface InstallmentResponse {
   downPayment: boolean;                 // plan kurulurken alinan / odenen pesinat
   number: number;                       // pesinat haric taksit no (pesinatta 0)
   installmentCount: number;             // pesinat haric taksit sayisi
+  beneficiary: ContactSummary | null;   // gecmis senet / cek kime ait (sermayedar): tahsil edildikce onun sermayesine
 }
 
 // Toplu satis: ayni aliciya birden fazla arac, toplam uzerinden tek plan.
@@ -248,7 +249,7 @@ export interface BasketSaleRequest {
 }
 
 // Gecmis senet / cek aktarimi (aracsiz plan). SALE: kisi bize borclu, PURCHASE: biz borcluyuz.
-export interface OpenItemsRequest { direction: PlanDirection; date: string; installments: InstallmentRequest[] }
+export interface OpenItemsRequest { direction: PlanDirection; date: string; installments: InstallmentRequest[]; beneficiaryId: string | null }
 
 export interface PaymentPlanResponse {
   id: string;

@@ -42,6 +42,11 @@ public class PaymentPlan extends BaseModel {
     @Column(name = "total_cents", nullable = false)
     private Long totalCents;
 
+    // Gecmis senet / cek kime ait (V18): tahsil edildikce bu sermayedarin sermayesine yazilir
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "beneficiary_contact_id")
+    private Contact beneficiary;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by_id", updatable = false)
     private PanelUser createdBy;

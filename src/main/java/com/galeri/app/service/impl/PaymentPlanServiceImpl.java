@@ -50,6 +50,7 @@ import com.galeri.app.repository.PaymentPlanRepository;
 import com.galeri.app.repository.PaymentPlanVehicleRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.security.CurrentUser;
+import com.galeri.app.service.CapitalService;
 import com.galeri.app.service.CoOwnershipService;
 import com.galeri.app.service.LedgerService;
 import com.galeri.app.service.PaymentPlanService;
@@ -90,6 +91,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     private final PanelUserRepository panelUserRepository;
     private final LedgerService ledgerService;
     private final CoOwnershipService coOwnershipService;
+    private final CapitalService capitalService;
     private final Clock clock;
     private final PaymentPlanVehicleRepository basketRepository;
 
@@ -442,6 +444,11 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         plan.setContact(contact);
         plan.setTotalCents(total);
         plan.setOpeningEntryId(opening.getId());
+        // Alacak sermayedara aitse tahsil edildikce onun sermayesine yazilir; dukkan sahibi secilirse zaten havuzda
+        if (r.beneficiaryId() != null && r.direction() == PlanDirection.SALE) {
+            Contact beneficiary = getContact(r.beneficiaryId(), tenantId);
+            if (!beneficiary.isOwner()) plan.setBeneficiary(beneficiary);
+        }
         plan.setCreatedBy(panelUserRepository.getReferenceById(CurrentUser.principal().userId()));
         plan = planRepository.save(plan);
 
@@ -546,6 +553,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         if (installmentRepository.markPaid(i.getId(), entry.getId(), paidAt) == 0) throw new InstallmentAlreadyPaidException();
         i.setPaidEntryId(entry.getId());   // bellekteki nesne de guncel (ayni degerler; ek UPDATE zararsiz)
         i.setPaidAt(paidAt);
+        credit(i, r.date());
         // Ortak aracin alis taksiti: odeme sahiplere paylarina gore bolunur (cepten kisim sermaye girisi)
         if (plan.getDirection() == PlanDirection.PURCHASE) coOwnershipService.syncContributions(vehicle);
         return single(i, vehicle);
@@ -569,6 +577,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         ledgerService.reverse(i.getPaidEntryId());
         i.setPaidEntryId(null);
         i.setPaidAt(null);
+        uncredit(i);
         if (i.getPlan().getDirection() == PlanDirection.PURCHASE) {
             installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
             coOwnershipService.syncContributions(vehicleOf(i.getPlan()));
@@ -624,6 +633,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         i.setEndorsedTo(to);
         i.setEndorseEntryId(e.out().getId());
         i.setBouncedAt(null);
+        credit(i, r.date());   // ciro da odemedir: senet sermayedarinsa degeri ona yazilir
         if (target != null) {
             if (installmentRepository.markPaid(target.getId(), e.out().getId(), paidAt) == 0) throw new InstallmentAlreadyPaidException();
             target.setPaidEntryId(e.out().getId());
@@ -645,6 +655,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             ledgerService.reverse(i.getPaidEntryId());
             i.setPaidEntryId(null);
             i.setPaidAt(null);
+            uncredit(i);
         }
         i.setBouncedAt(now());
         return single(i, null);
@@ -660,12 +671,30 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         source.setPaidAt(null);
         source.setEndorsedTo(null);
         source.setEndorseEntryId(null);
+        uncredit(source);
         target.ifPresent(t -> {
             t.setPaidEntryId(null);
             t.setPaidAt(null);
             installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
             coOwnershipService.syncContributions(vehicleOf(t.getPlan()));
         });
+    }
+
+    /** Sermayedara ait senet / cek odendi: tutari onun sermayesine yazilir. */
+    private void credit(Installment i, LocalDate date) {
+        Contact beneficiary = i.getPlan().getBeneficiary();
+        if (beneficiary == null || i.getCreditEntryId() != null) return;
+        String what = i.getMethod() == PaymentMethod.CHEQUE ? "Çek" : i.getMethod() == PaymentMethod.PROMISSORY_NOTE ? "Senet" : "Alacak";
+        LedgerEntry e = capitalService.creditFromOwner(beneficiary, i.getAmountCents(), date,
+                what + " tahsil edildi (" + i.getPayer().getName() + "): " + beneficiary.getName());
+        i.setCreditEntryId(e.getId());
+    }
+
+    /** Odeme geri alindi: sermayedara yazilan tutar terslenir. */
+    private void uncredit(Installment i) {
+        if (i.getCreditEntryId() == null) return;
+        ledgerService.reverse(i.getCreditEntryId());
+        i.setCreditEntryId(null);
     }
 
     /**
@@ -771,7 +800,8 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         return new InstallmentResponse(i.getId(), p.getId(), p.getDirection(), vehicle, i.getSeq(), count, i.getDueDate(),
                 i.getAmountCents(), i.getMethod(), i.getNoteNo(), summary(i.getPayer()), summary(p.getContact()),
                 status, daysLate, i.getPaidEntryId(), i.getPaidAt(), i.getBankName(), i.getDrawerName(), summary(i.getEndorsedTo()),
-                i.getBouncedAt() != null && !i.isPaid(), down, down ? 0 : regular.indexOf(i.getId()) + 1, regular.size());
+                i.getBouncedAt() != null && !i.isPaid(), down, down ? 0 : regular.indexOf(i.getId()) + 1, regular.size(),
+                summary(p.getBeneficiary()));
     }
 
     private Installment lockInstallment(UUID id) {

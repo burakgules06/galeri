@@ -211,6 +211,12 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
     Yeniden ortak yapılınca aynı hesap açılır.
   - Panel: araç detayında "Kaldır", Ortaklar listesinde "Kaldır" (onaylı). Test: `RemoveIT`.
 
+- **Geçmiş senet / çek kime ait** (`feat/open-items-beneficiary`, `V18__open_items_beneficiary.sql`). Yeni ortam değişkeni yok.
+  - Geçmiş senet / çek girişinde (alacak) "Kime ait" seçilir: Galeri (varsayılan) ya da bir sermayedar (`payment_plan.beneficiary_contact_id`).
+  - Sermayedarınsa her tahsilatta ve ciroda tutar dükkân sahibinden ona aktarılır (`CAPITAL_TRANSFER`, `installment.credit_entry_id`);
+    tahsilat geri alınınca, ciro geri alınınca ya da karşılıksız çıkınca terslenir. Tahsil edilmeden sermaye değişmez.
+  - Ödemeler listesinde senedin sahibi etiketle görünür. Test: `OpenItemsIT` (senet, ciro, geri alma, karşılıksız).
+
 ## Sıradaki
 
 Galerici geri bildirimi 4 (`feat/basket-sale`): toplu satış. `V14__basket_sale.sql`: `payment_plan_vehicle` (sepet planı araçsızdır;

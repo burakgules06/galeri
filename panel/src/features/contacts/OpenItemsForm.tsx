@@ -25,6 +25,9 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
   const [picked, setPicked] = useState<ContactSummary | null>(null);
   const contact: ContactSummary | null = fixedContact ?? picked;
   const [direction, setDirection] = useState<PlanDirection>("SALE");
+  const [beneficiaryId, setBeneficiaryId] = useState("");
+  const partners = useLoad(() => api.partners(), []);
+  const investors = (partners.data ?? []).filter((p) => !p.owner);
   const [rows, setRows] = useState<Row[]>([emptyRow(todayIso())]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -46,7 +49,7 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
     try {
       if (!contact) { setSaving(false); return setError("Kişiyi seç."); }
       await api.addOpenItems(contact.id, {
-        direction, date: todayIso(),
+        direction, date: todayIso(), beneficiaryId: direction === "SALE" && beneficiaryId ? beneficiaryId : null,
         installments: filled.map((r) => ({
           dueDate: r.dueDate, amountCents: cents(r), method: r.method, noteNo: r.noteNo.trim() || null, payerId: null,
           paidNow: false, accountId: null,
@@ -81,6 +84,14 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
         )}
         <Segment<PlanDirection> value={direction} onChange={setDirection}
           options={[{ value: "SALE", label: contact ? `${contact.name} bize borçlu` : "Bize borçlu" }, { value: "PURCHASE", label: "Biz borçluyuz" }]} />
+        {direction === "SALE" && investors.length > 0 && (
+          <Field label="Kime ait">
+            <select className={inputClass} value={beneficiaryId} onChange={(e) => setBeneficiaryId(e.target.value)}>
+              <option value="">Galeri</option>
+              {investors.map((p) => <option key={p.contactId} value={p.contactId}>{p.name}</option>)}
+            </select>
+          </Field>
+        )}
 
         <div className="space-y-2">
           {rows.map((r) => (
