@@ -42,7 +42,9 @@ export function PartnerCapitalCard({ revision = 0 }: { revision?: number }) {
 
       {h && (
         <>
-          <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">\n            <div className="min-w-0">\n              <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+          <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <div className="min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-5">
             <div className="mx-auto sm:mx-0">
               <Donut ariaLabel={`${h.name} sermayesinin dağılımı`} size={168} thickness={22}
                 slices={[
