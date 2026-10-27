@@ -187,7 +187,7 @@ Her alış ve satışın bir ödeme planı vardır:
 ```
 payment_plan: vehicle_id | direction (SALE/PURCHASE) | contact_id (karşı taraf) | total_cents | created_by_id
               unique (vehicle_id, direction): aracın her yönde en fazla bir planı
-installment:  plan_id | seq | due_date | amount_cents | method (CASH/TRANSFER/PROMISSORY_NOTE/INSTITUTION)
+installment:  plan_id | seq | due_date | amount_cents | method (CASH/TRANSFER/PROMISSORY_NOTE/INSTITUTION/CHEQUE)
               | note_no | payer_contact_id | paid_entry_id (→ ledger_entry) | paid_at
 ```
 
@@ -308,7 +308,7 @@ ADMIN kendini pasifleştiremez. Rol ve aktiflik her istekte DB'den okunur; pasif
 | `catalog_entry` | make, model (galerinin kataloğa eklediği temel model); unique (tenant_id, lower(make), lower(model)) |
 | `vehicle_share` | vehicle_id, nullable contact_id (null = Havuz), share_bp, profit_share_bp, contribution_source (CAPITAL/POCKET/HYBRID), pocket_cents |
 | `payment_plan` | vehicle_id, direction (SALE/PURCHASE), contact_id, total_cents, created_by_id; unique (vehicle_id, direction) |
-| `installment` | plan_id, seq, due_date, amount_cents, method, note_no, payer_contact_id, paid_entry_id, paid_at; index (tenant_id, due_date) ödenmemişler için |
+| `installment` | plan_id, seq, due_date, amount_cents, method, note_no, bank_name, drawer_name, payer_contact_id, paid_entry_id, paid_at, endorsed_to_contact_id, endorse_entry_id, bounced_at; index (tenant_id, due_date) ödenmemişler için |
 | `push_subscription` | panel_user_id, endpoint (unique), p256dh, auth |
 | `notification_log` | installment_id, notify_date, sent_at; unique (installment_id, notify_date) |
 

@@ -10,6 +10,8 @@ export interface PlanRow {
   amountCents: number;
   method: PaymentMethod;
   noteNo: string;
+  bankName: string;
+  drawerName: string;
   payer: ContactSummary | null;   // null: alici
   paidNow: boolean;
   accountId: string;
@@ -18,7 +20,7 @@ export interface PlanRow {
 let nextKey = 1;
 
 export function row(partial: Partial<PlanRow> & Pick<PlanRow, "dueDate" | "amountCents">): PlanRow {
-  return { key: nextKey++, method: "CASH", noteNo: "", payer: null, paidNow: false, accountId: "", ...partial };
+  return { key: nextKey++, method: "CASH", noteNo: "", bankName: "", drawerName: "", payer: null, paidNow: false, accountId: "", ...partial };
 }
 
 /** Pesin: tek satir, vade satis gunu, "simdi alindi". */
@@ -72,5 +74,7 @@ export function toRequest(r: PlanRow): InstallmentRequest {
     payerId: r.payer?.id ?? null,
     paidNow: r.paidNow,
     accountId: r.paidNow ? r.accountId : null,
+    bankName: r.method === "CHEQUE" ? r.bankName.trim() || null : null,
+    drawerName: r.method === "CHEQUE" ? r.drawerName.trim() || null : null,
   };
 }

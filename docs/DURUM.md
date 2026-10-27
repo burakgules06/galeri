@@ -193,6 +193,14 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
 
 ## Sıradaki
 
+Galerici geri bildirimi 2 (`feat/cheques`): çek ve senet takibi. `V12__cheques_and_endorsement.sql`: ödeme yöntemine `CHEQUE`
+(banka, keşideci), taksite ciro (`endorsed_to_contact_id`, `endorse_entry_id`) ve karşılıksız (`bounced_at`), hesap türüne
+`PORTFOLIO` (ciroda ara hesap, bakiyesi hep 0). Ciro: `POST /api/installments/{id}/endorse` { toContactId, targetInstallmentId?, date }
+→ BALANCE(veren) → PORTFOLIO (taksit ödendi) + PORTFOLIO → BALANCE(alan); hedef alış taksiti çekten büyükse bölünür, seçilmezse
+kişinin carisine ödeme. Ciro iki taraftan da geri alınır (ikisi birlikte). Karşılıksız: `POST /{id}/bounce` tahsilatı ya da ciroyu geri alır,
+borç açılır. Kısmi tahsilat: `collect` { amountCents } taksitten azsa taksit bölünür (çek bölünmez). Hata kodları 1048-1051.
+Panel: plan kurucuda Çek (no, banka, keşideci), Ödemeler'de "Çek / Senet" sekmesi (Alınan / Verilen), satırda Ciro et / Karşılıksız,
+tahsilde tutar. Test: `ChequeIT` (gerçek Postgres, her adımda `LedgerInvariants` + portföy bakiyesi 0).
 Galerici geri bildirimi 1 (`feat/bulk-expense`): Kasa > "Masraf ekle" artık toplu giriş (tarih ve hesap üstte bir kez,
 satırlarda araç / kategori / tutar / açıklama, Enter yeni satır). `POST /api/expenses/bulk` hepsini tek transaction'da yazar.
 `NameUtil`: tamamı büyük ya da tamamı küçük yazılmış kişi adı, kullanıcı adı ve renk kelime başı büyük kaydedilir (karışık yazıma dokunulmaz;

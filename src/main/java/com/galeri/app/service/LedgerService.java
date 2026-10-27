@@ -61,6 +61,16 @@ public interface LedgerService {
     /** Satis: INCOME -> BALANCE(odeyen). Odeyenin carisi yoksa acilir. */
     LedgerEntry writeSale(Vehicle vehicle, Contact payer, long amountCents, LocalDate date);
 
+    /** Ciro hareketleri: cekin / senedin alindigi kisiden portfoye (tahsilat), portfoyden verildigi kisiye (odeme). */
+    record Endorsement(LedgerEntry in, LedgerEntry out) {}
+
+    /**
+     * Ciro: COLLECTION BALANCE(from) -> PORTFOLIO ve PAYMENT PORTFOLIO -> BALANCE(to), ayni tutar ve tarihle. Portfoy bakiyesi
+     * 0'a doner. fromVehicle cekin geldigi satis, toVehicle (bos olabilir) cekle odenen alis.
+     */
+    Endorsement writeEndorsement(Vehicle fromVehicle, Contact from, Vehicle toVehicle, Contact to, long amountCents, LocalDate date,
+                                 String inDescription, String outDescription);
+
     /**
      * Taksit kapanisi. SALE: tahsilat (COLLECTION) BALANCE(odeyen) -> kasa/banka;
      * PURCHASE: odeme (PAYMENT) kasa/banka -> BALANCE(odeyen). accountId kasa ya da banka olmali.

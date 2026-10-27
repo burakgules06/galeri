@@ -35,11 +35,14 @@ export const api = {
     const qs = p.toString();
     return apiFetch<InstallmentResponse[]>(`/api/installments${qs ? `?${qs}` : ""}`);
   },
-  collect: (id: string, accountId: string, date: string) =>
-    apiFetch<InstallmentResponse>(`/api/installments/${id}/collect`, json({ accountId, date })),
+  collect: (id: string, accountId: string, date: string, amountCents: number | null = null) =>
+    apiFetch<InstallmentResponse>(`/api/installments/${id}/collect`, json({ accountId, date, amountCents })),
+  endorse: (id: string, toContactId: string, targetInstallmentId: string | null, date: string) =>
+    apiFetch<InstallmentResponse>(`/api/installments/${id}/endorse`, json({ toContactId, targetInstallmentId, date })),
+  bounce: (id: string) => apiFetch<InstallmentResponse>(`/api/installments/${id}/bounce`, { method: "POST" }),
   undoInstallment: (id: string) => apiFetch<InstallmentResponse>(`/api/installments/${id}/undo`, { method: "POST" }),
-  updateInstallment: (id: string, dueDate: string, noteNo: string | null) =>
-    apiFetch<InstallmentResponse>(`/api/installments/${id}`, json({ dueDate, noteNo }, "PATCH")),
+  updateInstallment: (id: string, dueDate: string, noteNo: string | null, bankName: string | null = null, drawerName: string | null = null) =>
+    apiFetch<InstallmentResponse>(`/api/installments/${id}`, json({ dueDate, noteNo, bankName, drawerName }, "PATCH")),
   // Sermaye ve kasa islemleri (sadece ADMIN)
   partners: () => apiFetch<Partner[]>("/api/partners"),
   addPartner: (contactId: string) => apiFetch<Partner>("/api/partners", json({ contactId })),

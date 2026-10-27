@@ -279,7 +279,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
               )}
               <PlanBuilder baseCents={Math.max(0, price - lockedCents)} date={purchaseDate} mode={planMode} onMode={setPlanMode}
                 rows={rows} onRows={setRows} remaining={remaining} accounts={accounts.data ?? []} organizations={[]}
-                modes={["INSTALLMENTS", "MIXED"]} methods={["CASH", "TRANSFER", "PROMISSORY_NOTE"]}
+                modes={["INSTALLMENTS", "MIXED"]} methods={["CASH", "TRANSFER", "PROMISSORY_NOTE", "CHEQUE"]}
                 paidNowLabel="Şimdi ödendi" downHint="Şimdi ödenir" />
               <PlanSummary planned={planned} remaining={remaining} ready={price > 0} />
             </>

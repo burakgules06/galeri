@@ -51,4 +51,8 @@ public class ErrorMessageConstant {
     public static final int INVALID_SHOP_CUT = 1045;
     public static final int PUSH_UNAVAILABLE = 1046;
     public static final int PUSH_DELIVERY_FAILED = 1047;
+    public static final int ENDORSE_NOT_ALLOWED = 1048;
+    public static final int INVALID_ENDORSE_TARGET = 1049;
+    public static final int INVALID_PARTIAL_AMOUNT = 1050;
+    public static final int BOUNCE_NOT_ALLOWED = 1051;
 }

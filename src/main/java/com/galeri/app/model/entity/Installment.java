@@ -55,7 +55,30 @@ public class Installment extends BaseModel {
     @Column(name = "paid_at")
     private OffsetDateTime paidAt;
 
+    // Cek bilgisi (V12): bankasi ve keside eden (cekin asil sahibi, odeyenden farkli olabilir)
+    @Column(name = "bank_name", length = 60)
+    private String bankName;
+
+    @Column(name = "drawer_name", length = 120)
+    private String drawerName;
+
+    // Ciro (V12): alinan cek / senet bu kisiye odeme olarak verildi. paidEntryId: veren -> portfoy, endorseEntryId: portfoy -> alan
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "endorsed_to_contact_id")
+    private Contact endorsedTo;
+
+    @Column(name = "endorse_entry_id")
+    private UUID endorseEntryId;
+
+    // Karsiliksiz cikti (V12): odemesi geri alindi, borc yeniden acik
+    @Column(name = "bounced_at")
+    private OffsetDateTime bouncedAt;
+
     public boolean isPaid() {
         return paidEntryId != null;
+    }
+
+    public boolean isEndorsed() {
+        return endorseEntryId != null;
     }
 }

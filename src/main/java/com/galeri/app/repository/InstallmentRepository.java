@@ -1,7 +1,9 @@
 package com.galeri.app.repository;
 
 import com.galeri.app.model.entity.Installment;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,6 +12,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface InstallmentRepository extends JpaRepository<Installment, UUID> {
@@ -51,6 +54,24 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
     List<Installment> findOpenDueBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
     boolean existsByPaidEntryId(UUID entryId);
+
+    Optional<Installment> findByPaidEntryId(UUID entryId);
+
+    Optional<Installment> findByEndorseEntryId(UUID entryId);
+
+    /** Bolme, ciro ve karsiliksiz isaretleme ayni taksitte es zamanli calismasin diye satir kilidi. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select i from Installment i where i.id = :id")
+    Optional<Installment> lockById(@Param("id") UUID id);
+
+    /** Kismi tahsilat / ciro icin taksitin tutarini kucultur; sadece odenmemisse. Kalan ayri taksit olarak eklenir. */
+    @Modifying(flushAutomatically = true)
+    @Query(value = "update installment set amount_cents = :amount, updated_at = now() where id = :id and paid_entry_id is null",
+            nativeQuery = true)
+    int resize(@Param("id") UUID id, @Param("amount") long amountCents);
+
+    @Query("select coalesce(max(i.seq), 0) from Installment i where i.plan.id = :planId")
+    int maxSeq(@Param("planId") UUID planId);
 
     boolean existsByPlan_IdAndPaidEntryIdIsNotNull(UUID planId);
 }

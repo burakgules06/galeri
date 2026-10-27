@@ -153,6 +153,7 @@ public class PaymentReminderServiceImpl implements PaymentReminderService {
             case PROMISSORY_NOTE -> "senet ";
             case INSTITUTION -> "kurum ";
             case TRANSFER -> "havale ";
+            case CHEQUE -> "çek ";
             case CASH -> "";
         };
     }

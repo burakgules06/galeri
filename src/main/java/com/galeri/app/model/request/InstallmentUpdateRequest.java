@@ -5,5 +5,14 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
-// Odenmemis taksitte sadece vade ve senet no degisir; tutar ve odeyen degismez.
-public record InstallmentUpdateRequest(@NotNull LocalDate dueDate, @Size(max = 40) String noteNo) {}
+// Odenmemis taksitte sadece vade, senet / cek no ve cek bilgisi degisir; tutar ve odeyen degismez.
+public record InstallmentUpdateRequest(
+        @NotNull LocalDate dueDate,
+        @Size(max = 40) String noteNo,
+        @Size(max = 60) String bankName,
+        @Size(max = 120) String drawerName
+) {
+    public InstallmentUpdateRequest(LocalDate dueDate, String noteNo) {
+        this(dueDate, noteNo, null, null);
+    }
+}

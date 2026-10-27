@@ -131,7 +131,7 @@ export function formatPhone(phone: string | null | undefined): string {
 export const SERIES = ["var(--color-seri-1)", "var(--color-seri-2)", "var(--color-seri-3)", "var(--color-seri-4)", "var(--color-seri-5)", "var(--color-seri-6)"];
 
 export const METHOD: Record<PaymentMethod, string> = {
-  CASH: "Nakit", TRANSFER: "Havale", PROMISSORY_NOTE: "Senet", INSTITUTION: "Evim / kredi",
+  CASH: "Nakit", TRANSFER: "Havale", PROMISSORY_NOTE: "Senet", INSTITUTION: "Evim / kredi", CHEQUE: "Çek",
 };
 
 /** ISO tarihe ay ekler; ayin son gunu tasarsa ay sonuna yaslar (31 Ocak + 1 ay -> 28/29 Subat). */

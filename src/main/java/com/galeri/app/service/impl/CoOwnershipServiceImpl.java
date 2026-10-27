@@ -212,7 +212,9 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
             List<UUID> paid = installmentRepository.findByPlanIds(List.of(plan.getId())).stream()
                     .filter(Installment::isPaid).map(Installment::getPaidEntryId).toList();
             for (LedgerEntry e : entryRepository.findAllById(paid)) {
-                payments.add(new Payment(e.getId(), e.getEntryDate(), e.getCreatedAt(), e.getAmountCents(), e.getSourceAccount()));
+                // Ciroyla (portfoyden) odenen taksitte ortagin cepten katkisi kasaya girer
+                Account money = e.getSourceAccount().getType().isMoneyAccount() ? e.getSourceAccount() : cashAccount(vehicle.getTenantId());
+                payments.add(new Payment(e.getId(), e.getEntryDate(), e.getCreatedAt(), e.getAmountCents(), money));
             }
         });
         LocalDate saleDate = vehicle.getStatus() == VehicleStatus.IN_STOCK ? null : vehicle.getSaleDate();
@@ -499,6 +501,16 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
                     a.setName(contact.getName());
                     return accountRepository.save(a);
                 });
+    }
+
+    private Account cashAccount(UUID tenantId) {
+        return accountRepository.findFirstByTenantIdAndType(tenantId, AccountType.CASH).orElseGet(() -> {
+            Account a = new Account();
+            a.setTenantId(tenantId);
+            a.setType(AccountType.CASH);
+            a.setName("Kasa");
+            return accountRepository.save(a);
+        });
     }
 
     private Account systemAccount(UUID tenantId, AccountType type) {
