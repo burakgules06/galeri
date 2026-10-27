@@ -1,84 +1,108 @@
-// Sermayedarlar kisi kisi (/api/holders): toplam sermaye, nakitte kalani, hangi aracta ne kadari (gercek tutar).
+// Sermayedarlar (/api/holders): listeden secilen kisinin parasi halka grafikte nakit / aracta / alacak olarak.
 // Dukkan sahibi havuzdan kalandir: kasa + bankalar + araclar + alacaklar - borclar - sermayedarlarin parasi.
+import { useState } from "react";
 import { api } from "../../api/galeri";
-import { SplitBar } from "../../shared/charts/Donut";
+import { Donut } from "../../shared/charts/Donut";
 import { percent, tl, tlShort } from "../../shared/format";
+import type { Holder } from "../../shared/types";
 import { useLoad } from "../../shared/useLoad";
-import { ErrorBox } from "../../shared/ui/Common";
+import { Button, ErrorBox } from "../../shared/ui/Common";
 import { Plate } from "../../shared/ui/Plate";
 
 const CASH = "var(--color-seri-1)";
 const BOUND = "var(--color-seri-4)";
-const MAX_PLATES = 6;
+const RECEIVABLE = "var(--color-seri-3)";
+
+const keyOf = (h: Holder) => h.contactId ?? "owner";
 
 export function PartnerCapitalCard({ revision = 0 }: { revision?: number }) {
   const { data, error } = useLoad(() => api.holders(), [revision]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [details, setDetails] = useState(false);
   const rows = (data ?? []).filter((h) => h.owner || h.capitalCents !== 0);
-
-  const total = rows.reduce((t, r) => t + r.capitalCents, 0);
-  const cash = rows.reduce((t, r) => t + r.cashCents, 0);
-  const inVehicles = rows.reduce((t, r) => t + r.vehicleCents, 0);
-  const max = Math.max(1, ...rows.map((r) => r.capitalCents));
+  const h = rows.find((r) => keyOf(r) === selected) ?? rows[0];
 
   return (
     <section className="kart p-4 md:p-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="etiket">Sermayedarlar</p>
-          <p className="sayi font-bold text-[26px] leading-tight mt-1">{tl(total)}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <p className="etiket shrink-0">Sermayedar</p>
+          {rows.length > 0 && (
+            <select aria-label="Sermayedar seç" value={h ? keyOf(h) : ""} onChange={(e) => { setSelected(e.target.value); setDetails(false); }}
+              className="h-8 max-w-[180px] rounded-lg border border-cizgi-2 bg-yuzey px-2 text-[14px] font-semibold focus:outline-none focus:border-plaka">
+              {rows.map((r) => <option key={keyOf(r)} value={keyOf(r)}>{r.name}</option>)}
+            </select>
+          )}
         </div>
-        <div className="flex gap-4 text-[13px] text-murekkep-2">
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-[4px]" style={{ background: CASH }} />Nakit <b className="sayi text-murekkep text-[14px]">{tlShort(cash)}</b></span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-[4px]" style={{ background: BOUND }} />Araçta <b className="sayi text-murekkep text-[14px]">{tlShort(inVehicles)}</b></span>
-        </div>
+        {h?.owner && <span className="text-[11px] font-semibold text-plaka-koyu bg-plaka-acik rounded px-1.5 py-0.5">Dükkân sahibi</span>}
       </div>
       <ErrorBox message={error} />
+      {data && rows.length === 0 && <p className="text-[14px] text-murekkep-3 mt-4">Henüz sermaye girişi yok.</p>}
 
-      <ul className="mt-4 space-y-5">
-        {rows.map((r) => (
-          <li key={r.contactId ?? "owner"}>
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="flex items-center gap-2 min-w-0">
-                {r.contactId
-                  ? <a href={`#/contacts/${r.contactId}`} className="font-semibold text-[15px] truncate hover:text-plaka">{r.name}</a>
-                  : <span className="font-semibold text-[15px] truncate">{r.name}</span>}
-                {r.owner && <span className="text-[11px] font-semibold text-plaka-koyu bg-plaka-acik rounded px-1.5 py-0.5 shrink-0">Dükkân sahibi</span>}
-              </span>
-              <span className="shrink-0 text-right">
-                <b className={`sayi text-[18px] ${r.capitalCents < 0 ? "text-tehlike" : ""}`}>{tl(r.capitalCents)}</b>
-                <span className="text-[13px] text-murekkep-3 ml-1.5">{percent(r.shareBp)}</span>
-              </span>
+      {h && (
+        <>
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-5">
+            <div className="mx-auto sm:mx-0">
+              <Donut ariaLabel={`${h.name} sermayesinin dağılımı`} size={168} thickness={22}
+                slices={[
+                  { key: "cash", label: `Nakit ${tl(h.cashCents)}`, value: Math.max(0, h.cashCents), color: CASH },
+                  { key: "bound", label: `Araçta ${tl(h.vehicleCents)}`, value: h.vehicleCents, color: BOUND },
+                  { key: "other", label: `Alacak ${tl(h.otherCents)}`, value: Math.max(0, h.otherCents), color: RECEIVABLE },
+                ].filter((s) => s.value > 0)}
+                center={<><span className="sayi font-bold text-[20px] leading-none">{tlShort(h.capitalCents)}</span>
+                  <span className="etiket mt-1.5">{percent(h.shareBp)}</span></>} />
             </div>
-            <div className="mt-1.5" style={{ width: `${Math.max(4, (Math.max(0, r.capitalCents) / max) * 100)}%` }}>
-              <SplitBar height={10} parts={[
-                { key: "cash", value: Math.max(0, r.cashCents), color: CASH },
-                { key: "bound", value: r.vehicleCents, color: BOUND },
-              ]} />
-            </div>
-            <p className="mt-1 text-[13px] text-murekkep-2">
-              Nakit <span className={`sayi text-[14px] ${r.cashCents < 0 ? "text-tehlike" : "text-murekkep"}`}>{tl(r.cashCents)}</span>
-              <span className="mx-1.5 text-murekkep-3">·</span>
-              Araçta <span className="sayi text-[14px] text-murekkep">{tl(r.vehicleCents)}</span>
-              {r.otherCents !== 0 && <>
-                <span className="mx-1.5 text-murekkep-3">·</span>
-                Alacak / borç <span className={`sayi text-[14px] ${r.otherCents < 0 ? "text-tehlike" : "text-murekkep"}`}>{tl(r.otherCents)}</span>
-              </>}
-            </p>
-            {r.vehicles.length > 0 && (
-              <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
-                {r.vehicles.slice(0, MAX_PLATES).map((x) => (
-                  <li key={x.vehicle.id}>
-                    <a href={`#/vehicles/${x.vehicle.id}`} className="inline-flex items-center gap-1.5 text-[13px] hover:text-plaka">
-                      <Plate plate={x.vehicle.plate} size="sm" /><span className="sayi text-[14px]">{tl(x.cents)}</span>
-                    </a>
-                  </li>
-                ))}
-                {r.vehicles.length > MAX_PLATES && <li className="text-[13px] text-murekkep-2 self-center">+{r.vehicles.length - MAX_PLATES} araç</li>}
-              </ul>
-            )}
-          </li>
-        ))}
-      </ul>
+            <dl className="grow min-w-0 space-y-2 text-[15px]">
+              <Line label="Sermaye" value={h.capitalCents} bold />
+              <Line label="Nakit" value={h.cashCents} color={CASH} />
+              <Line label="Araçta" value={h.vehicleCents} color={BOUND} />
+              {h.otherCents !== 0 && <Line label={h.otherCents > 0 ? "Alacak" : "Borç"} value={h.otherCents} color={h.otherCents > 0 ? RECEIVABLE : undefined} />}
+              <Button variant="secondary" className="h-9 px-3 text-[14px] mt-1" onClick={() => setDetails((d) => !d)}>
+                {details ? "Detayları gizle" : "Detayları gör"}
+              </Button>
+            </dl>
+          </div>
+
+          {details && (
+            <ul className="mt-4 border-t border-cizgi divide-y divide-cizgi">
+              {h.vehicles.map((x) => (
+                <li key={x.vehicle.id}>
+                  <a href={`#/vehicles/${x.vehicle.id}`} className="flex items-center gap-3 py-2.5 hover:bg-yuzey-2 -mx-1 px-1 rounded">
+                    <Plate plate={x.vehicle.plate} size="sm" />
+                    <span className="grow min-w-0 truncate font-semibold text-[14px]">{x.vehicle.make} <span className="font-medium text-murekkep-2">{x.vehicle.model}</span></span>
+                    <span className="sayi text-[15px]">{tl(x.cents)}</span>
+                  </a>
+                </li>
+              ))}
+              <li className="flex items-center gap-3 py-2.5">
+                <span className="w-3 h-3 rounded-[4px] shrink-0" style={{ background: CASH }} />
+                <span className="grow font-semibold text-[14px]">Nakit</span>
+                <span className={`sayi text-[15px] ${h.cashCents < 0 ? "text-tehlike" : ""}`}>{tl(h.cashCents)}</span>
+              </li>
+            </ul>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-murekkep-2">
+            <Legend color={CASH} label="Nakit (kasa ve bankalardaki payı)" />
+            <Legend color={BOUND} label="Araçta (araçlara bağlı parası)" />
+            <Legend color={RECEIVABLE} label="Alacak (senet, çek ve açık alacaklar)" />
+          </div>
+        </>
+      )}
     </section>
   );
+}
+
+function Line({ label, value, color, bold }: { label: string; value: number; color?: string; bold?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      {color ? <span className="w-3 h-3 rounded-[4px] shrink-0" style={{ background: color }} /> : <span className="w-3 shrink-0" />}
+      <dt className="text-murekkep-2">{label}</dt>
+      <dd className={`ml-auto whitespace-nowrap sayi ${bold ? "font-bold text-[18px]" : "text-[16px]"} ${value < 0 ? "text-tehlike" : ""}`}>{tl(value)}</dd>
+    </div>
+  );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ background: color }} />{label}</span>;
 }
