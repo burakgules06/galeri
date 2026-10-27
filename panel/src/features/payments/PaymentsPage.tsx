@@ -15,9 +15,9 @@ type Tab = "overdue" | "week" | "all" | "payables" | "instruments";
 type Side = "SALE" | "PURCHASE";
 
 const TABS: { value: Tab; label: string }[] = [
+  { value: "all", label: "Tümü" },
   { value: "overdue", label: "Geciken" },
   { value: "week", label: "Bu hafta" },
-  { value: "all", label: "Tümü" },
   { value: "payables", label: "Ödenecekler" },
   { value: "instruments", label: "Çek / Senet" },
 ];
