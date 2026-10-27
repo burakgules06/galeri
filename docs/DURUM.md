@@ -195,6 +195,7 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
   - Havuz = kasa + bankalar + araçlar + alacaklar − borçlar. Sermayedarın sermayesi defterden; dükkân sahibininki havuzdan kalan.
     Giderler ve çekişler sadece dükkân sahibini küçültür. Kâr sadece araç satışında, araç alınırken girilen kâr yüzdesiyle;
     kasadaki nakit kâr getirmez, ay sonu dağıtımı yok (Dönem kârı sekmesindeki "sermayeye ekle" kaldırıldı).
+  - Dükkân sahibinin araç payı, stok net araç değerinden diğer sermayedarların ödenmiş katkıları çıkarılarak bulunur; ortak araç masrafları artık araç değerinde kalır, alacak/borç artığına yazılmaz.
   - `GET /api/holders`: kişi başına sermaye, nakit, araçta (araç araç gerçek tutar), alacak/borç ve bilgi amaçlı yüzde.
     Yüzde ortaklık tabanına göre (`contact.capital_base`: Tüm varlık / Araçlar / Nakit), ortak eklerken seçilir, sonra değişir.
   - `POST /api/capital-transfers` (`CAPITAL_TRANSFER`): herkes herkese aktarır; kasa değişmez. Sermayedar en fazla nakitteki parasını
