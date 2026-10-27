@@ -21,6 +21,7 @@ export function PartnerCapitalCard({ revision = 0 }: { revision?: number }) {
   const [details, setDetails] = useState(false);
   const rows = (data ?? []).filter((h) => h.owner || h.capitalCents !== 0);
   const h = rows.find((r) => keyOf(r) === selected) ?? rows[0];
+  const statement = useLoad(() => h?.contactId ? api.statement(h.contactId) : Promise.resolve(null), [h?.contactId]);
 
   return (
     <section className="kart p-4 md:p-5">
@@ -41,7 +42,9 @@ export function PartnerCapitalCard({ revision = 0 }: { revision?: number }) {
 
       {h && (
         <>
-          <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-5">
+          <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <div className="min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-5">
             <div className="mx-auto sm:mx-0">
               <Donut ariaLabel={`${h.name} sermayesinin dağılımı`} size={168} thickness={22}
                 slices={[
@@ -82,10 +85,36 @@ export function PartnerCapitalCard({ revision = 0 }: { revision?: number }) {
             </ul>
           )}
 
-          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-murekkep-2">
-            <Legend color={CASH} label="Nakit (kasa ve bankalardaki payı)" />
-            <Legend color={BOUND} label="Araçta (araçlara bağlı parası)" />
-            <Legend color={RECEIVABLE} label="Alacak (senet, çek ve açık alacaklar)" />
+              <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-murekkep-2">
+                <Legend color={CASH} label="Nakit (kasa ve bankalardaki payı)" />
+                <Legend color={BOUND} label="Araçta (araçlara bağlı parası)" />
+                <Legend color={RECEIVABLE} label="Alacak (senet, çek ve açık alacaklar)" />
+              </div>
+            </div>
+            <div className="min-w-0 border-t border-cizgi pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-5">
+              <p className="etiket">Alacak ve verecek</p>
+              {!h.contactId
+                ? <p className="mt-3 text-[14px] text-murekkep-3">Cari hesabı yok.</p>
+                : statement.loading
+                  ? <p className="mt-3 text-[14px] text-murekkep-3">Yükleniyor…</p>
+                  : statement.error
+                    ? <ErrorBox message={statement.error} />
+                    : statement.data && (
+                      <>
+                        <div className="grid grid-cols-2 gap-4 mt-4">
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-semibold text-murekkep-2">Alacak</p>
+                            <p className="sayi font-bold text-[clamp(1.25rem,2.4vw,1.75rem)] leading-tight text-basari mt-1 break-words">{tl(Math.max(0, statement.data.balanceCents))}</p>
+                          </div>
+                          <div className="min-w-0 border-l border-cizgi pl-4">
+                            <p className="text-[13px] font-semibold text-murekkep-2">Verecek</p>
+                            <p className="sayi font-bold text-[clamp(1.25rem,2.4vw,1.75rem)] leading-tight text-tehlike mt-1 break-words">{tl(Math.max(0, -statement.data.balanceCents))}</p>
+                          </div>
+                        </div>
+                        <a href={`#/contacts/${h.contactId}`} className="inline-block mt-4 text-sm font-semibold text-plaka hover:text-plaka-koyu">Cari detayını gör →</a>
+                      </>
+                    )}
+            </div>
           </div>
         </>
       )}
@@ -106,3 +135,4 @@ function Line({ label, value, color, bold }: { label: string; value: number; col
 function Legend({ color, label }: { color: string; label: string }) {
   return <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ background: color }} />{label}</span>;
 }
+

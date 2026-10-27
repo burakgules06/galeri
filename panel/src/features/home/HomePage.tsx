@@ -10,7 +10,6 @@ import { Plate } from "../../shared/ui/Plate";
 import { useLoad } from "../../shared/useLoad";
 import { ErrorBox } from "../../shared/ui/Common";
 import { StatTile } from "../../shared/ui/StatTile";
-import { BalancesCard } from "../ledger/BalancesCard";
 import { VehicleCard } from "../vehicles/VehicleCard";
 import { PartnerCapitalCard } from "./PartnerCapitalCard";
 import { HoldersShareCard } from "./HoldersShareCard";
@@ -82,19 +81,18 @@ function AdminSummary() {
             Maliyet <b className="sayi font-semibold text-murekkep text-[14px]">{tlShort(data.stockCostCents)}</b> · ort. {data.averageDaysInStock} gün
             {data.consignmentCount > 0 && <span className="block text-konsinye font-semibold">+ {data.consignmentCount} konsinye araç</span>}
           </span>} />
-        <StatTile label="Alacak" value={tlShort(data.receivableCents)} tone="positive" sub={`${data.receivables.length} kişiden tahsil edilecek`} />
-        <StatTile label="Verecek" value={tlShort(data.payableCents)} tone="negative" sub={`${data.payables.length} kişiye ödenecek`} />
+        <StatTile label="Alacak" value={tl(data.receivableCents)} tone="positive" valueClassName="whitespace-normal break-words text-[23px] md:text-[28px]" sub={`${data.receivables.length} kişiden tahsil edilecek`} />
+        <StatTile label="Verecek" value={tl(data.payableCents)} tone="negative" valueClassName="whitespace-normal break-words text-[23px] md:text-[28px]" sub={`${data.payables.length} kişiye ödenecek`} />
       </div>
 
       <PaymentsStrip data={data} />
 
+      <PartnerCapitalCard />
+
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
-        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
-          <div className="order-1 flex flex-col gap-4">
-            <PartnerCapitalCard />
-            <HoldersShareCard />
-          </div>
-          <section className="kart p-4 md:p-5 order-3">
+        <div className="flex min-w-0 flex-col gap-4">
+          <HoldersShareCard />
+          <section className="kart p-4 md:p-5">
             <div className="flex flex-wrap items-end justify-between gap-2 mb-2">
               <div>
                 <p className="etiket">Son 6 ay · alım ve satım</p>
@@ -109,12 +107,8 @@ function AdminSummary() {
               ]} />
           </section>
         </div>
-        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
-          <div className="order-2">
-            <BalancesCard receivableCents={data.receivableCents} payableCents={data.payableCents}
-              receivables={data.receivables} payables={data.payables} />
-          </div>
-          <section className="kart p-4 md:p-5 order-4">
+        <div className="flex min-w-0 flex-col gap-4">
+          <section className="kart p-4 md:p-5">
             <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
               <div>
                 <p className="etiket">Son 6 ay · satış kârı</p>
@@ -199,3 +193,4 @@ function StaffSummary({ stock }: { stock: VehicleSummary[] }) {
     </div>
   );
 }
+
