@@ -236,6 +236,7 @@ export interface InstallmentResponse {
   downPayment: boolean;                 // plan kurulurken alinan / odenen pesinat
   number: number;                       // pesinat haric taksit no (pesinatta 0)
   installmentCount: number;             // pesinat haric taksit sayisi
+  holder: ContactSummary | null;        // gecmis senet / cek sermayedarinsa: tahsil edildikce onun sermayesine
 }
 
 // Toplu satis: ayni aliciya birden fazla arac, toplam uzerinden tek plan.
