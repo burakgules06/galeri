@@ -11,7 +11,7 @@ import { OwnershipBadge } from "./OwnershipBadge";
 import { PaymentPlanCard } from "./PaymentPlanCard";
 import { SaleForm } from "./SaleForm";
 import { VehicleForm } from "./VehicleForm";
-import { ExpenseForm } from "../ledger/ExpenseForm";
+import { BulkExpenseForm } from "../ledger/BulkExpenseForm";
 import { LedgerEntryList } from "../ledger/LedgerEntryList";
 
 // Durum renkleri: stokta (onayli, mavi), satildi (olumlu, yesil), kapandi (gri)
@@ -221,8 +221,8 @@ function CostCard({ vehicle }: { vehicle: VehicleDetail }) {
           </div>
         </>
       )}
-      <ExpenseForm open={expenseOpen} onClose={() => setExpenseOpen(false)} vehicle={vehicle}
-        onSaved={() => { setExpenseOpen(false); reload(); }} />
+      {expenseOpen && <BulkExpenseForm vehicle={vehicle} onClose={() => setExpenseOpen(false)}
+        onSaved={() => { setExpenseOpen(false); reload(); }} />}
     </Card>
   );
 }

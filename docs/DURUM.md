@@ -193,6 +193,13 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
 
 ## Sıradaki
 
+Galerici geri bildirimi 4 (`feat/basket-sale`): toplu satış. `V14__basket_sale.sql`: `payment_plan_vehicle` (sepet planı araçsızdır;
+araç ve satış bedeli burada, bir araç en fazla bir sepette). `POST /api/vehicles/basket-sale` { saleDate, buyerId, soldById, items[{vehicleId,
+salePriceCents}], installments } → her araç SOLD ve kendi bedeliyle; satış hareketi araç başına, ödeyenlerin tutarları araçlara sırayla
+(şelale) dağıtılır; taksitler toplam üzerinden tek plan. Sepetteki herhangi bir araçtan "Satışı geri al" bütün sepeti geri alır.
+Ortak araçta ortağa dönüş seçilmez (pay sermayede kalır). Hata kodu 1053. Panel: satış formunda "+ Aynı alıcıya araç ekle",
+ödeme planı kartında sepet listesi. Test: `BasketSaleIT`.
+
 Galerici geri bildirimi 3 (`feat/open-items`): geçmiş senet / çek aktarımı. `V13__open_items.sql`: `payment_plan.vehicle_id`
 boş olabilir, `opening_entry_id` (plan toplamını cariye yazan `OPENING_BALANCE`). `POST /api/contacts/{id}/open-items`
 { direction SALE (bize borçlu) | PURCHASE (biz borçluyuz), date, installments } → OPENING → BALANCE ya da BALANCE → OPENING,
@@ -208,6 +215,11 @@ kişinin carisine ödeme. Ciro iki taraftan da geri alınır (ikisi birlikte). K
 borç açılır. Kısmi tahsilat: `collect` { amountCents } taksitten azsa taksit bölünür (çek bölünmez). Hata kodları 1048-1051.
 Panel: plan kurucuda Çek (no, banka, keşideci), Ödemeler'de "Çek / Senet" sekmesi (Alınan / Verilen), satırda Ciro et / Karşılıksız,
 tahsilde tutar. Test: `ChequeIT` (gerçek Postgres, her adımda `LedgerInvariants` + portföy bakiyesi 0).
+Galerici geri bildirimi 1 (`feat/bulk-expense`): Kasa > "Masraf ekle" artık toplu giriş (tarih ve hesap üstte bir kez,
+satırlarda araç / kategori / tutar / açıklama, Enter yeni satır). `POST /api/expenses/bulk` hepsini tek transaction'da yazar.
+`NameUtil`: tamamı büyük ya da tamamı küçük yazılmış kişi adı, kullanıcı adı ve renk kelime başı büyük kaydedilir (karışık yazıma dokunulmaz;
+mevcut kayıtlar değişmedi). Alış tarihi araç formunda tekrar görünür; satış formunda tarih alıştan önceyse açık uyarı.
+Migration yok.
 
 Bildirim saati (`feat/reminder-time`, `bildirim-saati.md`): `V11__reminder_time.sql` ile tenant'a `reminder_time` (varsayılan 09:00)
 ve `reminder_sent_on` eklendi. Görev her dakika Europe/Istanbul'a göre saati gelen galerileri günde bir kez işler; taksit/abone/VAPID

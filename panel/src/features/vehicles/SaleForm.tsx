@@ -1,9 +1,12 @@
 // Satis: alici, bedel ve odeme plani (PlanBuilder). Altta her zaman "Planlanan / Kalan"; kalan 0 olmadan kaydedilmez.
 // Pesinat ("simdi alindi") ayni islemde kasaya girer. Ortak aracta altta ortaga donus secimi (OwnerReturns).
+// Toplu satis: "+ Araç ekle" ile ayni aliciya stoktaki baska araclar eklenir; bedeller toplanir, plan toplam uzerinden
+// kurulur ve tek istekte kaydedilir (sepet birlikte geri alinir).
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
-import { tlToCents, todayIso } from "../../shared/format";
-import type { ContactResponse, ContactSummary, VehicleDetailAdmin } from "../../shared/types";
+import { formatDate, tl, tlToCents, todayIso } from "../../shared/format";
+import type { ContactResponse, ContactSummary, VehicleDetailAdmin, VehicleSummary } from "../../shared/types";
+import { Plate } from "../../shared/ui/Plate";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal } from "../../shared/ui/Common";
 import { ContactPicker } from "../contacts/ContactPicker";
@@ -38,20 +41,31 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
   const cost = useLoad(() => (coOwned ? api.vehicleCost(vehicle.vehicle.id) : Promise.resolve(null)), [coOwned, vehicle.vehicle.id]);
   const [extraContacts, setExtraContacts] = useState<ContactResponse[]>([]);
   const allContacts = [...extraContacts, ...(contacts.data ?? [])];
+  // Sepet: bu araca ek olarak satilan araclar ve bedelleri
+  const [basket, setBasket] = useState<{ v: VehicleSummary; priceText: string }[]>([]);
+  const [picking, setPicking] = useState(false);
+  const stock = useLoad(() => (picking ? api.vehicles("", "IN_STOCK") : Promise.resolve([] as VehicleSummary[])), [picking]);
 
   const parsed = tlToCents(priceText);
-  const price = parsed != null && !Number.isNaN(parsed) ? parsed : 0;
+  const ownPrice = parsed != null && !Number.isNaN(parsed) ? parsed : 0;
+  const centsOf = (t: string) => { const c = tlToCents(t); return c != null && !Number.isNaN(c) ? c : 0; };
+  const price = ownPrice + basket.reduce((t, b) => t + centsOf(b.priceText), 0);
   const planned = rows.reduce((t, r) => t + (r.amountCents > 0 ? r.amountCents : 0), 0);
   const remaining = price - planned;
-  const canSave = !!buyer && price > 0 && rows.length > 0 && remaining === 0 && rows.every((r) => rowProblem(r) == null);
+  const beforePurchase = !!vehicle.vehicle.purchaseDate && date < vehicle.vehicle.purchaseDate;
+  const canSave = !beforePurchase && !!buyer && ownPrice > 0 && basket.every((b) => centsOf(b.priceText) > 0) && price > 0 && rows.length > 0 && remaining === 0 && rows.every((r) => rowProblem(r) == null);
 
+  // Pesin planda toplam degisince tek satir da degissin (elle duzenlenen planlara dokunulmaz)
+  const syncCash = (total: number) => {
+    if (mode === "CASH") setRows(cashPlan(total, date, rows[0]?.accountId || accounts.data?.[0]?.id || ""));
+  };
   const changePrice = (text: string) => {
     setPriceText(text);
-    // Pesin planda bedel degisince tek satir da degissin (elle duzenlenen planlara dokunulmaz)
-    const cents = tlToCents(text);
-    if (mode === "CASH" && cents != null && !Number.isNaN(cents)) {
-      setRows(cashPlan(cents, date, rows[0]?.accountId || accounts.data?.[0]?.id || ""));
-    }
+    syncCash(centsOf(text) + basket.reduce((t, b) => t + centsOf(b.priceText), 0));
+  };
+  const changeBasket = (next: { v: VehicleSummary; priceText: string }[]) => {
+    setBasket(next);
+    syncCash(ownPrice + next.reduce((t, b) => t + centsOf(b.priceText), 0));
   };
 
   const submit = async (e: FormEvent) => {
@@ -66,6 +80,13 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
     setSaving(true);
     setError(null);
     try {
+      if (basket.length > 0) {
+        onSaved(await api.sellBasket({
+          saleDate: date, buyerId: buyer.id, soldById: soldBy || null, installments: rows.map(toRequest),
+          items: [{ vehicleId: vehicle.vehicle.id, salePriceCents: ownPrice }, ...basket.map((b) => ({ vehicleId: b.v.id, salePriceCents: centsOf(b.priceText) }))],
+        }));
+        return;
+      }
       onSaved(await api.sell(vehicle.vehicle.id, {
         saleDate: date, buyerId: buyer.id, soldById: soldBy || null, salePriceCents: price, installments: rows.map(toRequest),
         ownerReturns: coOwned ? ownerReturns : null,
@@ -96,12 +117,17 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
             <ContactPicker contacts={allContacts} selected={buyer} onSelect={setBuyer}
               onCreated={(c) => setExtraContacts((l) => [c, ...l])} placeholder="İsim yaz ya da seç" />
           </Field>
-          <Field label="Satış bedeli">
+          <Field label={basket.length ? `${vehicle.vehicle.plate} bedeli` : "Satış bedeli"}>
             <NumberInput className={`${inputClass} sayi text-[19px] font-semibold`} value={priceText} onValueChange={changePrice}
               placeholder="1.400.000" />
           </Field>
           <Field label="Satış tarihi">
-            <input type="date" className={inputClass} value={date} min={vehicle.vehicle.purchaseDate} onChange={(e) => setDate(e.target.value)} required />
+            <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required />
+            {beforePurchase && (
+              <p className="text-[13px] text-tehlike mt-1">
+                Aracın alış tarihi {formatDate(vehicle.vehicle.purchaseDate)}. Satış bundan önce olamaz; önce araçta alış tarihini düzelt.
+              </p>
+            )}
           </Field>
           <Field label="Satan çalışan">
             <select className={inputClass} value={soldBy} onChange={(e) => setSoldBy(e.target.value)}>
@@ -109,6 +135,34 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
               {(staff.data ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </Field>
+        </section>
+
+        <section className="space-y-2">
+          {basket.map((b, k) => (
+            <div key={b.v.id} className="grid grid-cols-[1fr_130px_36px] md:grid-cols-[1fr_170px_36px] gap-2 items-center">
+              <span className="flex items-center gap-2 min-w-0"><Plate plate={b.v.plate} size="sm" /><span className="truncate">{b.v.make} {b.v.model}</span></span>
+              <NumberInput className={`${inputClass} sayi`} value={b.priceText} aria-label={`${b.v.plate} bedeli`} placeholder="Bedel" preview={false}
+                onValueChange={(t) => changeBasket(basket.map((x, j) => (j === k ? { ...x, priceText: t } : x)))} />
+              <button type="button" aria-label="Araçtan çıkar" onClick={() => changeBasket(basket.filter((_, j) => j !== k))}
+                className="basilir w-9 h-9 rounded-lg hover:bg-yuzey-2 grid place-items-center text-murekkep-3">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              </button>
+            </div>
+          ))}
+          {picking ? (
+            <select className={inputClass} autoFocus defaultValue="" aria-label="Eklenecek araç" onChange={(e) => {
+              const v = (stock.data ?? []).find((x) => x.id === e.target.value);
+              if (v) changeBasket([...basket, { v, priceText: "" }]);
+              setPicking(false);
+            }}>
+              <option value="" disabled>{stock.data ? "Araç seç" : "Yükleniyor…"}</option>
+              {(stock.data ?? []).filter((x) => x.id !== vehicle.vehicle.id && !basket.some((b) => b.v.id === x.id))
+                .map((x) => <option key={x.id} value={x.id}>{x.plate} · {x.make} {x.model}</option>)}
+            </select>
+          ) : (
+            <Button type="button" variant="quiet" className="text-plaka" onClick={() => setPicking(true)}>+ Aynı alıcıya araç ekle</Button>
+          )}
+          {basket.length > 0 && <p className="text-[14px]">Toplam <b className="sayi text-[17px]">{tl(price)}</b> · {basket.length + 1} araç</p>}
         </section>
 
         <section className="space-y-3">
@@ -119,7 +173,7 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
             paidNowLabel="Şimdi alındı" downHint="Şimdi alınır" />
         </section>
 
-        {coOwned && (
+        {coOwned && basket.length === 0 && (
           <OwnerReturns owners={vehicle.shares} profitCents={price > 0 && cost.data ? price - cost.data.totalCents : null}
             shopCutType={vehicle.shopCutType} shopCutRateBp={vehicle.shopCutRateBp} shopCutCents={vehicle.shopCutCents}
             accounts={accounts.data ?? []} value={returns} onChange={setReturns} />

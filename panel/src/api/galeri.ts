@@ -1,7 +1,7 @@
 import { apiFetch } from "./client";
 import type {
   NetWorthResponse, AccountResponse, BodyPart, CategoryResponse, ContactRequest, ContactResponse, DashboardResponse, ExpenseRequest, ExpenseRoot,
-  YearlyTrades, PaymentPlanResponse, OpenItemsRequest, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
+  YearlyTrades, PaymentPlanResponse, OpenItemsRequest, BasketSaleRequest, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
   LedgerEntryResponse, MonthlyTrades, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
   VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary, UserResponse, UserRole, ContactPaymentRequest,
   CapitalMovementRequest, OpeningBalanceRequest, Partner, PeriodProfit, ProfitAllocationRequest, TransferRequest, CatalogItem,
@@ -27,6 +27,7 @@ export const api = {
   updateParts: (id: string, parts: Partial<Record<BodyPart, PartCondition>>) =>
     apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}/parts`, json({ parts }, "PUT")),
   sell: (id: string, request: SaleRequest) => apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}/sale`, json(request)),
+  sellBasket: (request: BasketSaleRequest) => apiFetch<VehicleDetailAdmin>("/api/vehicles/basket-sale", json(request)),
   undoSale: (id: string) => apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}/sale`, { method: "DELETE" }),
   paymentPlans: (id: string) => apiFetch<PaymentPlanResponse[]>(`/api/vehicles/${id}/payment-plans`),
   installments: (f: { status?: InstallmentStatus; direction?: PlanDirection; from?: string; to?: string } = {}) => {
@@ -76,6 +77,7 @@ export const api = {
   correctEntry: (id: string) => apiFetch<LedgerEntryResponse>(`/api/ledger-entries/${id}/correct`, { method: "POST" }),
   addExpense: (request: ExpenseRequest) => apiFetch<LedgerEntryResponse>("/api/expenses", json(request)),
   // Duzenle: eski kayit terslenir + yeni kayit; sil: ters kayit (defter degismez)
+  addExpenses: (items: ExpenseRequest[]) => apiFetch<LedgerEntryResponse[]>("/api/expenses/bulk", json({ items })),
   updateExpense: (id: string, request: ExpenseRequest) => apiFetch<LedgerEntryResponse>(`/api/expenses/${id}`, json(request, "PUT")),
   deleteExpense: (id: string) => apiFetch<LedgerEntryResponse>(`/api/expenses/${id}`, { method: "DELETE" }),
   categories: (root: ExpenseRoot) => apiFetch<CategoryResponse[]>(`/api/expense-categories?root=${root}`),

@@ -15,6 +15,7 @@ import com.galeri.app.repository.TenantRepository;
 import com.galeri.app.security.CurrentUser;
 import com.galeri.app.service.UserService;
 import com.galeri.app.util.PhoneUtil;
+import com.galeri.app.util.NameUtil;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,7 +58,7 @@ public class UserServiceImpl implements UserService {
         PanelUser user = new PanelUser();
         user.setTenant(tenantRepository.getReferenceById(CurrentUser.tenantId()));
         user.setPhone(phone);
-        user.setFullName(request.fullName().trim());
+        user.setFullName(NameUtil.normalize(request.fullName()));
         user.setRole(request.role());
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         panelUserRepository.save(user);
@@ -80,7 +81,7 @@ public class UserServiceImpl implements UserService {
         }
         if (user.getId().equals(me) && !staysActiveAdmin) throw new SelfChangeNotAllowedException();
 
-        user.setFullName(request.fullName().trim());
+        user.setFullName(NameUtil.normalize(request.fullName()));
         user.setRole(request.role());
         user.setActive(request.active());
         log.info("Kullanici guncellendi: userId={}, rol={}, aktif={}", id, user.getRole(), user.isActive());

@@ -31,6 +31,9 @@ public interface LedgerService {
 
     LedgerEntryResponse addExpense(ExpenseRequest request);
 
+    /** Toplu masraf: hepsi tek transaction'da, sirayla; biri hataliysa hicbiri yazilmaz. */
+    List<LedgerEntryResponse> addExpenses(List<ExpenseRequest> requests);
+
     /** Masrafi duzenle: eski kayit terslenir, yeni degerlerle yeni kayit yazilir (tek transaction). */
     LedgerEntryResponse updateExpense(UUID entryId, ExpenseRequest request);
 

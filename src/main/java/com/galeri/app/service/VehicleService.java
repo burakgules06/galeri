@@ -3,6 +3,7 @@ package com.galeri.app.service;
 import com.galeri.app.model.enums.VehicleStatus;
 import com.galeri.app.model.request.VehiclePartsRequest;
 import com.galeri.app.model.request.VehicleRequest;
+import com.galeri.app.model.request.BasketSaleRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
 import com.galeri.app.model.response.VehicleDetailAdmin;
 import com.galeri.app.model.response.VehicleSummary;
@@ -27,4 +28,7 @@ public interface VehicleService {
 
     /** Satisi geri alir: hic taksit odenmemis olmali; arac stoka doner. */
     VehicleDetailAdmin undoSale(UUID id);
+
+    /** Toplu satis: ayni aliciya birden fazla arac, tek odeme plani. Ilk aracin detayini dondurur. */
+    VehicleDetailAdmin sellBasket(BasketSaleRequest request);
 }

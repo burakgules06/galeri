@@ -9,7 +9,7 @@ import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, Empty, ErrorBox, inputClass, Segment } from "../../shared/ui/Common";
 import { BalancesCard } from "./BalancesCard";
 import { CapitalCard } from "./CapitalCard";
-import { ExpenseForm } from "./ExpenseForm";
+import { BulkExpenseForm } from "./BulkExpenseForm";
 import { LedgerEntryList } from "./LedgerEntryList";
 import { PartnersPanel } from "./PartnersPanel";
 import { PeriodProfitPanel } from "./PeriodProfitPanel";
@@ -108,7 +108,7 @@ export function LedgerPage() {
 
       {dialog === "transfer" && <TransferForm onClose={() => setDialog(null)} onSaved={() => { setDialog(null); reload(); }} />}
       {dialog === "opening" && <OpeningBalanceForm onClose={() => setDialog(null)} onSaved={() => { setDialog(null); reload(); }} />}
-      <ExpenseForm open={expenseOpen} onClose={() => setExpenseOpen(false)} onSaved={() => { setExpenseOpen(false); reload(); }} />
+      {expenseOpen && <BulkExpenseForm onClose={() => setExpenseOpen(false)} onSaved={() => { setExpenseOpen(false); reload(); }} />}
     </div>
   );
 }

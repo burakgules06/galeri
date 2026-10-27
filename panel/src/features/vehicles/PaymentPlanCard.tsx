@@ -9,6 +9,7 @@ import type { PlanDirection, VehicleDetailAdmin } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox } from "../../shared/ui/Common";
 import { InstallmentRow } from "../payments/InstallmentRow";
+import { Plate } from "../../shared/ui/Plate";
 
 export function PaymentPlanCard({ vehicleId, direction = "SALE", onChanged, onUndone }: {
   vehicleId: string;
@@ -65,6 +66,22 @@ export function PaymentPlanCard({ vehicleId, direction = "SALE", onChanged, onUn
             ]} />
           </div>
 
+          {plan.basket.length > 0 && (
+            <div className="mt-3 rounded-[12px] bg-yuzey-2 border border-cizgi p-3">
+              <p className="etiket mb-1.5">Toplu satış · {plan.basket.length} araç</p>
+              <ul className="space-y-1">
+                {plan.basket.map((b) => (
+                  <li key={b.vehicle.id} className="flex items-center justify-between gap-2 text-[14px]">
+                    <a href={`#/vehicles/${b.vehicle.id}`} className="flex items-center gap-2 min-w-0 hover:text-murekkep">
+                      <Plate plate={b.vehicle.plate} size="sm" /><span className="truncate">{b.vehicle.make} {b.vehicle.model}</span>
+                    </a>
+                    <span className="sayi font-semibold">{tl(b.salePriceCents)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <ul className="mt-3 divide-y divide-cizgi -mx-1">
             {plan.installments.map((i) => (
               <InstallmentRow key={i.id} i={i} onChange={changed} showVehicle={false} showPayer={i.payer.id !== plan.counterparty.id} />
@@ -83,7 +100,9 @@ export function PaymentPlanCard({ vehicleId, direction = "SALE", onChanged, onUn
             </div>
           ) : (
             <div className="rounded-[12px] bg-tehlike-zemin border border-tehlike/20 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <span className="text-[14px] text-tehlike font-semibold">Satış hareketleri terslenecek, plan silinecek, araç stoka dönecek.</span>
+              <span className="text-[14px] text-tehlike font-semibold">{plan && plan.basket.length > 0
+                ? `Toplu satış: ${plan.basket.length} aracın satışı birlikte geri alınacak, hepsi stoka dönecek.`
+                : "Satış hareketleri terslenecek, plan silinecek, araç stoka dönecek."}</span>
               <div className="flex gap-2 shrink-0">
                 <Button variant="quiet" className="h-9" onClick={() => setConfirming(false)}>Vazgeç</Button>
                 <Button variant="danger" className="h-9" onClick={undoSale} disabled={busy}>Evet, geri al</Button>

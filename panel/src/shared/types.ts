@@ -235,6 +235,15 @@ export interface InstallmentResponse {
   bounced: boolean;                     // karsiliksiz cikti, hala acik
 }
 
+// Toplu satis: ayni aliciya birden fazla arac, toplam uzerinden tek plan.
+export interface BasketSaleRequest {
+  saleDate: string;
+  buyerId: string;
+  soldById: string | null;
+  items: { vehicleId: string; salePriceCents: number }[];
+  installments: InstallmentRequest[];
+}
+
 // Gecmis senet / cek aktarimi (aracsiz plan). SALE: kisi bize borclu, PURCHASE: biz borcluyuz.
 export interface OpenItemsRequest { direction: PlanDirection; date: string; installments: InstallmentRequest[] }
 
@@ -248,6 +257,7 @@ export interface PaymentPlanResponse {
   remainingCents: number;
   overdueCents: number;
   installments: InstallmentResponse[];
+  basket: { vehicle: VehicleRef; salePriceCents: number }[];   // toplu satista sepetteki araclar (normal planda bos)
 }
 
 export interface StatementLine {
