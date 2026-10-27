@@ -74,6 +74,10 @@ public class Installment extends BaseModel {
     @Column(name = "down_payment", nullable = false)
     private boolean downPayment;
 
+    // Evrak sermayedarinsa (V18): odenince yazilan kredi hareketi; odeme geri alininca terslenir
+    @Column(name = "holder_entry_id")
+    private UUID holderEntryId;
+
     // Karsiliksiz cikti (V12): odemesi geri alindi, borc yeniden acik
     @Column(name = "bounced_at")
     private OffsetDateTime bouncedAt;

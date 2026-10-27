@@ -211,6 +211,12 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
     Yeniden ortak yapılınca aynı hesap açılır.
   - Panel: araç detayında "Kaldır", Ortaklar listesinde "Kaldır" (onaylı). Test: `RemoveIT`.
 
+- **Sermayedarın geçmiş evrakı** (`feat/open-item-holder`, `V18__open_item_holder.sql`). Yeni ortam değişkeni yok.
+  - Geçmiş senet / çek (bize borçlu) girilirken "Kimin" seçilir (Dükkân ya da bir sermayedar; `payment_plan.holder_contact_id`).
+  - Sermayedarın evrakı tahsil edildikçe (ya da ciro edilince) tutar onun sermayesine yazılır: sermaye hesabı → açılış hesabı
+    (`CAPITAL_TRANSFER`, taksitte `holder_entry_id`). Ödeme geri alınınca / karşılıksız çıkınca terslenir. Tahsil edilene kadar
+    alacak dükkân sahibinin payında görünür. Dükkân sahibi ya da ortak olmayan seçilemez (1035). Test: `HolderItemsIT`.
+
 ## Sıradaki
 
 Galerici geri bildirimi 4 (`feat/basket-sale`): toplu satış. `V14__basket_sale.sql`: `payment_plan_vehicle` (sepet planı araçsızdır;
