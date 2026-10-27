@@ -24,12 +24,25 @@ const STATUS_PILL: Record<VehicleStatus, string> = {
 export function VehicleDetailPage({ id }: { id: string }) {
   const { data, setData, error, reload } = useLoad(() => api.vehicle(id), [id]);
   const [form, setForm] = useState<"edit" | "sell" | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   if (error) return <ErrorBox message={error} />;
   if (!data) return <p className="text-murekkep-2 py-10 text-center">Yükleniyor…</p>;
 
   const admin = isAdminDetail(data) ? data : null;
   const v: VehicleDetail = admin ? admin.vehicle : (data as VehicleDetail);
+
+  // Yanlis giris: alis, odemeler, masraflar ve ortak katkilari terslenir, para geldigi yere doner
+  const remove = async () => {
+    if (!window.confirm(`${v.plate} kaldırılsın mı? Alış, masraflar ve ödemeler geri alınır, para geldiği hesaba döner.`)) return;
+    setRemoveError(null);
+    try {
+      await api.removeVehicle(v.id);
+      window.location.hash = "#/vehicles";
+    } catch (e) {
+      setRemoveError(errorMessage(e));
+    }
+  };
 
   return (
     <div>
@@ -54,10 +67,12 @@ export function VehicleDetailPage({ id }: { id: string }) {
         {admin && (
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => setForm("edit")}>Düzenle</Button>
+            {v.status === "IN_STOCK" && <Button variant="quiet" className="text-tehlike" onClick={remove}>Kaldır</Button>}
             {v.status === "IN_STOCK" && <Button onClick={() => setForm("sell")}>Satıldı olarak işaretle</Button>}
           </div>
         )}
       </header>
+      <ErrorBox message={removeError} />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
         <div className="space-y-4">
