@@ -268,6 +268,18 @@ public class LedgerServiceImpl implements LedgerService {
 
     @Override
     @Transactional
+    public LedgerEntry creditHolder(UUID holderContactId, UUID tenantId, long amountCents, LocalDate date, String description) {
+        Account capital = accountRepository.findFirstByTenantIdAndTypeAndContactId(tenantId, AccountType.CAPITAL, holderContactId)
+                .filter(a -> !a.isClosed()).orElse(null);
+        if (capital == null) return null;
+        LedgerEntry e = newEntry(tenantId, LedgerEntryType.CAPITAL_TRANSFER, capital, systemAccount(tenantId, AccountType.OPENING),
+                amountCents, date);
+        e.setDescription(description);
+        return entryRepository.save(e);
+    }
+
+    @Override
+    @Transactional
     public Endorsement writeEndorsement(Vehicle fromVehicle, Contact from, Vehicle toVehicle, Contact to, long amountCents,
                                         LocalDate date, String inDescription, String outDescription) {
         UUID tenantId = from.getTenantId();

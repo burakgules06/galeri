@@ -9,6 +9,7 @@ import com.galeri.app.exception.runtime.InstallmentNotPaidException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidPayerException;
 import com.galeri.app.exception.runtime.PlanNotRemovableException;
+import com.galeri.app.exception.runtime.NotAPartnerException;
 import com.galeri.app.exception.runtime.PurchaseHasPaymentsException;
 import com.galeri.app.exception.runtime.VehicleNotRemovableException;
 import com.galeri.app.exception.runtime.PurchaseTotalMismatchException;
@@ -433,6 +434,14 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     public PaymentPlanResponse addOpenItems(UUID contactId, OpenItemsRequest r) {
         UUID tenantId = CurrentUser.tenantId();
         Contact contact = getContact(contactId, tenantId);
+        UUID holder = null;
+        if (r.holderId() != null && r.direction() == PlanDirection.SALE) {
+            Contact h = getContact(r.holderId(), tenantId);
+            boolean partner = accountRepository.findFirstByTenantIdAndTypeAndContactId(tenantId, AccountType.CAPITAL, h.getId())
+                    .filter(a -> !a.isClosed()).isPresent();
+            if (h.isOwner() || !partner) throw new NotAPartnerException();   // dukkan sahibine ait olan zaten onun payinda
+            holder = h.getId();
+        }
         long total = r.installments().stream().mapToLong(InstallmentRequest::amountCents).sum();
         LedgerEntry opening = ledgerService.writeOpenItems(contact, r.direction(), total, r.date());
 
@@ -442,6 +451,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         plan.setContact(contact);
         plan.setTotalCents(total);
         plan.setOpeningEntryId(opening.getId());
+        plan.setHolderContactId(holder);
         plan.setCreatedBy(panelUserRepository.getReferenceById(CurrentUser.principal().userId()));
         plan = planRepository.save(plan);
 
@@ -546,6 +556,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         if (installmentRepository.markPaid(i.getId(), entry.getId(), paidAt) == 0) throw new InstallmentAlreadyPaidException();
         i.setPaidEntryId(entry.getId());   // bellekteki nesne de guncel (ayni degerler; ek UPDATE zararsiz)
         i.setPaidAt(paidAt);
+        syncHolder(i, r.date());
         // Ortak aracin alis taksiti: odeme sahiplere paylarina gore bolunur (cepten kisim sermaye girisi)
         if (plan.getDirection() == PlanDirection.PURCHASE) coOwnershipService.syncContributions(vehicle);
         return single(i, vehicle);
@@ -569,6 +580,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         ledgerService.reverse(i.getPaidEntryId());
         i.setPaidEntryId(null);
         i.setPaidAt(null);
+        syncHolder(i, null);
         if (i.getPlan().getDirection() == PlanDirection.PURCHASE) {
             installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
             coOwnershipService.syncContributions(vehicleOf(i.getPlan()));
@@ -624,6 +636,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         i.setEndorsedTo(to);
         i.setEndorseEntryId(e.out().getId());
         i.setBouncedAt(null);
+        syncHolder(i, r.date());   // ciro: dukkan sermayedarin evrakini kullandi
         if (target != null) {
             if (installmentRepository.markPaid(target.getId(), e.out().getId(), paidAt) == 0) throw new InstallmentAlreadyPaidException();
             target.setPaidEntryId(e.out().getId());
@@ -645,6 +658,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             ledgerService.reverse(i.getPaidEntryId());
             i.setPaidEntryId(null);
             i.setPaidAt(null);
+            syncHolder(i, null);
         }
         i.setBouncedAt(now());
         return single(i, null);
@@ -660,12 +674,31 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         source.setPaidAt(null);
         source.setEndorsedTo(null);
         source.setEndorseEntryId(null);
+        syncHolder(source, null);
         target.ifPresent(t -> {
             t.setPaidEntryId(null);
             t.setPaidAt(null);
             installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
             coOwnershipService.syncContributions(vehicleOf(t.getPlan()));
         });
+    }
+
+    /**
+     * Evrak sermayedarinsa: odenen taksit onun sermayesine yazilir, odemesi geri alinan taksitin kredisi terslenir.
+     * Her durum degisikliginden sonra cagrilir; zaten uygunsa bir sey yapmaz.
+     */
+    private void syncHolder(Installment i, LocalDate date) {
+        UUID holder = i.getPlan().getHolderContactId();
+        if (holder == null) return;
+        if (i.isPaid() && i.getHolderEntryId() == null) {
+            String what = i.getMethod() == PaymentMethod.CHEQUE ? "Çek" : "Senet";
+            LedgerEntry credit = ledgerService.creditHolder(holder, i.getTenantId(), i.getAmountCents(), date != null ? date : today(),
+                    what + " tahsili: " + i.getPayer().getName() + (i.getNoteNo() != null ? " · " + i.getNoteNo() : ""));
+            if (credit != null) i.setHolderEntryId(credit.getId());
+        } else if (!i.isPaid() && i.getHolderEntryId() != null) {
+            ledgerService.reverse(i.getHolderEntryId());
+            i.setHolderEntryId(null);
+        }
     }
 
     /**

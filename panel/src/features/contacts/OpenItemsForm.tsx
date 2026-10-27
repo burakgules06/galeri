@@ -1,5 +1,6 @@
 // Gecmis senet / cek aktarimi: kagittan takip edilen eski evrak kisinin carisine aracsiz girilir. Yon: kisi bize borclu
 // (alinan senet / cek) ya da biz borcluyuz (verilen). Satirlar acik girer; sonra Odemeler'de tahsil / ode / ciro edilir.
+// Alinan evrak bir sermayedara aitse "Kimin" secilir: tahsil edildikce onun sermayesine yazilir.
 import { useState } from "react";
 import { api } from "../../api/galeri";
 import { addMonthsIso, METHOD, tl, tlToCents, todayIso } from "../../shared/format";
@@ -25,6 +26,9 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
   const [picked, setPicked] = useState<ContactSummary | null>(null);
   const contact: ContactSummary | null = fixedContact ?? picked;
   const [direction, setDirection] = useState<PlanDirection>("SALE");
+  const partners = useLoad(() => api.partners().catch(() => []), []);
+  const investors = (partners.data ?? []).filter((p) => !p.owner);
+  const [holder, setHolder] = useState("");
   const [rows, setRows] = useState<Row[]>([emptyRow(todayIso())]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -46,7 +50,7 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
     try {
       if (!contact) { setSaving(false); return setError("Kişiyi seç."); }
       await api.addOpenItems(contact.id, {
-        direction, date: todayIso(),
+        direction, date: todayIso(), holderId: direction === "SALE" && holder ? holder : null,
         installments: filled.map((r) => ({
           dueDate: r.dueDate, amountCents: cents(r), method: r.method, noteNo: r.noteNo.trim() || null, payerId: null,
           paidNow: false, accountId: null,
@@ -81,6 +85,12 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
         )}
         <Segment<PlanDirection> value={direction} onChange={setDirection}
           options={[{ value: "SALE", label: contact ? `${contact.name} bize borçlu` : "Bize borçlu" }, { value: "PURCHASE", label: "Biz borçluyuz" }]} />
+        {direction === "SALE" && investors.length > 0 && (
+          <Field label="Kimin">
+            <Segment<string> value={holder} onChange={setHolder}
+              options={[{ value: "", label: "Dükkân" }, ...investors.map((p) => ({ value: p.contactId, label: p.name }))]} />
+          </Field>
+        )}
 
         <div className="space-y-2">
           {rows.map((r) => (

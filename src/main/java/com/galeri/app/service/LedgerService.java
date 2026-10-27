@@ -67,6 +67,12 @@ public interface LedgerService {
      */
     LedgerEntry writeOpenItems(Contact contact, PlanDirection direction, long amountCents, LocalDate date);
 
+    /**
+     * Sermayedara ait gecmis evrak tahsil edildi: sermaye hesabi -> acilis hesabi (sermayesi artar). Kisinin acik sermaye
+     * hesabi yoksa (ortakliktan cikmis) yazilmaz, null doner.
+     */
+    LedgerEntry creditHolder(UUID holderContactId, UUID tenantId, long amountCents, LocalDate date, String description);
+
     /** Ciro hareketleri: cekin / senedin alindigi kisiden portfoye (tahsilat), portfoyden verildigi kisiye (odeme). */
     record Endorsement(LedgerEntry in, LedgerEntry out) {}
 

@@ -30,6 +30,10 @@ public class PaymentPlan extends BaseModel {
     @Column(name = "opening_entry_id", updatable = false)
     private UUID openingEntryId;
 
+    // Gecmis alacakta evrak bir sermayedara aitse (V18): tahsil edildikce onun sermayesine yazilir
+    @Column(name = "holder_contact_id", updatable = false)
+    private UUID holderContactId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10, updatable = false)
     private PlanDirection direction;

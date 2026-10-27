@@ -248,7 +248,7 @@ export interface BasketSaleRequest {
 }
 
 // Gecmis senet / cek aktarimi (aracsiz plan). SALE: kisi bize borclu, PURCHASE: biz borcluyuz.
-export interface OpenItemsRequest { direction: PlanDirection; date: string; installments: InstallmentRequest[] }
+export interface OpenItemsRequest { direction: PlanDirection; date: string; installments: InstallmentRequest[]; holderId?: string | null }
 
 export interface PaymentPlanResponse {
   id: string;
