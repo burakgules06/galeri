@@ -531,6 +531,12 @@ public class LedgerServiceImpl implements LedgerService {
     }
 
     @Override
+    @Transactional
+    public void reverseVehicleEntries(UUID vehicleId) {
+        activeEntries(entryRepository.findByVehicle_Id(vehicleId)).forEach(this::writeReversal);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<LedgerEntry> activeVehiclePurchases(UUID vehicleId) {
         return activeVehicleEntries(vehicleId, LedgerEntryType.VEHICLE_PURCHASE);
@@ -629,6 +635,7 @@ public class LedgerServiceImpl implements LedgerService {
     private Vehicle getVehicle(UUID id) {
         Vehicle vehicle = vehicleRepository.findById(id).orElseThrow(RecordNotFoundException::new);
         if (!vehicle.getTenantId().equals(CurrentUser.tenantId())) throw new SourceNotBelongToTenantException();
+        if (vehicle.getStatus() == VehicleStatus.REMOVED) throw new RecordNotFoundException();   // kaldirilan araca masraf yazilmaz
         return vehicle;
     }
 

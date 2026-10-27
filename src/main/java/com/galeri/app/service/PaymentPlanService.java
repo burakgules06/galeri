@@ -80,6 +80,9 @@ public interface PaymentPlanService {
     /** Aracsiz plani siler (hicbir taksiti odenmemisse): acilis hareketi terslenir. Hata yapan sifirdan girer. */
     void removeOpenItems(UUID planId);
 
+    /** Arac kaldirilirken alis plani silinir; pesinat disinda odenmis taksit varsa kaldirilamaz (1054). */
+    void removePurchasePlan(Vehicle vehicle);
+
     /** Karsiliksiz: tahsil ya da ciro edildiyse geri alinir, borc yeniden acilir, taksit karsiliksiz olarak isaretlenir. */
     InstallmentResponse bounce(UUID installmentId);
 

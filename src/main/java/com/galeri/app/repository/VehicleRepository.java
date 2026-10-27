@@ -18,7 +18,7 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
             left join fetch v.buyer b
             left join v.seller s
             where v.tenantId = :tenantId
-              and (:status is null or v.status = :status)
+              and ((:status is null and v.status <> com.galeri.app.model.enums.VehicleStatus.REMOVED) or v.status = :status)
               and (:q = ''
                    or lower(v.plate) like lower(concat('%', :q, '%'))
                    or lower(v.make) like lower(concat('%', :q, '%'))
@@ -37,9 +37,18 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
 
     List<Vehicle> findByTenantIdAndStatus(UUID tenantId, VehicleStatus status);
 
-    List<Vehicle> findByTenantIdAndPurchaseDateBetween(UUID tenantId, LocalDate start, LocalDate end);
+    // Kaldirilan (yanlis girilen) araclar alis raporlarina girmez
+    @Query("""
+            select v from Vehicle v where v.tenantId = :tenantId and v.purchaseDate between :start and :end
+              and v.status <> com.galeri.app.model.enums.VehicleStatus.REMOVED
+            """)
+    List<Vehicle> findByTenantIdAndPurchaseDateBetween(@Param("tenantId") UUID tenantId, @Param("start") LocalDate start, @Param("end") LocalDate end);
 
     List<Vehicle> findByTenantIdAndSaleDateBetween(UUID tenantId, LocalDate start, LocalDate end);
 
-    List<Vehicle> findByTenantIdAndOwnership(UUID tenantId, Ownership ownership);
+    @Query("""
+            select v from Vehicle v where v.tenantId = :tenantId and v.ownership = :ownership
+              and v.status <> com.galeri.app.model.enums.VehicleStatus.REMOVED
+            """)
+    List<Vehicle> findByTenantIdAndOwnership(@Param("tenantId") UUID tenantId, @Param("ownership") Ownership ownership);
 }

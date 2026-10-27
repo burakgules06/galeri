@@ -10,6 +10,7 @@ import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidPayerException;
 import com.galeri.app.exception.runtime.PlanNotRemovableException;
 import com.galeri.app.exception.runtime.PurchaseHasPaymentsException;
+import com.galeri.app.exception.runtime.VehicleNotRemovableException;
 import com.galeri.app.exception.runtime.PurchaseTotalMismatchException;
 import com.galeri.app.exception.runtime.RecordNotFoundException;
 import com.galeri.app.exception.runtime.SaleHasPaymentsException;
@@ -477,6 +478,19 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         ledgerService.reverse(plan.getOpeningEntryId());
         installmentRepository.deleteAll(installmentRepository.findByPlanIds(List.of(plan.getId())));
         planRepository.delete(plan);
+    }
+
+    @Override
+    @Transactional
+    public void removePurchasePlan(Vehicle vehicle) {
+        planRepository.findByVehicleIdAndDirection(vehicle.getId(), PlanDirection.PURCHASE).ifPresent(plan -> {
+            List<Installment> rows = installmentRepository.findByPlanIds(List.of(plan.getId()));
+            if (rows.stream().anyMatch(i -> i.isPaid() && !i.isDownPayment())) {
+                throw new VehicleNotRemovableException("Ödenmiş alış senedi / taksiti var. Önce ödemeyi geri alın.");
+            }
+            installmentRepository.deleteAll(rows);
+            planRepository.delete(plan);
+        });
     }
 
     @Override

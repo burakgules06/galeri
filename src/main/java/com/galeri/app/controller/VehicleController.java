@@ -72,6 +72,13 @@ public class VehicleController {
         return responseService.success(vehicleService.sell(id, request));
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public GenericResponse<Void> remove(@PathVariable UUID id) {
+        vehicleService.remove(id);
+        return responseService.success(null);
+    }
+
     @DeleteMapping("/{id}/sale")
     @PreAuthorize("hasRole('ADMIN')")
     public GenericResponse<VehicleDetailAdmin> undoSale(@PathVariable UUID id) {

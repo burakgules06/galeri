@@ -29,6 +29,9 @@ public interface VehicleService {
     /** Satisi geri alir: hic taksit odenmemis olmali; arac stoka doner. */
     VehicleDetailAdmin undoSale(UUID id);
 
+    /** Yanlis girilen stoktaki araci kaldirir: hareketleri terslenir, alis plani silinir, arac REMOVED olur (1054). */
+    void remove(UUID id);
+
     /** Toplu satis: ayni aliciya birden fazla arac, tek odeme plani. Ilk aracin detayini dondurur. */
     VehicleDetailAdmin sellBasket(BasketSaleRequest request);
 }

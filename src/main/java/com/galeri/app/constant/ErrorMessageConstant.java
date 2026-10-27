@@ -57,4 +57,6 @@ public class ErrorMessageConstant {
     public static final int BOUNCE_NOT_ALLOWED = 1051;
     public static final int PLAN_NOT_REMOVABLE = 1052;
     public static final int INVALID_BASKET = 1053;
+    public static final int VEHICLE_NOT_REMOVABLE = 1054;
+    public static final int PARTNER_NOT_REMOVABLE = 1055;
 }

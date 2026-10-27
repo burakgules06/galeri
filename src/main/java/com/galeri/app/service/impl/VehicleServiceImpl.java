@@ -9,6 +9,7 @@ import com.galeri.app.exception.runtime.PlateAlreadyInStockException;
 import com.galeri.app.exception.runtime.RecordNotFoundException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.exception.runtime.VehicleAlreadySoldException;
+import com.galeri.app.exception.runtime.VehicleNotRemovableException;
 import com.galeri.app.exception.runtime.VehicleNotSoldException;
 import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.PanelUser;
@@ -206,6 +207,18 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     @Transactional
+    public void remove(UUID id) {
+        Vehicle vehicle = getVehicle(id);
+        if (vehicle.getStatus() != VehicleStatus.IN_STOCK) {
+            throw new VehicleNotRemovableException("Satılmış araç kaldırılamaz. Önce satışı geri alın.");
+        }
+        paymentPlanService.removePurchasePlan(vehicle);
+        ledgerService.reverseVehicleEntries(vehicle.getId());   // alis, pesinat, masraflar, ortak katkilari: para geldigi yere doner
+        vehicle.setStatus(VehicleStatus.REMOVED);
+    }
+
+    @Override
+    @Transactional
     public VehicleDetailAdmin undoSale(UUID id) {
         Vehicle vehicle = getVehicle(id);
         // Toplu satista sepetin butun araclari birlikte geri alinir
@@ -350,6 +363,7 @@ public class VehicleServiceImpl implements VehicleService {
     private Vehicle getVehicle(UUID id) {
         Vehicle vehicle = vehicleRepository.findById(id).orElseThrow(RecordNotFoundException::new);
         if (!vehicle.getTenantId().equals(CurrentUser.tenantId())) throw new SourceNotBelongToTenantException();
+        if (vehicle.getStatus() == VehicleStatus.REMOVED) throw new RecordNotFoundException();
         return vehicle;
     }
 

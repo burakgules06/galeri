@@ -4,6 +4,7 @@ import com.galeri.app.exception.runtime.CapitalExceededException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidPeriodException;
 import com.galeri.app.exception.runtime.NotAPartnerException;
+import com.galeri.app.exception.runtime.PartnerNotRemovableException;
 import com.galeri.app.exception.runtime.SameAccountException;
 import com.galeri.app.exception.runtime.RecordNotFoundException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
@@ -42,6 +43,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -121,6 +123,54 @@ public class CapitalServiceImpl implements CapitalService {
         contact.setCapitalBase(request.base());
         contactRepository.save(contact);
         return find(contact.getId());
+    }
+
+    @Override
+    @Transactional
+    public void removePartner(UUID contactId) {
+        Contact contact = getContact(contactId);
+        if (contact.isOwner()) throw new PartnerNotRemovableException("Dükkân sahibi kaldırılamaz. Önce başka birini sahip yapın.");
+        Account capital = capitalAccount(contact, false);
+        if (capital == null) throw new NotAPartnerException();
+        accountRepository.lockById(capital.getId());
+        UUID tenantId = contact.getTenantId();
+        if (coOwnershipService.boundCapital(tenantId, today()).getOrDefault(contactId, 0L) > 0) {
+            throw new PartnerNotRemovableException("Araçta parası var. Önce o araçlar satılmalı.");
+        }
+        List<LedgerEntry> touching = entryRepository.touchingType(tenantId, AccountType.CAPITAL);
+        long remaining = capitalByAccount(touching, null).getOrDefault(capital.getId(), 0L);
+
+        // Hesap basina net giris (giris - cekis): para nereden girdiyse oraya doner
+        Map<UUID, Long> net = new LinkedHashMap<>();
+        Map<UUID, Account> money = new HashMap<>();
+        for (LedgerEntry e : touching) {
+            if (e.getType() != LedgerEntryType.CAPITAL) continue;
+            Account other = e.getSourceAccount().getId().equals(capital.getId()) ? e.getTargetAccount()
+                    : e.getTargetAccount().getId().equals(capital.getId()) ? e.getSourceAccount() : null;
+            if (other == null || (other.getType() != AccountType.CASH && other.getType() != AccountType.BANK)) continue;
+            money.putIfAbsent(other.getId(), other);
+            net.merge(other.getId(), e.getSourceAccount().getId().equals(capital.getId()) ? e.getAmountCents() : -e.getAmountCents(), Long::sum);
+        }
+        List<Map.Entry<UUID, Long>> order = net.entrySet().stream().filter(x -> x.getValue() > 0)
+                .sorted(Map.Entry.<UUID, Long>comparingByValue().reversed()).toList();
+        for (Map.Entry<UUID, Long> x : order) {
+            if (remaining <= 0) break;
+            long amount = Math.min(remaining, x.getValue());
+            refund(money.get(x.getKey()), capital, amount);
+            remaining -= amount;
+        }
+        if (remaining > 0) {   // aktarim ya da kar payindan gelen kisim kasadan
+            refund(accountRepository.findFirstByTenantIdAndType(tenantId, AccountType.CASH).orElseThrow(RecordNotFoundException::new),
+                    capital, remaining);
+        }
+        capital.setClosed(true);
+        accountRepository.save(capital);
+    }
+
+    private void refund(Account money, Account capital, long amount) {
+        LedgerEntry e = newEntry(LedgerEntryType.CAPITAL, money, capital, amount, today());
+        e.setDescription("Ortaklıktan çıkış: iade");
+        entryRepository.save(e);
     }
 
     @Override
@@ -294,7 +344,8 @@ public class CapitalServiceImpl implements CapitalService {
     }
 
     private List<Account> capitalAccounts(UUID tenantId) {
-        return accountRepository.findByTenantIdAndTypeInOrderByCreatedAtAsc(tenantId, List.of(AccountType.CAPITAL));
+        return accountRepository.findByTenantIdAndTypeInOrderByCreatedAtAsc(tenantId, List.of(AccountType.CAPITAL)).stream()
+                .filter(a -> !a.isClosed()).toList();
     }
 
     private Map<UUID, Contact> contacts(List<Account> accounts) {
@@ -302,18 +353,22 @@ public class CapitalServiceImpl implements CapitalService {
                 .collect(Collectors.toMap(Contact::getId, Function.identity()));
     }
 
-    /** Ortagin sermaye hesabi; yoksa create ise acilir, degilse null. */
+    /** Ortagin sermaye hesabi; yoksa (ya da kapaliysa) create ise acilir, degilse null. */
     private Account capitalAccount(Contact contact, boolean create) {
-        return accountRepository.findFirstByTenantIdAndTypeAndContactId(contact.getTenantId(), AccountType.CAPITAL, contact.getId())
-                .orElseGet(() -> {
-                    if (!create) return null;
-                    Account a = new Account();
-                    a.setTenantId(contact.getTenantId());
-                    a.setType(AccountType.CAPITAL);
-                    a.setContactId(contact.getId());
-                    a.setName(contact.getName());
-                    return accountRepository.save(a);
-                });
+        Account found = accountRepository.findFirstByTenantIdAndTypeAndContactId(contact.getTenantId(), AccountType.CAPITAL, contact.getId())
+                .orElse(null);
+        if (found != null && !found.isClosed()) return found;
+        if (!create) return null;
+        if (found != null) {   // kaldirilan ortak yeniden ortak yapildi
+            found.setClosed(false);
+            return accountRepository.save(found);
+        }
+        Account a = new Account();
+        a.setTenantId(contact.getTenantId());
+        a.setType(AccountType.CAPITAL);
+        a.setContactId(contact.getId());
+        a.setName(contact.getName());
+        return accountRepository.save(a);
     }
 
     private Account incomeAccount(UUID tenantId) {
