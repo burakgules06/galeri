@@ -58,7 +58,7 @@ export function HomePage() {
 function AdminSummary() {
   const { data, error } = useLoad(() => api.dashboard(), []);
   if (error) return <ErrorBox message={error} />;
-  if (!data) return <div className="grid grid-cols-2 gap-3">{[0, 1, 2, 3].map((i) => <div key={i} className="kart h-[118px] animate-pulse" />)}</div>;
+  if (!data) return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{[0, 1].map((i) => <div key={i} className="kart h-[118px] animate-pulse" />)}</div>;
 
   const money = data.cashCents + data.bankCents;
   const months = data.months.map((m) => SHORT_MONTHS[m.month - 1]);
