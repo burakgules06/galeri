@@ -169,7 +169,7 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
           <p className="etiket">Ödeme planı</p>
           <PlanBuilder baseCents={price} date={date} mode={mode} onMode={setMode} rows={rows} onRows={setRows} remaining={remaining}
             accounts={accounts.data ?? []} organizations={allContacts.filter((c) => c.type === "ORGANIZATION")}
-            modes={["CASH", "INSTALLMENTS", "INSTITUTION", "MIXED"]} methods={["CASH", "TRANSFER", "PROMISSORY_NOTE", "CHEQUE", "INSTITUTION"]}
+            modes={["CASH", "INSTALLMENTS", "CHEQUE", "INSTITUTION", "MIXED"]} methods={["CASH", "TRANSFER", "PROMISSORY_NOTE", "CHEQUE", "INSTITUTION"]}
             paidNowLabel="Şimdi alındı" downHint="Şimdi alınır" />
         </section>
 
