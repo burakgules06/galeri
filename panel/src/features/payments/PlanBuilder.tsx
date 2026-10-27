@@ -5,11 +5,11 @@ import { addMonthsIso, centsToInput, METHOD, tl, tlToCents } from "../../shared/
 import type { AccountResponse, ContactResponse, ContactSummary, PaymentMethod } from "../../shared/types";
 import { ContactPicker } from "../contacts/ContactPicker";
 import { Button, Field, inputClass, Segment } from "../../shared/ui/Common";
-import { cashPlan, installmentPlan, institutionPlan, row, rowProblem, type PlanMode, type PlanRow } from "./plan";
+import { cashPlan, chequePlan, installmentPlan, institutionPlan, row, rowProblem, type PlanMode, type PlanRow } from "./plan";
 import { NumberInput } from "../../shared/ui/NumberInput";
 
 const MODE_LABEL: Record<PlanMode, string> = {
-  CASH: "Peşin", INSTALLMENTS: "Taksit / senet", INSTITUTION: "Evim / kredi", MIXED: "Karma",
+  CASH: "Peşin", INSTALLMENTS: "Taksit / senet", CHEQUE: "Çek", INSTITUTION: "Evim / kredi", MIXED: "Karma",
 };
 
 export function PlanBuilder({
@@ -48,6 +48,9 @@ export function PlanBuilder({
       <Segment<PlanMode> value={mode ?? ("" as PlanMode)} onChange={choose} options={modes.map((m) => ({ value: m, label: MODE_LABEL[m] }))} />
       {mode === "INSTALLMENTS" && (
         <InstallmentGenerator price={baseCents} date={date} account={firstAccount} methods={methods} downHint={downHint} onBuild={onRows} />
+      )}
+      {mode === "CHEQUE" && (
+        <ChequeGenerator price={baseCents} date={date} account={firstAccount} downHint={downHint} onBuild={onRows} />
       )}
       {mode === "INSTITUTION" && (
         <InstitutionGenerator price={baseCents} date={date} account={firstAccount} organizations={orgs} onOrgCreated={orgCreated} downHint={downHint} onBuild={onRows} />
@@ -118,6 +121,38 @@ function InstallmentGenerator({ price, date, account, methods, downHint, onBuild
   );
 }
 
+function ChequeGenerator({ price, date, account, downHint, onBuild }: {
+  price: number; date: string; account: string; downHint: string; onBuild: (rows: PlanRow[]) => void;
+}) {
+  const [down, setDown] = useState("");
+  const [count, setCount] = useState("1");
+  const [firstDue, setFirstDue] = useState(addMonthsIso(date, 1));
+  const [bank, setBank] = useState("");
+  const [drawer, setDrawer] = useState("");
+  const downCents = tlToCents(down) ?? 0;
+  const n = Number(count);
+  const valid = price > 0 && !Number.isNaN(downCents) && downCents < price && Number.isInteger(n) && n >= 1 && n <= 60;
+
+  return (
+    <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
+        <Field label="Peşinat" hint={downHint}><NumberInput value={down} onValueChange={setDown} placeholder="0" /></Field>
+        <Field label="Çek sayısı"><NumberInput kind="integer" value={count} onValueChange={setCount} /></Field>
+        <Field label="İlk vade"><input type="date" className={inputClass} value={firstDue} onChange={(e) => setFirstDue(e.target.value)} /></Field>
+        <Field label="Banka"><input className={inputClass} value={bank} onChange={(e) => setBank(e.target.value)} /></Field>
+        <Field label="Keşideci"><input className={inputClass} value={drawer} onChange={(e) => setDrawer(e.target.value)} /></Field>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[13px] text-murekkep-2">
+          {valid ? <>{n} çek × ~{tl(Math.floor((price - downCents) / n))}</> : "Önce bedeli gir."}
+        </p>
+        <Button type="button" disabled={!valid}
+          onClick={() => onBuild(chequePlan(price, downCents, n, firstDue, bank.trim(), drawer.trim(), date, account))}>Planı kur</Button>
+      </div>
+    </div>
+  );
+}
+
 function InstitutionGenerator({ price, date, account, organizations, onOrgCreated, downHint, onBuild }: {
   price: number; date: string; account: string; organizations: ContactResponse[]; onOrgCreated: (c: ContactResponse) => void;
   downHint: string; onBuild: (rows: PlanRow[]) => void;
@@ -179,11 +214,13 @@ function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods,
         {r.method === "PROMISSORY_NOTE" && (
           <input className={`${inputClass} h-9 md:w-32`} value={r.noteNo} onChange={(e) => onChange({ noteNo: e.target.value })} placeholder="Senet no" aria-label="Senet no" />
         )}
-        {r.method === "CHEQUE" && <>
-          <input className={`${inputClass} h-9 md:w-28`} value={r.noteNo} onChange={(e) => onChange({ noteNo: e.target.value })} placeholder="Çek no" aria-label="Çek no" />
-          <input className={`${inputClass} h-9 md:w-28`} value={r.bankName} onChange={(e) => onChange({ bankName: e.target.value })} placeholder="Banka" aria-label="Banka" />
-          <input className={`${inputClass} h-9 md:w-36`} value={r.drawerName} onChange={(e) => onChange({ drawerName: e.target.value })} placeholder="Keşideci" aria-label="Keşideci" />
-        </>}
+        {r.method === "CHEQUE" && (
+          <div className="w-full grid grid-cols-3 gap-2">
+            <input className={`${inputClass} h-9`} value={r.noteNo} onChange={(e) => onChange({ noteNo: e.target.value })} placeholder="Çek no" aria-label="Çek no" />
+            <input className={`${inputClass} h-9`} value={r.bankName} onChange={(e) => onChange({ bankName: e.target.value })} placeholder="Banka" aria-label="Banka" />
+            <input className={`${inputClass} h-9`} value={r.drawerName} onChange={(e) => onChange({ drawerName: e.target.value })} placeholder="Keşideci" aria-label="Keşideci" />
+          </div>
+        )}
         <label className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold whitespace-nowrap">
           <input type="checkbox" checked={r.paidNow} className="w-4 h-4 accent-[var(--color-basari)]"
             onChange={(e) => onChange({ paidNow: e.target.checked, accountId: e.target.checked ? (r.accountId || accounts[0]?.id || "") : "" })} />

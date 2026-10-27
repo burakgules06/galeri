@@ -2,7 +2,7 @@
 import { addMonthsIso } from "../../shared/format";
 import type { ContactSummary, InstallmentRequest, PaymentMethod } from "../../shared/types";
 
-export type PlanMode = "CASH" | "INSTALLMENTS" | "INSTITUTION" | "MIXED";
+export type PlanMode = "CASH" | "INSTALLMENTS" | "CHEQUE" | "INSTITUTION" | "MIXED";
 
 export interface PlanRow {
   key: number;
@@ -44,6 +44,16 @@ export function installmentPlan(priceCents: number, downCents: number, count: nu
     rows.push(row({ dueDate: addMonthsIso(firstDue, k), amountCents: amount, method }));
   }
   return rows;
+}
+
+/**
+ * Cek: pesinat (varsa, simdi alindi) + kalan cek sayisina esit bolunur, ilk vadeden itibaren aylik; banka ve keside eden
+ * her satira yazilir (cek no satirda girilir). Kurus farki son cege.
+ */
+export function chequePlan(priceCents: number, downCents: number, count: number, firstDue: string, bankName: string,
+                           drawerName: string, saleDate: string, accountId: string): PlanRow[] {
+  return installmentPlan(priceCents, downCents, count, firstDue, "CHEQUE", saleDate, accountId)
+    .map((r) => (r.method === "CHEQUE" ? { ...r, bankName, drawerName } : r));
 }
 
 /** Evim / kredi: pesinat (alicidan, simdi alindi) + kalan kurumdan tek satir. */
