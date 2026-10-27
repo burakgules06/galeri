@@ -58,7 +58,7 @@ export function HomePage() {
 function AdminSummary() {
   const { data, error } = useLoad(() => api.dashboard(), []);
   if (error) return <ErrorBox message={error} />;
-  if (!data) return <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{[0, 1, 2, 3].map((i) => <div key={i} className="kart h-[118px] animate-pulse" />)}</div>;
+  if (!data) return <div className="grid grid-cols-2 gap-3">{[0, 1, 2, 3].map((i) => <div key={i} className="kart h-[118px] animate-pulse" />)}</div>;
 
   const money = data.cashCents + data.bankCents;
   const months = data.months.map((m) => SHORT_MONTHS[m.month - 1]);
@@ -81,8 +81,6 @@ function AdminSummary() {
             Maliyet <b className="sayi font-semibold text-murekkep text-[14px]">{tlShort(data.stockCostCents)}</b> · ort. {data.averageDaysInStock} gün
             {data.consignmentCount > 0 && <span className="block text-konsinye font-semibold">+ {data.consignmentCount} konsinye araç</span>}
           </span>} />
-        <StatTile label="Alacak" value={tl(data.receivableCents)} tone="positive" valueClassName="whitespace-normal break-words text-[23px] md:text-[28px]" sub={`${data.receivables.length} kişiden tahsil edilecek`} />
-        <StatTile label="Verecek" value={tl(data.payableCents)} tone="negative" valueClassName="whitespace-normal break-words text-[23px] md:text-[28px]" sub={`${data.payables.length} kişiye ödenecek`} />
       </div>
 
       <PaymentsStrip data={data} />
