@@ -11,8 +11,8 @@ import { useLoad } from "../../shared/useLoad";
 import { ErrorBox } from "../../shared/ui/Common";
 import { StatTile } from "../../shared/ui/StatTile";
 import { BalancesCard } from "../ledger/BalancesCard";
-import { CapitalCard } from "../ledger/CapitalCard";
 import { VehicleCard } from "../vehicles/VehicleCard";
+import { PartnerCapitalCard } from "./PartnerCapitalCard";
 
 const BOUGHT_COLOR = "var(--color-seri-1)";
 const SOLD_COLOR = "var(--color-seri-2)";
@@ -90,7 +90,7 @@ function AdminSummary() {
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
         <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           <div className="order-1">
-            <CapitalCard partners={data.partners} totalCents={data.capitalCents} />
+            <PartnerCapitalCard />
           </div>
           <section className="kart p-4 md:p-5 order-3">
             <div className="flex flex-wrap items-end justify-between gap-2 mb-2">
