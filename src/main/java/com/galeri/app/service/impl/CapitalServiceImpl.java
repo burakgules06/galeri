@@ -4,6 +4,7 @@ import com.galeri.app.exception.runtime.CapitalExceededException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidPeriodException;
 import com.galeri.app.exception.runtime.NotAPartnerException;
+import com.galeri.app.exception.runtime.SameAccountException;
 import com.galeri.app.exception.runtime.RecordNotFoundException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.model.entity.Account;
@@ -89,6 +90,10 @@ public class CapitalServiceImpl implements CapitalService {
     public Partner addPartner(CapitalRequests.Partner request) {
         Contact contact = getContact(request.contactId());
         capitalAccount(contact, true);
+        if (request.base() != null) {
+            contact.setCapitalBase(request.base());
+            contactRepository.save(contact);
+        }
         return find(contact.getId());
     }
 
@@ -110,13 +115,46 @@ public class CapitalServiceImpl implements CapitalService {
 
     @Override
     @Transactional
+    public Partner setBase(UUID contactId, CapitalRequests.Base request) {
+        Contact contact = getContact(contactId);
+        if (capitalAccount(contact, false) == null) throw new NotAPartnerException();
+        contact.setCapitalBase(request.base());
+        contactRepository.save(contact);
+        return find(contact.getId());
+    }
+
+    @Override
+    @Transactional
+    public LedgerEntryResponse transferCapital(CapitalRequests.CapitalTransfer r) {
+        if (r.fromContactId().equals(r.toContactId())) throw new SameAccountException();
+        Contact from = getContact(r.fromContactId());
+        Contact to = getContact(r.toContactId());
+        Account fromCapital = capitalAccount(from, from.isOwner());   // dukkan sahibinin hesabi yoksa acilir
+        if (fromCapital == null) throw new NotAPartnerException();
+        Account toCapital = capitalAccount(to, true);                 // alan kisi sermayedar olur
+        if (!from.isOwner()) {
+            accountRepository.lockById(fromCapital.getId());
+            long cash = capitalByAccount(entryRepository.touchingType(from.getTenantId(), AccountType.CAPITAL), null)
+                    .getOrDefault(fromCapital.getId(), 0L)
+                    - coOwnershipService.boundCapital(from.getTenantId(), today()).getOrDefault(from.getId(), 0L);
+            if (r.amountCents() > cash) throw new CapitalExceededException();
+        }
+        LedgerEntry e = newEntry(LedgerEntryType.CAPITAL_TRANSFER, toCapital, fromCapital, r.amountCents(), r.date());
+        String description = blankToNull(r.description());
+        e.setDescription(description != null ? description : "Sermaye aktarımı: " + from.getName() + " → " + to.getName());
+        return LedgerServiceImpl.toResponse(entryRepository.save(e), false);
+    }
+
+    @Override
+    @Transactional
     public LedgerEntryResponse move(UUID contactId, CapitalRequests.Movement r) {
         Contact contact = getContact(contactId);
         Account money = moneyAccount(r.accountId());
         boolean in = r.direction() == CapitalRequests.Direction.IN;
-        Account capital = capitalAccount(contact, in);   // giris kisiyi ortak yapar; cekis icin ortak olmali
+        Account capital = capitalAccount(contact, in || contact.isOwner());   // giris kisiyi ortak yapar; cekis icin ortak olmali
         if (capital == null) throw new NotAPartnerException();
-        if (!in) {
+        // Dukkan sahibinin cekisi sinirlanmaz: sermayesi havuzdan sermayedarlar cikinca kalandir (panel kasadaki payi bitince uyarir)
+        if (!in && !contact.isOwner()) {
             accountRepository.lockById(capital.getId());   // es zamanli iki cekis ayni bakiyeyi gormesin
             // Cekis en fazla nakitteki sermaye kadar: araclarda bagli kisim arac satilinca nakde doner
             long current = capitalByAccount(entryRepository.touchingType(contact.getTenantId(), AccountType.CAPITAL), null)

@@ -1,5 +1,6 @@
 package com.galeri.app.model.entity;
 
+import com.galeri.app.model.enums.CapitalBase;
 import com.galeri.app.model.enums.ContactType;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -38,4 +39,9 @@ public class Contact extends BaseModel {
     // Sermaye ortaklari arasinda dukkan sahibi (galeri basina en fazla bir)
     @Column(name = "is_owner", nullable = false)
     private boolean owner = false;
+
+    // Sermayedarin havuzdaki yuzdesi (sadece bilgi) neye gore gosterilir (V16)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "capital_base", nullable = false, length = 8)
+    private CapitalBase capitalBase = CapitalBase.ALL;
 }

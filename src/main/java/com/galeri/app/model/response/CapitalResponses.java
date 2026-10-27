@@ -1,5 +1,6 @@
 package com.galeri.app.model.response;
 
+import com.galeri.app.model.enums.CapitalBase;
 import com.galeri.app.model.enums.Ownership;
 
 import java.time.LocalDate;
@@ -40,4 +41,15 @@ public final class CapitalResponses {
     public record PeriodProfit(LocalDate from, LocalDate to, List<SoldVehicle> vehicles,
                                long vehicleProfitCents, long commissionCents, long generalExpenseCents, long netCents,
                                long coOwnedProfitCents, List<PartnerProfit> partners) {}
+
+    /**
+     * Sermayedar gorunumu (V16 dukkan sahibi modeli). Havuz: kasa + bankalar + araclar + alacaklar - borclar. Sermayedarin
+     * sermayesi defterden (girisler, cekisler, aktarimlar, arac kar paylari); dukkan sahibininki havuzdan sermayedarlar
+     * cikinca kalan. cash: kasa / bankadaki payi, vehicleCents: araclardaki odenmis payi (vehicles: hangi aracta ne kadar),
+     * otherCents: alacak / borc (sadece dukkan sahibinde). shareBp sadece bilgi: base'e gore yuzde.
+     */
+    public record Holder(UUID contactId, String name, boolean owner, CapitalBase base, long capitalCents, long cashCents,
+                         long vehicleCents, long otherCents, int shareBp, List<HolderVehicle> vehicles) {}
+
+    public record HolderVehicle(VehicleRef vehicle, long cents) {}
 }

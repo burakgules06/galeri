@@ -7,6 +7,7 @@ import com.galeri.app.repository.*;
 import com.galeri.app.security.CurrentUser;
 import com.galeri.app.service.*;
 import com.galeri.app.util.CoOwnershipMath;
+import com.galeri.app.util.MoneyMath;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -23,6 +24,7 @@ public class NetWorthServiceImpl implements NetWorthService {
     private final InstallmentRepository installments;
     private final CapitalService capital;
     private final CoOwnershipService coOwnership;
+    private final ContactRepository contacts;
 
     @Override
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -78,5 +80,57 @@ public class NetWorthServiceImpl implements NetWorthService {
         long total = cash + bank + stockTotal + receivable - payable;
         return new NetWorthResponse(cash, bank, stockTotal, receivable, payable, total, cap, opening, profit,
                 total - cap - opening - profit, capital.partners(), stock);
+    }
+
+    @Override
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public List<CapitalResponses.Holder> holders() {
+        UUID tenant = CurrentUser.tenantId();
+        NetWorthResponse w = summary();
+        Optional<com.galeri.app.model.entity.Contact> owner = contacts.findFirstByTenantIdAndOwnerTrue(tenant);
+        UUID ownerId = owner.map(com.galeri.app.model.entity.Contact::getId).orElse(null);
+        long money = w.cashCents() + w.bankCents();
+
+        List<CapitalResponses.Holder> raw = new ArrayList<>();
+        long investorsCapital = 0, investorsCash = 0;
+        for (CapitalResponses.Partner p : w.partners()) {
+            if (p.contactId().equals(ownerId)) continue;
+            List<CapitalResponses.HolderVehicle> list = vehiclesOf(w, o -> p.contactId().equals(o.contactId()));
+            CapitalBase base = contacts.findById(p.contactId()).map(com.galeri.app.model.entity.Contact::getCapitalBase).orElse(CapitalBase.ALL);
+            raw.add(new CapitalResponses.Holder(p.contactId(), p.name(), false, base, p.capitalCents(), p.cashCents(), p.boundCents(), 0,
+                    0, list));
+            investorsCapital += p.capitalCents();
+            investorsCash += p.cashCents();
+        }
+        // Dukkan sahibi: havuzdan sermayedarlar cikinca kalan; kasayla (Havuz) alinan araclarin odenmis kismi onun malidir
+        List<CapitalResponses.HolderVehicle> ownerVehicles = vehiclesOf(w, o -> o.contactId() == null || o.contactId().equals(ownerId));
+        long ownerCapital = w.totalCents() - investorsCapital;
+        long ownerCash = money - investorsCash;
+        long ownerInVehicles = ownerVehicles.stream().mapToLong(CapitalResponses.HolderVehicle::cents).sum();
+        raw.add(new CapitalResponses.Holder(ownerId, owner.map(com.galeri.app.model.entity.Contact::getName).orElse("Dükkân sahibi"), true,
+                owner.map(com.galeri.app.model.entity.Contact::getCapitalBase).orElse(CapitalBase.ALL), ownerCapital, ownerCash,
+                ownerInVehicles, ownerCapital - ownerCash - ownerInVehicles, 0, ownerVehicles));
+
+        long allVehicles = raw.stream().mapToLong(CapitalResponses.Holder::vehicleCents).sum();
+        return raw.stream()
+                .map(h -> new CapitalResponses.Holder(h.contactId(), h.name(), h.owner(), h.base(), h.capitalCents(), h.cashCents(),
+                        h.vehicleCents(), h.otherCents(), switch (h.base()) {
+                            case ALL -> MoneyMath.basisPoints(Math.max(0, h.capitalCents()), w.totalCents());
+                            case VEHICLES -> MoneyMath.basisPoints(Math.max(0, h.vehicleCents()), allVehicles);
+                            case CASH -> MoneyMath.basisPoints(Math.max(0, h.cashCents()), money);
+                        }, h.vehicles()))
+                .sorted(Comparator.comparing(CapitalResponses.Holder::owner).reversed()
+                        .thenComparing(Comparator.comparingLong(CapitalResponses.Holder::capitalCents).reversed()))
+                .toList();
+    }
+
+    /** Stoktaki araclarda secilen sahiplerin odenmis katkisi, buyukten kucuge. */
+    private static List<CapitalResponses.HolderVehicle> vehiclesOf(NetWorthResponse w, java.util.function.Predicate<NetWorthResponse.Owner> who) {
+        Map<UUID, CapitalResponses.HolderVehicle> byVehicle = new LinkedHashMap<>();
+        for (NetWorthResponse.StockVehicle v : w.vehicles()) {
+            long cents = v.owners().stream().filter(who).mapToLong(NetWorthResponse.Owner::contributionCents).sum();
+            if (cents > 0) byVehicle.put(v.vehicle().id(), new CapitalResponses.HolderVehicle(v.vehicle(), cents));
+        }
+        return byVehicle.values().stream().sorted(Comparator.comparingLong(CapitalResponses.HolderVehicle::cents).reversed()).toList();
     }
 }
