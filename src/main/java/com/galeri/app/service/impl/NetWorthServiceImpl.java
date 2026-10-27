@@ -158,4 +158,3 @@ public class NetWorthServiceImpl implements NetWorthService {
                 .toList();
     }
 }
-

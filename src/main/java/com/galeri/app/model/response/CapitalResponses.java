@@ -53,4 +53,3 @@ public final class CapitalResponses {
 
     public record HolderVehicle(VehicleRef vehicle, long cents) {}
 }
-

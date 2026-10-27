@@ -323,4 +323,3 @@ Adım 2'den kalan küçükler (gerekirse):
 ## Açık sorular
 
 `MIMARI.md` §13: konsinye komisyonu, takas. (Ana ekranın ilk hali yapıldı; galericiye gösterilip geri bildirim alınacak.)
-
