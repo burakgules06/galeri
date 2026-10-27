@@ -2,7 +2,7 @@
 // Pesinat ("simdi alindi") ayni islemde kasaya girer. Ortak aracta altta ortaga donus secimi (OwnerReturns).
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
-import { tlToCents, todayIso } from "../../shared/format";
+import { formatDate, tlToCents, todayIso } from "../../shared/format";
 import type { ContactResponse, ContactSummary, VehicleDetailAdmin } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal } from "../../shared/ui/Common";
@@ -43,7 +43,8 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
   const price = parsed != null && !Number.isNaN(parsed) ? parsed : 0;
   const planned = rows.reduce((t, r) => t + (r.amountCents > 0 ? r.amountCents : 0), 0);
   const remaining = price - planned;
-  const canSave = !!buyer && price > 0 && rows.length > 0 && remaining === 0 && rows.every((r) => rowProblem(r) == null);
+  const beforePurchase = !!vehicle.vehicle.purchaseDate && date < vehicle.vehicle.purchaseDate;
+  const canSave = !beforePurchase && !!buyer && price > 0 && rows.length > 0 && remaining === 0 && rows.every((r) => rowProblem(r) == null);
 
   const changePrice = (text: string) => {
     setPriceText(text);
@@ -101,7 +102,12 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
               placeholder="1.400.000" />
           </Field>
           <Field label="Satış tarihi">
-            <input type="date" className={inputClass} value={date} min={vehicle.vehicle.purchaseDate} onChange={(e) => setDate(e.target.value)} required />
+            <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required />
+            {beforePurchase && (
+              <p className="text-[13px] text-tehlike mt-1">
+                Aracın alış tarihi {formatDate(vehicle.vehicle.purchaseDate)}. Satış bundan önce olamaz; önce araçta alış tarihini düzelt.
+              </p>
+            )}
           </Field>
           <Field label="Satan çalışan">
             <select className={inputClass} value={soldBy} onChange={(e) => setSoldBy(e.target.value)}>

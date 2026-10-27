@@ -181,6 +181,35 @@ class LedgerServiceImplTest {
     }
 
     @Test
+    void topluMasraf_herSatirAyriHareketOlarakSirayaGoreYazilir() {
+        when(categoryRepository.findFirstByTenantIdAndRootAndParentIdIsNullAndNameIgnoreCase(any(), any(), any()))
+                .thenReturn(Optional.empty());
+
+        List<LedgerEntryResponse> result = service.addExpenses(List.of(
+                expenseRequest(cash.getId(), 4000000L, null, "Kira"),
+                expenseRequest(cash.getId(), 1500000L, null, "Maaş"),
+                expenseRequest(cash.getId(), 25000L, null, "Çay")));
+
+        ArgumentCaptor<LedgerEntry> written = ArgumentCaptor.forClass(LedgerEntry.class);
+        verify(entryRepository, times(3)).save(written.capture());
+        assertThat(written.getAllValues()).extracting(LedgerEntry::getAmountCents).containsExactly(4000000L, 1500000L, 25000L);
+        assertThat(written.getAllValues()).allSatisfy(e -> assertThat(e.getType()).isEqualTo(LedgerEntryType.GENERAL_EXPENSE));
+        assertThat(result).extracting(LedgerEntryResponse::category).containsExactly("Kira", "Maaş", "Çay");
+    }
+
+    @Test
+    void topluMasraf_hataliSatirdaDurur() {
+        when(categoryRepository.findFirstByTenantIdAndRootAndParentIdIsNullAndNameIgnoreCase(any(), any(), any()))
+                .thenReturn(Optional.empty());
+
+        // Ikinci satirin kategorisi bos: hata firlar, transaction geri alinir (ilk satir da yazilmamis olur)
+        assertThatThrownBy(() -> service.addExpenses(List.of(
+                expenseRequest(cash.getId(), 4000000L, null, "Kira"),
+                expenseRequest(cash.getId(), 100L, null, " "))))
+                .isInstanceOf(InvalidCategoryException.class);
+    }
+
+    @Test
     void masraf_kasaYaDaBankaDisindakiHesaptanOdenemez() {
         Account balance = account(AccountType.BALANCE, tenantId);
         when(accountRepository.findById(balance.getId())).thenReturn(Optional.of(balance));
