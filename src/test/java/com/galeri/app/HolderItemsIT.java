@@ -106,33 +106,34 @@ class HolderItemsIT {
     }
 
     @Test
-    void sermayedarinEvraki_tahsilEdildikceSermayesineYazilir_geriAlinincaTerslenir() {
+    void sermayedarinEvraki_alacakOlarakOnunKartinda_tahsilEdilinceNakde_geriAlinincaYineAlacak_sahibiEtkilenmez() {
         paymentPlanService.addOpenItems(ali, new OpenItemsRequest(PlanDirection.SALE, today, List.of(
                 cheque(500 * K, "C-1"), cheque(300 * K, "C-2")), burak));
         assertThat(paymentPlanService.list(null, PlanDirection.SALE, null, null))
                 .allSatisfy(i -> assertThat(i.holder().id()).isEqualTo(burak));
-        expect("evrak girildi", burak, 1_000 * K);
-        expect("evrak girildi", furkan, 10_800 * K);   // alacak havuzda, tahsil edilene kadar dukkan sahibinin payinda
+        expect("evrak girildi", burak, 1_800 * K, 1_000 * K, 800 * K);   // alacak Burak'in: riski onda
+        expect("evrak girildi", furkan, 10_000 * K, 10_000 * K, 0);
+        expectError(1055, () -> capitalService.removePartner(burak));
         check("evrak girildi");
 
         UUID first = open().get(0), second = open().get(1);
         paymentPlanService.collect(first, new CollectRequest(cash, today));
-        expect("tahsil", burak, 1_500 * K);
-        expect("tahsil", furkan, 10_300 * K);
-        assertThat(holder(burak).cashCents()).isEqualTo(1_500 * K);
+        expect("tahsil", burak, 1_800 * K, 1_500 * K, 300 * K);
+        expect("tahsil", furkan, 10_000 * K, 10_000 * K, 0);
         check("tahsil");
 
         paymentPlanService.undo(first);
-        expect("geri alindi", burak, 1_000 * K);
+        expect("geri alindi", burak, 1_800 * K, 1_000 * K, 800 * K);
         check("geri alindi");
         paymentPlanService.collect(first, new CollectRequest(cash, today));
 
-        // Ciro: dukkan evraki kullandi, sermayedara yazilir; karsiliksiz cikinca terslenir
+        // Ciro: dukkan evraki kullandi, Burak'in nakdine gecer; karsiliksiz cikinca yine Burak'in alacagi
         paymentPlanService.endorse(second, new EndorseRequest(veli, null, today));
-        expect("ciro", burak, 1_800 * K);
+        expect("ciro", burak, 1_800 * K, 1_800 * K, 0);
         check("ciro");
         paymentPlanService.bounce(second);
-        expect("karsiliksiz", burak, 1_500 * K);
+        expect("karsiliksiz", burak, 1_800 * K, 1_500 * K, 300 * K);
+        expect("karsiliksiz", furkan, 10_000 * K, 10_000 * K, 0);
         assertThat(holders().stream().mapToLong(CapitalResponses.Holder::capitalCents).sum())
                 .as("herkesin sermayesi = havuz").isEqualTo(netWorthService.summary().totalCents());
         check("karsiliksiz");
@@ -147,7 +148,7 @@ class HolderItemsIT {
         paymentPlanService.addOpenItems(ali, new OpenItemsRequest(PlanDirection.PURCHASE, today, List.of(cheque(100 * K, "C-5")), burak));
         UUID item = paymentPlanService.list(null, PlanDirection.PURCHASE, null, null).getFirst().id();
         paymentPlanService.collect(item, new CollectRequest(cash, today));
-        expect("borc odendi", burak, 1_000 * K);
+        expect("borc odendi", burak, 1_000 * K, 1_000 * K, 0);
         check("borc");
     }
 
@@ -179,8 +180,11 @@ class HolderItemsIT {
         return holders().stream().filter(h -> contact.equals(h.contactId())).findFirst().orElseThrow();
     }
 
-    private void expect(String step, UUID contact, long capital) {
-        assertThat(holder(contact).capitalCents()).as("%s: sermaye", step).isEqualTo(capital);
+    private void expect(String step, UUID contact, long capital, long cashPart, long receivable) {
+        CapitalResponses.Holder h = holder(contact);
+        assertThat(h.capitalCents()).as("%s: sermaye", step).isEqualTo(capital);
+        assertThat(h.cashCents()).as("%s: nakit", step).isEqualTo(cashPart);
+        assertThat(h.otherCents()).as("%s: alacak", step).isEqualTo(receivable);
     }
 
     private void check(String step) {

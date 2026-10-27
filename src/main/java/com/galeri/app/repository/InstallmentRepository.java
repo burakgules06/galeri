@@ -74,4 +74,12 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
     int maxSeq(@Param("planId") UUID planId);
 
     boolean existsByPlan_IdAndPaidEntryIdIsNotNull(UUID planId);
+
+    /** Sermayedara ait (V18) henuz tahsil edilmemis evrak toplami, kisi basina: [holderContactId, toplam kurus]. */
+    @Query("""
+            select p.holderContactId, sum(i.amountCents) from Installment i join i.plan p
+            where p.tenantId = :tenantId and p.holderContactId is not null and i.paidEntryId is null
+            group by p.holderContactId
+            """)
+    List<Object[]> pendingByHolder(@Param("tenantId") UUID tenantId);
 }
