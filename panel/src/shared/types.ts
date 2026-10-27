@@ -233,6 +233,9 @@ export interface InstallmentResponse {
   drawerName: string | null;
   endorsedTo: ContactSummary | null;   // ciro edildiyse cekin / senedin verildigi kisi
   bounced: boolean;                     // karsiliksiz cikti, hala acik
+  downPayment: boolean;                 // plan kurulurken alinan / odenen pesinat
+  number: number;                       // pesinat haric taksit no (pesinatta 0)
+  installmentCount: number;             // pesinat haric taksit sayisi
 }
 
 // Toplu satis: ayni aliciya birden fazla arac, toplam uzerinden tek plan.

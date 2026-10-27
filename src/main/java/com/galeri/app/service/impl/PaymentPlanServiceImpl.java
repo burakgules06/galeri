@@ -415,7 +415,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
 
     private static PaymentPlanResponse planResponse(PaymentPlan p, List<Installment> installments, VehicleRef ref, LocalDate today,
                                                     List<PaymentPlanResponse.BasketItem> basket) {
-        List<InstallmentResponse> rows = installments.stream().map(i -> toResponse(i, ref, installments.size(), today)).toList();
+        List<InstallmentResponse> rows = installments.stream().map(i -> toResponse(i, ref, installments, today)).toList();
         long paid = rows.stream().filter(i -> i.status() == InstallmentStatus.PAID).mapToLong(InstallmentResponse::amountCents).sum();
         long overdue = rows.stream().filter(i -> i.status() == InstallmentStatus.OVERDUE).mapToLong(InstallmentResponse::amountCents).sum();
         return new PaymentPlanResponse(p.getId(), p.getDirection(), p.getVehicleId(), summary(p.getContact()),
@@ -482,7 +482,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         UUID tenantId = CurrentUser.tenantId();
         List<Installment> all = installmentRepository.findAllWithPlan(tenantId);
         if (all.isEmpty()) return List.of();
-        Map<UUID, Long> counts = all.stream().collect(Collectors.groupingBy(i -> i.getPlan().getId(), Collectors.counting()));
+        Map<UUID, List<Installment>> byPlan = all.stream().collect(Collectors.groupingBy(i -> i.getPlan().getId()));
         // Sepet planinda listede ilk arac gosterilir
         Map<UUID, UUID> basketFirst = new HashMap<>();
         List<UUID> vehicleless = all.stream().map(Installment::getPlan).filter(p -> p.getVehicleId() == null && p.getOpeningEntryId() == null)
@@ -501,7 +501,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                 .filter(i -> direction == null || i.getPlan().getDirection() == direction)
                 .filter(i -> from == null || !i.getDueDate().isBefore(from))
                 .filter(i -> to == null || !i.getDueDate().isAfter(to))
-                .map(i -> toResponse(i, vehicles.get(vehicleIdOf.apply(i.getPlan())), counts.get(i.getPlan().getId()).intValue(), today))
+                .map(i -> toResponse(i, vehicles.get(vehicleIdOf.apply(i.getPlan())), byPlan.get(i.getPlan().getId()), today))
                 .filter(i -> status == null || i.status() == status)
                 .toList();
     }
@@ -733,11 +733,24 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
 
     private InstallmentResponse single(Installment i, Vehicle vehicle) {
         Vehicle v = vehicle != null ? vehicle : vehicleOf(i.getPlan());
-        int count = installmentRepository.findByPlanIds(List.of(i.getPlan().getId())).size();
-        return toResponse(i, ref(v), count, today());
+        return toResponse(i, ref(v), installmentRepository.findByPlanIds(List.of(i.getPlan().getId())), today());
     }
 
-    private static InstallmentResponse toResponse(Installment i, VehicleRef vehicle, int count, LocalDate today) {
+    /**
+     * Pesinat: plan kurulurken ayni islemde tahsil / odenen satir ("simdi alindi"). Odenme ani kayit anina 2 dakikadan yakindir;
+     * sonradan tahsil edilen taksit bu kadar yakin olmaz.
+     */
+    static boolean isDownPayment(Installment i) {
+        return i.isPaid() && i.getPaidAt() != null && i.getCreatedAt() != null
+                && Math.abs(java.time.Duration.between(i.getCreatedAt(), i.getPaidAt()).toSeconds()) < 120;
+    }
+
+    /** siblings: ayni planin butun taksitleri. Taksit no ve sayisi pesinat haric sayilir ("Pesinat", "1. taksit" ...). */
+    private static InstallmentResponse toResponse(Installment i, VehicleRef vehicle, List<Installment> siblings, LocalDate today) {
+        int count = siblings.size();
+        List<UUID> regular = siblings.stream().filter(s -> !isDownPayment(s))
+                .sorted(Comparator.comparing(Installment::getSeq)).map(Installment::getId).toList();
+        boolean down = isDownPayment(i);
         InstallmentStatus status = i.isPaid() ? InstallmentStatus.PAID
                 : i.getDueDate().isBefore(today) ? InstallmentStatus.OVERDUE : InstallmentStatus.UPCOMING;
         long daysLate = status == InstallmentStatus.OVERDUE ? ChronoUnit.DAYS.between(i.getDueDate(), today) : 0;
@@ -745,7 +758,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         return new InstallmentResponse(i.getId(), p.getId(), p.getDirection(), vehicle, i.getSeq(), count, i.getDueDate(),
                 i.getAmountCents(), i.getMethod(), i.getNoteNo(), summary(i.getPayer()), summary(p.getContact()),
                 status, daysLate, i.getPaidEntryId(), i.getPaidAt(), i.getBankName(), i.getDrawerName(), summary(i.getEndorsedTo()),
-                i.getBouncedAt() != null && !i.isPaid());
+                i.getBouncedAt() != null && !i.isPaid(), down, down ? 0 : regular.indexOf(i.getId()) + 1, regular.size());
     }
 
     private Installment lockInstallment(UUID id) {

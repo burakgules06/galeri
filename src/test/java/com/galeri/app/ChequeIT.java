@@ -101,7 +101,13 @@ class ChequeIT {
         sell(v, ali, List.of(
                 new InstallmentRequest(today, 300_000 * TL, PaymentMethod.CASH, null, null, true, cash),
                 cheque(today.plusDays(30), 700_000 * TL, "123456")));
+        InstallmentResponse down = installments(v).stream().filter(i -> i.method() == PaymentMethod.CASH).findFirst().orElseThrow();
+        assertThat(down.downPayment()).as("satista alinan pesinat").isTrue();
+        assertThat(down.number()).isZero();
         InstallmentResponse c = open(v).getFirst();
+        assertThat(c.downPayment()).isFalse();
+        assertThat(c.number()).as("pesinat sayilmaz: 1. taksit").isEqualTo(1);
+        assertThat(c.installmentCount()).isEqualTo(1);
         assertThat(c.method()).isEqualTo(PaymentMethod.CHEQUE);
         assertThat(c.noteNo()).isEqualTo("123456");
         assertThat(c.bankName()).isEqualTo("Ziraat");

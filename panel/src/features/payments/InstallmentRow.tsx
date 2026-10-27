@@ -44,7 +44,7 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
         <div className="min-w-0 grow">
           <div className="flex items-center gap-2 flex-wrap">
             {showPayer && <span className="font-semibold text-[15.5px] truncate">{i.payer.name}</span>}
-            {!showPayer && <span className="font-semibold text-[15px]">{i.seq}. taksit</span>}
+            {!showPayer && <span className="font-semibold text-[15px]">{i.downPayment ? (i.count === 1 ? "Peşin" : "Peşinat") : `${i.number}. taksit`}</span>}
             <span className={`text-[12px] font-semibold rounded-full px-2 py-0.5 ${PILL[i.status]}`}>
               {i.endorsedTo ? `Ciro: ${i.endorsedTo.name}` : dueLabel(i)}
             </span>
@@ -64,7 +64,7 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
             <span className="text-murekkep-3">·</span>
             <span>{METHOD[i.method]}{i.noteNo ? ` no ${i.noteNo}` : ""}{i.bankName ? ` · ${i.bankName}` : ""}</span>
             {i.drawerName && <span className="text-murekkep-3">keşideci {i.drawerName}</span>}
-            {showPayer && <><span className="text-murekkep-3">·</span><span>{i.seq}/{i.count}</span></>}
+            {showPayer && <><span className="text-murekkep-3">·</span><span>{i.downPayment ? "Peşinat" : `${i.number}/${i.installmentCount}`}</span></>}
             {showPayer && i.payer.phone && <span className="sayi text-[14px] text-murekkep-3">{formatPhone(i.payer.phone)}</span>}
           </div>
         </div>
