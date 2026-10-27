@@ -4,10 +4,12 @@ import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.InstallmentStatus;
 import com.galeri.app.model.enums.PlanDirection;
+import com.galeri.app.model.request.BasketSaleRequest;
 import com.galeri.app.model.request.CollectRequest;
 import com.galeri.app.model.request.EndorseRequest;
 import com.galeri.app.model.request.InstallmentRequest;
 import com.galeri.app.model.request.InstallmentUpdateRequest;
+import com.galeri.app.model.request.OpenItemsRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
 import com.galeri.app.model.response.ContactStatement;
 import com.galeri.app.model.response.InstallmentResponse;
@@ -26,8 +28,20 @@ public interface PaymentPlanService {
      */
     void recordSale(Vehicle vehicle, Contact buyer, VehicleSaleRequest request);
 
-    /** Satisi geri alir: hic taksit odenmemis olmali; satis hareketleri terslenir, plan silinir. */
+    /**
+     * Satisi geri alir: hic taksit odenmemis olmali; satis hareketleri terslenir, plan silinir. Arac bir sepetteyse sepetin
+     * tamami (butun araclarin satis hareketleri) geri alinir.
+     */
     void undoSale(Vehicle vehicle);
+
+    /**
+     * Toplu satis: tek plan (aracsiz) + sepet satirlari; satis hareketi arac basina (bedeller), taksitler toplam uzerinden.
+     * Araclarin satis alanlarini cagiran (VehicleService) doldurur.
+     */
+    void recordBasketSale(List<Vehicle> vehicles, List<Long> prices, Contact buyer, BasketSaleRequest request);
+
+    /** Arac bir sepetteyse sepetteki butun araclar (kendisi dahil), degilse bos. */
+    List<UUID> basketVehicleIds(UUID vehicleId);
 
     /**
      * Aracin alis odemesini esitler (VehicleService create / update cagirir, ayni transaction).
@@ -56,6 +70,15 @@ public interface PaymentPlanService {
      * carisine ya da secilen acik alis taksitine odeme yazilir. Taksit cekten buyukse bolunur.
      */
     InstallmentResponse endorse(UUID installmentId, EndorseRequest request);
+
+    /**
+     * Gecmis senet / cek aktarimi: kisinin carisine aracsiz plan. Toplam acilis hareketiyle cariye yazilir, taksitler acik girer
+     * (tahsil / ode / ciro / karsiliksiz aracli planlardaki gibi).
+     */
+    PaymentPlanResponse addOpenItems(UUID contactId, OpenItemsRequest request);
+
+    /** Aracsiz plani siler (hicbir taksiti odenmemisse): acilis hareketi terslenir. Hata yapan sifirdan girer. */
+    void removeOpenItems(UUID planId);
 
     /** Karsiliksiz: tahsil ya da ciro edildiyse geri alinir, borc yeniden acilir, taksit karsiliksiz olarak isaretlenir. */
     InstallmentResponse bounce(UUID installmentId);

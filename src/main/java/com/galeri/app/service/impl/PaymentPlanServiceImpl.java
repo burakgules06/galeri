@@ -8,6 +8,7 @@ import com.galeri.app.exception.runtime.InstallmentAlreadyPaidException;
 import com.galeri.app.exception.runtime.InstallmentNotPaidException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidPayerException;
+import com.galeri.app.exception.runtime.PlanNotRemovableException;
 import com.galeri.app.exception.runtime.PurchaseHasPaymentsException;
 import com.galeri.app.exception.runtime.PurchaseTotalMismatchException;
 import com.galeri.app.exception.runtime.RecordNotFoundException;
@@ -20,16 +21,19 @@ import com.galeri.app.model.entity.Contact;
 import com.galeri.app.model.entity.Installment;
 import com.galeri.app.model.entity.LedgerEntry;
 import com.galeri.app.model.entity.PaymentPlan;
+import com.galeri.app.model.entity.PaymentPlanVehicle;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.AccountType;
 import com.galeri.app.model.enums.ContactType;
 import com.galeri.app.model.enums.InstallmentStatus;
 import com.galeri.app.model.enums.PaymentMethod;
 import com.galeri.app.model.enums.PlanDirection;
+import com.galeri.app.model.request.BasketSaleRequest;
 import com.galeri.app.model.request.CollectRequest;
 import com.galeri.app.model.request.EndorseRequest;
 import com.galeri.app.model.request.InstallmentRequest;
 import com.galeri.app.model.request.InstallmentUpdateRequest;
+import com.galeri.app.model.request.OpenItemsRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
 import com.galeri.app.model.response.ContactStatement;
 import com.galeri.app.model.response.ContactSummary;
@@ -42,6 +46,7 @@ import com.galeri.app.repository.InstallmentRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.PaymentPlanRepository;
+import com.galeri.app.repository.PaymentPlanVehicleRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.security.CurrentUser;
 import com.galeri.app.service.CoOwnershipService;
@@ -59,12 +64,14 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -83,6 +90,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     private final LedgerService ledgerService;
     private final CoOwnershipService coOwnershipService;
     private final Clock clock;
+    private final PaymentPlanVehicleRepository basketRepository;
 
     // ------------------------------------------------------------------ satis
 
@@ -146,12 +154,113 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     @Override
     @Transactional
     public void undoSale(Vehicle vehicle) {
+        Optional<PaymentPlanVehicle> link = basketRepository.findByVehicleId(vehicle.getId());
+        if (link.isPresent()) {
+            undoBasket(link.get().getPlanId());
+            return;
+        }
         planRepository.findByVehicleIdAndDirection(vehicle.getId(), PlanDirection.SALE).ifPresent(plan -> {
             if (installmentRepository.existsByPlan_IdAndPaidEntryIdIsNotNull(plan.getId())) throw new SaleHasPaymentsException();
             installmentRepository.deleteAll(installmentRepository.findByPlanIds(List.of(plan.getId())));
             planRepository.delete(plan);
         });
         ledgerService.reverseVehicleSales(vehicle.getId());
+    }
+
+    // ------------------------------------------------------------------ toplu satis (sepet)
+
+    @Override
+    @Transactional
+    public void recordBasketSale(List<Vehicle> vehicles, List<Long> prices, Contact buyer, BasketSaleRequest r) {
+        long total = prices.stream().mapToLong(Long::longValue).sum();
+        if (r.installments().stream().mapToLong(InstallmentRequest::amountCents).sum() != total) throw new SaleTotalMismatchException();
+        UUID tenantId = buyer.getTenantId();
+
+        PaymentPlan plan = new PaymentPlan();
+        plan.setTenantId(tenantId);
+        plan.setDirection(PlanDirection.SALE);
+        plan.setContact(buyer);
+        plan.setTotalCents(total);
+        plan.setCreatedBy(panelUserRepository.getReferenceById(CurrentUser.principal().userId()));
+        plan = planRepository.save(plan);
+        for (int k = 0; k < vehicles.size(); k++) {
+            PaymentPlanVehicle link = new PaymentPlanVehicle();
+            link.setTenantId(tenantId);
+            link.setPlanId(plan.getId());
+            link.setVehicleId(vehicles.get(k).getId());
+            link.setSalePriceCents(prices.get(k));
+            basketRepository.save(link);
+        }
+
+        List<InstallmentRequest> rows = new ArrayList<>(r.installments());
+        rows.sort(Comparator.comparing(InstallmentRequest::dueDate));
+        List<Contact> payers = new ArrayList<>();
+        for (InstallmentRequest row : rows) {
+            payers.add(payer(row, buyer, tenantId));
+            if (row.paidNow() && row.accountId() == null) throw new InvalidAccountException();
+        }
+
+        // Satis hareketi arac ve odeyen basina: odeyenlerin tutarlari araclarin bedellerine sirayla dagitilir (selale).
+        // Her aracin hareketleri toplami bedeline, her odeyeninki taksitlerinin toplamina kurusu kurusuna esit.
+        Map<UUID, Long> perPayer = new LinkedHashMap<>();
+        Map<UUID, Contact> payerById = new LinkedHashMap<>();
+        for (int k = 0; k < rows.size(); k++) {
+            perPayer.merge(payers.get(k).getId(), rows.get(k).amountCents(), Long::sum);
+            payerById.putIfAbsent(payers.get(k).getId(), payers.get(k));
+        }
+        List<UUID> payerIds = new ArrayList<>(perPayer.keySet());
+        int p = 0;
+        long payerLeft = perPayer.get(payerIds.get(0));
+        for (int k = 0; k < vehicles.size(); k++) {
+            long need = prices.get(k);
+            while (need > 0) {
+                long take = Math.min(need, payerLeft);
+                ledgerService.writeSale(vehicles.get(k), payerById.get(payerIds.get(p)), take, r.saleDate());
+                need -= take;
+                payerLeft -= take;
+                if (payerLeft == 0 && p + 1 < payerIds.size()) payerLeft = perPayer.get(payerIds.get(++p));
+            }
+        }
+
+        for (int k = 0; k < rows.size(); k++) {
+            InstallmentRequest row = rows.get(k);
+            Installment i = new Installment();
+            i.setTenantId(tenantId);
+            i.setPlan(plan);
+            i.setSeq((short) (k + 1));
+            i.setDueDate(row.dueDate());
+            i.setAmountCents(row.amountCents());
+            i.setMethod(row.method());
+            i.setNoteNo(blankToNull(row.noteNo()));
+            i.setBankName(blankToNull(row.bankName()));
+            i.setDrawerName(blankToNull(row.drawerName()));
+            i.setPayer(payers.get(k));
+            if (row.paidNow()) {
+                LedgerEntry paid = ledgerService.writeSettlement(PlanDirection.SALE, null, payers.get(k), row.accountId(),
+                        row.amountCents(), r.saleDate(), rows.size() == 1 ? "Peşin tahsilat" : "Peşinat");
+                i.setPaidEntryId(paid.getId());
+                i.setPaidAt(now());
+            }
+            installmentRepository.save(i);
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UUID> basketVehicleIds(UUID vehicleId) {
+        return basketRepository.findByVehicleId(vehicleId)
+                .map(l -> basketRepository.findByPlanIdOrderByCreatedAtAscIdAsc(l.getPlanId()).stream().map(PaymentPlanVehicle::getVehicleId).toList())
+                .orElse(List.of());
+    }
+
+    /** Sepet butunuyle geri alinir: hicbir taksiti odenmemis olmali; araclarin satis hareketleri terslenir, plan silinir. */
+    private void undoBasket(UUID planId) {
+        if (installmentRepository.existsByPlan_IdAndPaidEntryIdIsNotNull(planId)) throw new SaleHasPaymentsException();
+        List<PaymentPlanVehicle> links = basketRepository.findByPlanIdOrderByCreatedAtAscIdAsc(planId);
+        installmentRepository.deleteAll(installmentRepository.findByPlanIds(List.of(planId)));
+        basketRepository.deleteAll(links);
+        planRepository.deleteById(planId);
+        links.forEach(l -> ledgerService.reverseVehicleSales(l.getVehicleId()));
     }
 
     // ------------------------------------------------------------------ alis
@@ -285,20 +394,86 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     @Transactional(readOnly = true)
     public List<PaymentPlanResponse> plans(UUID vehicleId) {
         Vehicle vehicle = getVehicle(vehicleId);
-        List<PaymentPlan> plans = planRepository.findByVehicleIdOrderByDirection(vehicle.getId());
+        List<PaymentPlan> plans = new ArrayList<>(planRepository.findByVehicleIdOrderByDirection(vehicle.getId()));
+        basketRepository.findByVehicleId(vehicle.getId()).flatMap(l -> planRepository.findById(l.getPlanId())).ifPresent(plans::add);
         if (plans.isEmpty()) return List.of();
         Map<UUID, List<Installment>> byPlan = installmentRepository.findByPlanIds(plans.stream().map(PaymentPlan::getId).toList())
                 .stream().collect(Collectors.groupingBy(i -> i.getPlan().getId()));
         LocalDate today = today();
         VehicleRef ref = ref(vehicle);
-        return plans.stream().map(p -> {
-            List<InstallmentResponse> rows = byPlan.getOrDefault(p.getId(), List.of()).stream()
-                    .map(i -> toResponse(i, ref, byPlan.get(p.getId()).size(), today)).toList();
-            long paid = rows.stream().filter(i -> i.status() == InstallmentStatus.PAID).mapToLong(InstallmentResponse::amountCents).sum();
-            long overdue = rows.stream().filter(i -> i.status() == InstallmentStatus.OVERDUE).mapToLong(InstallmentResponse::amountCents).sum();
-            return new PaymentPlanResponse(p.getId(), p.getDirection(), p.getVehicleId(), summary(p.getContact()),
-                    p.getTotalCents(), paid, p.getTotalCents() - paid, overdue, rows);
-        }).toList();
+        return plans.stream().map(p -> planResponse(p, byPlan.getOrDefault(p.getId(), List.of()), ref, today, basketItems(p))).toList();
+    }
+
+    /** Sepet planinin araclari ve bedelleri (normal planda bos). */
+    private List<PaymentPlanResponse.BasketItem> basketItems(PaymentPlan p) {
+        if (p.getVehicleId() != null || p.getOpeningEntryId() != null) return List.of();
+        List<PaymentPlanVehicle> links = basketRepository.findByPlanIdOrderByCreatedAtAscIdAsc(p.getId());
+        Map<UUID, Vehicle> vehicles = vehicleRepository.findAllById(links.stream().map(PaymentPlanVehicle::getVehicleId).toList()).stream()
+                .collect(Collectors.toMap(Vehicle::getId, v -> v));
+        return links.stream().map(l -> new PaymentPlanResponse.BasketItem(ref(vehicles.get(l.getVehicleId())), l.getSalePriceCents())).toList();
+    }
+
+    private static PaymentPlanResponse planResponse(PaymentPlan p, List<Installment> installments, VehicleRef ref, LocalDate today,
+                                                    List<PaymentPlanResponse.BasketItem> basket) {
+        List<InstallmentResponse> rows = installments.stream().map(i -> toResponse(i, ref, installments.size(), today)).toList();
+        long paid = rows.stream().filter(i -> i.status() == InstallmentStatus.PAID).mapToLong(InstallmentResponse::amountCents).sum();
+        long overdue = rows.stream().filter(i -> i.status() == InstallmentStatus.OVERDUE).mapToLong(InstallmentResponse::amountCents).sum();
+        return new PaymentPlanResponse(p.getId(), p.getDirection(), p.getVehicleId(), summary(p.getContact()),
+                p.getTotalCents(), paid, p.getTotalCents() - paid, overdue, rows, basket);
+    }
+
+    // ------------------------------------------------------------------ gecmis senet / cek (aracsiz)
+
+    @Override
+    @Transactional
+    public PaymentPlanResponse addOpenItems(UUID contactId, OpenItemsRequest r) {
+        UUID tenantId = CurrentUser.tenantId();
+        Contact contact = getContact(contactId, tenantId);
+        long total = r.installments().stream().mapToLong(InstallmentRequest::amountCents).sum();
+        LedgerEntry opening = ledgerService.writeOpenItems(contact, r.direction(), total, r.date());
+
+        PaymentPlan plan = new PaymentPlan();
+        plan.setTenantId(tenantId);
+        plan.setDirection(r.direction());
+        plan.setContact(contact);
+        plan.setTotalCents(total);
+        plan.setOpeningEntryId(opening.getId());
+        plan.setCreatedBy(panelUserRepository.getReferenceById(CurrentUser.principal().userId()));
+        plan = planRepository.save(plan);
+
+        List<InstallmentRequest> rows = new ArrayList<>(r.installments());
+        rows.sort(Comparator.comparing(InstallmentRequest::dueDate));
+        List<Installment> saved = new ArrayList<>();
+        for (int k = 0; k < rows.size(); k++) {
+            InstallmentRequest row = rows.get(k);
+            Installment i = new Installment();
+            i.setTenantId(tenantId);
+            i.setPlan(plan);
+            i.setSeq((short) (k + 1));
+            i.setDueDate(row.dueDate());
+            i.setAmountCents(row.amountCents());
+            // Kurum yontemi aracsiz kayitta yok: odeyen her zaman kisinin kendisi
+            i.setMethod(row.method() == PaymentMethod.INSTITUTION ? PaymentMethod.TRANSFER : row.method());
+            i.setNoteNo(blankToNull(row.noteNo()));
+            i.setBankName(blankToNull(row.bankName()));
+            i.setDrawerName(blankToNull(row.drawerName()));
+            i.setPayer(contact);
+            saved.add(installmentRepository.save(i));
+        }
+        return planResponse(plan, saved, null, today(), List.of());
+    }
+
+    @Override
+    @Transactional
+    public void removeOpenItems(UUID planId) {
+        PaymentPlan plan = planRepository.findById(planId).orElseThrow(RecordNotFoundException::new);
+        if (!plan.getTenantId().equals(CurrentUser.tenantId())) throw new SourceNotBelongToTenantException();
+        if (plan.getOpeningEntryId() == null || installmentRepository.existsByPlan_IdAndPaidEntryIdIsNotNull(plan.getId())) {
+            throw new PlanNotRemovableException();
+        }
+        ledgerService.reverse(plan.getOpeningEntryId());
+        installmentRepository.deleteAll(installmentRepository.findByPlanIds(List.of(plan.getId())));
+        planRepository.delete(plan);
     }
 
     @Override
@@ -308,14 +483,25 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         List<Installment> all = installmentRepository.findAllWithPlan(tenantId);
         if (all.isEmpty()) return List.of();
         Map<UUID, Long> counts = all.stream().collect(Collectors.groupingBy(i -> i.getPlan().getId(), Collectors.counting()));
-        Map<UUID, VehicleRef> vehicles = vehicleRepository.findAllById(all.stream().map(i -> i.getPlan().getVehicleId()).distinct().toList())
+        // Sepet planinda listede ilk arac gosterilir
+        Map<UUID, UUID> basketFirst = new HashMap<>();
+        List<UUID> vehicleless = all.stream().map(Installment::getPlan).filter(p -> p.getVehicleId() == null && p.getOpeningEntryId() == null)
+                .map(PaymentPlan::getId).distinct().toList();
+        if (!vehicleless.isEmpty()) {
+            basketRepository.findByPlanIdIn(vehicleless).stream()
+                    .sorted(Comparator.comparing(PaymentPlanVehicle::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                    .forEach(l -> basketFirst.putIfAbsent(l.getPlanId(), l.getVehicleId()));
+        }
+        Function<PaymentPlan, UUID> vehicleIdOf = p -> p.getVehicleId() != null ? p.getVehicleId() : basketFirst.get(p.getId());
+        Map<UUID, VehicleRef> vehicles = vehicleRepository.findAllById(all.stream().map(i -> vehicleIdOf.apply(i.getPlan()))
+                        .filter(Objects::nonNull).distinct().toList())
                 .stream().collect(Collectors.toMap(Vehicle::getId, PaymentPlanServiceImpl::ref));
         LocalDate today = today();
         return all.stream()
                 .filter(i -> direction == null || i.getPlan().getDirection() == direction)
                 .filter(i -> from == null || !i.getDueDate().isBefore(from))
                 .filter(i -> to == null || !i.getDueDate().isAfter(to))
-                .map(i -> toResponse(i, vehicles.get(i.getPlan().getVehicleId()), counts.get(i.getPlan().getId()).intValue(), today))
+                .map(i -> toResponse(i, vehicles.get(vehicleIdOf.apply(i.getPlan())), counts.get(i.getPlan().getId()).intValue(), today))
                 .filter(i -> status == null || i.status() == status)
                 .toList();
     }
@@ -335,7 +521,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             split(i, r.amountCents());
         }
         PaymentPlan plan = i.getPlan();
-        Vehicle vehicle = vehicleRepository.findById(plan.getVehicleId()).orElseThrow(RecordNotFoundException::new);
+        Vehicle vehicle = vehicleOf(plan);
         LedgerEntry entry = ledgerService.writeSettlement(plan.getDirection(), vehicle, i.getPayer(), r.accountId(),
                 i.getAmountCents(), r.date(), description(plan.getDirection(), i.getMethod()));
         OffsetDateTime paidAt = now();
@@ -368,7 +554,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         i.setPaidAt(null);
         if (i.getPlan().getDirection() == PlanDirection.PURCHASE) {
             installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
-            coOwnershipService.syncContributions(vehicleRepository.findById(i.getPlan().getVehicleId()).orElseThrow(RecordNotFoundException::new));
+            coOwnershipService.syncContributions(vehicleOf(i.getPlan()));
         }
         return single(i, null);
     }
@@ -407,10 +593,10 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             }
             // Alis taksiti cekten buyukse: cek kadari ciroyla, kalani ayri taksit olarak acik kalir (or. nakitle odenir)
             if (target.getAmountCents() > i.getAmountCents()) split(target, i.getAmountCents());
-            toVehicle = vehicleRepository.findById(target.getPlan().getVehicleId()).orElseThrow(RecordNotFoundException::new);
+            toVehicle = vehicleOf(target.getPlan());
         }
 
-        Vehicle fromVehicle = vehicleRepository.findById(i.getPlan().getVehicleId()).orElseThrow(RecordNotFoundException::new);
+        Vehicle fromVehicle = vehicleOf(i.getPlan());
         String what = i.getMethod() == PaymentMethod.CHEQUE ? "Çek" : "Senet";
         LedgerService.Endorsement e = ledgerService.writeEndorsement(fromVehicle, i.getPayer(), toVehicle, to, i.getAmountCents(),
                 r.date(), what + " ciro edildi: " + to.getName(), what + " cirosu (" + i.getPayer().getName() + ")");
@@ -461,7 +647,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             t.setPaidEntryId(null);
             t.setPaidAt(null);
             installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
-            coOwnershipService.syncContributions(vehicleRepository.findById(t.getPlan().getVehicleId()).orElseThrow(RecordNotFoundException::new));
+            coOwnershipService.syncContributions(vehicleOf(t.getPlan()));
         });
     }
 
@@ -546,8 +732,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     }
 
     private InstallmentResponse single(Installment i, Vehicle vehicle) {
-        Vehicle v = vehicle != null ? vehicle
-                : vehicleRepository.findById(i.getPlan().getVehicleId()).orElseThrow(RecordNotFoundException::new);
+        Vehicle v = vehicle != null ? vehicle : vehicleOf(i.getPlan());
         int count = installmentRepository.findByPlanIds(List.of(i.getPlan().getId())).size();
         return toResponse(i, ref(v), count, today());
     }
@@ -596,7 +781,13 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     }
 
     private static VehicleRef ref(Vehicle v) {
-        return new VehicleRef(v.getId(), v.getPlate(), v.getMake(), v.getModel());
+        return v == null ? null : new VehicleRef(v.getId(), v.getPlate(), v.getMake(), v.getModel());
+    }
+
+    /** Planin araci; aracsiz planda (gecmis senet / cek) null. */
+    private Vehicle vehicleOf(PaymentPlan plan) {
+        return plan.getVehicleId() == null ? null
+                : vehicleRepository.findById(plan.getVehicleId()).orElseThrow(RecordNotFoundException::new);
     }
 
     private static ContactSummary summary(Contact c) {

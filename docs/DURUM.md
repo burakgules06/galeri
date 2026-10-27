@@ -193,6 +193,20 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
 
 ## Sıradaki
 
+Galerici geri bildirimi 4 (`feat/basket-sale`): toplu satış. `V14__basket_sale.sql`: `payment_plan_vehicle` (sepet planı araçsızdır;
+araç ve satış bedeli burada, bir araç en fazla bir sepette). `POST /api/vehicles/basket-sale` { saleDate, buyerId, soldById, items[{vehicleId,
+salePriceCents}], installments } → her araç SOLD ve kendi bedeliyle; satış hareketi araç başına, ödeyenlerin tutarları araçlara sırayla
+(şelale) dağıtılır; taksitler toplam üzerinden tek plan. Sepetteki herhangi bir araçtan "Satışı geri al" bütün sepeti geri alır.
+Ortak araçta ortağa dönüş seçilmez (pay sermayede kalır). Hata kodu 1053. Panel: satış formunda "+ Aynı alıcıya araç ekle",
+ödeme planı kartında sepet listesi. Test: `BasketSaleIT`.
+
+Galerici geri bildirimi 3 (`feat/open-items`): geçmiş senet / çek aktarımı. `V13__open_items.sql`: `payment_plan.vehicle_id`
+boş olabilir, `opening_entry_id` (plan toplamını cariye yazan `OPENING_BALANCE`). `POST /api/contacts/{id}/open-items`
+{ direction SALE (bize borçlu) | PURCHASE (biz borçluyuz), date, installments } → OPENING → BALANCE ya da BALANCE → OPENING,
+taksitler açık girer ve aracı olanlarla aynı tahsil / öde / ciro / karşılıksız akışını kullanır. `DELETE /api/contacts/open-items/{planId}`
+hiç ödenmemişse açılış hareketini tersler, planı siler (1052). Bu açılış hareketi Kasa'dan düzeltilemez ve kişinin ayrı
+açılış bakiyesini engellemez. Panel: kişi detayında "Geçmiş senet / çek" formu ve "Kaydı sil". Test: `OpenItemsIT`.
+
 Galerici geri bildirimi 2 (`feat/cheques`): çek ve senet takibi. `V12__cheques_and_endorsement.sql`: ödeme yöntemine `CHEQUE`
 (banka, keşideci), taksite ciro (`endorsed_to_contact_id`, `endorse_entry_id`) ve karşılıksız (`bounced_at`), hesap türüne
 `PORTFOLIO` (ciroda ara hesap, bakiyesi hep 0). Ciro: `POST /api/installments/{id}/endorse` { toContactId, targetInstallmentId?, date }

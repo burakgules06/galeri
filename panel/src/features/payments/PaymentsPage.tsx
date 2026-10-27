@@ -6,7 +6,8 @@ import { api } from "../../api/galeri";
 import { addDaysIso, tl, todayIso } from "../../shared/format";
 import type { InstallmentResponse } from "../../shared/types";
 import { useLoad } from "../../shared/useLoad";
-import { Empty, ErrorBox, inputClass, Segment } from "../../shared/ui/Common";
+import { Button, Empty, ErrorBox, inputClass, Segment } from "../../shared/ui/Common";
+import { OpenItemsForm } from "../contacts/OpenItemsForm";
 import { StatTile } from "../../shared/ui/StatTile";
 import { InstallmentRow } from "./InstallmentRow";
 
@@ -26,6 +27,7 @@ export function PaymentsPage() {
   const [tab, setTab] = useState<Tab>("overdue");
   const [q, setQ] = useState("");
   const [side, setSide] = useState<Side>("SALE");
+  const [importing, setImporting] = useState(false);
   const today = todayIso();
   const weekEnd = addDaysIso(today, 6);
 
@@ -61,10 +63,14 @@ export function PaymentsPage() {
 
   return (
     <div className="space-y-5">
-      <header>
-        <p className="etiket">Tahsilat</p>
-        <h1 className="font-cond font-bold text-[30px] md:text-[34px] leading-tight tracking-tight">Ödemeler</h1>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="etiket">Tahsilat</p>
+          <h1 className="font-cond font-bold text-[30px] md:text-[34px] leading-tight tracking-tight">Ödemeler</h1>
+        </div>
+        <Button variant="secondary" onClick={() => setImporting(true)}>Geçmiş senet / çek ekle</Button>
       </header>
+      {importing && <OpenItemsForm onClose={() => setImporting(false)} onSaved={() => { setImporting(false); reload(); }} />}
 
       <ErrorBox message={error} />
 

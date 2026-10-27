@@ -4,6 +4,7 @@ import com.galeri.app.model.GenericResponse;
 import com.galeri.app.model.enums.VehicleStatus;
 import com.galeri.app.model.request.VehiclePartsRequest;
 import com.galeri.app.model.request.VehicleRequest;
+import com.galeri.app.model.request.BasketSaleRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
 import com.galeri.app.model.response.PaymentPlanResponse;
 import com.galeri.app.model.response.VehicleDetailAdmin;
@@ -57,6 +58,12 @@ public class VehicleController {
     public GenericResponse<VehicleDetailAdmin> updateParts(@PathVariable UUID id,
                                                           @Valid @RequestBody VehiclePartsRequest request) {
         return responseService.success(vehicleService.updateParts(id, request));
+    }
+
+    @PostMapping("/basket-sale")
+    @PreAuthorize("hasRole('ADMIN')")
+    public GenericResponse<VehicleDetailAdmin> sellBasket(@Valid @RequestBody BasketSaleRequest request) {
+        return responseService.success(vehicleService.sellBasket(request));
     }
 
     @PostMapping("/{id}/sale")

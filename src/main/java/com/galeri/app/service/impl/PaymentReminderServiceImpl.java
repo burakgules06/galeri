@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -85,7 +86,7 @@ public class PaymentReminderServiceImpl implements PaymentReminderService {
         if (byTenant.isEmpty()) return 0;
 
         Map<UUID, Vehicle> vehicles = vehicleRepository.findAllById(byTenant.values().stream().flatMap(List::stream)
-                        .map(i -> i.getPlan().getVehicleId()).distinct().toList()).stream()
+                        .map(i -> i.getPlan().getVehicleId()).filter(Objects::nonNull).distinct().toList()).stream()
                 .collect(Collectors.toMap(Vehicle::getId, Function.identity()));
 
         int sent = 0;

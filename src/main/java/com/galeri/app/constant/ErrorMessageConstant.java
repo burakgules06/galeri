@@ -55,4 +55,6 @@ public class ErrorMessageConstant {
     public static final int INVALID_ENDORSE_TARGET = 1049;
     public static final int INVALID_PARTIAL_AMOUNT = 1050;
     public static final int BOUNCE_NOT_ALLOWED = 1051;
+    public static final int PLAN_NOT_REMOVABLE = 1052;
+    public static final int INVALID_BASKET = 1053;
 }
