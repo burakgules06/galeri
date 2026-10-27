@@ -104,11 +104,11 @@ export function PartnerCapitalCard({ revision = 0 }: { revision?: number }) {
                         <div className="grid grid-cols-2 gap-4 mt-4">
                           <div className="min-w-0">
                             <p className="text-[13px] font-semibold text-murekkep-2">Alacak</p>
-                            <p className="sayi font-bold text-[clamp(1.25rem,2.4vw,1.75rem)] leading-tight text-basari mt-1 break-words">{tl(Math.max(0, statement.data.balanceCents))}</p>
+                            <p className="sayi font-bold text-[clamp(1.25rem,2.4vw,1.75rem)] leading-tight text-basari mt-1 break-words">{tl(Math.max(0, -statement.data.balanceCents))}</p>
                           </div>
                           <div className="min-w-0 border-l border-cizgi pl-4">
                             <p className="text-[13px] font-semibold text-murekkep-2">Verecek</p>
-                            <p className="sayi font-bold text-[clamp(1.25rem,2.4vw,1.75rem)] leading-tight text-tehlike mt-1 break-words">{tl(Math.max(0, -statement.data.balanceCents))}</p>
+                            <p className="sayi font-bold text-[clamp(1.25rem,2.4vw,1.75rem)] leading-tight text-tehlike mt-1 break-words">{tl(Math.max(0, statement.data.balanceCents))}</p>
                           </div>
                         </div>
                         <a href={`#/contacts/${h.contactId}`} className="inline-block mt-4 text-sm font-semibold text-plaka hover:text-plaka-koyu">Cari detayını gör →</a>
