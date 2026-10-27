@@ -146,6 +146,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                         row.amountCents(), r.saleDate(), rows.size() == 1 ? "Peşin tahsilat" : "Peşinat");
                 i.setPaidEntryId(paid.getId());
                 i.setPaidAt(now());
+                i.setDownPayment(true);
             }
             installmentRepository.save(i);
         }
@@ -240,6 +241,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                         row.amountCents(), r.saleDate(), rows.size() == 1 ? "Peşin tahsilat" : "Peşinat");
                 i.setPaidEntryId(paid.getId());
                 i.setPaidAt(now());
+                i.setDownPayment(true);
             }
             installmentRepository.save(i);
         }
@@ -355,6 +357,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                         row.amountCents(), vehicle.getPurchaseDate(), sorted.size() == 1 && paid.isEmpty() ? "Peşin ödeme" : "Peşinat");
                 i.setPaidEntryId(e.getId());
                 i.setPaidAt(now());
+                i.setDownPayment(true);
             }
             installmentRepository.save(i);
         }
@@ -736,13 +739,9 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         return toResponse(i, ref(v), installmentRepository.findByPlanIds(List.of(i.getPlan().getId())), today());
     }
 
-    /**
-     * Pesinat: plan kurulurken ayni islemde tahsil / odenen satir ("simdi alindi"). Odenme ani kayit anina 2 dakikadan yakindir;
-     * sonradan tahsil edilen taksit bu kadar yakin olmaz.
-     */
+    /** Pesinat: plan kurulurken ayni islemde tahsil / odenen satir (V15 isareti). Geri alinip sonra tahsil edilse de pesinattir. */
     static boolean isDownPayment(Installment i) {
-        return i.isPaid() && i.getPaidAt() != null && i.getCreatedAt() != null
-                && Math.abs(java.time.Duration.between(i.getCreatedAt(), i.getPaidAt()).toSeconds()) < 120;
+        return i.isDownPayment();
     }
 
     /** siblings: ayni planin butun taksitleri. Taksit no ve sayisi pesinat haric sayilir ("Pesinat", "1. taksit" ...). */
