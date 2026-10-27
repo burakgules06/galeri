@@ -64,6 +64,7 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
             <span className="text-murekkep-3">·</span>
             <span>{METHOD[i.method]}{i.noteNo ? ` no ${i.noteNo}` : ""}{i.bankName ? ` · ${i.bankName}` : ""}</span>
             {i.drawerName && <span className="text-murekkep-3">keşideci {i.drawerName}</span>}
+            {i.holder && <span className="text-[12px] font-semibold text-plaka-koyu bg-plaka-acik rounded px-1.5 py-0.5">{i.holder.name}</span>}
             {showPayer && <><span className="text-murekkep-3">·</span><span>{i.downPayment ? "Peşinat" : `${i.number}/${i.installmentCount}`}</span></>}
             {showPayer && i.payer.phone && <span className="sayi text-[14px] text-murekkep-3">{formatPhone(i.payer.phone)}</span>}
           </div>

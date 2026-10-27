@@ -109,6 +109,8 @@ class HolderItemsIT {
     void sermayedarinEvraki_tahsilEdildikceSermayesineYazilir_geriAlinincaTerslenir() {
         paymentPlanService.addOpenItems(ali, new OpenItemsRequest(PlanDirection.SALE, today, List.of(
                 cheque(500 * K, "C-1"), cheque(300 * K, "C-2")), burak));
+        assertThat(paymentPlanService.list(null, PlanDirection.SALE, null, null))
+                .allSatisfy(i -> assertThat(i.holder().id()).isEqualTo(burak));
         expect("evrak girildi", burak, 1_000 * K);
         expect("evrak girildi", furkan, 10_800 * K);   // alacak havuzda, tahsil edilene kadar dukkan sahibinin payinda
         check("evrak girildi");

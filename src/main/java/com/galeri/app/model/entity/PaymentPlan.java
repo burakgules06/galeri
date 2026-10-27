@@ -34,6 +34,11 @@ public class PaymentPlan extends BaseModel {
     @Column(name = "holder_contact_id", updatable = false)
     private UUID holderContactId;
 
+    // Sadece okuma: listede evrakin sahibini gostermek icin
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "holder_contact_id", insertable = false, updatable = false)
+    private Contact holder;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10, updatable = false)
     private PlanDirection direction;
