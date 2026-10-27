@@ -36,4 +36,8 @@ public class Account extends BaseModel {
     // VEHICLE icin
     @Column(name = "vehicle_id", updatable = false)
     private UUID vehicleId;
+
+    // CAPITAL icin: ortak kaldirildi (V17)
+    @Column(nullable = false)
+    private boolean closed = false;
 }

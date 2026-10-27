@@ -20,6 +20,12 @@ public interface CapitalService {
     /** Dukkan sahibini isaretler (galeri basina bir); kisi ortak olmali. */
     CapitalResponses.Partner setOwner(UUID contactId);
 
+    /**
+     * Ortagi kaldirir: nakitteki parasi, girislerini yaptigi hesaplara (en cok girilenden baslayarak) cekis olarak iade edilir,
+     * kalan kasadan; sonra sermaye hesabi kapanir. Dukkan sahibi ve aracta parasi olan kaldirilamaz (1055).
+     */
+    void removePartner(UUID contactId);
+
     /** Sermayedarin havuzdaki yuzdesinin (bilgi) tabanini degistirir. */
     CapitalResponses.Partner setBase(UUID contactId, CapitalRequests.Base request);
 

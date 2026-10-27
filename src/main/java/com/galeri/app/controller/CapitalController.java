@@ -43,6 +43,12 @@ public class CapitalController {
         return responseService.success(capitalService.setOwner(contactId));
     }
 
+    @DeleteMapping("/partners/{contactId}")
+    public GenericResponse<Void> removePartner(@PathVariable UUID contactId) {
+        capitalService.removePartner(contactId);
+        return responseService.success(null);
+    }
+
     @PutMapping("/partners/{contactId}/base")
     public GenericResponse<CapitalResponses.Partner> setBase(@PathVariable UUID contactId, @Valid @RequestBody CapitalRequests.Base request) {
         return responseService.success(capitalService.setBase(contactId, request));

@@ -202,6 +202,15 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
   - Panel: ana ekran, Kasa > Hareketler ve Ortaklar sekmesi aynı sermayedar kartını (`/api/holders`) kullanır.
   - Test: `HoldersIT` (50M + 6M örneği; galeri aracı, ortak araç, gider, aktarım, taban, satış, sahip çekişi; her adımda değişmezler).
 
+- **Araç ve ortak kaldırma** (`feat/remove-vehicle-partner`, `V17__remove_vehicle_and_partner.sql`). Yeni ortam değişkeni yok.
+  - `DELETE /api/vehicles/{id}`: sadece stoktaki araç; alış, peşinat, masraflar ve ortak katkıları terslenir (para geldiği yere döner),
+    alış planı silinir, araç `REMOVED` olur ve listelerden / raporlardan kalkar. Satılmışsa ya da peşinat dışında ödenmiş alış
+    taksiti varsa 1054.
+  - `DELETE /api/partners/{contactId}`: nakitteki parası girdiği hesaplara (en çok girilenden) çekiş olarak iade edilir, kalan
+    (aktarım / kâr payı) kasadan; sermaye hesabı `closed` olur. Dükkân sahibi ya da araçta parası olan kaldırılamaz (1055).
+    Yeniden ortak yapılınca aynı hesap açılır.
+  - Panel: araç detayında "Kaldır", Ortaklar listesinde "Kaldır" (onaylı). Test: `RemoveIT`.
+
 ## Sıradaki
 
 Galerici geri bildirimi 4 (`feat/basket-sale`): toplu satış. `V14__basket_sale.sql`: `payment_plan_vehicle` (sepet planı araçsızdır;

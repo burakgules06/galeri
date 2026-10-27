@@ -96,6 +96,9 @@ public interface LedgerService {
     /** Aracin gecerli (duzeltilmemis) tum alis hareketlerini terser: pesin ya da planli. */
     void reverseVehiclePurchases(UUID vehicleId);
 
+    /** Aracin gecerli (duzeltilmemis) butun hareketlerini terser: alis, odemeler, masraflar, ortak katkilari (arac kaldirma). */
+    void reverseVehicleEntries(UUID vehicleId);
+
     /** Aracin gecerli alis hareketleri (duzeltme ve duzeltilmis olanlar haric). */
     List<LedgerEntry> activeVehiclePurchases(UUID vehicleId);
 

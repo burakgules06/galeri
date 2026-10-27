@@ -92,6 +92,10 @@ export function PartnersPanel({ onChange }: { onChange: () => void }) {
                   <Button variant="secondary" className="h-9 px-3 text-[14px]" disabled={!p.owner && (h?.cashCents ?? 0) <= 0}
                     onClick={() => setMoving({ partner: p, direction: "OUT" })}>Çekiş</Button>
                   {!p.owner && <Button variant="quiet" className="h-9 px-3 text-[14px]" onClick={() => run(() => api.setOwner(p.contactId))}>Sahip yap</Button>}
+                  {!p.owner && <Button variant="quiet" className="h-9 px-3 text-[14px] text-tehlike" onClick={() => {
+                    const back = h && h.cashCents > 0 ? ` ${tl(h.cashCents)} girdiği hesaplara geri ödenir.` : "";
+                    if (window.confirm(`${p.name} ortaklıktan çıkarılsın mı?${back}`)) run(() => api.removePartner(p.contactId));
+                  }}>Kaldır</Button>}
                 </span>
               </li>
             );

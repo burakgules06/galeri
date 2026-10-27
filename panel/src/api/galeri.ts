@@ -28,6 +28,7 @@ export const api = {
     apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}/parts`, json({ parts }, "PUT")),
   sell: (id: string, request: SaleRequest) => apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}/sale`, json(request)),
   sellBasket: (request: BasketSaleRequest) => apiFetch<VehicleDetailAdmin>("/api/vehicles/basket-sale", json(request)),
+  removeVehicle: (id: string) => apiFetch<void>(`/api/vehicles/${id}`, { method: "DELETE" }),
   undoSale: (id: string) => apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}/sale`, { method: "DELETE" }),
   paymentPlans: (id: string) => apiFetch<PaymentPlanResponse[]>(`/api/vehicles/${id}/payment-plans`),
   installments: (f: { status?: InstallmentStatus; direction?: PlanDirection; from?: string; to?: string } = {}) => {
@@ -50,6 +51,7 @@ export const api = {
   // Sermaye ve kasa islemleri (sadece ADMIN)
   partners: () => apiFetch<Partner[]>("/api/partners"),
   addPartner: (contactId: string, base: CapitalBase) => apiFetch<Partner>("/api/partners", json({ contactId, base })),
+  removePartner: (contactId: string) => apiFetch<void>(`/api/partners/${contactId}`, { method: "DELETE" }),
   setPartnerBase: (contactId: string, base: CapitalBase) => apiFetch<Partner>(`/api/partners/${contactId}/base`, json({ base }, "PUT")),
   holders: () => apiFetch<Holder[]>("/api/holders"),
   capitalTransfer: (request: CapitalTransferRequest) => apiFetch<LedgerEntryResponse>("/api/capital-transfers", json(request)),
