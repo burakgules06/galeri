@@ -111,7 +111,7 @@ function AdminSummary() {
           <section className="kart p-4 md:p-5">
             <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
               <div>
-                <p className="etiket">Son 6 ay · satış kârı</p>
+                <p className="etiket">Son 6 ay · net kâr/zarar</p>
                 <p className={`sayi font-bold text-[22px] leading-tight mt-0.5 ${totalProfit >= 0 ? "text-basari" : "text-tehlike"}`}>{tl(totalProfit)}</p>
               </div>
               {/* Konsinye komisyonu arac karindan ayri: sermaye karina girip girmeyecegi acik soru (MIMARI §13) */}
