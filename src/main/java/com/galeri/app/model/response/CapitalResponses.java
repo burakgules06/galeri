@@ -45,11 +45,12 @@ public final class CapitalResponses {
     /**
      * Sermayedar gorunumu (V16 dukkan sahibi modeli). Havuz: kasa + bankalar + araclar + alacaklar - borclar. Sermayedarin
      * sermayesi defterden (girisler, cekisler, aktarimlar, arac kar paylari); dukkan sahibininki havuzdan sermayedarlar
-     * cikinca kalan. cash: kasa / bankadaki payi, vehicleCents: araclardaki odenmis payi (vehicles: hangi aracta ne kadar),
-     * otherCents: alacak / borc (sadece dukkan sahibinde). shareBp sadece bilgi: base'e gore yuzde.
+     * cikinca kalan. Sermayedarda vehicleCents araclardaki odenmis katkidir; dukkan sahibinde diger sermayedarlarin
+     * katkisi dusulmus stok net degeridir (arac masraflari dahil). otherCents gercek alacak / borctur. shareBp sadece bilgi.
      */
     public record Holder(UUID contactId, String name, boolean owner, CapitalBase base, long capitalCents, long cashCents,
                          long vehicleCents, long otherCents, int shareBp, List<HolderVehicle> vehicles) {}
 
     public record HolderVehicle(VehicleRef vehicle, long cents) {}
 }
+

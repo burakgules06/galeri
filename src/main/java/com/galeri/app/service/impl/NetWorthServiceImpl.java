@@ -97,6 +97,7 @@ public class NetWorthServiceImpl implements NetWorthService {
 
         List<CapitalResponses.Holder> raw = new ArrayList<>();
         long investorsCapital = 0, investorsCash = 0;
+        long investorsReceivable = 0;
         for (CapitalResponses.Partner p : w.partners()) {
             if (p.contactId().equals(ownerId)) continue;
             List<CapitalResponses.HolderVehicle> list = vehiclesOf(w, o -> p.contactId().equals(o.contactId()));
@@ -106,15 +107,19 @@ public class NetWorthServiceImpl implements NetWorthService {
                     p.boundCents(), receivable, 0, list));
             investorsCapital += p.capitalCents() + receivable;
             investorsCash += p.cashCents();
+            investorsReceivable += receivable;
         }
-        // Dukkan sahibi: havuzdan sermayedarlar cikinca kalan; kasayla (Havuz) alinan araclarin odenmis kismi onun malidir
-        List<CapitalResponses.HolderVehicle> ownerVehicles = vehiclesOf(w, o -> o.contactId() == null || o.contactId().equals(ownerId));
+        // Dukkan sahibi havuzun kalani: ortaklarin odenmis katkisi dusulunce kalan stok araci degeri (masraflar dahil) onundur.
+        List<CapitalResponses.HolderVehicle> ownerVehicles = ownerVehicles(w, ownerId);
         long ownerCapital = w.totalCents() - investorsCapital;
         long ownerCash = money - investorsCash;
         long ownerInVehicles = ownerVehicles.stream().mapToLong(CapitalResponses.HolderVehicle::cents).sum();
+        long stockDebt = w.vehicles().stream().mapToLong(NetWorthResponse.StockVehicle::debtCents).sum();
+        // Arac alis borcu arac net degerinden dusuldu; other'da yalnizca cari alacak/borc ve dukkan evraki kalir.
+        long ownerOther = w.receivableCents() - w.payableCents() + stockDebt - investorsReceivable;
         raw.add(new CapitalResponses.Holder(ownerId, owner.map(com.galeri.app.model.entity.Contact::getName).orElse("Dükkân sahibi"), true,
                 owner.map(com.galeri.app.model.entity.Contact::getCapitalBase).orElse(CapitalBase.ALL), ownerCapital, ownerCash,
-                ownerInVehicles, ownerCapital - ownerCash - ownerInVehicles, 0, ownerVehicles));
+                ownerInVehicles, ownerOther, 0, ownerVehicles));
 
         long allVehicles = raw.stream().mapToLong(CapitalResponses.Holder::vehicleCents).sum();
         return raw.stream()
@@ -138,4 +143,19 @@ public class NetWorthServiceImpl implements NetWorthService {
         }
         return byVehicle.values().stream().sorted(Comparator.comparingLong(CapitalResponses.HolderVehicle::cents).reversed()).toList();
     }
+
+    /** Dukkan sahibinin arac payi: stok net degerinden diger sermayedarlarin odenmis katkisi dusulur. */
+    private static List<CapitalResponses.HolderVehicle> ownerVehicles(NetWorthResponse w, UUID ownerId) {
+        return w.vehicles().stream().map(v -> {
+            long investorContributions = v.owners().stream()
+                    .filter(o -> o.contactId() != null && !Objects.equals(o.contactId(), ownerId))
+                    .mapToLong(NetWorthResponse.Owner::contributionCents)
+                    .sum();
+            long cents = v.costCents() - v.debtCents() - investorContributions;
+            return new CapitalResponses.HolderVehicle(v.vehicle(), cents);
+        }).filter(v -> v.cents() != 0)
+                .sorted(Comparator.comparingLong(CapitalResponses.HolderVehicle::cents).reversed())
+                .toList();
+    }
 }
+
