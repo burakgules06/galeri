@@ -81,8 +81,8 @@ function AdminSummary() {
             Maliyet <b className="sayi font-semibold text-murekkep text-[14px]">{tlShort(data.stockCostCents)}</b> · ort. {data.averageDaysInStock} gün
             {data.consignmentCount > 0 && <span className="block text-konsinye font-semibold">+ {data.consignmentCount} konsinye araç</span>}
           </span>} />
-        <StatTile label="Alacak" value={tl(data.receivableCents)} tone="positive" sub={`${data.receivables.length} kişiden tahsil edilecek`} />
-        <StatTile label="Verecek" value={tl(data.payableCents)} tone="negative" sub={`${data.payables.length} kişiye ödenecek`} />
+        <StatTile label="Alacak" value={tl(data.receivableCents)} tone="positive" valueClassName="whitespace-normal break-words text-[23px] md:text-[28px]" sub={`${data.receivables.length} kişiden tahsil edilecek`} />
+        <StatTile label="Verecek" value={tl(data.payableCents)} tone="negative" valueClassName="whitespace-normal break-words text-[23px] md:text-[28px]" sub={`${data.payables.length} kişiye ödenecek`} />
       </div>
 
       <PaymentsStrip data={data} />
