@@ -7,8 +7,8 @@ package com.galeri.app.model.enums;
 // CAPITAL: sermaye girisi CAPITAL(ortak) -> CASH/BANK, cekisi ters yonde. PROFIT_ALLOCATION: CAPITAL(ortak) -> INCOME
 // (gelirdeki kar ortagin sermayesine gecer). TRANSFER: kasa <-> banka. OPENING_BALANCE: OPENING <-> kasa / banka / cari.
 // VEHICLE_PROFIT_SHARE: ortak aracin satisinda ortagin kar payi CAPITAL(ortak) -> INCOME; zararda INCOME -> CAPITAL,
-// katkiyi asan zarar INCOME -> BALANCE(ortak).
+// katkiyi asan zarar INCOME -> BALANCE(ortak). CAPITAL_TRANSFER (V16): kisiler arasi sermaye aktarimi CAPITAL(alan) -> CAPITAL(veren).
 public enum LedgerEntryType {
     VEHICLE_PURCHASE, VEHICLE_EXPENSE, GENERAL_EXPENSE, CAPITAL, VEHICLE_SALE, COLLECTION, PAYMENT, CONSIGNMENT_SETTLEMENT,
-    PROFIT_ALLOCATION, TRANSFER, OPENING_BALANCE, VEHICLE_PROFIT_SHARE
+    PROFIT_ALLOCATION, TRANSFER, OPENING_BALANCE, VEHICLE_PROFIT_SHARE, CAPITAL_TRANSFER
 }

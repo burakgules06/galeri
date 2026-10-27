@@ -8,6 +8,7 @@ import type { ExpenseRequest, Ownership } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
 import { NumberInput } from "../../shared/ui/NumberInput";
+import { confirmOwnerCash } from "../../shared/ownerCash";
 
 interface Row { key: number; vehicleId: string; category: string; amount: string; description: string }
 
@@ -68,6 +69,7 @@ export function BulkExpenseForm({ onClose, onSaved, vehicle }: {
         chargeToOwner: consignment ? chargeToOwner : null,
       });
     }
+    if (!(await confirmOwnerCash(items.reduce((t, x) => t + x.amountCents, 0)))) return;
     setSaving(true);
     setError(null);
     try {

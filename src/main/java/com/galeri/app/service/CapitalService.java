@@ -20,6 +20,15 @@ public interface CapitalService {
     /** Dukkan sahibini isaretler (galeri basina bir); kisi ortak olmali. */
     CapitalResponses.Partner setOwner(UUID contactId);
 
+    /** Sermayedarin havuzdaki yuzdesinin (bilgi) tabanini degistirir. */
+    CapitalResponses.Partner setBase(UUID contactId, CapitalRequests.Base request);
+
+    /**
+     * Kisiler arasi sermaye aktarimi. Veren sermayedarsa en fazla nakitteki sermayesi kadar (araclardaki kismi arac satilinca
+     * nakde doner); dukkan sahibinde sinir yok (panel uyarir).
+     */
+    LedgerEntryResponse transferCapital(CapitalRequests.CapitalTransfer request);
+
     /** Sermaye girisi (CAPITAL -> kasa/banka) ya da cekisi (ters yon, sermayeden fazla olamaz). */
     LedgerEntryResponse move(UUID contactId, CapitalRequests.Movement request);
 

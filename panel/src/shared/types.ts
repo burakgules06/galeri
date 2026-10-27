@@ -285,7 +285,7 @@ export interface ContactRequest { name: string; phone: string | null; type: Cont
 export type AccountType = "CASH" | "BANK" | "BALANCE" | "CAPITAL" | "VEHICLE" | "EXPENSE" | "INCOME" | "OPENING";
 export type LedgerEntryType =
   | "VEHICLE_PURCHASE" | "VEHICLE_EXPENSE" | "GENERAL_EXPENSE" | "CAPITAL" | "VEHICLE_SALE" | "COLLECTION" | "PAYMENT"
-  | "CONSIGNMENT_SETTLEMENT" | "PROFIT_ALLOCATION" | "TRANSFER" | "OPENING_BALANCE" | "VEHICLE_PROFIT_SHARE";
+  | "CONSIGNMENT_SETTLEMENT" | "PROFIT_ALLOCATION" | "TRANSFER" | "OPENING_BALANCE" | "VEHICLE_PROFIT_SHARE" | "CAPITAL_TRANSFER";
 export type ExpenseRoot = "VEHICLE" | "GENERAL";
 
 export interface AccountSummary { id: string; type: AccountType; name: string }
@@ -355,6 +355,13 @@ export interface NetWorthResponse {
   partners: Partner[];
   vehicles: { vehicle: VehicleRef; costCents: number; debtCents: number; owners: NetWorthOwner[] }[];
 }
+// Havuz modeli: sermayedarin sermayesi defterden, dukkan sahibininki havuzdan kalan. Yuzde sadece bilgi (tabana gore).
+export type CapitalBase = "ALL" | "VEHICLES" | "CASH";
+export interface Holder {
+  contactId: string | null; name: string; owner: boolean; base: CapitalBase; capitalCents: number; cashCents: number;
+  vehicleCents: number; otherCents: number; shareBp: number; vehicles: { vehicle: VehicleRef; cents: number }[];
+}
+export interface CapitalTransferRequest { fromContactId: string; toContactId: string; date: string; amountCents: number; description: string | null }
 export type CapitalDirection = "IN" | "OUT";
 export interface CapitalMovementRequest { direction: CapitalDirection; accountId: string; date: string; amountCents: number; description: string | null }
 export interface ProfitAllocationRequest { contactId: string; date: string; amountCents: number; periodFrom: string; periodTo: string }

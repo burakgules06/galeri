@@ -9,6 +9,7 @@ import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
 import { CategoryPicker } from "./CategoryPicker";
 import { NumberInput } from "../../shared/ui/NumberInput";
+import { confirmOwnerCash } from "../../shared/ownerCash";
 
 interface VehicleChoice { id: string; plate: string; make: string; model: string; ownership?: Ownership }
 
@@ -56,6 +57,7 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing 
     if (!category.trim()) return setError("Kategori yaz ya da seç.");
     if (root === "VEHICLE" && !vehicleId) return setError("Aracı seç.");
     if (!selectedAccount) return setError("Ödemenin çıktığı hesabı seç.");
+    if (!existing && !(await confirmOwnerCash(cents))) return;
     setSaving(true);
     setError(null);
     try {

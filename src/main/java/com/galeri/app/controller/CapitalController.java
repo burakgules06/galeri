@@ -43,6 +43,16 @@ public class CapitalController {
         return responseService.success(capitalService.setOwner(contactId));
     }
 
+    @PutMapping("/partners/{contactId}/base")
+    public GenericResponse<CapitalResponses.Partner> setBase(@PathVariable UUID contactId, @Valid @RequestBody CapitalRequests.Base request) {
+        return responseService.success(capitalService.setBase(contactId, request));
+    }
+
+    @PostMapping("/capital-transfers")
+    public GenericResponse<LedgerEntryResponse> transferCapital(@Valid @RequestBody CapitalRequests.CapitalTransfer request) {
+        return responseService.success(capitalService.transferCapital(request));
+    }
+
     @PostMapping("/partners/{contactId}/capital")
     public GenericResponse<LedgerEntryResponse> move(@PathVariable UUID contactId, @Valid @RequestBody CapitalRequests.Movement request) {
         return responseService.success(capitalService.move(contactId, request));

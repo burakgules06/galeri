@@ -191,6 +191,17 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
   - Doğrulama: izole `galeri_codex_test` üzerinde `./mvnw -B verify` başarılı (173 test + 19 entegrasyon testi);
     panel `npm run lint` ve `npm run build` başarılı. Kuruşlu taksitlerin tamamı ödendiğinde sahip borçlarının sıfırlandığı da sınandı.
 
+- **Dükkân sahibi modeli** (`feat/owner-pool`, `V16__owner_pool.sql`). Yeni ortam değişkeni yok.
+  - Havuz = kasa + bankalar + araçlar + alacaklar − borçlar. Sermayedarın sermayesi defterden; dükkân sahibininki havuzdan kalan.
+    Giderler ve çekişler sadece dükkân sahibini küçültür. Kâr sadece araç satışında, araç alınırken girilen kâr yüzdesiyle;
+    kasadaki nakit kâr getirmez, ay sonu dağıtımı yok (Dönem kârı sekmesindeki "sermayeye ekle" kaldırıldı).
+  - `GET /api/holders`: kişi başına sermaye, nakit, araçta (araç araç gerçek tutar), alacak/borç ve bilgi amaçlı yüzde.
+    Yüzde ortaklık tabanına göre (`contact.capital_base`: Tüm varlık / Araçlar / Nakit), ortak eklerken seçilir, sonra değişir.
+  - `POST /api/capital-transfers` (`CAPITAL_TRANSFER`): herkes herkese aktarır; kasa değişmez. Sermayedar en fazla nakitteki parasını
+    verir/çeker (1036); dükkân sahibi sınırsız, kasadaki payı biterse panel uyarır (masraf, çekiş, aktarım).
+  - Panel: ana ekran, Kasa > Hareketler ve Ortaklar sekmesi aynı sermayedar kartını (`/api/holders`) kullanır.
+  - Test: `HoldersIT` (50M + 6M örneği; galeri aracı, ortak araç, gider, aktarım, taban, satış, sahip çekişi; her adımda değişmezler).
+
 ## Sıradaki
 
 Galerici geri bildirimi 4 (`feat/basket-sale`): toplu satış. `V14__basket_sale.sql`: `payment_plan_vehicle` (sepet planı araçsızdır;
