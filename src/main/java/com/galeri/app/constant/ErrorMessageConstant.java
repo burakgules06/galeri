@@ -59,4 +59,5 @@ public class ErrorMessageConstant {
     public static final int INVALID_BASKET = 1053;
     public static final int VEHICLE_NOT_REMOVABLE = 1054;
     public static final int PARTNER_NOT_REMOVABLE = 1055;
+    public static final int INVALID_OPEN_ACCOUNT_USAGE = 1056;
 }

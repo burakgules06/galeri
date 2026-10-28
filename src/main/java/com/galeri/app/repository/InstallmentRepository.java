@@ -53,7 +53,13 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
             """)
     List<Installment> findOpenDueBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select i from Installment i where i.plan.id = :planId order by i.seq")
+    List<Installment> lockByPlanId(@Param("planId") UUID planId);
+
     boolean existsByPaidEntryId(UUID entryId);
+
+    boolean existsByCapitalEntryId(UUID entryId);
 
     Optional<Installment> findByPaidEntryId(UUID entryId);
 

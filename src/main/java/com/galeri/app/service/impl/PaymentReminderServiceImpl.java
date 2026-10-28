@@ -156,6 +156,7 @@ public class PaymentReminderServiceImpl implements PaymentReminderService {
             case TRANSFER -> "havale ";
             case CHEQUE -> "çek ";
             case CASH -> "";
+            case OPEN_ACCOUNT -> "açık hesap ";
         };
     }
 

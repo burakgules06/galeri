@@ -12,7 +12,7 @@ import { NumberInput } from "../../shared/ui/NumberInput";
 
 interface Row { key: number; dueDate: string; amount: string; method: PaymentMethod; noteNo: string; bankName: string; drawerName: string }
 
-const METHODS: PaymentMethod[] = ["PROMISSORY_NOTE", "CHEQUE", "CASH", "TRANSFER"];
+const METHODS: PaymentMethod[] = ["PROMISSORY_NOTE", "CHEQUE", "OPEN_ACCOUNT", "CASH", "TRANSFER"];
 let nextKey = 1;
 const emptyRow = (dueDate: string, method: PaymentMethod = "PROMISSORY_NOTE"): Row =>
   ({ key: nextKey++, dueDate, amount: "", method, noteNo: "", bankName: "", drawerName: "" });
@@ -43,7 +43,7 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
   });
 
   const submit = async () => {
-    if (filled.length === 0) return setError("En az bir senet ya da çek gir.");
+    if (filled.length === 0) return setError("En az bir senet, çek ya da açık hesap kaydı gir.");
     if (filled.some((r) => cents(r) <= 0 || !r.dueDate)) return setError("Her satırda vade ve tutar olmalı.");
     setSaving(true);
     setError(null);
@@ -53,7 +53,7 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
         direction, date: todayIso(), holderId: direction === "SALE" && holder ? holder : null,
         installments: filled.map((r) => ({
           dueDate: r.dueDate, amountCents: cents(r), method: r.method, noteNo: r.noteNo.trim() || null, payerId: null,
-          paidNow: false, accountId: null,
+          paidNow: false, accountId: null, capitalCents: 0,
           bankName: r.method === "CHEQUE" ? r.bankName.trim() || null : null,
           drawerName: r.method === "CHEQUE" ? r.drawerName.trim() || null : null,
         })),
@@ -67,7 +67,7 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
   };
 
   return (
-    <Modal title={fixedContact ? `Geçmiş senet / çek · ${fixedContact.name}` : "Geçmiş senet / çek"} open onClose={onClose} wide
+    <Modal title={fixedContact ? `Geçmiş cari kayıt · ${fixedContact.name}` : "Geçmiş cari kayıt"} open onClose={onClose} wide
       footer={<>
         <span className="mr-auto self-center text-[14px] text-murekkep-2">
           {filled.length} kayıt · <b className="sayi text-murekkep text-[16px]">{tl(total)}</b>
@@ -102,12 +102,13 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
                 {METHODS.map((m) => <option key={m} value={m}>{METHOD[m]}</option>)}
               </select>
               <div className="col-span-2 md:col-span-1 grid grid-cols-3 gap-2">
-                <input className={`${inputClass} ${r.method === "CHEQUE" ? "" : "col-span-3"}`} value={r.noteNo} aria-label="Numara"
-                  placeholder={r.method === "CHEQUE" ? "Çek no" : "Senet no"} onChange={(e) => update(r.key, { noteNo: e.target.value })} />
+                {r.method !== "OPEN_ACCOUNT" && <input className={`${inputClass} ${r.method === "CHEQUE" ? "" : "col-span-3"}`} value={r.noteNo} aria-label="Numara"
+                  placeholder={r.method === "CHEQUE" ? "Çek no" : "Senet no"} onChange={(e) => update(r.key, { noteNo: e.target.value })} />}
                 {r.method === "CHEQUE" && <>
                   <input className={inputClass} value={r.bankName} aria-label="Banka" placeholder="Banka" onChange={(e) => update(r.key, { bankName: e.target.value })} />
                   <input className={inputClass} value={r.drawerName} aria-label="Keşideci" placeholder="Keşideci" onChange={(e) => update(r.key, { drawerName: e.target.value })} />
                 </>}
+                {r.method === "OPEN_ACCOUNT" && <span className="col-span-3 self-center text-[13px] text-murekkep-3">Sözlü borç / açık hesap kaydı</span>}
               </div>
               <button type="button" aria-label="Satırı sil" onClick={() => setRows((l) => (l.length > 1 ? l.filter((x) => x.key !== r.key) : l))}
                 className="basilir w-9 h-9 rounded-lg hover:bg-yuzey-2 grid place-items-center text-murekkep-3 justify-self-end">

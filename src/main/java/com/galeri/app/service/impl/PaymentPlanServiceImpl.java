@@ -1,6 +1,7 @@
 package com.galeri.app.service.impl;
 
 import com.galeri.app.exception.runtime.BounceNotAllowedException;
+import com.galeri.app.exception.runtime.CapitalExceededException;
 import com.galeri.app.exception.runtime.EndorseNotAllowedException;
 import com.galeri.app.exception.runtime.InvalidEndorseTargetException;
 import com.galeri.app.exception.runtime.InvalidPartialAmountException;
@@ -8,6 +9,7 @@ import com.galeri.app.exception.runtime.InstallmentAlreadyPaidException;
 import com.galeri.app.exception.runtime.InstallmentNotPaidException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidPayerException;
+import com.galeri.app.exception.runtime.InvalidOpenAccountUsageException;
 import com.galeri.app.exception.runtime.PlanNotRemovableException;
 import com.galeri.app.exception.runtime.NotAPartnerException;
 import com.galeri.app.exception.runtime.PurchaseHasPaymentsException;
@@ -99,6 +101,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     @Override
     @Transactional
     public void recordSale(Vehicle vehicle, Contact buyer, VehicleSaleRequest r) {
+        ensureNoOpenAccount(r.installments());
         long total = r.installments().stream().mapToLong(InstallmentRequest::amountCents).sum();
         if (total != r.salePriceCents()) throw new SaleTotalMismatchException();
         UUID tenantId = vehicle.getTenantId();
@@ -118,8 +121,11 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         List<Contact> payers = new ArrayList<>();
         for (InstallmentRequest row : rows) {
             payers.add(payer(row, buyer, tenantId));
-            if (row.paidNow() && row.accountId() == null) throw new InvalidAccountException();
+            if (row.paidNow() && externalCents(row.amountCents(), capitalCents(row)) > 0 && row.accountId() == null) {
+                throw new InvalidAccountException();
+            }
         }
+        validateCapitalFunding(rows, payers, buyer, tenantId);
 
         // Satis hareketi odeyen basina: Evim / kredi kismi alicinin degil kurumun carisine yazilir.
         Map<UUID, Long> perPayer = new LinkedHashMap<>();
@@ -138,14 +144,15 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             i.setSeq((short) (k + 1));
             i.setDueDate(row.dueDate());
             i.setAmountCents(row.amountCents());
+            i.setCapitalCents(capitalCents(row));
             i.setMethod(row.method());
             i.setNoteNo(blankToNull(row.noteNo()));
             i.setBankName(blankToNull(row.bankName()));
             i.setDrawerName(blankToNull(row.drawerName()));
             i.setPayer(payers.get(k));
             if (row.paidNow()) {
-                LedgerEntry paid = ledgerService.writeSettlement(PlanDirection.SALE, vehicle, payers.get(k), row.accountId(),
-                        row.amountCents(), r.saleDate(), rows.size() == 1 ? "Peşin tahsilat" : "Peşinat");
+                LedgerEntry paid = settle(i, PlanDirection.SALE, vehicle, row.accountId(), r.saleDate(),
+                        rows.size() == 1 ? "Peşin tahsilat" : "Peşinat");
                 i.setPaidEntryId(paid.getId());
                 i.setPaidAt(now());
                 i.setDownPayment(true);
@@ -175,6 +182,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     @Override
     @Transactional
     public void recordBasketSale(List<Vehicle> vehicles, List<Long> prices, Contact buyer, BasketSaleRequest r) {
+        ensureNoOpenAccount(r.installments());
         long total = prices.stream().mapToLong(Long::longValue).sum();
         if (r.installments().stream().mapToLong(InstallmentRequest::amountCents).sum() != total) throw new SaleTotalMismatchException();
         UUID tenantId = buyer.getTenantId();
@@ -200,8 +208,11 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         List<Contact> payers = new ArrayList<>();
         for (InstallmentRequest row : rows) {
             payers.add(payer(row, buyer, tenantId));
-            if (row.paidNow() && row.accountId() == null) throw new InvalidAccountException();
+            if (row.paidNow() && externalCents(row.amountCents(), capitalCents(row)) > 0 && row.accountId() == null) {
+                throw new InvalidAccountException();
+            }
         }
+        validateCapitalFunding(rows, payers, buyer, tenantId);
 
         // Satis hareketi arac ve odeyen basina: odeyenlerin tutarlari araclarin bedellerine sirayla dagitilir (selale).
         // Her aracin hareketleri toplami bedeline, her odeyeninki taksitlerinin toplamina kurusu kurusuna esit.
@@ -233,14 +244,15 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             i.setSeq((short) (k + 1));
             i.setDueDate(row.dueDate());
             i.setAmountCents(row.amountCents());
+            i.setCapitalCents(capitalCents(row));
             i.setMethod(row.method());
             i.setNoteNo(blankToNull(row.noteNo()));
             i.setBankName(blankToNull(row.bankName()));
             i.setDrawerName(blankToNull(row.drawerName()));
             i.setPayer(payers.get(k));
             if (row.paidNow()) {
-                LedgerEntry paid = ledgerService.writeSettlement(PlanDirection.SALE, null, payers.get(k), row.accountId(),
-                        row.amountCents(), r.saleDate(), rows.size() == 1 ? "Peşin tahsilat" : "Peşinat");
+                LedgerEntry paid = settle(i, PlanDirection.SALE, null, row.accountId(), r.saleDate(),
+                        rows.size() == 1 ? "Peşin tahsilat" : "Peşinat");
                 i.setPaidEntryId(paid.getId());
                 i.setPaidAt(now());
                 i.setDownPayment(true);
@@ -272,6 +284,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     @Override
     @Transactional
     public void syncPurchase(Vehicle vehicle, UUID purchaseAccountId, List<InstallmentRequest> rows) {
+        if (rows != null) ensureNoOpenAccount(rows);
         Optional<PaymentPlan> existing = planRepository.findByVehicleIdAndDirection(vehicle.getId(), PlanDirection.PURCHASE);
         List<Installment> current = existing.map(p -> installmentRepository.findByPlanIds(List.of(p.getId()))).orElse(List.of());
         List<Installment> paid = current.stream().filter(Installment::isPaid).toList();
@@ -492,6 +505,34 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
 
     @Override
     @Transactional
+    public void removeOpenItemInstallment(UUID planId, UUID installmentId) {
+        PaymentPlan plan = planRepository.lockById(planId).orElseThrow(RecordNotFoundException::new);
+        if (!plan.getTenantId().equals(CurrentUser.tenantId())) throw new SourceNotBelongToTenantException();
+        if (plan.getOpeningEntryId() == null) throw new PlanNotRemovableException();
+        List<Installment> rows = installmentRepository.lockByPlanId(planId);
+        Installment target = rows.stream().filter(i -> i.getId().equals(installmentId)).findFirst()
+                .orElseThrow(RecordNotFoundException::new);
+        if (!target.getTenantId().equals(CurrentUser.tenantId()) || target.isPaid()) throw new PlanNotRemovableException();
+
+        List<Installment> retained = rows.stream().filter(i -> !i.getId().equals(installmentId)).toList();
+        long retainedTotal = retained.stream().mapToLong(Installment::getAmountCents).sum();
+        LedgerEntry opening = entryRepository.findById(plan.getOpeningEntryId()).orElseThrow(RecordNotFoundException::new);
+        ledgerService.reverse(opening.getId());
+        installmentRepository.delete(target);
+        if (retained.isEmpty()) {
+            planRepository.delete(plan);
+            return;
+        }
+
+        LedgerEntry revisedOpening = ledgerService.writeOpenItems(plan.getContact(), plan.getDirection(), retainedTotal, opening.getEntryDate());
+        entryRepository.flush();
+        installmentRepository.flush();
+        planRepository.replaceOpenItemsAmountAndOpeningEntry(planId, retainedTotal, revisedOpening.getId());
+    }
+
+
+    @Override
+    @Transactional
     public void removePurchasePlan(Vehicle vehicle) {
         planRepository.findByVehicleIdAndDirection(vehicle.getId(), PlanDirection.PURCHASE).ifPresent(plan -> {
             List<Installment> rows = installmentRepository.findByPlanIds(List.of(plan.getId()));
@@ -549,8 +590,12 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         }
         PaymentPlan plan = i.getPlan();
         Vehicle vehicle = vehicleOf(plan);
-        LedgerEntry entry = ledgerService.writeSettlement(plan.getDirection(), vehicle, i.getPayer(), r.accountId(),
-                i.getAmountCents(), r.date(), description(plan.getDirection(), i.getMethod()));
+        if (plan.getDirection() == PlanDirection.SALE && i.getCapitalCents() > 0) {
+            ensureCapitalAvailable(i.getPayer(), i.getCapitalCents());
+        }
+        if (externalCents(i.getAmountCents(), i.getCapitalCents()) > 0 && r.accountId() == null) throw new InvalidAccountException();
+        LedgerEntry entry = settle(i, plan.getDirection(), vehicle, r.accountId(), r.date(),
+                description(plan.getDirection(), i.getMethod()));
         OffsetDateTime paidAt = now();
         // Kosullu guncelleme: baska bir istek ayni anda tahsil ettiyse 0 satir; hata transaction'i (tahsilat hareketiyle) geri alir
         if (installmentRepository.markPaid(i.getId(), entry.getId(), paidAt) == 0) throw new InstallmentAlreadyPaidException();
@@ -578,7 +623,11 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             return single(i, null);
         }
         ledgerService.reverse(i.getPaidEntryId());
+        if (i.getCapitalEntryId() != null && !i.getCapitalEntryId().equals(i.getPaidEntryId())) {
+            ledgerService.reverse(i.getCapitalEntryId());
+        }
         i.setPaidEntryId(null);
+        i.setCapitalEntryId(null);
         i.setPaidAt(null);
         syncHolder(i, null);
         if (i.getPlan().getDirection() == PlanDirection.PURCHASE) {
@@ -707,14 +756,18 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
      */
     private Installment split(Installment i, long firstCents) {
         long rest = i.getAmountCents() - firstCents;
+        long originalCapital = i.getCapitalCents();
+        long firstCapital = Math.min(originalCapital, firstCents); // kismi tahsilat sermaye kismini once kapatir
         if (installmentRepository.resize(i.getId(), firstCents) == 0) throw new InstallmentAlreadyPaidException();
         i.setAmountCents(firstCents);
+        i.setCapitalCents(firstCapital);
         Installment r = new Installment();
         r.setTenantId(i.getTenantId());
         r.setPlan(i.getPlan());
         r.setSeq((short) (installmentRepository.maxSeq(i.getPlan().getId()) + 1));
         r.setDueDate(i.getDueDate());
         r.setAmountCents(rest);
+        r.setCapitalCents(originalCapital - firstCapital);
         r.setMethod(i.getMethod());
         r.setNoteNo(i.getNoteNo());
         r.setBankName(i.getBankName());
@@ -754,7 +807,73 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
 
     // ------------------------------------------------------------------ yardimcilar
 
+    private static void ensureNoOpenAccount(List<InstallmentRequest> rows) {
+        if (rows.stream().anyMatch(row -> row.method() == PaymentMethod.OPEN_ACCOUNT)) {
+            throw new InvalidOpenAccountUsageException();
+        }
+    }
+
     /** Odeyen: kurum taksitinde secilen kurum (zorunlu), digerlerinde secilen kisi ya da alici. */
+    private long capitalCents(InstallmentRequest row) {
+        return row.capitalCents() == null ? 0L : row.capitalCents();
+    }
+
+    private static long externalCents(long amount, long capital) {
+        return amount - Math.min(amount, capital);
+    }
+
+    /** Ortagin planlanan sermaye kullanimi, bagli sermaye ve diger acik sermaye taksitleri dusulerek dogrulanir. */
+    private void validateCapitalFunding(List<InstallmentRequest> rows, List<Contact> payers, Contact buyer, UUID tenantId) {
+        long requested = 0;
+        for (int k = 0; k < rows.size(); k++) {
+            InstallmentRequest row = rows.get(k);
+            long capital = capitalCents(row);
+            if (capital > row.amountCents()) throw new CapitalExceededException();
+            if (capital == 0) continue;
+            if (!payers.get(k).getId().equals(buyer.getId())) throw new NotAPartnerException();
+            requested += capital;
+        }
+        if (requested == 0) return;
+
+        Account capital = accountRepository.findFirstByTenantIdAndTypeAndContactId(tenantId, AccountType.CAPITAL, buyer.getId())
+                .filter(a -> !a.isClosed()).orElseThrow(NotAPartnerException::new);
+        accountRepository.lockById(capital.getId());
+        long available = CapitalServiceImpl.capitalByAccount(entryRepository.touchingType(tenantId, AccountType.CAPITAL), null)
+                .getOrDefault(capital.getId(), 0L)
+                - coOwnershipService.boundCapital(tenantId, today()).getOrDefault(buyer.getId(), 0L);
+        long reserved = installmentRepository.findAllWithPlan(tenantId).stream()
+                .filter(i -> !i.isPaid() && i.getPlan().getDirection() == PlanDirection.SALE
+                        && i.getPayer().getId().equals(buyer.getId()))
+                .mapToLong(Installment::getCapitalCents).sum();
+        if (requested + reserved > available) throw new CapitalExceededException();
+    }
+
+    private void ensureCapitalAvailable(Contact buyer, long amountCents) {
+        if (amountCents <= 0) return;
+        UUID tenantId = buyer.getTenantId();
+        Account capital = accountRepository.findFirstByTenantIdAndTypeAndContactId(tenantId, AccountType.CAPITAL, buyer.getId())
+                .filter(a -> !a.isClosed()).orElseThrow(NotAPartnerException::new);
+        accountRepository.lockById(capital.getId());
+        long available = CapitalServiceImpl.capitalByAccount(entryRepository.touchingType(tenantId, AccountType.CAPITAL), null)
+                .getOrDefault(capital.getId(), 0L)
+                - coOwnershipService.boundCapital(tenantId, today()).getOrDefault(buyer.getId(), 0L);
+        if (amountCents > available) throw new CapitalExceededException();
+    }
+
+    /** Sermaye kismi cari -> sermaye, kalan kisim secilen kasa / bankaya gider. */
+    private LedgerEntry settle(Installment i, PlanDirection direction, Vehicle vehicle, UUID accountId, LocalDate date, String description) {
+        long capitalCents = direction == PlanDirection.SALE ? i.getCapitalCents() : 0;
+        long externalCents = externalCents(i.getAmountCents(), capitalCents);
+        LedgerEntry cashEntry = externalCents > 0
+                ? ledgerService.writeSettlement(direction, vehicle, i.getPayer(), accountId, externalCents, date, description)
+                : null;
+        LedgerEntry capitalEntry = capitalCents > 0
+                ? ledgerService.writePartnerSaleCapitalSettlement(vehicle, i.getPayer(), capitalCents, date)
+                : null;
+        i.setCapitalEntryId(capitalEntry != null ? capitalEntry.getId() : null);
+        return cashEntry != null ? cashEntry : capitalEntry;
+    }
+
     private Contact payer(InstallmentRequest row, Contact buyer, UUID tenantId) {
         if (row.method() == PaymentMethod.INSTITUTION) {
             if (row.payerId() == null) throw new InvalidPayerException();
@@ -769,12 +888,14 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         if (direction == PlanDirection.PURCHASE) {
             return switch (method) {
                 case PROMISSORY_NOTE -> "Senet ödemesi";
+                case OPEN_ACCOUNT -> "Açık hesap ödemesi";
                 case CHEQUE -> "Çek ödemesi";
                 default -> "Ödeme";
             };
         }
         return switch (method) {
             case PROMISSORY_NOTE -> "Senet tahsilatı";
+            case OPEN_ACCOUNT -> "Açık hesap tahsilatı";
             case CHEQUE -> "Çek tahsilatı";
             case INSTITUTION -> "Kurum ödemesi";
             default -> "Tahsilat";
@@ -805,7 +926,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                 i.getAmountCents(), i.getMethod(), i.getNoteNo(), summary(i.getPayer()), summary(p.getContact()),
                 status, daysLate, i.getPaidEntryId(), i.getPaidAt(), i.getBankName(), i.getDrawerName(), summary(i.getEndorsedTo()),
                 i.getBouncedAt() != null && !i.isPaid(), down, down ? 0 : regular.indexOf(i.getId()) + 1, regular.size(),
-                summary(p.getHolder()));
+                summary(p.getHolder()), i.getCapitalCents());
     }
 
     private Installment lockInstallment(UUID id) {

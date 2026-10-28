@@ -48,6 +48,14 @@ export function shortDate(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
 }
 
+export function shortDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  const dayMonth = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short" }).format(date);
+  const time = new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
+  return `${dayMonth} - ${time}`;
+}
+
 export function todayIso(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -86,7 +94,7 @@ export const ENTRY_TYPE: Record<LedgerEntryType, string> = {
   VEHICLE_PURCHASE: "Araç alışı", VEHICLE_EXPENSE: "Araç masrafı", GENERAL_EXPENSE: "Genel gider", CAPITAL: "Sermaye",
   VEHICLE_SALE: "Araç satışı", COLLECTION: "Tahsilat", PAYMENT: "Ödeme", CONSIGNMENT_SETTLEMENT: "Konsinye borcu",
   PROFIT_ALLOCATION: "Kâr payı sermayeye", TRANSFER: "Virman", OPENING_BALANCE: "Açılış bakiyesi",
-  VEHICLE_PROFIT_SHARE: "Ortak kâr payı", CAPITAL_TRANSFER: "Sermaye aktarımı",
+  VEHICLE_PROFIT_SHARE: "Ortak kâr payı", CAPITAL_TRANSFER: "Sermaye aktarımı", PARTNER_SALE_SETTLEMENT: "Ortak araç alımı · sermayeden",
 };
 
 export const OWNERSHIP: Record<Ownership, string> = { DEALER: "Galeri", CONSIGNMENT: "Konsinye", CO_OWNED: "Ortak" };
@@ -131,7 +139,7 @@ export function formatPhone(phone: string | null | undefined): string {
 export const SERIES = ["var(--color-seri-1)", "var(--color-seri-2)", "var(--color-seri-3)", "var(--color-seri-4)", "var(--color-seri-5)", "var(--color-seri-6)"];
 
 export const METHOD: Record<PaymentMethod, string> = {
-  CASH: "Nakit", TRANSFER: "Havale", PROMISSORY_NOTE: "Senet", INSTITUTION: "Evim / kredi", CHEQUE: "Çek",
+  CASH: "Nakit", TRANSFER: "Havale", PROMISSORY_NOTE: "Senet", INSTITUTION: "Evim / kredi", CHEQUE: "Çek", OPEN_ACCOUNT: "Açık hesap",
 };
 
 /** ISO tarihe ay ekler; ayin son gunu tasarsa ay sonuna yaslar (31 Ocak + 1 ay -> 28/29 Subat). */
