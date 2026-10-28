@@ -22,15 +22,21 @@ public record InstallmentRequest(
         UUID accountId,
         @Size(max = 60) String bankName,
         @Size(max = 120) String drawerName,
-        @PositiveOrZero Long capitalCents
+        @PositiveOrZero Long capitalCents,
+        @Size(max = 500) String description
 ) {
     public InstallmentRequest(LocalDate dueDate, Long amountCents, PaymentMethod method, String noteNo, UUID payerId,
                               boolean paidNow, UUID accountId) {
-        this(dueDate, amountCents, method, noteNo, payerId, paidNow, accountId, null, null, 0L);
+        this(dueDate, amountCents, method, noteNo, payerId, paidNow, accountId, null, null, 0L, null);
     }
 
     public InstallmentRequest(LocalDate dueDate, Long amountCents, PaymentMethod method, String noteNo, UUID payerId,
                               boolean paidNow, UUID accountId, String bankName, String drawerName) {
-        this(dueDate, amountCents, method, noteNo, payerId, paidNow, accountId, bankName, drawerName, 0L);
+        this(dueDate, amountCents, method, noteNo, payerId, paidNow, accountId, bankName, drawerName, 0L, null);
+    }
+
+    public InstallmentRequest(LocalDate dueDate, Long amountCents, PaymentMethod method, String noteNo, UUID payerId,
+                              boolean paidNow, UUID accountId, String bankName, String drawerName, Long capitalCents) {
+        this(dueDate, amountCents, method, noteNo, payerId, paidNow, accountId, bankName, drawerName, capitalCents, null);
     }
 }
