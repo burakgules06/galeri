@@ -210,6 +210,7 @@ export interface InstallmentRequest {
   accountId: string | null;
   bankName?: string | null;     // cek
   drawerName?: string | null;   // cek: keside eden
+  capitalCents: number;        // ortak alicinin sermayeden odeyecegi kisim
 }
 
 export interface InstallmentResponse {
