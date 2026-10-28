@@ -216,7 +216,8 @@ Alış kuralları (3B ile kesinleşti):
 - Planlı alış hareketi kasa ekranından düzeltilmez (1023); araç formundaki "Ödeme nereden" sadece peşin alışta dolar.
 
 Durum (saklanmaz, bugüne göre hesaplanır): `PAID`
-- Araçsız geçmiş cari kayıtları senet/çek veya `OPEN_ACCOUNT` (sözlü borç) olabilir. Ödenmemiş geçmiş satır tek tek silinirse eski açılış
+- Araçsız geçmiş cari kayıtları senet/çek veya `OPEN_ACCOUNT` (sözlü borç) olabilir; açık hesap taksitlerinde isteğe bağlı açıklama tutulur.
+  Ödenmemiş geçmiş satır tek tek silinirse eski açılış
   hareketi terslenir ve kalan satırların toplamıyla aynı tarihle yeniden cariye yazılır. Ödenmiş satır önce geri alınmalıdır; araçlı planlardaki
   satırları silmek yerine araç satış/alış akışı düzeltilir.
 
