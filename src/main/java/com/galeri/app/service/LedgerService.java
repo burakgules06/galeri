@@ -90,6 +90,9 @@ public interface LedgerService {
     LedgerEntry writeSettlement(PlanDirection direction, Vehicle vehicle, Contact payer, UUID accountId,
                                 long amountCents, LocalDate date, String description);
 
+    /** Ortagin arac alis bedelini kendi sermayesinden karsilamasi: BALANCE(ortak) -> CAPITAL(ortak). */
+    LedgerEntry writePartnerSaleCapitalSettlement(Vehicle vehicle, Contact buyer, long amountCents, LocalDate date);
+
     /** Hareketi ters hareketle duzeltir (bagli kayit kontrolu yapmadan; plan islemleri icin). */
     void reverse(UUID entryId);
 

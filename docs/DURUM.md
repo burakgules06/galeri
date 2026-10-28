@@ -323,3 +323,11 @@ Adım 2'den kalan küçükler (gerekirse):
 ## Açık sorular
 
 `MIMARI.md` §13: konsinye komisyonu, takas. (Ana ekranın ilk hali yapıldı; galericiye gösterilip geri bildirim alınacak.)
+
+
+## Ortak sermayedarın araç alımı
+
+- Ortak alıcı satışlarında her ödeme planı satırı nakit, sermayeden veya hibrit olarak tanımlanabilir.
+- Sermayeden karşılanan tutar tahsil edildiğinde cariden sermaye hesabına aktarılır; hibrit satırda kalan tutar kasa/bankaya gider.
+- Taksit kısmi tahsil edilirse önce sermaye kısmı kullanılır, kalan plan satırı aynı vadeyle devam eder.
+- Veritabanı değişikliği: V19 (capital_cents, capital_entry_id, PARTNER_SALE_SETTLEMENT).

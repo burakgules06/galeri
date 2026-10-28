@@ -37,7 +37,7 @@ export const api = {
     const qs = p.toString();
     return apiFetch<InstallmentResponse[]>(`/api/installments${qs ? `?${qs}` : ""}`);
   },
-  collect: (id: string, accountId: string, date: string, amountCents: number | null = null) =>
+  collect: (id: string, accountId: string | null, date: string, amountCents: number | null = null) =>
     apiFetch<InstallmentResponse>(`/api/installments/${id}/collect`, json({ accountId, date, amountCents })),
   addOpenItems: (contactId: string, request: OpenItemsRequest) =>
     apiFetch<PaymentPlanResponse>(`/api/contacts/${contactId}/open-items`, json(request)),

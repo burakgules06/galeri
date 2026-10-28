@@ -11,7 +11,7 @@ import { Button, ErrorBox } from "../../shared/ui/Common";
 import { ExpenseForm } from "./ExpenseForm";
 
 // Satis ve taksit hareketleri plana bagli: arac detayindan / odemeler ekranindan geri alinir, burada duzeltilmez.
-const LINKED: LedgerEntryType[] = ["VEHICLE_SALE", "COLLECTION", "PAYMENT", "CONSIGNMENT_SETTLEMENT"];
+const LINKED: LedgerEntryType[] = ["VEHICLE_SALE", "COLLECTION", "PAYMENT", "CONSIGNMENT_SETTLEMENT", "PARTNER_SALE_SETTLEMENT"];
 const EXPENSE: LedgerEntryType[] = ["VEHICLE_EXPENSE", "GENERAL_EXPENSE"];
 
 export function LedgerEntryList({ entries, direction, onChange, showVehicle = true }: {
