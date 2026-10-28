@@ -100,6 +100,7 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
           {paid && panel === null && (
             <div className="flex gap-1.5">
               {instrument && <Button variant="quiet" className="h-9 text-tehlike" onClick={() => setPanel("bounce")}>Karşılıksız</Button>}
+              {i.method === "OPEN_ACCOUNT" && <Button variant="quiet" className="h-9" aria-label="Açıklamayı düzenle" onClick={() => setPanel("edit")}>Düzenle</Button>}
               <Button variant="quiet" className="h-9" onClick={() => setPanel("undo")}>Geri al</Button>
             </div>
           )}
@@ -214,12 +215,16 @@ function EditPanel({ i, onClose, onDone }: { i: InstallmentResponse; onClose: ()
   const [noteNo, setNoteNo] = useState(i.noteNo ?? "");
   const [bankName, setBankName] = useState(i.bankName ?? "");
   const [drawerName, setDrawerName] = useState(i.drawerName ?? "");
+  const [description, setDescription] = useState(i.description ?? "");
   const [error, setError] = useState<string | null>(null);
   const cheque = i.method === "CHEQUE";
+  const openAccount = i.method === "OPEN_ACCOUNT";
+  const descriptionOnly = i.status === "PAID" && openAccount;
   const submit = async () => {
     setError(null);
     try {
-      await api.updateInstallment(i.id, dueDate, noteNo.trim() || null, cheque ? bankName.trim() : null, cheque ? drawerName.trim() : null);
+      await api.updateInstallment(i.id, dueDate, noteNo.trim() || null, cheque ? bankName.trim() : null,
+        cheque ? drawerName.trim() : null, openAccount ? description.trim() || null : null);
       onDone();
     } catch (e) {
       setError(errorMessage(e));
@@ -229,8 +234,11 @@ function EditPanel({ i, onClose, onDone }: { i: InstallmentResponse; onClose: ()
     <div className="mx-1 mb-3 rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
       <ErrorBox message={error} />
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Vade"><input type="date" className={inputClass} value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
-        {i.method !== "OPEN_ACCOUNT" && <Field label={cheque ? "Çek no" : "Senet no"}><input className={inputClass} value={noteNo} onChange={(e) => setNoteNo(e.target.value)} /></Field>}
+        {!descriptionOnly && <Field label="Vade"><input type="date" className={inputClass} value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>}
+        {!descriptionOnly && !openAccount && <Field label={cheque ? "Çek no" : "Senet no"}><input className={inputClass} value={noteNo} onChange={(e) => setNoteNo(e.target.value)} /></Field>}
+        {openAccount && <div className="col-span-2"><Field label="Açıklama">
+          <textarea className={inputClass} rows={2} maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)} />
+        </Field></div>}
         {cheque && <>
           <Field label="Banka"><input className={inputClass} value={bankName} onChange={(e) => setBankName(e.target.value)} /></Field>
           <Field label="Keşideci"><input className={inputClass} value={drawerName} onChange={(e) => setDrawerName(e.target.value)} /></Field>
