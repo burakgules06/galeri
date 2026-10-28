@@ -198,7 +198,7 @@ function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods,
   };
 
   return (
-    <div className={`rounded-[12px] border p-2.5 md:p-2 grid gap-2 grid-cols-2 md:grid-cols-[140px_150px_140px_1fr_40px] md:items-start ${
+    <div className={`rounded-[12px] border p-2.5 md:p-2 grid gap-2 grid-cols-2 md:grid-cols-[140px_150px_140px_1fr_40px] md:items-center ${
       problem ? "border-uyari bg-uyari-zemin/40" : r.paidNow ? "border-basari/30 bg-basari-zemin/50" : "border-cizgi bg-yuzey"}`}>
       <input type="date" className={`${inputClass} h-9`} value={r.dueDate} onChange={(e) => onChange({ dueDate: e.target.value })} aria-label="Vade" />
       <NumberInput className={`${inputClass} h-9 sayi text-[16px]`} value={text} onValueChange={changeAmount} aria-label="Tutar" />
@@ -206,11 +206,11 @@ function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods,
         onChange={(e) => { const method = e.target.value as PaymentMethod; onChange({ method, payer: null, ...(method === "INSTITUTION" ? { capitalCents: 0 } : {}) }); }}>
         {methods.map((m) => <option key={m} value={m}>{METHOD[m]}</option>)}
       </select>
-      <div className="col-span-2 md:col-span-1 flex flex-wrap items-start gap-2 min-w-0">
+      <div className="col-span-2 md:col-span-1 flex flex-wrap items-center gap-2 min-w-0">
         {capitalBuyer && r.method !== "INSTITUTION" && (
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="text-[12px] text-murekkep-2 whitespace-nowrap">Ödeme kaynağı</label>
-            <select className={`${inputClass} h-9 w-36`} value={r.capitalCents === 0 ? "CASH" : r.capitalCents >= r.amountCents ? "CAPITAL" : "HYBRID"}
+          <div className="w-full flex flex-wrap items-center gap-2">
+            <label className="text-[12px] text-murekkep-2">Ödeme kaynağı</label>
+            <select className={`${inputClass} h-9 md:w-36`} value={r.capitalCents === 0 ? "CASH" : r.capitalCents >= r.amountCents ? "CAPITAL" : "HYBRID"}
               onChange={(e) => {
                 const source = e.target.value;
                 onChange({ capitalCents: source === "CASH" ? 0 : source === "CAPITAL" ? r.amountCents : Math.max(1, Math.floor(r.amountCents / 2)) });

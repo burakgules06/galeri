@@ -3,7 +3,7 @@
 // "Düzeltmeleri göster" ile gri ve ustu cizili gorunur. Maliyet karti ve Kasa listesi bu bileseni kullanir.
 import { useState } from "react";
 import { api } from "../../api/galeri";
-import { ENTRY_TYPE, shortDateTime, tl } from "../../shared/format";
+import { ENTRY_TYPE, shortDate, tl } from "../../shared/format";
 import type { LedgerEntryResponse, LedgerEntryType } from "../../shared/types";
 import { errorMessage } from "../../shared/useLoad";
 import { Plate } from "../../shared/ui/Plate";
@@ -89,7 +89,7 @@ function Row({ e, direction, onChange, showVehicle }: { e: LedgerEntryResponse; 
             </a>
           )}
           <p className="text-[14px] text-murekkep-2 mt-0.5">
-            {shortDateTime(e.createdAt)} · {e.source.name} → {e.target.name}
+            {shortDate(e.date)} · {e.source.name} → {e.target.name}
           </p>
           {e.description && e.description !== title && e.description !== "Düzeltme" && <p className="text-[14px] text-murekkep-3 mt-0.5">{e.description}</p>}
         </div>

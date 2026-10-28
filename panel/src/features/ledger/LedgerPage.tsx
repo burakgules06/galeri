@@ -4,8 +4,7 @@
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
 import { SplitBar } from "../../shared/charts/Donut";
-import { ENTRY_TYPE, entryDirection, percent, SERIES, tl } from "../../shared/format";
-import type { LedgerEntryType } from "../../shared/types";
+import { entryDirection, percent, SERIES, tl } from "../../shared/format";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, Empty, ErrorBox, inputClass, Segment } from "../../shared/ui/Common";
 import { BalancesCard } from "./BalancesCard";
@@ -26,11 +25,6 @@ export function LedgerPage() {
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [bankOpen, setBankOpen] = useState(false);
   const [dialog, setDialog] = useState<"transfer" | "opening" | null>(null);
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [person, setPerson] = useState("");
-  const [entryType, setEntryType] = useState<LedgerEntryType | "">("");
-  const [entryPage, setEntryPage] = useState(1);
   const accounts = useLoad(() => api.accounts(), []);
   const summary = useLoad(() => api.dashboard(), []);
   const entries = useLoad(() => api.ledgerEntries(selected), [selected]);
@@ -40,18 +34,6 @@ export function LedgerPage() {
   const total = list.reduce((t, a) => t + a.balanceCents, 0);
   const selectedName = list.find((a) => a.id === selected)?.name;
   const colored = list.map((a, i) => ({ ...a, color: SERIES[i % SERIES.length] }));
-  const allEntries = entries.data ?? [];
-  const people = [...new Set(allEntries.flatMap((e) => [e.source.name, e.target.name]))].sort((a, b) => a.localeCompare(b, "tr"));
-  const filteredEntries = allEntries.filter((e) =>
-    (!fromDate || e.date >= fromDate) && (!toDate || e.date <= toDate) &&
-    (!person || e.source.name === person || e.target.name === person) && (!entryType || e.type === entryType));
-  const hasEntryFilters = !!(fromDate || toDate || person || entryType);
-  const entryPageSize = 20;
-  const entryPageCount = Math.max(1, Math.ceil(filteredEntries.length / entryPageSize));
-  const currentEntryPage = Math.min(entryPage, entryPageCount);
-  const pageEntries = filteredEntries.slice((currentEntryPage - 1) * entryPageSize, currentEntryPage * entryPageSize);
-  const changeAccount = (id: string | null) => { setSelected(id); setEntryPage(1); };
-  const resetEntryFilters = () => { setFromDate(""); setToDate(""); setPerson(""); setEntryType(""); setEntryPage(1); };
 
   return (
     <div className="space-y-5">
@@ -84,11 +66,11 @@ export function LedgerPage() {
         </div>
         <div className="mt-4"><SplitBar height={10} parts={colored.map((a) => ({ key: a.id, value: a.balanceCents, color: a.color }))} /></div>
         <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-          <AccountButton name="Tümü" balance={total} share={null} color={null} selected={selected === null} onClick={() => changeAccount(null)} />
+          <AccountButton name="Tümü" balance={total} share={null} color={null} selected={selected === null} onClick={() => setSelected(null)} />
           {colored.map((a) => (
             <AccountButton key={a.id} name={a.name} balance={a.balanceCents} color={a.color}
               share={total > 0 && a.balanceCents > 0 ? Math.round((a.balanceCents * 10000) / total) : null}
-              selected={selected === a.id} onClick={() => changeAccount(a.id)} />
+              selected={selected === a.id} onClick={() => setSelected(a.id)} />
           ))}
         </div>
       </section>
@@ -113,37 +95,15 @@ export function LedgerPage() {
       {tab === "entries" && <section className="kart p-4 md:p-5">
         <div className="flex items-baseline justify-between gap-3 mb-3">
           <h2 className="font-cond font-bold text-[22px]">{selectedName ? `${selectedName} hareketleri` : "Son hareketler"}</h2>
-          {entries.data && <span className="text-[13px] text-murekkep-2">{filteredEntries.length}{hasEntryFilters ? ` / ${allEntries.length}` : ""} kayıt</span>}
+          {entries.data && <span className="text-[13px] text-murekkep-2">{entries.data.length} kayıt</span>}
         </div>
         <ErrorBox message={entries.error} />
-        {entries.data && allEntries.length > 0 && <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-[150px_150px_minmax(180px,1fr)_minmax(180px,1fr)_auto] xl:items-end">
-          <label className="text-[12px] text-murekkep-2">Başlangıç tarihi<input type="date" className={`${inputClass} mt-1 h-9 w-full`} value={fromDate} max={toDate || undefined} onChange={(e) => { setFromDate(e.target.value); setEntryPage(1); }} /></label>
-          <label className="text-[12px] text-murekkep-2">Bitiş tarihi<input type="date" className={`${inputClass} mt-1 h-9 w-full`} value={toDate} min={fromDate || undefined} onChange={(e) => { setToDate(e.target.value); setEntryPage(1); }} /></label>
-          <label className="text-[12px] text-murekkep-2">Kişi<select className={`${inputClass} mt-1 h-9 w-full`} value={person} onChange={(e) => { setPerson(e.target.value); setEntryPage(1); }}>
-            <option value="">Tüm kişiler</option>{people.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select></label>
-          <label className="text-[12px] text-murekkep-2">Hareket tipi<select className={`${inputClass} mt-1 h-9 w-full`} value={entryType} onChange={(e) => { setEntryType(e.target.value as LedgerEntryType | ""); setEntryPage(1); }}>
-            <option value="">Tüm hareketler</option>{Object.entries(ENTRY_TYPE).map(([type, label]) => <option key={type} value={type}>{label}</option>)}
-          </select></label>
-          {hasEntryFilters && <Button type="button" variant="quiet" className="h-9" onClick={resetEntryFilters}>Filtreleri temizle</Button>}
-        </div>}
-        {entries.data && allEntries.length === 0 && (
+        {entries.data && entries.data.length === 0 && (
           <Empty title="Henüz hareket yok" description="Masraf girdiğinde ya da kasadan araç aldığında burada görünür." />
         )}
-        {entries.data && allEntries.length > 0 && filteredEntries.length === 0 && (
-          <Empty title="Filtreye uygun hareket yok" description="Tarih aralığını, kişiyi veya hareket tipini değiştirebilirsin." />
+        {entries.data && entries.data.length > 0 && (
+          <LedgerEntryList entries={entries.data} direction={(e) => entryDirection(e, selected)} onChange={reload} />
         )}
-        {entries.data && filteredEntries.length > 0 && (
-          <LedgerEntryList entries={pageEntries} direction={(e) => entryDirection(e, selected)} onChange={reload} />
-        )}
-        {entries.data && filteredEntries.length > entryPageSize && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-cizgi pt-3">
-          <span className="text-[13px] text-murekkep-2">{(currentEntryPage - 1) * entryPageSize + 1}–{Math.min(currentEntryPage * entryPageSize, filteredEntries.length)} / {filteredEntries.length} hareket</span>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="secondary" className="h-9" disabled={currentEntryPage === 1} onClick={() => setEntryPage((p) => Math.max(1, p - 1))}>Önceki</Button>
-            <span className="min-w-16 text-center text-[13px] font-semibold">{currentEntryPage} / {entryPageCount}</span>
-            <Button type="button" variant="secondary" className="h-9" disabled={currentEntryPage === entryPageCount} onClick={() => setEntryPage((p) => Math.min(entryPageCount, p + 1))}>Sonraki</Button>
-          </div>
-        </div>}
       </section>}
 
       {dialog === "transfer" && <TransferForm onClose={() => setDialog(null)} onSaved={() => { setDialog(null); reload(); }} />}
