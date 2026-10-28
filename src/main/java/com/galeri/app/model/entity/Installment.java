@@ -45,6 +45,9 @@ public class Installment extends BaseModel {
     @Column(name = "note_no", length = 40)
     private String noteNo;
 
+    @Column(length = 500)
+    private String description;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "payer_contact_id", updatable = false)
     private Contact payer;

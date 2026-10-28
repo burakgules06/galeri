@@ -4,9 +4,10 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
 
 ## Yapılanlar
 
-- Geçmiş cari kaydı: `OPEN_ACCOUNT` yöntemiyle senetsiz sözlü borç girilebilir. Araca bağlı olmayan geçmiş çek/senet/açık hesap
-  taksitleri Ödemeler ve kişi detayından tek tek silinebilir; silmede değişmez defter kuralına uygun ters hareket yazılır, kalan tutarla
-  açılış hareketi yeniden kurulur. Ödenmiş kayıt için önce tahsilat/ödeme geri alınır. Migration: `V20__open_account_and_remove_open_item.sql`.
+- Geçmiş cari kaydı: `OPEN_ACCOUNT` yöntemiyle senetsiz sözlü borç girilebilir; her açık hesap satırına isteğe bağlı açıklama eklenebilir.
+  Araca bağlı olmayan geçmiş çek/senet/açık hesap taksitleri Ödemeler ve kişi detayından tek tek silinebilir; silmede değişmez defter kuralına
+  uygun ters hareket yazılır, kalan tutarla açılış hareketi yeniden kurulur. Ödenmiş kayıt için önce tahsilat/ödeme geri alınır.
+  Migration'lar: `V20__open_account_and_remove_open_item.sql`, `V21__installment_description.sql`.
 
 - **Adım 1: kişiler ve araçlar** (PR #2, merge edildi). Kişi, araç, 13 parçalı hasar şeması, alan/satan çalışan,
   araç listesi/detayı/formu, satış formu, çalışan bazında aylık alım-satım. STAFF para alanı görmez.

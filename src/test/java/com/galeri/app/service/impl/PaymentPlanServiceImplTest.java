@@ -21,6 +21,7 @@ import com.galeri.app.model.enums.PaymentMethod;
 import com.galeri.app.model.enums.PlanDirection;
 import com.galeri.app.model.request.CollectRequest;
 import com.galeri.app.model.request.InstallmentRequest;
+import com.galeri.app.model.request.OpenItemsRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
 import com.galeri.app.model.response.InstallmentResponse;
 import com.galeri.app.repository.AccountRepository;
@@ -144,6 +145,22 @@ class PaymentPlanServiceImplTest {
         verify(installmentRepository).delete(target);
         verify(planRepository).delete(plan);
         verify(entryRepository, never()).findById(openingId);
+    }
+
+    @Test
+    void gecmisAcikHesapAciklamasi_taksitVeCevaptaSaklanir() {
+        String description = "Araç tamir masrafı için sözlü borç";
+        InstallmentRequest row = new InstallmentRequest(TODAY, 100000L, PaymentMethod.OPEN_ACCOUNT,
+                null, null, false, null, null, null, 0L, description);
+        when(ledgerService.writeOpenItems(buyer, PlanDirection.SALE, 100000L, TODAY)).thenReturn(entry());
+
+        var response = service.addOpenItems(buyer.getId(),
+                new OpenItemsRequest(PlanDirection.SALE, TODAY, List.of(row)));
+
+        ArgumentCaptor<Installment> saved = ArgumentCaptor.forClass(Installment.class);
+        verify(installmentRepository).save(saved.capture());
+        assertThat(saved.getValue().getDescription()).isEqualTo(description);
+        assertThat(response.installments().get(0).description()).isEqualTo(description);
     }
 
     // ------------------------------------------------------------------ satis

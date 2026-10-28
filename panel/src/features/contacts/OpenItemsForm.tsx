@@ -10,12 +10,12 @@ import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../share
 import { ContactPicker } from "./ContactPicker";
 import { NumberInput } from "../../shared/ui/NumberInput";
 
-interface Row { key: number; dueDate: string; amount: string; method: PaymentMethod; noteNo: string; bankName: string; drawerName: string }
+interface Row { key: number; dueDate: string; amount: string; method: PaymentMethod; noteNo: string; description: string; bankName: string; drawerName: string }
 
 const METHODS: PaymentMethod[] = ["PROMISSORY_NOTE", "CHEQUE", "OPEN_ACCOUNT", "CASH", "TRANSFER"];
 let nextKey = 1;
 const emptyRow = (dueDate: string, method: PaymentMethod = "PROMISSORY_NOTE"): Row =>
-  ({ key: nextKey++, dueDate, amount: "", method, noteNo: "", bankName: "", drawerName: "" });
+  ({ key: nextKey++, dueDate, amount: "", method, noteNo: "", description: "", bankName: "", drawerName: "" });
 
 // contact verilmezse (Odemeler ekranindan) kisi formun basinda secilir.
 export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
@@ -53,6 +53,7 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
         direction, date: todayIso(), holderId: direction === "SALE" && holder ? holder : null,
         installments: filled.map((r) => ({
           dueDate: r.dueDate, amountCents: cents(r), method: r.method, noteNo: r.noteNo.trim() || null, payerId: null,
+          description: r.method === "OPEN_ACCOUNT" ? r.description.trim() || null : null,
           paidNow: false, accountId: null, capitalCents: 0,
           bankName: r.method === "CHEQUE" ? r.bankName.trim() || null : null,
           drawerName: r.method === "CHEQUE" ? r.drawerName.trim() || null : null,
@@ -108,7 +109,8 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
                   <input className={inputClass} value={r.bankName} aria-label="Banka" placeholder="Banka" onChange={(e) => update(r.key, { bankName: e.target.value })} />
                   <input className={inputClass} value={r.drawerName} aria-label="Keşideci" placeholder="Keşideci" onChange={(e) => update(r.key, { drawerName: e.target.value })} />
                 </>}
-                {r.method === "OPEN_ACCOUNT" && <span className="col-span-3 self-center text-[13px] text-murekkep-3">Sözlü borç / açık hesap kaydı</span>}
+                {r.method === "OPEN_ACCOUNT" && <input className="col-span-3" value={r.description} aria-label="Açıklama"
+                  maxLength={500} placeholder="Açıklama (isteğe bağlı)" onChange={(e) => update(r.key, { description: e.target.value })} />}
               </div>
               <button type="button" aria-label="Satırı sil" onClick={() => setRows((l) => (l.length > 1 ? l.filter((x) => x.key !== r.key) : l))}
                 className="basilir w-9 h-9 rounded-lg hover:bg-yuzey-2 grid place-items-center text-murekkep-3 justify-self-end">
