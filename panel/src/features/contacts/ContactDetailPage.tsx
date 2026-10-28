@@ -49,6 +49,9 @@ export function ContactDetailPage({ id }: { id: string }) {
         <div>
           <p className="etiket">{c.type === "ORGANIZATION" ? "Kurum" : "Kişi"}</p>
           <h1 className="font-cond font-bold text-[30px] md:text-[34px] leading-tight tracking-tight">{c.name}</h1>
+          {c.tags.length > 0 && <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {c.tags.map((tag) => <span key={tag} className="text-[12px] font-semibold text-basari bg-basari-zemin rounded px-1.5 py-0.5">{tag === "CUSTOMER" ? "Müşteri" : tag}</span>)}
+          </div>}
           <p className="sayi text-[17px] text-murekkep-2 mt-0.5">{formatPhone(c.phone) || "Telefon yok"}</p>
           {c.notes && <p className="text-[14px] text-murekkep-3 mt-1 max-w-xl">{c.notes}</p>}
         </div>

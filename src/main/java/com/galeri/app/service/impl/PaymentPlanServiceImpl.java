@@ -27,6 +27,7 @@ import com.galeri.app.model.entity.PaymentPlanVehicle;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.AccountType;
 import com.galeri.app.model.enums.ContactType;
+import com.galeri.app.model.enums.ContactTag;
 import com.galeri.app.model.enums.InstallmentStatus;
 import com.galeri.app.model.enums.PaymentMethod;
 import com.galeri.app.model.enums.PlanDirection;
@@ -44,6 +45,7 @@ import com.galeri.app.model.response.PaymentPlanResponse;
 import com.galeri.app.model.response.VehicleRef;
 import com.galeri.app.repository.AccountRepository;
 import com.galeri.app.repository.ContactRepository;
+import com.galeri.app.repository.ContactTagRepository;
 import com.galeri.app.repository.InstallmentRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
@@ -72,6 +74,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -85,6 +88,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     private final PaymentPlanRepository planRepository;
     private final InstallmentRepository installmentRepository;
     private final ContactRepository contactRepository;
+    private final ContactTagRepository contactTagRepository;
     private final VehicleRepository vehicleRepository;
     private final AccountRepository accountRepository;
     private final LedgerEntryRepository entryRepository;
@@ -749,7 +753,9 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         List<InstallmentResponse> open = list(null, null, null, null).stream()
                 .filter(i -> i.status() != InstallmentStatus.PAID && i.payer().id().equals(contact.getId()))
                 .toList();
-        return new ContactStatement(ContactServiceImpl.toResponse(contact), running, lines, open);
+        Set<ContactTag> tags = contactTagRepository.findByTenantIdAndContact_IdIn(CurrentUser.tenantId(), List.of(contact.getId()))
+                .stream().map(t -> t.getTag()).collect(Collectors.toSet());
+        return new ContactStatement(ContactServiceImpl.toResponse(contact, tags), running, lines, open);
     }
 
     // ------------------------------------------------------------------ yardimcilar

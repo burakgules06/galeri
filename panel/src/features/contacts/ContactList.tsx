@@ -2,15 +2,17 @@
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
 import { formatPhone } from "../../shared/format";
-import type { ContactResponse, ContactType } from "../../shared/types";
+import type { ContactResponse, ContactTag, ContactType } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, Empty, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
 import { NumberInput } from "../../shared/ui/NumberInput";
 
 export function ContactList() {
   const [q, setQ] = useState("");
+  const [view, setView] = useState<"ALL" | ContactTag>("ALL");
   const { data, error, reload } = useLoad(() => api.contacts(q), [q]);
   const [editing, setEditing] = useState<ContactResponse | "new" | null>(null);
+  const visible = (data ?? []).filter((c) => view === "ALL" || c.tags.includes(view));
 
   return (
     <div>
@@ -23,16 +25,23 @@ export function ContactList() {
       </div>
       <input className={`${inputClass} md:max-w-xs mb-4`} placeholder="İsim ya da telefon ara" value={q}
         onChange={(e) => setQ(e.target.value)} aria-label="Kişi ara" />
+      <div className="mb-4">
+        <Segment<"ALL" | ContactTag> value={view} onChange={setView} options={[
+          { value: "ALL", label: `Tüm kişiler${data ? ` (${data.length})` : ""}` },
+          { value: "CUSTOMER", label: `Müşteriler${data ? ` (${data.filter((c) => c.tags.includes("CUSTOMER")).length})` : ""}` },
+        ]} />
+      </div>
       <ErrorBox message={error} />
-      {data && data.length === 0 && <Empty title={q ? "Aramaya uyan kişi yok" : "Henüz kişi yok"} description="Araç alırken ya da satarken de isim yazarak ekleyebilirsin." />}
-      {data && data.length > 0 && (
+      {data && visible.length === 0 && <Empty title={view === "CUSTOMER" ? "Henüz müşteri yok" : q ? "Aramaya uyan kişi yok" : "Henüz kişi yok"} description={view === "CUSTOMER" ? "Araç satışı tamamlanan alıcılar burada görünür." : "Araç alırken ya da satarken de isim yazarak ekleyebilirsin."} />}
+      {visible.length > 0 && (
         <ul className="kart overflow-hidden divide-y divide-cizgi">
-          {data.map((c) => (
+          {visible.map((c) => (
             <li key={c.id}>
               <a href={`#/contacts/${c.id}`} className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-yuzey-2">
                 <span className="grow min-w-0">
                   <span className="font-semibold">{c.name}</span>
                   {c.type === "ORGANIZATION" && <span className="ml-2 text-[12px] font-semibold text-plaka bg-plaka-acik rounded px-1.5 py-0.5">Kurum</span>}
+                  {c.tags.map((tag) => <span key={tag} className="ml-2 text-[12px] font-semibold text-basari bg-basari-zemin rounded px-1.5 py-0.5">{tag === "CUSTOMER" ? "Müşteri" : tag}</span>)}
                   {c.notes && <span className="block text-[14px] text-murekkep-3 truncate">{c.notes}</span>}
                 </span>
                 <span className="sayi text-[16px] text-murekkep-2">{formatPhone(c.phone)}</span>

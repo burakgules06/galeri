@@ -35,6 +35,8 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
 
     boolean existsByTenantIdAndPlateAndStatus(UUID tenantId, String plate, VehicleStatus status);
 
+    boolean existsByTenantIdAndBuyer_IdAndStatusIn(UUID tenantId, UUID buyerId, List<VehicleStatus> statuses);
+
     List<Vehicle> findByTenantIdAndStatus(UUID tenantId, VehicleStatus status);
 
     // Kaldirilan (yanlis girilen) araclar alis raporlarina girmez

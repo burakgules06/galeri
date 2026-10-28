@@ -26,6 +26,7 @@ export type BodyPart =
   | "LEFT_FRONT_FENDER" | "LEFT_FRONT_DOOR" | "LEFT_REAR_DOOR" | "LEFT_REAR_FENDER"
   | "RIGHT_FRONT_FENDER" | "RIGHT_FRONT_DOOR" | "RIGHT_REAR_DOOR" | "RIGHT_REAR_FENDER";
 export type ContactType = "PERSON" | "ORGANIZATION";
+export type ContactTag = "CUSTOMER";
 // Sahiplik: galeri (varsayilan), konsinye (sahibi bir kisi, galeri komisyon alir), ortak (Havuz ve/veya ortaklar).
 export type Ownership = "DEALER" | "CONSIGNMENT" | "CO_OWNED";
 export type CommissionType = "RATE" | "FIXED";   // RATE: baz puan (%3 = 300), FIXED: kurus
@@ -116,7 +117,7 @@ export interface VehicleDetailAdmin {
   shopCutCents: number | null;
 }
 
-export interface ContactResponse { id: string; name: string; phone: string | null; type: ContactType; notes: string | null }
+export interface ContactResponse { id: string; name: string; phone: string | null; type: ContactType; notes: string | null; tags: ContactTag[] }
 
 export interface MonthlyVehicle { vehicleId: string; plate: string; make: string; model: string; date: string }
 export interface StaffMonthly { staffId: string | null; name: string; bought: MonthlyVehicle[]; sold: MonthlyVehicle[] }

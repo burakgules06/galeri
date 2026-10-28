@@ -17,6 +17,7 @@ import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.entity.VehiclePart;
 import com.galeri.app.model.enums.BodyPart;
 import com.galeri.app.model.enums.CommissionType;
+import com.galeri.app.model.enums.ContactTag;
 import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.PartCondition;
 import com.galeri.app.model.enums.VehicleStatus;
@@ -31,6 +32,7 @@ import com.galeri.app.model.response.VehicleDetail;
 import com.galeri.app.model.response.VehicleDetailAdmin;
 import com.galeri.app.model.response.VehicleSummary;
 import com.galeri.app.repository.ContactRepository;
+import com.galeri.app.repository.ContactTagRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.VehiclePartRepository;
 import com.galeri.app.repository.VehicleRepository;
@@ -68,6 +70,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final VehicleRepository vehicleRepository;
     private final VehiclePartRepository vehiclePartRepository;
     private final ContactRepository contactRepository;
+    private final ContactTagRepository contactTagRepository;
     private final PanelUserRepository panelUserRepository;
     private final LedgerService ledgerService;
     private final PaymentPlanService paymentPlanService;
@@ -194,6 +197,7 @@ public class VehicleServiceImpl implements VehicleService {
         if (request.saleDate().isBefore(vehicle.getPurchaseDate())) throw new InvalidDateException();
 
         Contact buyer = getContact(request.buyerId(), vehicle.getTenantId());
+        contactTagRepository.addIfMissing(vehicle.getTenantId(), buyer.getId(), ContactTag.CUSTOMER.name());
         vehicle.setStatus(VehicleStatus.SOLD);
         vehicle.setSaleDate(request.saleDate());
         vehicle.setBuyer(buyer);
@@ -231,6 +235,7 @@ public class VehicleServiceImpl implements VehicleService {
                 throw new PlateAlreadyInStockException();
             }
         }
+        Contact previousBuyer = all.get(0).getBuyer();
         for (Vehicle v : all) coOwnershipService.onUndoSale(v);   // ortaga nakit donus yapildiysa 1043; kar paylari terslenir
         paymentPlanService.undoSale(vehicle);
         for (Vehicle v : all) {
@@ -241,6 +246,10 @@ public class VehicleServiceImpl implements VehicleService {
             v.setSalePriceCents(null);
             ledgerService.syncConsignmentSettlement(v);   // stoktaki araca sahibine borc kalmaz
             coOwnershipService.syncContributions(v);      // katkilar yeniden araca baglanir: nakit sermaye yetmeli
+        }
+        if (previousBuyer != null && !vehicleRepository.existsByTenantIdAndBuyer_IdAndStatusIn(
+                previousBuyer.getTenantId(), previousBuyer.getId(), List.of(VehicleStatus.SOLD, VehicleStatus.CLOSED))) {
+            contactTagRepository.deleteByTenantIdAndContact_IdAndTag(previousBuyer.getTenantId(), previousBuyer.getId(), ContactTag.CUSTOMER);
         }
         return toAdmin(vehicle, toDetail(vehicle));
     }
@@ -257,6 +266,7 @@ public class VehicleServiceImpl implements VehicleService {
             if (r.saleDate().isBefore(v.getPurchaseDate())) throw new InvalidDateException();
         }
         Contact buyer = getContact(r.buyerId(), tenantId);
+        contactTagRepository.addIfMissing(tenantId, buyer.getId(), ContactTag.CUSTOMER.name());
         PanelUser soldBy = getStaff(r.soldById(), tenantId);
         List<Long> prices = r.items().stream().map(BasketSaleRequest.Item::salePriceCents).toList();
         for (int k = 0; k < vehicles.size(); k++) {

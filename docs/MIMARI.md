@@ -23,11 +23,13 @@ Fotoğraf yok. Döviz yok (her şey TL; ileride gerekirse eklenir).
 | Kavram | Anlamı |
 |---|---|
 | **Galeri (tenant)** | Uygulamayı kullanan işletme. Örnek: Furkan'ın dükkânı. |
-| **Kişi** | Uygulamada adı geçen her insan ya da kurum: ortaklar, müşteriler, araç sattığımız kişiler, Evim şirketi, banka. Rolü sabit değildir; aynı kişi bir araçta alıcı, başka araçta konsinye sahibi olabilir. |
+| **Kişi** | Uygulamada adı geçen her insan ya da kurum: ortaklar, müşteriler, araç sattığımız kişiler, Evim şirketi, banka. Temel türü insan/kurumdur; ticari rolleri birden fazla olabilir. |
 | **Sermaye ortağı** | Galeriye sermaye koymuş kişi. Genel dönem kârı önerisindeki ağırlığı, araçlarda bağlı olmayan nakit sermayesidir. |
 | **Konsinye araç** | Aracın sahibi galeri değil bir kişidir (örn. Burak'ın kendi aracı). Galeride satılır, galeri satıştan komisyon alır. Galerinin bu araca maliyeti yoktur, kârı sadece komisyondur. |
 | **Ortak araç** | Aracın maliyeti Havuz (galerinin ortak parası) ve/veya sermaye ortaklarınca karşılanır. Her sahibin katkı ve kâr payı hesaplanır. |
 | **Hareket** | Bir para hareketi. Sistemdeki bütün bakiyeler hareketlerden hesaplanır. |
+
+Kişinin ticari rolü temel kişi türünün yerine geçmez. Roller `contact_tag` ilişkilerinde tutulur; örneğin araç satışındaki alıcıya `CUSTOMER` etiketi eklenir. Yeni bir rol eklenirken var olan etiketler korunur. Araç alıcısı, araç satıcısı ve sermaye ortağı ilişkileri kişi kaydına bağlanır; bir kişi birden çok rolde olabilir. `panel_user` ise giriş/yetki hesabıdır ve ticari kişi kaydıyla aynı gerçek kişiye ait olması mümkündür.
 
 ## 3. Temel kural: hareket defteri
 

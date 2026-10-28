@@ -221,6 +221,8 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
     dükkân sahibinin payı etkilenmez). Tahsilde alacaktan nakde geçer, geri alınınca / karşılıksız çıkınca yine alacak olur.
     Adına tahsil edilmemiş evrak olan ortak kaldırılamaz (1055).
 
+- **Kişi rolleri (başlangıç):** `V19__contact_tags.sql` ile kişi etiketleri eklendi. Araç alıcısı satışta `CUSTOMER` etiketi alır; mevcut etiketler korunur, satışı geri alınan kişinin başka tamamlanmış satışı yoksa müşteri etiketi kaldırılır. Geçmiş satış alıcıları migration ile etiketlenir. Kişiler ekranında tüm kişiler/müşteriler görünümü ve etiket rozeti var.
+
 ## Sıradaki
 
 Galerici geri bildirimi 4 (`feat/basket-sale`): toplu satış. `V14__basket_sale.sql`: `payment_plan_vehicle` (sepet planı araçsızdır;
