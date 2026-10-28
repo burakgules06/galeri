@@ -103,7 +103,7 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
               </select>
               <div className="col-span-2 md:col-span-1 grid grid-cols-3 gap-2">
                 {r.method !== "OPEN_ACCOUNT" && <input className={`${inputClass} ${r.method === "CHEQUE" ? "" : "col-span-3"}`} value={r.noteNo} aria-label="Numara"
-                  placeholder={r.method === "CHEQUE" ? "Çek no" : "Senet no"} onChange={(e) => update(r.key, { noteNo: e.target.value })} />
+                  placeholder={r.method === "CHEQUE" ? "Çek no" : "Senet no"} onChange={(e) => update(r.key, { noteNo: e.target.value })} />}
                 {r.method === "CHEQUE" && <>
                   <input className={inputClass} value={r.bankName} aria-label="Banka" placeholder="Banka" onChange={(e) => update(r.key, { bankName: e.target.value })} />
                   <input className={inputClass} value={r.drawerName} aria-label="Keşideci" placeholder="Keşideci" onChange={(e) => update(r.key, { drawerName: e.target.value })} />
