@@ -311,7 +311,13 @@ public class LedgerServiceImpl implements LedgerService {
     @Override
     @Transactional
     public void reverse(UUID entryId) {
-        writeReversal(reversible(entryId));
+        reverseAndGet(entryId);
+    }
+
+    @Override
+    @Transactional
+    public LedgerEntry reverseAndGet(UUID entryId) {
+        return writeReversal(reversible(entryId));
     }
 
     @Override
