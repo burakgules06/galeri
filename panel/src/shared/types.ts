@@ -304,6 +304,7 @@ export interface LedgerEntryResponse {
   description: string | null;
   correctedEntryId: string | null;   // doluysa bu bir duzeltme hareketi
   corrected: boolean;                // true ise bu hareket ters hareketle iptal edildi
+  createdById: string | null;
   createdBy: string | null;
   createdAt: string;
 }

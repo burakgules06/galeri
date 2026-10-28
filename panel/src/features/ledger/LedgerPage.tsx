@@ -28,11 +28,12 @@ export function LedgerPage() {
   const [dialog, setDialog] = useState<"transfer" | "opening" | null>(null);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [person, setPerson] = useState("");
+  const [userId, setUserId] = useState("");
   const [entryType, setEntryType] = useState<LedgerEntryType | "">("");
   const [entryPage, setEntryPage] = useState(1);
   const accounts = useLoad(() => api.accounts(), []);
   const summary = useLoad(() => api.dashboard(), []);
+  const users = useLoad(() => api.users(), []);
   const entries = useLoad(() => api.ledgerEntries(selected), [selected]);
 
   const reload = () => { accounts.reload(); entries.reload(); summary.reload(); setRevision(r => r + 1); };
@@ -41,17 +42,16 @@ export function LedgerPage() {
   const selectedName = list.find((a) => a.id === selected)?.name;
   const colored = list.map((a, i) => ({ ...a, color: SERIES[i % SERIES.length] }));
   const allEntries = entries.data ?? [];
-  const people = [...new Set(allEntries.flatMap((e) => [e.source.name, e.target.name]))].sort((a, b) => a.localeCompare(b, "tr"));
   const filteredEntries = allEntries.filter((e) =>
     (!fromDate || e.date >= fromDate) && (!toDate || e.date <= toDate) &&
-    (!person || e.source.name === person || e.target.name === person) && (!entryType || e.type === entryType));
-  const hasEntryFilters = !!(fromDate || toDate || person || entryType);
+    (!userId || e.createdById === userId) && (!entryType || e.type === entryType));
+  const hasEntryFilters = !!(fromDate || toDate || userId || entryType);
   const entryPageSize = 20;
   const entryPageCount = Math.max(1, Math.ceil(filteredEntries.length / entryPageSize));
   const currentEntryPage = Math.min(entryPage, entryPageCount);
   const pageEntries = filteredEntries.slice((currentEntryPage - 1) * entryPageSize, currentEntryPage * entryPageSize);
   const changeAccount = (id: string | null) => { setSelected(id); setEntryPage(1); };
-  const resetEntryFilters = () => { setFromDate(""); setToDate(""); setPerson(""); setEntryType(""); setEntryPage(1); };
+  const resetEntryFilters = () => { setFromDate(""); setToDate(""); setUserId(""); setEntryType(""); setEntryPage(1); };
 
   return (
     <div className="space-y-5">
@@ -67,7 +67,7 @@ export function LedgerPage() {
         </div>
       </header>
 
-      <ErrorBox message={accounts.error ?? summary.error} />
+      <ErrorBox message={accounts.error ?? summary.error ?? users.error} />
 
       {/* Nakit: toplam ve hesaplara dagilimi. Karta dokununca hareketler o hesaba suzulur. */}
       <section className="kart p-4 md:p-5">
@@ -119,8 +119,8 @@ export function LedgerPage() {
         {entries.data && allEntries.length > 0 && <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-[150px_150px_minmax(180px,1fr)_minmax(180px,1fr)_auto] xl:items-end">
           <label className="text-[12px] text-murekkep-2">Başlangıç tarihi<input type="date" className={`${inputClass} mt-1 h-9 w-full`} value={fromDate} max={toDate || undefined} onChange={(e) => { setFromDate(e.target.value); setEntryPage(1); }} /></label>
           <label className="text-[12px] text-murekkep-2">Bitiş tarihi<input type="date" className={`${inputClass} mt-1 h-9 w-full`} value={toDate} min={fromDate || undefined} onChange={(e) => { setToDate(e.target.value); setEntryPage(1); }} /></label>
-          <label className="text-[12px] text-murekkep-2">Kişi<select className={`${inputClass} mt-1 h-9 w-full`} value={person} onChange={(e) => { setPerson(e.target.value); setEntryPage(1); }}>
-            <option value="">Tüm kişiler</option>{people.map((name) => <option key={name} value={name}>{name}</option>)}
+          <label className="text-[12px] text-murekkep-2">Kullanıcı<select className={`${inputClass} mt-1 h-9 w-full`} value={userId} onChange={(e) => { setUserId(e.target.value); setEntryPage(1); }}>
+            <option value="">Tüm kullanıcılar</option>{(users.data ?? []).map((user) => <option key={user.id} value={user.id}>{user.fullName?.trim() || "İsimsiz kullanıcı"} · {user.phone}</option>)}
           </select></label>
           <label className="text-[12px] text-murekkep-2">Hareket tipi<select className={`${inputClass} mt-1 h-9 w-full`} value={entryType} onChange={(e) => { setEntryType(e.target.value as LedgerEntryType | ""); setEntryPage(1); }}>
             <option value="">Tüm hareketler</option>{Object.entries(ENTRY_TYPE).map(([type, label]) => <option key={type} value={type}>{label}</option>)}

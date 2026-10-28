@@ -704,6 +704,7 @@ public class LedgerServiceImpl implements LedgerService {
                 v == null ? null : new VehicleRef(v.getId(), v.getPlate(), v.getMake(), v.getModel()),
                 e.getCategory() == null ? null : e.getCategory().getName(),
                 e.getDescription(), e.getCorrectedEntryId(), corrected,
+                e.getCreatedBy() == null ? null : e.getCreatedBy().getId(),
                 e.getCreatedBy() == null ? null : e.getCreatedBy().getFullName(),
                 e.getCreatedAt());
     }

@@ -19,6 +19,7 @@ public record LedgerEntryResponse(
         String description,
         UUID correctedEntryId,
         boolean corrected,
+        UUID createdById,
         String createdBy,
         OffsetDateTime createdAt
 ) {}
