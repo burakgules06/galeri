@@ -36,6 +36,9 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
   const contacts = useLoad(() => api.contacts(), []);
   const staff = useLoad(() => api.staff(), []);
   const accounts = useLoad(() => api.accounts(), []);
+  const holders = useLoad(() => api.holders(), []);
+  const capitalBuyer = !!buyer && (holders.data ?? []).some((h) => h.contactId === buyer.id);
+  const planRows = capitalBuyer ? rows : rows.map((r) => r.capitalCents === 0 ? r : { ...r, capitalCents: 0 });
   const coOwned = vehicle.vehicle.ownership === "CO_OWNED";
   // Ortak arac: tahmini kar icin maliyet (alis + masraflar)
   const cost = useLoad(() => (coOwned ? api.vehicleCost(vehicle.vehicle.id) : Promise.resolve(null)), [coOwned, vehicle.vehicle.id]);
@@ -50,10 +53,10 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
   const ownPrice = parsed != null && !Number.isNaN(parsed) ? parsed : 0;
   const centsOf = (t: string) => { const c = tlToCents(t); return c != null && !Number.isNaN(c) ? c : 0; };
   const price = ownPrice + basket.reduce((t, b) => t + centsOf(b.priceText), 0);
-  const planned = rows.reduce((t, r) => t + (r.amountCents > 0 ? r.amountCents : 0), 0);
+  const planned = planRows.reduce((t, r) => t + (r.amountCents > 0 ? r.amountCents : 0), 0);
   const remaining = price - planned;
   const beforePurchase = !!vehicle.vehicle.purchaseDate && date < vehicle.vehicle.purchaseDate;
-  const canSave = !beforePurchase && !!buyer && ownPrice > 0 && basket.every((b) => centsOf(b.priceText) > 0) && price > 0 && rows.length > 0 && remaining === 0 && rows.every((r) => rowProblem(r) == null);
+  const canSave = !beforePurchase && !!buyer && ownPrice > 0 && basket.every((b) => centsOf(b.priceText) > 0) && price > 0 && planRows.length > 0 && remaining === 0 && planRows.every((r) => rowProblem(r, capitalBuyer) == null);
 
   // Pesin planda toplam degisince tek satir da degissin (elle duzenlenen planlara dokunulmaz)
   const syncCash = (total: number) => {
@@ -82,13 +85,13 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
     try {
       if (basket.length > 0) {
         onSaved(await api.sellBasket({
-          saleDate: date, buyerId: buyer.id, soldById: soldBy || null, installments: rows.map(toRequest),
+          saleDate: date, buyerId: buyer.id, soldById: soldBy || null, installments: planRows.map(toRequest),
           items: [{ vehicleId: vehicle.vehicle.id, salePriceCents: ownPrice }, ...basket.map((b) => ({ vehicleId: b.v.id, salePriceCents: centsOf(b.priceText) }))],
         }));
         return;
       }
       onSaved(await api.sell(vehicle.vehicle.id, {
-        saleDate: date, buyerId: buyer.id, soldById: soldBy || null, salePriceCents: price, installments: rows.map(toRequest),
+        saleDate: date, buyerId: buyer.id, soldById: soldBy || null, salePriceCents: price, installments: planRows.map(toRequest),
         ownerReturns: coOwned ? ownerReturns : null,
       }));
     } catch (err) {
@@ -167,10 +170,10 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
 
         <section className="space-y-3">
           <p className="etiket">Ödeme planı</p>
-          <PlanBuilder baseCents={price} date={date} mode={mode} onMode={setMode} rows={rows} onRows={setRows} remaining={remaining}
+          <PlanBuilder baseCents={price} date={date} mode={mode} onMode={setMode} rows={planRows} onRows={setRows} remaining={remaining}
             accounts={accounts.data ?? []} organizations={allContacts.filter((c) => c.type === "ORGANIZATION")}
             modes={["CASH", "INSTALLMENTS", "CHEQUE", "INSTITUTION", "MIXED"]} methods={["CASH", "TRANSFER", "PROMISSORY_NOTE", "CHEQUE", "INSTITUTION"]}
-            paidNowLabel="Şimdi alındı" downHint="Şimdi alınır" />
+            paidNowLabel="Şimdi alındı" downHint="Şimdi alınır" capitalBuyer={capitalBuyer} />
         </section>
 
         {coOwned && basket.length === 0 && (

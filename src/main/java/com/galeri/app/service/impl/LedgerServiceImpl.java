@@ -220,7 +220,8 @@ public class LedgerServiceImpl implements LedgerService {
                 || (original.getType() == LedgerEntryType.OPENING_BALANCE && planRepository.existsByOpeningEntryId(original.getId()))
                 || original.getSourceAccount().getType() == AccountType.PORTFOLIO
                 || original.getTargetAccount().getType() == AccountType.PORTFOLIO
-                || installmentRepository.existsByPaidEntryId(original.getId())) {
+                || installmentRepository.existsByPaidEntryId(original.getId())
+                || installmentRepository.existsByCapitalEntryId(original.getId())) {
             throw new LinkedEntryException();
         }
         LedgerEntry reversal = writeReversal(original);
@@ -251,6 +252,20 @@ public class LedgerServiceImpl implements LedgerService {
                 : newEntry(payer.getTenantId(), LedgerEntryType.PAYMENT, money, balance, amountCents, date);
         e.setVehicle(vehicle);
         e.setDescription(description);
+        return entryRepository.save(e);
+    }
+
+    @Override
+    @Transactional
+    public LedgerEntry writePartnerSaleCapitalSettlement(Vehicle vehicle, Contact buyer, long amountCents, LocalDate date) {
+        Account capital = accountRepository.findFirstByTenantIdAndTypeAndContactId(
+                        buyer.getTenantId(), AccountType.CAPITAL, buyer.getId())
+                .filter(a -> !a.isClosed())
+                .orElseThrow(com.galeri.app.exception.runtime.NotAPartnerException::new);
+        LedgerEntry e = newEntry(buyer.getTenantId(), LedgerEntryType.PARTNER_SALE_SETTLEMENT,
+                balanceAccount(buyer), capital, amountCents, date);
+        e.setVehicle(vehicle);
+        e.setDescription("Ortak araç alımı: sermayeden");
         return entryRepository.save(e);
     }
 

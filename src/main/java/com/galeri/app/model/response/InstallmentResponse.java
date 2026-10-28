@@ -35,12 +35,13 @@ public record InstallmentResponse(
         boolean downPayment,       // plan kurulurken alinan / odenen pesinat
         int number,                // pesinat haric taksit no (pesinatta 0)
         int installmentCount,      // pesinat haric taksit sayisi
-        ContactSummary holder      // gecmis senet / cek sermayedarinsa (V18)
+        ContactSummary holder,     // gecmis senet / cek sermayedarinsa (V18)
+        long capitalCents       // ortak alicinin bu taksitinde sermayeden karsilanacak kisim
 ) {
     public InstallmentResponse(UUID id, UUID planId, PlanDirection direction, VehicleRef vehicle, int seq, int count, LocalDate dueDate,
                                long amountCents, PaymentMethod method, String noteNo, ContactSummary payer, ContactSummary counterparty,
                                InstallmentStatus status, long daysLate, UUID paidEntryId, OffsetDateTime paidAt) {
         this(id, planId, direction, vehicle, seq, count, dueDate, amountCents, method, noteNo, payer, counterparty, status, daysLate,
-                paidEntryId, paidAt, null, null, null, false, false, seq, count, null);
+                paidEntryId, paidAt, null, null, null, false, false, seq, count, null, 0L);
     }
 }

@@ -382,3 +382,8 @@ Her yerde aynı terim kullanılır:
 API: `/api/vehicles` (`/{id}/parts`, `/{id}/sale`, `/{id}/cost`), `/api/contacts`, `/api/staff`,
 `/api/reports/monthly-trades`, `/api/reports/yearly-trades`, `/api/dashboard`, `/api/accounts`, `/api/ledger-entries` (`/{id}/correct`), `/api/expenses`,
 `/api/expense-categories?root=`.
+
+
+## Ortak alıcının araç finansmanı
+
+Ortak alıcılı araç satışında ödeme planı satırı, sermaye kaynaklı tutarı capital_cents ile saklar. Nakit kaynaklı kalan kısım tahsilatta seçilen kasa/banka hesabına, sermaye kısmı ise BALANCE(ortak) -> CAPITAL(ortak) olarak PARTNER_SALE_SETTLEMENT hareketiyle yazılır. Her iki hareket de aynı installment kaydına bağlıdır; geri alma ikisini de tersler. Hibrit taksit kısmi tahsil edilirse sermaye payı önce kapatılır; kalan taksit sermaye ve nakit paylarının kalanını taşır. Sermaye taahhüdü, nakitteki kullanılabilir sermayeyi ve açık plan rezervlerini aşamaz.

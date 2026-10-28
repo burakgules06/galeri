@@ -53,7 +53,7 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
         direction, date: todayIso(), holderId: direction === "SALE" && holder ? holder : null,
         installments: filled.map((r) => ({
           dueDate: r.dueDate, amountCents: cents(r), method: r.method, noteNo: r.noteNo.trim() || null, payerId: null,
-          paidNow: false, accountId: null,
+          paidNow: false, accountId: null, capitalCents: 0,
           bankName: r.method === "CHEQUE" ? r.bankName.trim() || null : null,
           drawerName: r.method === "CHEQUE" ? r.drawerName.trim() || null : null,
         })),

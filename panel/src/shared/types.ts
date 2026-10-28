@@ -210,6 +210,7 @@ export interface InstallmentRequest {
   accountId: string | null;
   bankName?: string | null;     // cek
   drawerName?: string | null;   // cek: keside eden
+  capitalCents: number;        // ortak alicinin sermayeden odeyecegi kisim
 }
 
 export interface InstallmentResponse {
@@ -237,6 +238,7 @@ export interface InstallmentResponse {
   number: number;                       // pesinat haric taksit no (pesinatta 0)
   installmentCount: number;             // pesinat haric taksit sayisi
   holder: ContactSummary | null;        // gecmis senet / cek sermayedarinsa: tahsil edildikce onun sermayesine
+  capitalCents: number;                // ortak alicinin sermayeden odeyecegi kisim
 }
 
 // Toplu satis: ayni aliciya birden fazla arac, toplam uzerinden tek plan.
@@ -286,7 +288,7 @@ export interface ContactRequest { name: string; phone: string | null; type: Cont
 export type AccountType = "CASH" | "BANK" | "BALANCE" | "CAPITAL" | "VEHICLE" | "EXPENSE" | "INCOME" | "OPENING";
 export type LedgerEntryType =
   | "VEHICLE_PURCHASE" | "VEHICLE_EXPENSE" | "GENERAL_EXPENSE" | "CAPITAL" | "VEHICLE_SALE" | "COLLECTION" | "PAYMENT"
-  | "CONSIGNMENT_SETTLEMENT" | "PROFIT_ALLOCATION" | "TRANSFER" | "OPENING_BALANCE" | "VEHICLE_PROFIT_SHARE" | "CAPITAL_TRANSFER";
+  | "CONSIGNMENT_SETTLEMENT" | "PROFIT_ALLOCATION" | "TRANSFER" | "OPENING_BALANCE" | "VEHICLE_PROFIT_SHARE" | "CAPITAL_TRANSFER" | "PARTNER_SALE_SETTLEMENT";
 export type ExpenseRoot = "VEHICLE" | "GENERAL";
 
 export interface AccountSummary { id: string; type: AccountType; name: string }

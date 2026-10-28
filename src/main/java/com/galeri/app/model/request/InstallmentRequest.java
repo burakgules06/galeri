@@ -3,6 +3,7 @@ package com.galeri.app.model.request;
 import com.galeri.app.model.enums.PaymentMethod;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
@@ -20,10 +21,16 @@ public record InstallmentRequest(
         boolean paidNow,
         UUID accountId,
         @Size(max = 60) String bankName,
-        @Size(max = 120) String drawerName
+        @Size(max = 120) String drawerName,
+        @PositiveOrZero Long capitalCents
 ) {
     public InstallmentRequest(LocalDate dueDate, Long amountCents, PaymentMethod method, String noteNo, UUID payerId,
                               boolean paidNow, UUID accountId) {
-        this(dueDate, amountCents, method, noteNo, payerId, paidNow, accountId, null, null);
+        this(dueDate, amountCents, method, noteNo, payerId, paidNow, accountId, null, null, 0L);
+    }
+
+    public InstallmentRequest(LocalDate dueDate, Long amountCents, PaymentMethod method, String noteNo, UUID payerId,
+                              boolean paidNow, UUID accountId, String bankName, String drawerName) {
+        this(dueDate, amountCents, method, noteNo, payerId, paidNow, accountId, bankName, drawerName, 0L);
     }
 }

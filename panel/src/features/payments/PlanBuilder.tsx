@@ -13,7 +13,7 @@ const MODE_LABEL: Record<PlanMode, string> = {
 };
 
 export function PlanBuilder({
-  baseCents, date, mode, onMode, rows, onRows, remaining, accounts, organizations, modes, methods, paidNowLabel, downHint,
+  baseCents, date, mode, onMode, rows, onRows, remaining, accounts, organizations, modes, methods, paidNowLabel, downHint, capitalBuyer = false,
 }: {
   baseCents: number;                 // plana dagitilacak tutar (bedel - odenmis taksitler)
   date: string;                      // satis / alis gunu: pesin ve pesinat vadesi
@@ -28,9 +28,10 @@ export function PlanBuilder({
   methods: PaymentMethod[];
   paidNowLabel: string;              // "Şimdi alındı" / "Şimdi ödendi"
   downHint: string;                  // "Şimdi alınır" / "Şimdi ödenir"
+  capitalBuyer?: boolean;             // alici galerinin sermayedari
 }) {
   const firstAccount = accounts[0]?.id ?? "";
-  const problems = rows.map(rowProblem);
+  const problems = rows.map((r) => rowProblem(r, capitalBuyer));
   // "+ Yeni kurum" ile eklenenler hemen listede olsun (form kapanmaz)
   const [newOrgs, setNewOrgs] = useState<ContactResponse[]>([]);
   const orgs = [...newOrgs, ...organizations.filter((o) => !newOrgs.some((n) => n.id === o.id))];
@@ -63,7 +64,7 @@ export function PlanBuilder({
           </div>
           {rows.map((r, k) => (
             <RowEditor key={r.key} r={r} problem={problems[k]} accounts={accounts} organizations={orgs} onOrgCreated={orgCreated} methods={methods}
-              paidNowLabel={paidNowLabel} onChange={(patch) => update(r.key, patch)} onRemove={() => onRows(rows.filter((x) => x.key !== r.key))} />
+              paidNowLabel={paidNowLabel} capitalBuyer={capitalBuyer} onChange={(patch) => update(r.key, patch)} onRemove={() => onRows(rows.filter((x) => x.key !== r.key))} />
           ))}
         </div>
       )}
@@ -183,16 +184,17 @@ function InstitutionGenerator({ price, date, account, organizations, onOrgCreate
   );
 }
 
-function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods, paidNowLabel, onChange, onRemove }: {
+function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods, paidNowLabel, capitalBuyer, onChange, onRemove }: {
   r: PlanRow; problem: string | null; accounts: AccountResponse[]; organizations: ContactResponse[];
   onOrgCreated: (c: ContactResponse) => void; methods: PaymentMethod[];
-  paidNowLabel: string; onChange: (patch: Partial<PlanRow>) => void; onRemove: () => void;
+  paidNowLabel: string; capitalBuyer: boolean; onChange: (patch: Partial<PlanRow>) => void; onRemove: () => void;
 }) {
   const [text, setText] = useState(centsToInput(r.amountCents));
   const changeAmount = (t: string) => {
     setText(t);
     const cents = tlToCents(t);
-    onChange({ amountCents: cents != null && !Number.isNaN(cents) ? cents : 0 });
+    const amountCents = cents != null && !Number.isNaN(cents) ? cents : 0;
+    onChange({ amountCents, ...(r.capitalCents === r.amountCents && r.capitalCents > 0 ? { capitalCents: amountCents } : {}) });
   };
 
   return (
@@ -201,10 +203,31 @@ function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods,
       <input type="date" className={`${inputClass} h-9`} value={r.dueDate} onChange={(e) => onChange({ dueDate: e.target.value })} aria-label="Vade" />
       <NumberInput className={`${inputClass} h-9 sayi text-[16px]`} value={text} onValueChange={changeAmount} aria-label="Tutar" />
       <select className={`${inputClass} h-9`} value={r.method} aria-label="Yöntem"
-        onChange={(e) => onChange({ method: e.target.value as PaymentMethod, payer: null })}>
+        onChange={(e) => { const method = e.target.value as PaymentMethod; onChange({ method, payer: null, ...(method === "INSTITUTION" ? { capitalCents: 0 } : {}) }); }}>
         {methods.map((m) => <option key={m} value={m}>{METHOD[m]}</option>)}
       </select>
       <div className="col-span-2 md:col-span-1 flex flex-wrap items-center gap-2 min-w-0">
+        {capitalBuyer && r.method !== "INSTITUTION" && (
+          <div className="w-full flex flex-wrap items-center gap-2">
+            <label className="text-[12px] text-murekkep-2">Ödeme kaynağı</label>
+            <select className={`${inputClass} h-9 md:w-36`} value={r.capitalCents === 0 ? "CASH" : r.capitalCents >= r.amountCents ? "CAPITAL" : "HYBRID"}
+              onChange={(e) => {
+                const source = e.target.value;
+                onChange({ capitalCents: source === "CASH" ? 0 : source === "CAPITAL" ? r.amountCents : Math.max(1, Math.floor(r.amountCents / 2)) });
+              }}>
+              <option value="CASH">Nakit</option><option value="CAPITAL">Sermayeden</option><option value="HYBRID" disabled={r.amountCents < 2}>Hibrit</option>
+            </select>
+            {r.capitalCents > 0 && r.capitalCents < r.amountCents && (
+              <div className="flex items-center gap-2">
+                <Field label="Sermayeden">
+                  <NumberInput className={`${inputClass} h-9 md:w-32 sayi`} value={centsToInput(r.capitalCents)}
+                    onValueChange={(v) => { const c = tlToCents(v); onChange({ capitalCents: c != null && !Number.isNaN(c) ? c : 0 }); }} />
+                </Field>
+                <span className="text-[12px] text-murekkep-3">Kalanı nakit / banka</span>
+              </div>
+            )}
+          </div>
+        )}
         {r.method === "INSTITUTION" && (
           <div className="w-full md:w-48">
             <ContactPicker kind="ORGANIZATION" className={`${inputClass} h-9`} contacts={organizations} selected={r.payer}
@@ -226,7 +249,7 @@ function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods,
             onChange={(e) => onChange({ paidNow: e.target.checked, accountId: e.target.checked ? (r.accountId || accounts[0]?.id || "") : "" })} />
           {paidNowLabel}
         </label>
-        {r.paidNow && (
+        {r.paidNow && r.amountCents > r.capitalCents && (
           <select className={`${inputClass} h-9 md:w-36`} value={r.accountId} onChange={(e) => onChange({ accountId: e.target.value })} aria-label="Hesap">
             {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
