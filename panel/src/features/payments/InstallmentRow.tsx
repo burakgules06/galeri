@@ -38,8 +38,8 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
   const actionLabel = i.direction === "SALE" ? "Tahsil et" : "Öde";
   // Alinmis cek / senet: ciro edilebilir, karsiliksiz cikabilir
   const instrument = i.direction === "SALE" && (i.method === "CHEQUE" || i.method === "PROMISSORY_NOTE");
-  const canDeleteOpenItem = allowDeleteOpenItem && !i.vehicle && !paid
-    && (i.method === "CHEQUE" || i.method === "PROMISSORY_NOTE" || i.method === "OPEN_ACCOUNT");
+  // Araca bagli olmayan, acik durumdaki gecmis cari satirlari yonteminden bagimsiz silinebilir.
+  const canDeleteOpenItem = allowDeleteOpenItem && !i.vehicle && !paid;
   const removeOpenItem = async () => {
     if (!window.confirm(`${METHOD[i.method]} · ${tl(i.amountCents)} kaydı silinsin mi? Cari açılış tutarı yeniden hesaplanır.`)) return;
     try {
