@@ -4,7 +4,7 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
 
 ## Yapılanlar
 
-- Geçmiş cari kaydı: `OPEN_ACCOUNT` yöntemiyle senetsiz sözlü borç girilebilir; her açık hesap satırına isteğe bağlı açıklama eklenebilir.
+- Geçmiş cari kaydı: `OPEN_ACCOUNT` yöntemiyle senetsiz sözlü borç girilebilir; her açık hesap satırına isteğe bağlı açıklama eklenebilir ve sonradan düzenlenebilir; tahsilattan sonra da yalnızca açıklama değişir.
   Araca bağlı olmayan geçmiş çek/senet/açık hesap taksitleri Ödemeler ve kişi detayından tek tek silinebilir; silmede değişmez defter kuralına
   uygun ters hareket yazılır, kalan tutarla açılış hareketi yeniden kurulur. Ödenmiş kayıt için önce tahsilat/ödeme geri alınır.
   Migration'lar: `V20__open_account_and_remove_open_item.sql`, `V21__installment_description.sql`.
