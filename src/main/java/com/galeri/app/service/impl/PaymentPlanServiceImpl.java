@@ -482,6 +482,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             // Kurum yontemi aracsiz kayitta yok: odeyen her zaman kisinin kendisi
             i.setMethod(row.method() == PaymentMethod.INSTITUTION ? PaymentMethod.TRANSFER : row.method());
             i.setNoteNo(blankToNull(row.noteNo()));
+            i.setDescription(blankToNull(row.description()));
             i.setBankName(blankToNull(row.bankName()));
             i.setDrawerName(blankToNull(row.drawerName()));
             i.setPayer(contact);
@@ -925,7 +926,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                 i.getAmountCents(), i.getMethod(), i.getNoteNo(), summary(i.getPayer()), summary(p.getContact()),
                 status, daysLate, i.getPaidEntryId(), i.getPaidAt(), i.getBankName(), i.getDrawerName(), summary(i.getEndorsedTo()),
                 i.getBouncedAt() != null && !i.isPaid(), down, down ? 0 : regular.indexOf(i.getId()) + 1, regular.size(),
-                summary(p.getHolder()), i.getCapitalCents());
+                summary(p.getHolder()), i.getCapitalCents(), i.getDescription());
     }
 
     private Installment lockInstallment(UUID id) {
