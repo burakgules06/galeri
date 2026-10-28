@@ -80,6 +80,9 @@ public interface PaymentPlanService {
     /** Aracsiz plani siler (hicbir taksiti odenmemisse): acilis hareketi terslenir. Hata yapan sifirdan girer. */
     void removeOpenItems(UUID planId);
 
+    /** Aracsiz gecmis plandaki odenmemis tek satiri kaldirir; cari acilisini kalan tutara esitler. */
+    void removeOpenItemInstallment(UUID planId, UUID installmentId);
+
     /** Arac kaldirilirken alis plani silinir; pesinat disinda odenmis taksit varsa kaldirilamaz (1054). */
     void removePurchasePlan(Vehicle vehicle);
 

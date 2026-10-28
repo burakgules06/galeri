@@ -196,7 +196,7 @@ export interface SaleRequest {
 
 // ---- Odeme plani ve taksitler (sadece ADMIN). Tutarlar kurus. ----
 export type PlanDirection = "SALE" | "PURCHASE";
-export type PaymentMethod = "CASH" | "TRANSFER" | "PROMISSORY_NOTE" | "INSTITUTION" | "CHEQUE";
+export type PaymentMethod = "CASH" | "TRANSFER" | "PROMISSORY_NOTE" | "INSTITUTION" | "CHEQUE" | "OPEN_ACCOUNT";
 export type InstallmentStatus = "PAID" | "OVERDUE" | "UPCOMING";
 export interface VehicleRef { id: string; plate: string; make: string; model: string }
 

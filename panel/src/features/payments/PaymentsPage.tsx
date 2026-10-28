@@ -68,7 +68,7 @@ export function PaymentsPage() {
           <p className="etiket">Tahsilat</p>
           <h1 className="font-cond font-bold text-[30px] md:text-[34px] leading-tight tracking-tight">Ödemeler</h1>
         </div>
-        <Button variant="secondary" onClick={() => setImporting(true)}>Geçmiş senet / çek ekle</Button>
+        <Button variant="secondary" onClick={() => setImporting(true)}>Geçmiş borç ekle</Button>
       </header>
       {importing && <OpenItemsForm onClose={() => setImporting(false)} onSaved={() => { setImporting(false); reload(); }} />}
 
@@ -114,7 +114,7 @@ export function PaymentsPage() {
         )}
         {rows.length > 0 && (
           <ul className="divide-y divide-cizgi px-2 md:px-3">
-            {rows.map((i) => <InstallmentRow key={i.id} i={i} onChange={reload} />)}
+            {rows.map((i) => <InstallmentRow key={i.id} i={i} onChange={reload} allowDeleteOpenItem />)}
           </ul>
         )}
       </section>
