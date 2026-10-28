@@ -240,6 +240,7 @@ export interface InstallmentResponse {
   installmentCount: number;             // pesinat haric taksit sayisi
   holder: ContactSummary | null;        // gecmis senet / cek sermayedarinsa: tahsil edildikce onun sermayesine
   capitalCents: number;                // ortak alicinin sermayeden odeyecegi kisim
+  description: string | null;           // acik hesap aciklamasi
 }
 
 // Toplu satis: ayni aliciya birden fazla arac, toplam uzerinden tek plan.
