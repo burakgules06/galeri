@@ -1,0 +1,25 @@
+meta {
+  name: Set partner base
+  type: http
+  seq: 43
+}
+
+put {
+  url: {{baseUrl}}/api/partners/{{contactId}}/base
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "base": "ALL"
+  }
+}

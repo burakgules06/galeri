@@ -1,0 +1,23 @@
+meta {
+  name: Undo collection
+  type: http
+  seq: 25
+}
+
+post {
+  url: {{baseUrl}}/api/installments/{{installmentId}}/undo
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {}
+}

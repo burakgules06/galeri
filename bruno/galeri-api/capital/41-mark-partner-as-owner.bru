@@ -1,0 +1,23 @@
+meta {
+  name: Mark partner as owner
+  type: http
+  seq: 41
+}
+
+put {
+  url: {{baseUrl}}/api/partners/{{contactId}}/owner
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {}
+}

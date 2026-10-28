@@ -1,0 +1,29 @@
+meta {
+  name: Transfer between accounts
+  type: http
+  seq: 48
+}
+
+post {
+  url: {{baseUrl}}/api/transfers
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "fromAccountId": "{{accountId}}",
+    "toAccountId": "{{accountId2}}",
+    "date": "2026-10-28",
+    "amountCents": 1000000,
+    "description": "Örnek virman"
+  }
+}

@@ -1,0 +1,33 @@
+meta {
+  name: Create expense
+  type: http
+  seq: 33
+}
+
+post {
+  url: {{baseUrl}}/api/expenses
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "date": "2026-10-28",
+    "sourceAccountId": "{{accountId}}",
+    "amountCents": 500000,
+    "vehicleId": "{{vehicleId}}",
+    "categoryId": null,
+    "categoryName": "Bakım",
+    "parentCategoryId": null,
+    "description": "Bruno örnek araç masrafı",
+    "chargeToOwner": false
+  }
+}

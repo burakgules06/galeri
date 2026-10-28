@@ -1,0 +1,15 @@
+meta {
+  name: List holders
+  type: http
+  seq: 53
+}
+
+get {
+  url: {{baseUrl}}/api/holders
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

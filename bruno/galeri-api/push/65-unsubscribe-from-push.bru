@@ -1,0 +1,25 @@
+meta {
+  name: Unsubscribe from push
+  type: http
+  seq: 65
+}
+
+delete {
+  url: {{baseUrl}}/api/push/subscribe
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "endpoint": "https://push.example.test/subscription"
+  }
+}

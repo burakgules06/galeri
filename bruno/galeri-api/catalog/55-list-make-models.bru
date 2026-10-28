@@ -1,0 +1,15 @@
+meta {
+  name: List make models
+  type: http
+  seq: 55
+}
+
+get {
+  url: {{baseUrl}}/api/catalog/makes/{{make}}/models
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

@@ -1,0 +1,23 @@
+meta {
+  name: Send test push
+  type: http
+  seq: 66
+}
+
+post {
+  url: {{baseUrl}}/api/push/test
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {}
+}

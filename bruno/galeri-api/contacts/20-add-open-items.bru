@@ -1,0 +1,42 @@
+meta {
+  name: Add open items
+  type: http
+  seq: 20
+}
+
+post {
+  url: {{baseUrl}}/api/contacts/{{contactId}}/open-items
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "direction": "SALE",
+    "date": "2026-10-28",
+    "installments": [
+      {
+        "dueDate": "2026-11-28",
+        "amountCents": 10000000,
+        "method": "PROMISSORY_NOTE",
+        "noteNo": "BRUNO-001",
+        "payerId": null,
+        "paidNow": false,
+        "accountId": null,
+        "bankName": null,
+        "drawerName": null,
+        "capitalCents": 0,
+        "description": "Geçmiş açık hesap örneği"
+      }
+    ],
+    "holderId": null
+  }
+}

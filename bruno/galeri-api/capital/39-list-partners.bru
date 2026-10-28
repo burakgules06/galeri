@@ -1,0 +1,15 @@
+meta {
+  name: List partners
+  type: http
+  seq: 39
+}
+
+get {
+  url: {{baseUrl}}/api/partners
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

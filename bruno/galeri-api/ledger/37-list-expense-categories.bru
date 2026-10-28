@@ -1,0 +1,19 @@
+meta {
+  name: List expense categories
+  type: http
+  seq: 37
+}
+
+get {
+  url: {{baseUrl}}/api/expense-categories
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+params:query {
+  root: VEHICLE
+}

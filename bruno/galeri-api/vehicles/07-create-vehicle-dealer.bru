@@ -1,0 +1,43 @@
+meta {
+  name: Create vehicle (dealer)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/vehicles
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "plate": "06 ABC 123",
+    "make": "Toyota",
+    "model": "Corolla 1.5 Vision",
+    "modelYear": 2022,
+    "fuel": "GASOLINE",
+    "transmission": "AUTOMATIC",
+    "mileageKm": 45000,
+    "color": "Beyaz",
+    "tramerCents": 0,
+    "notes": "Bruno örnek isteği",
+    "purchaseDate": "2026-10-28",
+    "sellerId": "{{contactId}}",
+    "boughtById": "{{userId}}",
+    "actualPurchaseCents": 125000000,
+    "officialPurchaseCents": 120000000,
+    "purchaseAccountId": "{{accountId}}",
+    "purchasePlan": null,
+    "ownership": "DEALER",
+    "addToCatalog": false
+  }
+}

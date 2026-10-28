@@ -1,0 +1,31 @@
+meta {
+  name: Update expense
+  type: http
+  seq: 35
+}
+
+put {
+  url: {{baseUrl}}/api/expenses/{{ledgerEntryId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "date": "2026-10-28",
+    "sourceAccountId": "{{accountId}}",
+    "amountCents": 500000,
+    "vehicleId": "{{vehicleId}}",
+    "categoryName": "Bakım",
+    "description": "Güncellenmiş örnek masraf",
+    "chargeToOwner": false
+  }
+}

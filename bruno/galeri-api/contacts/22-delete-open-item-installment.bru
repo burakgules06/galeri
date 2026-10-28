@@ -1,0 +1,15 @@
+meta {
+  name: Delete open item installment
+  type: http
+  seq: 22
+}
+
+delete {
+  url: {{baseUrl}}/api/contacts/open-items/{{planId}}/installments/{{installmentId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

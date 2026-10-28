@@ -1,0 +1,15 @@
+meta {
+  name: Delete vehicle
+  type: http
+  seq: 13
+}
+
+delete {
+  url: {{baseUrl}}/api/vehicles/{{vehicleId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

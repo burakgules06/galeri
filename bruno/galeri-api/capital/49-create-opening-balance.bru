@@ -1,0 +1,29 @@
+meta {
+  name: Create opening balance
+  type: http
+  seq: 49
+}
+
+post {
+  url: {{baseUrl}}/api/opening-balances
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "accountId": "{{accountId}}",
+    "contactId": null,
+    "side": null,
+    "date": "2026-10-28",
+    "amountCents": 1000000
+  }
+}

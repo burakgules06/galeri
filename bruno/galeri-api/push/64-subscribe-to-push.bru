@@ -1,0 +1,29 @@
+meta {
+  name: Subscribe to push
+  type: http
+  seq: 64
+}
+
+post {
+  url: {{baseUrl}}/api/push/subscribe
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "endpoint": "https://push.example.test/subscription",
+    "keys": {
+      "p256dh": "REPLACE_WITH_BROWSER_P256DH_KEY",
+      "auth": "REPLACE_WITH_BROWSER_AUTH_KEY"
+    }
+  }
+}

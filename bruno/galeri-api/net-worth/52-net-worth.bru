@@ -1,0 +1,15 @@
+meta {
+  name: Net worth
+  type: http
+  seq: 52
+}
+
+get {
+  url: {{baseUrl}}/api/net-worth
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

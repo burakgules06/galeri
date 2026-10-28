@@ -1,0 +1,15 @@
+meta {
+  name: Contact statement
+  type: http
+  seq: 18
+}
+
+get {
+  url: {{baseUrl}}/api/contacts/{{contactId}}/statement
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

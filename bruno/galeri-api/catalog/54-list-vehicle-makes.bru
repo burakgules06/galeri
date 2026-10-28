@@ -1,0 +1,15 @@
+meta {
+  name: List vehicle makes
+  type: http
+  seq: 54
+}
+
+get {
+  url: {{baseUrl}}/api/catalog/makes
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

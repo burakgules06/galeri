@@ -1,0 +1,28 @@
+meta {
+  name: Create panel user
+  type: http
+  seq: 57
+}
+
+post {
+  url: {{baseUrl}}/api/users
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "fullName": "Bruno Örnek Kullanıcı",
+    "phone": "5550000001",
+    "role": "STAFF",
+    "password": "ChangeMe123!"
+  }
+}

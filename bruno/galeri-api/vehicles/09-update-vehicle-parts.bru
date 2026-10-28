@@ -1,0 +1,28 @@
+meta {
+  name: Update vehicle parts
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{baseUrl}}/api/vehicles/{{vehicleId}}/parts
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "parts": {
+      "HOOD": "ORIGINAL",
+      "FRONT_BUMPER": "LOCALLY_PAINTED"
+    }
+  }
+}
