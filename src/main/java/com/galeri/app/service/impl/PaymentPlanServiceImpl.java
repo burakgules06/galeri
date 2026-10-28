@@ -641,11 +641,16 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     @Transactional
     public InstallmentResponse update(UUID installmentId, InstallmentUpdateRequest r) {
         Installment i = getInstallment(installmentId);
-        if (i.isPaid()) throw new InstallmentAlreadyPaidException();
+        if (i.isPaid()) {
+            if (i.getMethod() != PaymentMethod.OPEN_ACCOUNT) throw new InstallmentAlreadyPaidException();
+            i.setDescription(blankToNull(r.description()));
+            return single(i, null);
+        }
         i.setDueDate(r.dueDate());
         i.setNoteNo(blankToNull(r.noteNo()));
         if (r.bankName() != null) i.setBankName(blankToNull(r.bankName()));
         if (r.drawerName() != null) i.setDrawerName(blankToNull(r.drawerName()));
+        if (i.getMethod() == PaymentMethod.OPEN_ACCOUNT) i.setDescription(blankToNull(r.description()));
         return single(i, null);
     }
 

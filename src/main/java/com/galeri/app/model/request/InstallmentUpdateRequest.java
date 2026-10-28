@@ -10,9 +10,14 @@ public record InstallmentUpdateRequest(
         @NotNull LocalDate dueDate,
         @Size(max = 40) String noteNo,
         @Size(max = 60) String bankName,
-        @Size(max = 120) String drawerName
+        @Size(max = 120) String drawerName,
+        @Size(max = 500) String description
 ) {
     public InstallmentUpdateRequest(LocalDate dueDate, String noteNo) {
-        this(dueDate, noteNo, null, null);
+        this(dueDate, noteNo, null, null, null);
+    }
+
+    public InstallmentUpdateRequest(LocalDate dueDate, String noteNo, String bankName, String drawerName) {
+        this(dueDate, noteNo, bankName, drawerName, null);
     }
 }

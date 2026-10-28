@@ -21,6 +21,7 @@ import com.galeri.app.model.enums.PaymentMethod;
 import com.galeri.app.model.enums.PlanDirection;
 import com.galeri.app.model.request.CollectRequest;
 import com.galeri.app.model.request.InstallmentRequest;
+import com.galeri.app.model.request.InstallmentUpdateRequest;
 import com.galeri.app.model.request.OpenItemsRequest;
 import com.galeri.app.model.request.VehicleSaleRequest;
 import com.galeri.app.model.response.InstallmentResponse;
@@ -161,6 +162,24 @@ class PaymentPlanServiceImplTest {
         verify(installmentRepository).save(saved.capture());
         assertThat(saved.getValue().getDescription()).isEqualTo(description);
         assertThat(response.installments().get(0).description()).isEqualTo(description);
+    }
+
+    @Test
+    void odenmisAcikHesapAciklamasi_duzenlenirVadeDegismez() {
+        PaymentPlan plan = plan();
+        plan.setVehicleId(null);
+        Installment target = installment(plan, TODAY, 100000L, true);
+        target.setMethod(PaymentMethod.OPEN_ACCOUNT);
+        target.setDescription("Eski açıklama");
+        when(installmentRepository.findById(target.getId())).thenReturn(Optional.of(target));
+        when(installmentRepository.findByPlanIds(List.of(plan.getId()))).thenReturn(List.of(target));
+
+        InstallmentResponse response = service.update(target.getId(),
+                new InstallmentUpdateRequest(TODAY.plusDays(3), null, null, null, "Yeni açıklama"));
+
+        assertThat(target.getDescription()).isEqualTo("Yeni açıklama");
+        assertThat(response.description()).isEqualTo("Yeni açıklama");
+        assertThat(response.dueDate()).isEqualTo(TODAY);
     }
 
     // ------------------------------------------------------------------ satis
