@@ -516,15 +516,14 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
 
         List<Installment> retained = rows.stream().filter(i -> !i.getId().equals(installmentId)).toList();
         long retainedTotal = retained.stream().mapToLong(Installment::getAmountCents).sum();
-        LedgerEntry opening = entryRepository.findById(plan.getOpeningEntryId()).orElseThrow(RecordNotFoundException::new);
-        ledgerService.reverse(opening.getId());
+        LedgerEntry reversal = ledgerService.reverseAndGet(plan.getOpeningEntryId());
         installmentRepository.delete(target);
         if (retained.isEmpty()) {
             planRepository.delete(plan);
             return;
         }
 
-        LedgerEntry revisedOpening = ledgerService.writeOpenItems(plan.getContact(), plan.getDirection(), retainedTotal, opening.getEntryDate());
+        LedgerEntry revisedOpening = ledgerService.writeOpenItems(plan.getContact(), plan.getDirection(), retainedTotal, reversal.getEntryDate());
         entryRepository.flush();
         installmentRepository.flush();
         planRepository.replaceOpenItemsAmountAndOpeningEntry(planId, retainedTotal, revisedOpening.getId());

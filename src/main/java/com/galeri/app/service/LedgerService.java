@@ -96,6 +96,9 @@ public interface LedgerService {
     /** Hareketi ters hareketle duzeltir (bagli kayit kontrolu yapmadan; plan islemleri icin). */
     void reverse(UUID entryId);
 
+    /** Hareketi tersler ve olusan ters kaydi dondurur. */
+    LedgerEntry reverseAndGet(UUID entryId);
+
     /** Aracin duzeltilmemis tum satis hareketlerini terser (satisi geri al). */
     void reverseVehicleSales(UUID vehicleId);
 
