@@ -14,7 +14,7 @@ export function BalancesCard({ receivableCents, payableCents, receivables, payab
     <section className="kart overflow-hidden self-start">
       <div className="p-4 md:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="etiket">Alacak ve verecek</p>
+          <p className="etiket">Alacak ve verecek (toplam)</p>
           <p className={`inline-flex items-baseline gap-1.5 rounded-md px-2 py-1 text-xs font-semibold ${net > 0 ? "bg-basari-zemin text-basari" : net < 0 ? "bg-tehlike-zemin text-tehlike" : "bg-yuzey-2 text-murekkep-2"}`}>
             Net <span className="sayi text-base">{net > 0 ? "+" : net < 0 ? "−" : ""}{tl(Math.abs(net))}</span>
           </p>
