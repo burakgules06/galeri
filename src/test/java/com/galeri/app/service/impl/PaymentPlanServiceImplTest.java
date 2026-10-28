@@ -123,6 +123,29 @@ class PaymentPlanServiceImplTest {
         TestSession.close();
     }
 
+    // ------------------------------------------------------------------ gecmis cari kaydini sil
+
+    @Test
+    void sonGecmisTaksitiSilinirken_acilisHareketiKilitlemeSonrasiTerslenir() {
+        PaymentPlan plan = plan();
+        plan.setVehicleId(null);
+        UUID openingId = UUID.randomUUID();
+        plan.setOpeningEntryId(openingId);
+        Installment target = installment(plan, TODAY, 10000000L, false);
+        when(planRepository.lockById(plan.getId())).thenReturn(Optional.of(plan));
+        when(installmentRepository.lockByPlanId(plan.getId())).thenReturn(List.of(target));
+        LedgerEntry reversal = entry();
+        reversal.setEntryDate(LocalDate.of(2026, 10, 27));
+        when(ledgerService.reverseAndGet(openingId)).thenReturn(reversal);
+
+        service.removeOpenItemInstallment(plan.getId(), target.getId());
+
+        verify(ledgerService).reverseAndGet(openingId);
+        verify(installmentRepository).delete(target);
+        verify(planRepository).delete(plan);
+        verify(entryRepository, never()).findById(openingId);
+    }
+
     // ------------------------------------------------------------------ satis
 
     @Test
