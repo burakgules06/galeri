@@ -48,8 +48,8 @@ export const api = {
     apiFetch<InstallmentResponse>(`/api/installments/${id}/endorse`, json({ toContactId, targetInstallmentId, date })),
   bounce: (id: string) => apiFetch<InstallmentResponse>(`/api/installments/${id}/bounce`, { method: "POST" }),
   undoInstallment: (id: string) => apiFetch<InstallmentResponse>(`/api/installments/${id}/undo`, { method: "POST" }),
-  updateInstallment: (id: string, dueDate: string, noteNo: string | null, bankName: string | null = null, drawerName: string | null = null) =>
-    apiFetch<InstallmentResponse>(`/api/installments/${id}`, json({ dueDate, noteNo, bankName, drawerName }, "PATCH")),
+  updateInstallment: (id: string, dueDate: string, noteNo: string | null, bankName: string | null = null, drawerName: string | null = null, description: string | null = null) =>
+    apiFetch<InstallmentResponse>(`/api/installments/${id}`, json({ dueDate, noteNo, bankName, drawerName, description }, "PATCH")),
   // Sermaye ve kasa islemleri (sadece ADMIN)
   partners: () => apiFetch<Partner[]>("/api/partners"),
   addPartner: (contactId: string, base: CapitalBase) => apiFetch<Partner>("/api/partners", json({ contactId, base })),
