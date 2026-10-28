@@ -91,7 +91,7 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
         return;
       }
       onSaved(await api.sell(vehicle.vehicle.id, {
-        saleDate: date, buyerId: buyer.id, soldById: soldBy || null, salePriceCents: price, installments: rows.map(toRequest),
+        saleDate: date, buyerId: buyer.id, soldById: soldBy || null, salePriceCents: price, installments: planRows.map(toRequest),
         ownerReturns: coOwned ? ownerReturns : null,
       }));
     } catch (err) {
