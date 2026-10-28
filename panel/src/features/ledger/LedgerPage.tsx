@@ -103,8 +103,8 @@ export function LedgerPage() {
       {tab === "assets" && <NetWorthPanel revision={revision} />}
 
       {tab === "entries" && summary.data && (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-          <PartnerCapitalCard revision={revision} stackStatement />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <PartnerCapitalCard revision={revision} />
           <BalancesCard receivableCents={summary.data.receivableCents} payableCents={summary.data.payableCents}
             receivables={summary.data.receivables} payables={summary.data.payables} />
         </div>

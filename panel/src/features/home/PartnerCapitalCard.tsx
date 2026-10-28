@@ -15,7 +15,7 @@ const RECEIVABLE = "var(--color-seri-3)";
 
 const keyOf = (h: Holder) => h.contactId ?? "owner";
 
-export function PartnerCapitalCard({ revision = 0, stackStatement = false }: { revision?: number; stackStatement?: boolean }) {
+export function PartnerCapitalCard({ revision = 0 }: { revision?: number }) {
   const { data, error } = useLoad(() => api.holders(), [revision]);
   const [selected, setSelected] = useState<string | null>(null);
   const [details, setDetails] = useState(false);
@@ -42,7 +42,7 @@ export function PartnerCapitalCard({ revision = 0, stackStatement = false }: { r
 
       {h && (
         <>
-          <div className={`mt-4 grid gap-5 ${stackStatement ? "grid-cols-1" : "lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"}`}>
+          <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
             <div className="min-w-0">
               <div className="flex flex-col sm:flex-row sm:items-center gap-5">
             <div className="mx-auto sm:mx-0">
@@ -91,7 +91,7 @@ export function PartnerCapitalCard({ revision = 0, stackStatement = false }: { r
                 <Legend color={RECEIVABLE} label="Alacak (senet, çek ve açık alacaklar)" />
               </div>
             </div>
-            <div className={`min-w-0 border-t border-cizgi pt-4 ${stackStatement ? "" : "lg:border-t-0 lg:border-l lg:pt-0 lg:pl-5"}`}>
+            <div className="min-w-0 border-t border-cizgi pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-5">
               <p className="etiket">Alacak ve verecek</p>
               {!h.contactId
                 ? <p className="mt-3 text-[14px] text-murekkep-3">Cari hesabı yok.</p>
