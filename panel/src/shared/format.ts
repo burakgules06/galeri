@@ -48,6 +48,14 @@ export function shortDate(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
 }
 
+export function shortDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  const dayMonth = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short" }).format(date);
+  const time = new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
+  return `${dayMonth} - ${time}`;
+}
+
 export function todayIso(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
