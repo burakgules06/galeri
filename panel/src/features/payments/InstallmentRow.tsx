@@ -25,17 +25,31 @@ const STRIPE: Record<InstallmentStatus, string> = {
 
 type Panel = "collect" | "undo" | "edit" | "endorse" | "bounce" | null;
 
-export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = true }: {
+export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = true, allowDeleteOpenItem = false }: {
   i: InstallmentResponse;
   onChange: () => void;
   showVehicle?: boolean;
   showPayer?: boolean;
+  allowDeleteOpenItem?: boolean;
 }) {
   const [panel, setPanel] = useState<Panel>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const paid = i.status === "PAID";
   const actionLabel = i.direction === "SALE" ? "Tahsil et" : "Öde";
   // Alinmis cek / senet: ciro edilebilir, karsiliksiz cikabilir
   const instrument = i.direction === "SALE" && (i.method === "CHEQUE" || i.method === "PROMISSORY_NOTE");
+  const canDeleteOpenItem = allowDeleteOpenItem && !i.vehicle && !paid
+    && (i.method === "CHEQUE" || i.method === "PROMISSORY_NOTE" || i.method === "OPEN_ACCOUNT");
+  const removeOpenItem = async () => {
+    if (!window.confirm(`${METHOD[i.method]} · ${tl(i.amountCents)} kaydı silinsin mi? Cari açılış tutarı yeniden hesaplanır.`)) return;
+    try {
+      setDeleteError(null);
+      await api.removeOpenItemInstallment(i.planId, i.id);
+      onChange();
+    } catch (e) {
+      setDeleteError(errorMessage(e));
+    }
+  };
 
   return (
     <li className="relative">
@@ -76,6 +90,7 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
           </span>
           {!paid && panel === null && (
             <div className="flex flex-wrap justify-end gap-1.5">
+              {canDeleteOpenItem && <Button variant="quiet" className="h-9 px-2.5 text-tehlike" onClick={removeOpenItem}>Sil</Button>}
               <Button variant="quiet" className="h-9 px-2.5" onClick={() => setPanel("edit")} aria-label="Vadeyi düzenle">Düzenle</Button>
               {instrument && <Button variant="secondary" className="h-9" onClick={() => setPanel("endorse")}>Ciro et</Button>}
               <Button className="h-9" onClick={() => setPanel("collect")}>{actionLabel}</Button>
@@ -89,6 +104,7 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
           )}
         </div>
       </div>
+      {deleteError && <div className="px-4 pb-2"><ErrorBox message={deleteError} /></div>}
       {panel === "collect" && <CollectPanel i={i} label={actionLabel} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
       {panel === "undo" && <UndoPanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
       {panel === "edit" && <EditPanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
@@ -213,7 +229,7 @@ function EditPanel({ i, onClose, onDone }: { i: InstallmentResponse; onClose: ()
       <ErrorBox message={error} />
       <div className="grid grid-cols-2 gap-3">
         <Field label="Vade"><input type="date" className={inputClass} value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
-        <Field label={cheque ? "Çek no" : "Senet no"}><input className={inputClass} value={noteNo} onChange={(e) => setNoteNo(e.target.value)} /></Field>
+        {i.method !== "OPEN_ACCOUNT" && <Field label={cheque ? "Çek no" : "Senet no"}><input className={inputClass} value={noteNo} onChange={(e) => setNoteNo(e.target.value)} /></Field>}
         {cheque && <>
           <Field label="Banka"><input className={inputClass} value={bankName} onChange={(e) => setBankName(e.target.value)} /></Field>
           <Field label="Keşideci"><input className={inputClass} value={drawerName} onChange={(e) => setDrawerName(e.target.value)} /></Field>

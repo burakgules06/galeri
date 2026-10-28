@@ -42,6 +42,8 @@ export const api = {
   addOpenItems: (contactId: string, request: OpenItemsRequest) =>
     apiFetch<PaymentPlanResponse>(`/api/contacts/${contactId}/open-items`, json(request)),
   removeOpenItems: (planId: string) => apiFetch<void>(`/api/contacts/open-items/${planId}`, { method: "DELETE" }),
+  removeOpenItemInstallment: (planId: string, installmentId: string) =>
+    apiFetch<void>(`/api/contacts/open-items/${planId}/installments/${installmentId}`, { method: "DELETE" }),
   endorse: (id: string, toContactId: string, targetInstallmentId: string | null, date: string) =>
     apiFetch<InstallmentResponse>(`/api/installments/${id}/endorse`, json({ toContactId, targetInstallmentId, date })),
   bounce: (id: string) => apiFetch<InstallmentResponse>(`/api/installments/${id}/bounce`, { method: "POST" }),

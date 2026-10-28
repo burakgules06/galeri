@@ -60,6 +60,12 @@ public class ContactController {
         return responseService.success(null);
     }
 
+    @DeleteMapping("/open-items/{planId}/installments/{installmentId}")
+    public GenericResponse<Void> removeOpenItemInstallment(@PathVariable UUID planId, @PathVariable UUID installmentId) {
+        paymentPlanService.removeOpenItemInstallment(planId, installmentId);
+        return responseService.success(null);
+    }
+
     @PostMapping
     public GenericResponse<ContactResponse> create(@Valid @RequestBody ContactRequest request) {
         return responseService.success(contactService.create(request));

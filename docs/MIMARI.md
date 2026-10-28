@@ -215,6 +215,11 @@ Alış kuralları (3B ile kesinleşti):
 - Ödenmiş taksit varken bedel, satıcı ya da plandan peşine geçiş değiştirilemez (1026); önce ödemeler geri alınır.
 - Planlı alış hareketi kasa ekranından düzeltilmez (1023); araç formundaki "Ödeme nereden" sadece peşin alışta dolar.
 
+Durum (saklanmaz, bugüne göre hesaplanır): `PAID`
+- Araçsız geçmiş cari kayıtları senet/çek veya `OPEN_ACCOUNT` (sözlü borç) olabilir. Ödenmemiş geçmiş satır tek tek silinirse eski açılış
+  hareketi terslenir ve kalan satırların toplamıyla aynı tarihle yeniden cariye yazılır. Ödenmiş satır önce geri alınmalıdır; araçlı planlardaki
+  satırları silmek yerine araç satış/alış akışı düzeltilir.
+
 Durum (saklanmaz, bugüne göre hesaplanır): `PAID` (ödendi, yeşil), `UPCOMING` (bekliyor, turuncu; vadesi bugün dahil),
 `OVERDUE` (gecikti, kırmızı). Geciken ve bu haftanın ödemeleri ana ekranda ve `#/payments`'ta görünür.
 
