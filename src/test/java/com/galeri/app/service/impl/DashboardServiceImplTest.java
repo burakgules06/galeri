@@ -2,6 +2,7 @@ package com.galeri.app.service.impl;
 
 import com.galeri.app.model.entity.Account;
 import com.galeri.app.model.entity.Contact;
+import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.AccountType;
 import com.galeri.app.model.enums.InstallmentStatus;
@@ -51,6 +52,7 @@ class DashboardServiceImplTest {
     @Mock private AccountRepository accountRepository;
     @Mock private LedgerEntryRepository entryRepository;
     @Mock private ContactRepository contactRepository;
+    @Mock private com.galeri.app.repository.PanelUserRepository panelUserRepository;
     @Mock private VehicleRepository vehicleRepository;
     @Mock private PaymentPlanService paymentPlanService;
     @Mock private CapitalService capitalService;
@@ -60,20 +62,20 @@ class DashboardServiceImplTest {
     private final UUID tenantId = UUID.randomUUID();
     private DashboardServiceImpl service;
 
-    private final Contact owner = contact("Furkan Kaya", true);
-    private final Contact partner = contact("Selin Arslan", false);
+    private final PanelUser owner = user("Furkan Kaya", "ADMIN");
+    private final PanelUser partner = user("Selin Arslan", "INVESTOR");
     private final Contact buyer = contact("Ayse Demir", false);
     private final Contact seller = contact("Mehmet Yilmaz", false);
 
     private final Account cash = account(AccountType.CASH, null);
-    private final Account ownerCapital = account(AccountType.CAPITAL, owner);
-    private final Account partnerCapital = account(AccountType.CAPITAL, partner);
+    private final Account ownerCapital = capital(owner);
+    private final Account partnerCapital = capital(partner);
     private final Account buyerBalance = account(AccountType.BALANCE, buyer);
     private final Account sellerBalance = account(AccountType.BALANCE, seller);
 
     @BeforeEach
     void setUp() {
-        service = new DashboardServiceImpl(accountRepository, entryRepository, contactRepository, vehicleRepository,
+        service = new DashboardServiceImpl(accountRepository, entryRepository, contactRepository, panelUserRepository, vehicleRepository,
                 paymentPlanService, capitalService, clock);
         when(paymentPlanService.list(null, null, null, null)).thenReturn(List.of());
         when(capitalService.periodProfit(any(), any())).thenReturn(profit(0, 0));
@@ -81,7 +83,8 @@ class DashboardServiceImplTest {
 
         when(accountRepository.findByTenantIdAndTypeInOrderByCreatedAtAsc(eq(tenantId), anyCollection()))
                 .thenReturn(List.of(cash, ownerCapital, partnerCapital, buyerBalance, sellerBalance));
-        when(contactRepository.findAllById(any())).thenReturn(List.of(owner, partner, buyer, seller));
+        when(contactRepository.findAllById(any())).thenReturn(List.of(buyer, seller));
+        when(panelUserRepository.findAllById(any())).thenReturn(List.of(owner, partner));
         // giren: kasa 9.000, alici carisi 500; cikan: sahip 6.000, ortak 2.000 (+ ortak 1.000 sonradan), satici carisi 300
         when(entryRepository.incomingTotals(tenantId)).thenReturn(List.<Object[]>of(
                 new Object[]{cash.getId(), 900000L}, new Object[]{buyerBalance.getId(), 50000L}));
@@ -195,13 +198,27 @@ class DashboardServiceImplTest {
                 PaymentMethod.PROMISSORY_NOTE, null, null, null, status, 0, null, null);
     }
 
-    private Contact contact(String name, boolean isOwner) {
+    private Contact contact(String name, boolean unused) {
         Contact c = new Contact();
         c.setId(UUID.randomUUID());
         c.setTenantId(tenantId);
         c.setName(name);
-        c.setOwner(isOwner);
         return c;
+    }
+
+    private PanelUser user(String name, String role) {
+        PanelUser u = new PanelUser();
+        u.setId(UUID.randomUUID());
+        u.setFullName(name);
+        u.setRole(role);
+        return u;
+    }
+
+    private Account capital(PanelUser u) {
+        Account a = account(AccountType.CAPITAL, null);
+        a.setName(u.getFullName());
+        a.setUserId(u.getId());
+        return a;
     }
 
     private Account account(AccountType type, Contact c) {

@@ -10,6 +10,7 @@ import com.galeri.app.exception.runtime.VehicleAlreadySoldException;
 import com.galeri.app.exception.runtime.VehicleNotSoldException;
 import com.galeri.app.model.entity.CatalogEntry;
 import com.galeri.app.model.entity.Contact;
+import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.entity.VehiclePart;
 import com.galeri.app.model.enums.BodyPart;
@@ -421,9 +422,21 @@ class VehicleServiceImplTest {
         return c;
     }
 
+    private PanelUser investor(String name) {
+        com.galeri.app.model.entity.Tenant t = new com.galeri.app.model.entity.Tenant();
+        t.setId(tenantId);
+        PanelUser u = new PanelUser();
+        u.setId(UUID.randomUUID());
+        u.setTenant(t);
+        u.setFullName(name);
+        u.setRole("INVESTOR");
+        when(panelUserRepository.findById(u.getId())).thenReturn(Optional.of(u));
+        return u;
+    }
+
     @Test
     void konsinyeArac_alisBedeliVeSaticisiTutulmaz_alisDeftereYazilmaz() {
-        Contact owner = contact("Burak Gules");
+        PanelUser owner = investor("Burak Gules");   // konsinye sahibi sermayedar kullanici (V22)
         savesWithId();
 
         VehicleDetailAdmin result = service.create(ownershipRequest(Ownership.CONSIGNMENT, owner.getId(), CommissionType.RATE, 300, 999L, null));

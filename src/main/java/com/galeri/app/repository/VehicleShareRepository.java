@@ -10,9 +10,11 @@ import java.util.UUID;
 
 public interface VehicleShareRepository extends JpaRepository<VehicleShare, UUID> {
 
-    // Havuz satirinda kisi yok (left join); siralama sabit: buyuk pay once, esitlikte eklenme sirasi
-    @Query("select s from VehicleShare s left join fetch s.contact where s.vehicleId = :vehicleId order by s.shareBp desc, s.createdAt, s.id")
-    List<VehicleShare> findByVehicleIdWithContact(@Param("vehicleId") UUID vehicleId);
+    // Siralama sabit: buyuk pay once, esitlikte eklenme sirasi
+    @Query("select s from VehicleShare s join fetch s.user u left join fetch u.tenant where s.vehicleId = :vehicleId order by s.shareBp desc, s.createdAt, s.id")
+    List<VehicleShare> findByVehicleIdWithUser(@Param("vehicleId") UUID vehicleId);
 
     List<VehicleShare> findByVehicleId(UUID vehicleId);
+
+    boolean existsByUser_Id(UUID userId);
 }

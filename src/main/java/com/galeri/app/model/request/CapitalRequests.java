@@ -15,22 +15,15 @@ public final class CapitalRequests {
 
     public enum Direction { IN, OUT }
 
-    /** Kisiyi sermayedar yap (sermayesi 0 ile baslar). base: havuzdaki yuzdesi neye gore gosterilir (bos: tum varlik). */
-    public record Partner(@NotNull UUID contactId, CapitalBase base) {
-        public Partner(UUID contactId) {
-            this(contactId, null);
-        }
-    }
-
     public record Base(@NotNull CapitalBase base) {}
 
     /**
-     * Kisiler arasi sermaye aktarimi (dukkan sahibi dahil herkes herkese). Kasada para hareket etmez, sadece sahiplik degisir:
+     * Kullanicilar arasi sermaye aktarimi (dukkan sahibi dahil herkes herkese). Kasada para hareket etmez, sadece sahiplik degisir:
      * CAPITAL_TRANSFER CAPITAL(alan) -> CAPITAL(veren).
      */
     public record CapitalTransfer(
-            @NotNull UUID fromContactId,
-            @NotNull UUID toContactId,
+            @NotNull UUID fromUserId,
+            @NotNull UUID toUserId,
             @NotNull LocalDate date,
             @NotNull @Positive Long amountCents,
             @Size(max = 500) String description
@@ -47,7 +40,7 @@ public final class CapitalRequests {
 
     /** Kar payini sermayeye ekle: elle girilir (sistem kar dagitmaz). Donem aciklamaya yazilir. */
     public record Allocation(
-            @NotNull UUID contactId,
+            @NotNull UUID userId,
             @NotNull LocalDate date,
             @NotNull @Positive Long amountCents,
             @NotNull LocalDate periodFrom,

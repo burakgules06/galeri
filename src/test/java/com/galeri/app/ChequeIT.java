@@ -82,7 +82,7 @@ class ChequeIT {
                 user, tenant, "94" + suffix);
         TestSession.open(user, tenant, "ADMIN");
         cash = ledgerService.moneyAccounts().stream().filter(a -> a.type() == AccountType.CASH).findFirst().orElseThrow().id();
-        UUID furkan = person("Furkan");
+        UUID furkan = user;   // dukkan sahibi kullanici (V22)
         ali = person("Ali");
         mehmet = person("Mehmet");
         veli = person("Veli");

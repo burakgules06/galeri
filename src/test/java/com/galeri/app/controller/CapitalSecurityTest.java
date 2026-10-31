@@ -53,8 +53,7 @@ class CapitalSecurityTest {
         assertThatThrownBy(() -> netWorth.summary()).isInstanceOf(AccessDeniedException.class);
 
         assertThatThrownBy(() -> capital.partners()).isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(() -> capital.addPartner(new CapitalRequests.Partner(id))).isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(() -> capital.setOwner(id)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> capital.removePartner(id)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> capital.move(id, new CapitalRequests.Movement(CapitalRequests.Direction.IN, id, DAY, 1L, null)))
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> capital.periodProfit(DAY, DAY)).isInstanceOf(AccessDeniedException.class);

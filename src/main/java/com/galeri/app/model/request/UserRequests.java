@@ -10,18 +10,35 @@ public final class UserRequests {
 
     private UserRequests() {}
 
+    /**
+     * role: ADMIN (dukkan sahibi), INVESTOR (sermayedar), STAFF (calisan). canLogin false ise telefon ve sifre bos olabilir
+     * (or. telefonu olmayan sermayedar). canTrade sadece calisanda anlamli (arac alim / satimi girebilir).
+     */
     public record Create(
             @NotBlank @Size(max = 120) String fullName,
-            @NotBlank @Size(max = 20) String phone,
-            @NotNull @Pattern(regexp = "ADMIN|STAFF") String role,
-            @NotBlank @Size(min = 8, max = 72) String password
-    ) {}
+            @Size(max = 20) String phone,
+            @NotNull @Pattern(regexp = "ADMIN|INVESTOR|STAFF") String role,
+            @Size(min = 8, max = 72) String password,
+            Boolean canLogin,
+            Boolean canTrade
+    ) {
+        public Create(String fullName, String phone, String role, String password) {
+            this(fullName, phone, role, password, true, false);
+        }
+    }
 
     public record Update(
             @NotBlank @Size(max = 120) String fullName,
-            @NotNull @Pattern(regexp = "ADMIN|STAFF") String role,
-            @NotNull Boolean active
-    ) {}
+            @NotNull @Pattern(regexp = "ADMIN|INVESTOR|STAFF") String role,
+            @NotNull Boolean active,
+            Boolean canLogin,   // bos: degismez
+            Boolean canTrade,   // bos: degismez
+            @Size(max = 20) String phone   // bos: degismez
+    ) {
+        public Update(String fullName, String role, Boolean active) {
+            this(fullName, role, active, null, null, null);
+        }
+    }
 
     public record ResetPassword(@NotBlank @Size(min = 8, max = 72) String password) {}
 

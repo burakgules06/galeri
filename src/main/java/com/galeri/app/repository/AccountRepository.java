@@ -21,6 +21,8 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
 
     Optional<Account> findFirstByTenantIdAndTypeAndContactId(UUID tenantId, AccountType type, UUID contactId);
 
+    Optional<Account> findFirstByTenantIdAndTypeAndUserId(UUID tenantId, AccountType type, UUID userId);
+
     List<Account> findByTenantIdAndTypeInOrderByCreatedAtAsc(UUID tenantId, Collection<AccountType> types);
 
     /**

@@ -35,6 +35,7 @@ import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.service.VehicleService;
 import com.galeri.app.support.LedgerInvariants;
 import com.galeri.app.support.TestSession;
+import com.galeri.app.support.TestUsers;
 import org.assertj.core.api.ThrowableAssert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -93,7 +94,7 @@ class GoldenScenarioIT {
         UUID user = UUID.randomUUID();
         String suffix = Long.toString(ThreadLocalRandom.current().nextLong(1_000_000_000L, 9_999_999_999L));
         jdbc.update("insert into tenant (id, slug, display_name) values (?, ?, 'Altin Senaryo')", tenant, "golden-" + suffix);
-        jdbc.update("insert into panel_user (id, tenant_id, phone, password_hash, full_name, role) values (?, ?, ?, 'x', 'Test', 'ADMIN')",
+        jdbc.update("insert into panel_user (id, tenant_id, phone, password_hash, full_name, role) values (?, ?, ?, 'x', 'Furkan', 'ADMIN')",
                 user, tenant, "92" + suffix);
         TestSession.open(user, tenant, "ADMIN");
     }
@@ -108,12 +109,10 @@ class GoldenScenarioIT {
         // ---------------------------------------------------------------- TC0 hazirlik
         cash = ledgerService.moneyAccounts().stream().filter(a -> a.type() == AccountType.CASH).findFirst().orElseThrow().id();
         bank = ledgerService.addBank(new AccountRequest("Ziraat")).id();
-        UUID furkan = person("Furkan"), selin = person("Selin"), burak = person("Burak Şahin");
+        UUID furkan = user, selin = TestUsers.investor(jdbc, tenant, "Selin"), burak = TestUsers.investor(jdbc, tenant, "Burak Şahin");
         UUID ali = person("Ali"), hasan = person("Hasan"), veli = person("Veli"), can = person("Can");
-        UUID mehmet = person("Mehmet"), ayse = person("Ayşe");
+        UUID mehmet = TestUsers.investor(jdbc, tenant, "Mehmet"), ayse = TestUsers.investor(jdbc, tenant, "Ayşe");   // konsinye sahipleri kullanici (V22)
         UUID eminevim = contactService.create(new ContactRequest("Eminevim", null, ContactType.ORGANIZATION, null)).id();
-        for (UUID p : List.of(furkan, selin, burak)) capitalService.addPartner(new CapitalRequests.Partner(p));
-        capitalService.setOwner(furkan);
         capitalIn(furkan, cash, tl(40_000_000));
         capitalIn(selin, bank, tl(8_000_000));
         capitalIn(burak, cash, tl(2_000_000));
@@ -227,11 +226,11 @@ class GoldenScenarioIT {
         check("TC7");
 
         // ---------------------------------------------------------------- TC8 ortak arac (ortak finansmani, revizyon PR 3)
-        // Furkan %60 + Selin %40, Havuz yok; katki sermayeden (500.000 kasadan cikar, 300.000 / 200.000 araca baglanir).
-        // Eski model: kar 100.000 havuz disi gelirde kaliyor, sermayeler degismiyordu. Yeni: kar payi satista sermayeye.
+        // Furkan (dukkan sahibi) %60 + Selin %40. V22: dukkan sahibinin payi havuz gibi: katkisi kasadan (sermayesine baglanmaz),
+        // kar payi donem karinda kalir; Selin'in 200.000'i sermayesine baglanir, kar payi 40.000 satista sermayesine gecer.
         UUID v8 = create(request("34 TC 008", null, tl(500_000), cash, null, Ownership.CO_OWNED, null, null, null, null,
                 List.of(new ShareRequest(furkan, 6000), new ShareRequest(selin, 4000))));
-        expectBound("TC8 stokta", furkan, tl(300_000));
+        expectBound("TC8 stokta", furkan, 0);
         expectBound("TC8 stokta", selin, tl(200_000));
         expectCapital("TC8 stokta", furkan, tl(40_000_000));   // sermaye ayni, bir kismi aracta
         sell(v8, veli, tl(600_000), paidNow(tl(600_000), cash));
@@ -241,7 +240,7 @@ class GoldenScenarioIT {
         assertThat(c8.shares()).extracting(ShareResponse::receivableCents).as("TC8 alacak = katki + kar payi")
                 .containsExactly(tl(360_000), tl(240_000));
         expectMoney("TC8", tl(40_780_000), tl(9_560_000));    // degismedi: para kasadan cikip kasaya girdi
-        expectCapital("TC8", furkan, tl(40_060_000));         // eski 40.000.000
+        expectCapital("TC8", furkan, tl(40_000_000));
         expectCapital("TC8", selin, tl(8_040_000));           // eski 8.000.000
         expectBound("TC8 satildi", furkan, 0);
         check("TC8");
@@ -274,55 +273,55 @@ class GoldenScenarioIT {
         expectCari("TC10", ayse, -tl(700_000));
         expectCari("TC10", ali, -tl(300_000));
         for (UUID zero : List.of(veli, hasan, mehmet, burak, eminevim)) expectCari("TC10", zero, 0);
-        // TC8 yeni modelle: ortaklarin kar payi (100.000) sermayelerine gecti -> sermaye, pay ve oneriler degisti; net ayni.
-        expectCapital("TC10", furkan, tl(40_060_000));   // eski 40.000.000
+        // TC8 (V22): Selin'in kar payi 40.000 sermayesine gecti; dukkan sahibinin 60.000'i donem karinda.
+        expectCapital("TC10", furkan, tl(40_000_000));
         expectCapital("TC10", selin, tl(8_040_000));     // eski 8.000.000
         expectCapital("TC10", burak, tl(2_170_000));
-        expectShare("TC10", furkan, 7969);               // eski 7973
-        expectShare("TC10", selin, 1599);                // eski 1595
-        expectShare("TC10", burak, 432);                 // eski 433
+        expectShare("TC10", furkan, 7967);
+        expectShare("TC10", selin, 1601);
+        expectShare("TC10", burak, 432);
         CapitalResponses.PeriodProfit p10 = monthProfit();
-        assertThat(p10.vehicleProfitCents()).as("TC10 arac kari").isEqualTo(tl(750_000));   // TC8'de havuz payi yok
+        assertThat(p10.vehicleProfitCents()).as("TC10 arac kari").isEqualTo(tl(810_000));   // TC1-TC5 750.000 + TC8'de dukkan sahibinin payi 60.000
         assertThat(p10.commissionCents()).as("TC10 komisyon").isEqualTo(tl(100_000));
         assertThat(p10.generalExpenseCents()).as("TC10 genel gider").isEqualTo(tl(10_000));
-        assertThat(p10.netCents()).as("TC10 net").isEqualTo(tl(840_000));
-        assertThat(p10.coOwnedProfitCents()).as("TC10 ortaklara yazilan kar payi").isEqualTo(tl(100_000));
-        expectSuggested("TC10", p10, furkan, 66_939_329);   // eski 66.972.296
-        expectSuggested("TC10", p10, selin, 13_434_652);    // eski 13.394.458
-        expectSuggested("TC10", p10, burak, 3_626_019);     // eski 3.633.246
-        assertThat(p10.partners().stream().mapToLong(CapitalResponses.PartnerProfit::suggestedCents).sum()).isEqualTo(tl(840_000));
+        assertThat(p10.netCents()).as("TC10 net").isEqualTo(tl(900_000));
+        assertThat(p10.coOwnedProfitCents()).as("TC10 ortaklara yazilan kar payi").isEqualTo(tl(40_000));
+        expectSuggested("TC10", p10, furkan, 71_698_866);
+        expectSuggested("TC10", p10, selin, 14_411_471);
+        expectSuggested("TC10", p10, burak, 3_889_663);
+        assertThat(p10.partners().stream().mapToLong(CapitalResponses.PartnerProfit::suggestedCents).sum()).isEqualTo(tl(900_000));
         long capital10 = capitalService.partners().stream().mapToLong(CapitalResponses.Partner::capitalCents).sum();
         assertThat(cashBalance() + bankBalance() + d10.receivableCents() - d10.payableCents()).as("TC10 denge")
                 .isEqualTo(tl(51_110_000))
                 .isEqualTo(capital10 + p10.netCents());   // eski: + ortakli 100.000 (dagitilmamis kardaydi)
-        assertThat(capital10).isEqualTo(tl(50_270_000));   // eski 50.170.000
+        assertThat(capital10).isEqualTo(tl(50_210_000));
         check("TC10");
 
         // ---------------------------------------------------------------- TC11 kar payini sermayeye ekle ve cek
-        allocate(furkan, 66_939_329);
-        expectCapital("TC11", furkan, 4_072_939_329L);
+        allocate(furkan, 71_698_866);
+        expectCapital("TC11", furkan, 4_071_698_866L);
         expectMoney("TC11", tl(40_950_000), tl(9_560_000));
         CapitalResponses.PeriodProfit p11 = monthProfit();
-        expectSuggested("TC11 oneriler ayni", p11, furkan, 66_939_329);
-        expectSuggested("TC11 oneriler ayni", p11, selin, 13_434_652);
-        expectSuggested("TC11 oneriler ayni", p11, burak, 3_626_019);
-        assertThat(partnerProfit(p11, furkan).allocatedCents()).as("TC11 Furkan eklenen").isEqualTo(66_939_329);
-        allocate(selin, 13_434_652);
-        allocate(burak, 3_626_019);
-        expectShare("TC11", furkan, 7969);
-        expectShare("TC11", selin, 1599);
+        expectSuggested("TC11 oneriler ayni", p11, furkan, 71_698_866);
+        expectSuggested("TC11 oneriler ayni", p11, selin, 14_411_471);
+        expectSuggested("TC11 oneriler ayni", p11, burak, 3_889_663);
+        assertThat(partnerProfit(p11, furkan).allocatedCents()).as("TC11 Furkan eklenen").isEqualTo(71_698_866);
+        allocate(selin, 14_411_471);
+        allocate(burak, 3_889_663);
+        expectShare("TC11", furkan, 7967);
+        expectShare("TC11", selin, 1601);
         expectShare("TC11", burak, 432);
-        capitalService.move(selin, new CapitalRequests.Movement(CapitalRequests.Direction.OUT, bank, today, 13_434_652L, null));
-        expectMoney("TC11 Selin cekis", tl(40_950_000), 942_565_348);   // eski 942.605.542
+        capitalService.move(selin, new CapitalRequests.Movement(CapitalRequests.Direction.OUT, bank, today, 14_411_471L, null));
+        expectMoney("TC11 Selin cekis", tl(40_950_000), 941_588_529);
         expectCapital("TC11 Selin cekis", selin, tl(8_040_000));          // eski 8.000.000
         check("TC11");
 
         // ---------------------------------------------------------------- TC12 geri alma zinciri
         InstallmentResponse late = paymentPlanService.list(InstallmentStatus.OVERDUE, PlanDirection.SALE, null, null).getFirst();
         collect(late.id(), cash);
-        expectMoney("TC12 tahsil", tl(41_200_000), 942_565_348);
+        expectMoney("TC12 tahsil", tl(41_200_000), 941_588_529);
         paymentPlanService.undo(late.id());
-        expectMoney("TC12 geri al", tl(40_950_000), 942_565_348);
+        expectMoney("TC12 geri al", tl(40_950_000), 941_588_529);
         assertThat(paymentPlanService.list(InstallmentStatus.OVERDUE, PlanDirection.SALE, null, null))
                 .extracting(InstallmentResponse::id).as("TC12 senet yine gecikmis").containsExactly(late.id());
         assertThat(ledgerService.entries(cash)).as("TC12 duzeltme satiri")
@@ -330,11 +329,11 @@ class GoldenScenarioIT {
         expectError(1018, () -> vehicleService.undoSale(v1));
         paymentPlanService.undo(paymentPlanService.plans(v1).stream()
                 .filter(p -> p.direction() == PlanDirection.SALE).findFirst().orElseThrow().installments().getFirst().id());
-        expectMoney("TC12 pesin geri", tl(39_800_000), 942_565_348);
+        expectMoney("TC12 pesin geri", tl(39_800_000), 941_588_529);
         vehicleService.undoSale(v1);
         assertThat(vehicleStatus(v1)).as("TC12 arac stokta").isEqualTo(VehicleStatus.IN_STOCK);
         expectCari("TC12", veli, 0);
-        assertThat(monthProfit().vehicleProfitCents()).as("TC12 donem arac kari").isEqualTo(tl(620_000));
+        assertThat(monthProfit().vehicleProfitCents()).as("TC12 donem arac kari").isEqualTo(tl(680_000));
         expectError(1023, () -> ledgerService.correct(activeEntry(v2, "VEHICLE_SALE")));
         expectError(1023, () -> ledgerService.correct(activeEntry(v6, "CONSIGNMENT_SETTLEMENT")));
         check("TC12");
@@ -342,7 +341,7 @@ class GoldenScenarioIT {
         // ---------------------------------------------------------------- TC13 virman
         long net13 = monthProfit().netCents();
         ledgerService.transfer(new CapitalRequests.Transfer(cash, bank, today, tl(1_000_000), null));
-        expectMoney("TC13", tl(38_800_000), 942_565_348 + tl(1_000_000));   // TC12 sonu Kasa 39.800.000
+        expectMoney("TC13", tl(38_800_000), 941_588_529 + tl(1_000_000));   // TC12 sonu Kasa 39.800.000
         assertThat(monthProfit().netCents()).as("TC13 kar degismez").isEqualTo(net13);
         expectCari("TC13", can, tl(1_600_000));
         expectError(1037, () -> ledgerService.transfer(new CapitalRequests.Transfer(cash, cash, today, tl(1), null)));
@@ -407,8 +406,15 @@ class GoldenScenarioIT {
         paymentPlanService.collect(installment, new CollectRequest(account, today));
     }
 
-    private void pay(UUID contact, UUID account, long cents) {
-        ledgerService.payContact(contact, new ContactPaymentRequest(account, today, cents, null));
+    private void pay(UUID who, UUID account, long cents) {
+        ContactPaymentRequest r = new ContactPaymentRequest(account, today, cents, null);
+        if (isContact(who)) ledgerService.payContact(who, r);
+        else ledgerService.payUser(who, r);   // konsinye sahibi kullanici
+    }
+
+    private boolean isContact(UUID id) {
+        Long n = jdbc.queryForObject("select count(*) from contact where id = ?", Long.class, id);
+        return n != null && n > 0;
     }
 
     // ------------------------------------------------------------------ okuma
@@ -438,11 +444,11 @@ class GoldenScenarioIT {
     }
 
     private CapitalResponses.PartnerProfit partnerProfit(CapitalResponses.PeriodProfit p, UUID partner) {
-        return p.partners().stream().filter(x -> x.contactId().equals(partner)).findFirst().orElseThrow();
+        return p.partners().stream().filter(x -> x.userId().equals(partner)).findFirst().orElseThrow();
     }
 
     private CapitalResponses.Partner partner(UUID contact) {
-        return capitalService.partners().stream().filter(p -> p.contactId().equals(contact)).findFirst().orElseThrow();
+        return capitalService.partners().stream().filter(p -> p.userId().equals(contact)).findFirst().orElseThrow();
     }
 
     private List<Long> saleNotes(UUID vehicle) {
@@ -491,8 +497,20 @@ class GoldenScenarioIT {
         assertThat(bankBalance()).as("%s: Ziraat", step).isEqualTo(bankCents);
     }
 
-    private void expectCari(String step, UUID contact, long cents) {
-        assertThat(paymentPlanService.statement(contact).balanceCents()).as("%s: cari", step).isEqualTo(cents);
+    private void expectCari(String step, UUID who, long cents) {
+        long balance;
+        if (isContact(who)) {
+            balance = paymentPlanService.statement(who).balanceCents();
+        } else {   // kullanicinin carisi (konsinye sahibi)
+            Long b = jdbc.queryForObject("""
+                    select coalesce((select sum(e.amount_cents) from ledger_entry e where e.target_account_id = a.id), 0)
+                         - coalesce((select sum(e.amount_cents) from ledger_entry e where e.source_account_id = a.id), 0)
+                    from account a where a.type = 'BALANCE' and a.user_id = ?
+                    union all select 0 limit 1
+                    """, Long.class, who);
+            balance = b == null ? 0 : b;
+        }
+        assertThat(balance).as("%s: cari", step).isEqualTo(cents);
     }
 
     private void expectCapital(String step, UUID contact, long cents) {

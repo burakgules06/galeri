@@ -33,6 +33,8 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     List<Vehicle> search(@Param("tenantId") UUID tenantId, @Param("status") VehicleStatus status, @Param("q") String q,
                          @Param("withContacts") boolean withContacts, @Param("phone") String phone);
 
+    boolean existsByConsignor_Id(UUID userId);
+
     boolean existsByTenantIdAndPlateAndStatus(UUID tenantId, String plate, VehicleStatus status);
 
     List<Vehicle> findByTenantIdAndStatus(UUID tenantId, VehicleStatus status);

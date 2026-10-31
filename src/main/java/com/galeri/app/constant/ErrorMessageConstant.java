@@ -60,4 +60,6 @@ public class ErrorMessageConstant {
     public static final int VEHICLE_NOT_REMOVABLE = 1054;
     public static final int PARTNER_NOT_REMOVABLE = 1055;
     public static final int INVALID_OPEN_ACCOUNT_USAGE = 1056;
+    public static final int LOGIN_DETAILS_REQUIRED = 1057;
+    public static final int ROLE_CHANGE_NOT_ALLOWED = 1058;
 }

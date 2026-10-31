@@ -18,6 +18,8 @@ import com.galeri.app.model.response.DashboardResponse.PartnerShare;
 import com.galeri.app.repository.AccountRepository;
 import com.galeri.app.repository.ContactRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
+import com.galeri.app.repository.PanelUserRepository;
+import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.security.CurrentUser;
 import com.galeri.app.model.response.CapitalResponses.PeriodProfit;
@@ -50,6 +52,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final AccountRepository accountRepository;
     private final LedgerEntryRepository entryRepository;
     private final ContactRepository contactRepository;
+    private final PanelUserRepository panelUserRepository;
     private final VehicleRepository vehicleRepository;
     private final PaymentPlanService paymentPlanService;
     private final CapitalService capitalService;
@@ -71,6 +74,9 @@ public class DashboardServiceImpl implements DashboardService {
         Map<UUID, Contact> contacts = contactRepository.findAllById(accounts.stream()
                         .map(Account::getContactId).filter(id -> id != null).distinct().toList()).stream()
                 .collect(Collectors.toMap(Contact::getId, Function.identity()));
+        Map<UUID, PanelUser> users = panelUserRepository.findAllById(accounts.stream()
+                        .map(Account::getUserId).filter(id -> id != null).distinct().toList()).stream()
+                .collect(Collectors.toMap(PanelUser::getId, Function.identity()));
 
         long cash = 0, bank = 0;
         List<PartnerShare> partners = new ArrayList<>();
@@ -79,12 +85,14 @@ public class DashboardServiceImpl implements DashboardService {
         for (Account a : accounts) {
             long balance = balances.getOrDefault(a.getId(), 0L);
             Contact c = a.getContactId() == null ? null : contacts.get(a.getContactId());
+            PanelUser u = a.getUserId() == null ? null : users.get(a.getUserId());
             switch (a.getType()) {
                 case CASH -> cash += balance;
                 case BANK -> bank += balance;
                 // Sermaye hesabindan kasaya para cikar: ortagin sermayesi = hesabin eksi bakiyesi
                 case CAPITAL -> {
-                    if (-balance > 0) partners.add(new PartnerShare(a.getContactId(), name(c, a), c != null && c.isOwner(), -balance, 0));
+                    if (-balance > 0) partners.add(new PartnerShare(a.getUserId(), u != null ? u.getFullName() : a.getName(),
+                            u != null && u.isOwner(), -balance, 0));
                 }
                 case BALANCE -> {
                     if (balance > 0) receivables.add(new ContactBalance(a.getContactId(), name(c, a), phone(c), balance));
@@ -96,7 +104,7 @@ public class DashboardServiceImpl implements DashboardService {
 
         long capital = partners.stream().mapToLong(PartnerShare::capitalCents).sum();
         List<PartnerShare> shares = partners.stream()
-                .map(p -> new PartnerShare(p.contactId(), p.name(), p.owner(), p.capitalCents(),
+                .map(p -> new PartnerShare(p.userId(), p.name(), p.owner(), p.capitalCents(),
                         capital == 0 ? 0 : (int) Math.round(p.capitalCents() * 10000.0 / capital)))
                 .sorted(Comparator.comparing(PartnerShare::owner).reversed()
                         .thenComparing(Comparator.comparingLong(PartnerShare::capitalCents).reversed()))

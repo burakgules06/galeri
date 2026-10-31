@@ -30,14 +30,14 @@ public class PaymentPlan extends BaseModel {
     @Column(name = "opening_entry_id", updatable = false)
     private UUID openingEntryId;
 
-    // Gecmis alacakta evrak bir sermayedara aitse (V18): tahsil edildikce onun sermayesine yazilir
-    @Column(name = "holder_contact_id", updatable = false)
-    private UUID holderContactId;
+    // Gecmis alacakta evrak bir sermayedara aitse (V18, V22'de kullaniciya): tahsil edildikce onun sermayesine yazilir
+    @Column(name = "holder_user_id", updatable = false)
+    private UUID holderUserId;
 
     // Sadece okuma: listede evrakin sahibini gostermek icin
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "holder_contact_id", insertable = false, updatable = false)
-    private Contact holder;
+    @JoinColumn(name = "holder_user_id", insertable = false, updatable = false)
+    private PanelUser holder;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10, updatable = false)

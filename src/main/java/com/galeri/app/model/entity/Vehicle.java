@@ -101,9 +101,10 @@ public class Vehicle extends BaseModel {
     private Long salePriceCents;
 
     // ---- konsinye (sadece CONSIGNMENT'ta dolu; V7 CHECK) ----
+    // Konsinye sahibi kullanici (V22)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "consignor_id")
-    private Contact consignor;
+    @JoinColumn(name = "consignor_user_id")
+    private PanelUser consignor;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "commission_type", length = 5)

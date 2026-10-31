@@ -29,9 +29,13 @@ public class Account extends BaseModel {
     @Column(nullable = false, length = 120)
     private String name;
 
-    // BALANCE / CAPITAL icin
+    // BALANCE icin (kisinin carisi)
     @Column(name = "contact_id", updatable = false)
     private UUID contactId;
+
+    // CAPITAL icin; BALANCE'ta kullanicinin carisi (V22)
+    @Column(name = "user_id", updatable = false)
+    private UUID userId;
 
     // VEHICLE icin
     @Column(name = "vehicle_id", updatable = false)

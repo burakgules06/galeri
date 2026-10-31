@@ -14,6 +14,7 @@ import com.galeri.app.exception.runtime.SameAccountException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.model.entity.Account;
 import com.galeri.app.model.entity.Contact;
+import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.ExpenseCategory;
 import com.galeri.app.model.entity.LedgerEntry;
 import com.galeri.app.model.entity.Vehicle;
@@ -187,7 +188,7 @@ public class LedgerServiceImpl implements LedgerService {
             // ya da galerinin genel gideridir. Arac bagi her iki durumda da kalir (arac karinda gorunur).
             if (vehicle.getOwnership() == Ownership.CONSIGNMENT) {
                 target = Boolean.TRUE.equals(r.chargeToOwner())
-                        ? balanceAccount(vehicle.getConsignor())
+                        ? userBalanceAccount(vehicle.getConsignor())
                         : systemAccount(tenantId, AccountType.EXPENSE);
             } else {
                 target = vehicleAccount(vehicle);
@@ -257,20 +258,6 @@ public class LedgerServiceImpl implements LedgerService {
 
     @Override
     @Transactional
-    public LedgerEntry writePartnerSaleCapitalSettlement(Vehicle vehicle, Contact buyer, long amountCents, LocalDate date) {
-        Account capital = accountRepository.findFirstByTenantIdAndTypeAndContactId(
-                        buyer.getTenantId(), AccountType.CAPITAL, buyer.getId())
-                .filter(a -> !a.isClosed())
-                .orElseThrow(com.galeri.app.exception.runtime.NotAPartnerException::new);
-        LedgerEntry e = newEntry(buyer.getTenantId(), LedgerEntryType.PARTNER_SALE_SETTLEMENT,
-                balanceAccount(buyer), capital, amountCents, date);
-        e.setVehicle(vehicle);
-        e.setDescription("Ortak araç alımı: sermayeden");
-        return entryRepository.save(e);
-    }
-
-    @Override
-    @Transactional
     public LedgerEntry writeOpenItems(Contact contact, PlanDirection direction, long amountCents, LocalDate date) {
         Account opening = systemAccount(contact.getTenantId(), AccountType.OPENING);
         Account balance = balanceAccount(contact);
@@ -283,10 +270,9 @@ public class LedgerServiceImpl implements LedgerService {
 
     @Override
     @Transactional
-    public LedgerEntry creditHolder(UUID holderContactId, UUID tenantId, long amountCents, LocalDate date, String description) {
-        Account capital = accountRepository.findFirstByTenantIdAndTypeAndContactId(tenantId, AccountType.CAPITAL, holderContactId)
-                .filter(a -> !a.isClosed()).orElse(null);
-        if (capital == null) return null;
+    public LedgerEntry creditHolder(UUID holderUserId, UUID tenantId, long amountCents, LocalDate date, String description) {
+        Account capital = userAccount(tenantId, holderUserId, AccountType.CAPITAL);
+        if (capital == null || capital.isClosed()) return null;   // ortakliktan cikmis: yazilmaz
         LedgerEntry e = newEntry(tenantId, LedgerEntryType.CAPITAL_TRANSFER, capital, systemAccount(tenantId, AccountType.OPENING),
                 amountCents, date);
         e.setDescription(description);
@@ -352,6 +338,22 @@ public class LedgerServiceImpl implements LedgerService {
                     a.setName(contact.getName());
                     return accountRepository.save(a);
                 });
+    }
+
+    /** Kullanicinin carisi (konsinye sahibi; V22). Yoksa ilk ihtiyacta acilir. */
+    private Account userBalanceAccount(PanelUser user) {
+        Account found = userAccount(user.getTenant().getId(), user.getId(), AccountType.BALANCE);
+        if (found != null) return found;
+        Account a = new Account();
+        a.setTenantId(user.getTenant().getId());
+        a.setType(AccountType.BALANCE);
+        a.setUserId(user.getId());
+        a.setName(user.getFullName());
+        return accountRepository.save(a);
+    }
+
+    private Account userAccount(UUID tenantId, UUID userId, AccountType type) {
+        return accountRepository.findFirstByTenantIdAndTypeAndUserId(tenantId, type, userId).orElse(null);
     }
 
     // ------------------------------------------------------------------ kategoriler
@@ -436,7 +438,7 @@ public class LedgerServiceImpl implements LedgerService {
         if (wanted && active.size() == 1) {
             LedgerEntry e = active.get(0);
             if (e.getAmountCents() == amount && e.getEntryDate().equals(vehicle.getSaleDate())
-                    && vehicle.getConsignor().getId().equals(e.getSourceAccount().getContactId())) {
+                    && vehicle.getConsignor().getId().equals(e.getSourceAccount().getUserId())) {
                 return;   // degisiklik yok
             }
         }
@@ -444,12 +446,25 @@ public class LedgerServiceImpl implements LedgerService {
 
         active.forEach(this::writeReversal);
         if (wanted) {
-            LedgerEntry e = newEntry(vehicle.getTenantId(), LedgerEntryType.CONSIGNMENT_SETTLEMENT, balanceAccount(vehicle.getConsignor()),
+            LedgerEntry e = newEntry(vehicle.getTenantId(), LedgerEntryType.CONSIGNMENT_SETTLEMENT, userBalanceAccount(vehicle.getConsignor()),
                     systemAccount(vehicle.getTenantId(), AccountType.INCOME), amount, vehicle.getSaleDate());
             e.setVehicle(vehicle);
             e.setDescription("Konsinye satış: sahibine borç");
             entryRepository.save(e);
         }
+    }
+
+    @Override
+    @Transactional
+    public LedgerEntryResponse payUser(UUID userId, ContactPaymentRequest r) {
+        UUID tenantId = CurrentUser.tenantId();
+        PanelUser user = panelUserRepository.findById(userId).orElseThrow(RecordNotFoundException::new);
+        if (user.getTenant() == null || !user.getTenant().getId().equals(tenantId)) throw new SourceNotBelongToTenantException();
+        Account money = getMoneyAccount(r.accountId());
+        LedgerEntry e = newEntry(tenantId, LedgerEntryType.PAYMENT, money, userBalanceAccount(user), r.amountCents(), r.date());
+        String description = blankToNull(r.description());
+        e.setDescription(description == null ? "Ödeme" : description);
+        return toResponse(entryRepository.save(e), false);
     }
 
     @Override

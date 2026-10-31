@@ -71,7 +71,7 @@ public interface LedgerService {
      * Sermayedara ait gecmis evrak tahsil edildi: sermaye hesabi -> acilis hesabi (sermayesi artar). Kisinin acik sermaye
      * hesabi yoksa (ortakliktan cikmis) yazilmaz, null doner.
      */
-    LedgerEntry creditHolder(UUID holderContactId, UUID tenantId, long amountCents, LocalDate date, String description);
+    LedgerEntry creditHolder(UUID holderUserId, UUID tenantId, long amountCents, LocalDate date, String description);
 
     /** Ciro hareketleri: cekin / senedin alindigi kisiden portfoye (tahsilat), portfoyden verildigi kisiye (odeme). */
     record Endorsement(LedgerEntry in, LedgerEntry out) {}
@@ -89,9 +89,6 @@ public interface LedgerService {
      */
     LedgerEntry writeSettlement(PlanDirection direction, Vehicle vehicle, Contact payer, UUID accountId,
                                 long amountCents, LocalDate date, String description);
-
-    /** Ortagin arac alis bedelini kendi sermayesinden karsilamasi: BALANCE(ortak) -> CAPITAL(ortak). */
-    LedgerEntry writePartnerSaleCapitalSettlement(Vehicle vehicle, Contact buyer, long amountCents, LocalDate date);
 
     /** Hareketi ters hareketle duzeltir (bagli kayit kontrolu yapmadan; plan islemleri icin). */
     void reverse(UUID entryId);
@@ -122,6 +119,9 @@ public interface LedgerService {
      * tutar/sahip/tarih degistiyse eski hareket terslenir. Satis, satisi geri alma ve arac guncellemesi cagirir.
      */
     void syncConsignmentSettlement(Vehicle vehicle);
+
+    /** Kullaniciya (konsinye sahibi) odeme: kasa / banka -> kullanicinin carisi. */
+    LedgerEntryResponse payUser(UUID userId, ContactPaymentRequest request);
 
     /** Kisiye odeme (ornegin konsinye sahibine): PAYMENT kasa/banka -> BALANCE(kisi). Kismi olabilir. */
     LedgerEntryResponse payContact(UUID contactId, ContactPaymentRequest request);

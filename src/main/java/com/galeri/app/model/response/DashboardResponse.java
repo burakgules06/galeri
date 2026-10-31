@@ -27,7 +27,7 @@ public record DashboardResponse(
 ) {
 
     /** Sermaye ortagi: sermayesi ve toplam sermayedeki payi. owner = dukkan sahibi. */
-    public record PartnerShare(UUID contactId, String name, boolean owner, long capitalCents, int shareBasisPoints) {}
+    public record PartnerShare(UUID userId, String name, boolean owner, long capitalCents, int shareBasisPoints) {}
 
     /** Bir kisinin carisi: amountCents her zaman pozitif, yonu listeden belli. */
     public record ContactBalance(UUID contactId, String name, String phone, long amountCents) {}

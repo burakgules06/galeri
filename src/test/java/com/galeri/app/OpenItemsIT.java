@@ -77,7 +77,7 @@ class OpenItemsIT {
                 user, tenant, "95" + suffix);
         TestSession.open(user, tenant, "ADMIN");
         cash = ledgerService.moneyAccounts().stream().filter(a -> a.type() == AccountType.CASH).findFirst().orElseThrow().id();
-        UUID furkan = person("Furkan");
+        UUID furkan = user;   // dukkan sahibi kullanici (V22)
         ali = person("Ali");
         mehmet = person("Mehmet");
         capitalService.move(furkan, new CapitalRequests.Movement(CapitalRequests.Direction.IN, cash, today, 1_000_000 * TL, null));

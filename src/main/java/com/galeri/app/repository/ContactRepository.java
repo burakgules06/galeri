@@ -21,5 +21,4 @@ public interface ContactRepository extends JpaRepository<Contact, UUID> {
     List<Contact> search(@Param("tenantId") UUID tenantId, @Param("q") String q);
 
     /** Dukkan sahibi (galeri basina en fazla bir, uq_contact_owner). */
-    Optional<Contact> findFirstByTenantIdAndOwnerTrue(UUID tenantId);
 }

@@ -16,7 +16,7 @@ public final class CapitalResponses {
      * Ortak: sermayesi CAPITAL hesabinin bakiyesinden hesaplanir, hicbir yerde saklanmaz. Sermaye = nakitteki + araclarda
      * bagli (stoktaki ortak araclardaki odenmis katkilari). Pay toplam sermayeden; cekis en fazla nakitteki kadar.
      */
-    public record Partner(UUID contactId, String name, String phone, boolean owner, long capitalCents,
+    public record Partner(UUID userId, String name, String phone, boolean owner, long capitalCents,
                           long cashCents, long boundCents, int shareBp) {}
 
     /**
@@ -30,7 +30,7 @@ public final class CapitalResponses {
      * Ortagin bu donemdeki payi: capitalCents agirligi = donem sonu nakitteki sermayesi (araclarda bagli kismi ve bu
      * donemin karindan eklenen haric); onerilen = net kar x pay; allocated = donem icinde sermayeye eklenmis olan.
      */
-    public record PartnerProfit(UUID contactId, String name, boolean owner, long capitalCents, int shareBp,
+    public record PartnerProfit(UUID userId, String name, boolean owner, long capitalCents, int shareBp,
                                 long suggestedCents, long allocatedCents) {}
 
     /**
@@ -48,7 +48,7 @@ public final class CapitalResponses {
      * cikinca kalan. Sermayedarda vehicleCents araclardaki odenmis katkidir; dukkan sahibinde diger sermayedarlarin
      * katkisi dusulmus stok net degeridir (arac masraflari dahil). otherCents gercek alacak / borctur. shareBp sadece bilgi.
      */
-    public record Holder(UUID contactId, String name, boolean owner, CapitalBase base, long capitalCents, long cashCents,
+    public record Holder(UUID userId, String name, boolean owner, CapitalBase base, long capitalCents, long cashCents,
                          long vehicleCents, long otherCents, int shareBp, List<HolderVehicle> vehicles) {}
 
     public record HolderVehicle(VehicleRef vehicle, long cents) {}

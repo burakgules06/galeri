@@ -505,8 +505,8 @@ class LedgerServiceImplTest {
 
     @Test
     void konsinyeSatis_sahibininCarisine_satisEksiKomisyonYazilir() {
-        Contact owner = contact("Burak Gules");
-        Account ownerBalance = balance(owner);
+        PanelUser owner = consignor("Burak Gules");
+        Account ownerBalance = userBalance(owner);
         Account income = account(AccountType.INCOME, tenantId);
         when(accountRepository.findFirstByTenantIdAndType(tenantId, AccountType.INCOME)).thenReturn(Optional.of(income));
         Vehicle v = soldConsignment(owner, 130000000L);   // 1.300.000 TL, %3
@@ -526,8 +526,8 @@ class LedgerServiceImplTest {
 
     @Test
     void konsinyeBorcu_degismediyseYenidenYazilmaz_satisGeriAlininca_terslenir() {
-        Contact owner = contact("Burak Gules");
-        Account ownerBalance = balance(owner);
+        PanelUser owner = consignor("Burak Gules");
+        Account ownerBalance = userBalance(owner);
         Account income = account(AccountType.INCOME, tenantId);
         Vehicle v = soldConsignment(owner, 130000000L);
         LedgerEntry existing = entry(LedgerEntryType.CONSIGNMENT_SETTLEMENT, ownerBalance, income, 126100000L);
@@ -551,7 +551,7 @@ class LedgerServiceImplTest {
 
     @Test
     void sabitKomisyonSatistanBuyukse_reddedilir() {
-        Contact owner = contact("Burak Gules");
+        PanelUser owner = consignor("Burak Gules");
         Vehicle v = soldConsignment(owner, 1000000L);
         v.setCommissionType(CommissionType.FIXED);
         v.setCommissionRateBp(null);
@@ -563,8 +563,8 @@ class LedgerServiceImplTest {
 
     @Test
     void konsinyeMasrafi_sahibineYansitilirsa_sahibininCarisine_yoksaGenelGidereYazilir() {
-        Contact owner = contact("Burak Gules");
-        Account ownerBalance = balance(owner);
+        PanelUser owner = consignor("Burak Gules");
+        Account ownerBalance = userBalance(owner);
         Vehicle v = soldConsignment(owner, 130000000L);
         v.setStatus(VehicleStatus.IN_STOCK);
         when(vehicleRepository.findById(v.getId())).thenReturn(Optional.of(v));
@@ -589,8 +589,8 @@ class LedgerServiceImplTest {
 
     @Test
     void konsinyeMaliyeti_alisYok_kar_komisyonEksiUstlenilenMasraf() {
-        Contact owner = contact("Burak Gules");
-        Account ownerBalance = balance(owner);
+        PanelUser owner = consignor("Burak Gules");
+        Account ownerBalance = userBalance(owner);
         Vehicle v = soldConsignment(owner, 130000000L);
         when(vehicleRepository.findById(v.getId())).thenReturn(Optional.of(v));
         when(entryRepository.vehicleEntries(v.getId())).thenReturn(List.of(
@@ -615,7 +615,7 @@ class LedgerServiceImplTest {
         v.setSalePriceCents(72000001L);   // kar 0,01 TL
         when(vehicleRepository.findById(v.getId())).thenReturn(Optional.of(v));
         when(entryRepository.vehicleEntries(v.getId())).thenReturn(List.of());
-        List<ShareResponse> owners = List.of(new ShareResponse(null, "Havuz", 5000, 5000, ContributionSource.CAPITAL, null, 0, 1L, 1L));
+        List<ShareResponse> owners = List.of(new ShareResponse(null, "Havuz", true, 5000, 5000, ContributionSource.CAPITAL, null, 0, 1L, 1L));
         when(coOwnershipService.owners(v)).thenReturn(owners);
 
         VehicleCost cost = service.vehicleCost(v.getId());
@@ -833,7 +833,25 @@ class LedgerServiceImplTest {
         return a;
     }
 
-    private Vehicle soldConsignment(Contact owner, long salePrice) {
+    private PanelUser consignor(String name) {
+        com.galeri.app.model.entity.Tenant t = new com.galeri.app.model.entity.Tenant();
+        t.setId(tenantId);
+        PanelUser u = new PanelUser();
+        u.setId(UUID.randomUUID());
+        u.setTenant(t);
+        u.setFullName(name);
+        u.setRole("INVESTOR");
+        return u;
+    }
+
+    private Account userBalance(PanelUser u) {
+        Account a = account(AccountType.BALANCE, tenantId);
+        a.setUserId(u.getId());
+        when(accountRepository.findFirstByTenantIdAndTypeAndUserId(tenantId, AccountType.BALANCE, u.getId())).thenReturn(Optional.of(a));
+        return a;
+    }
+
+    private Vehicle soldConsignment(PanelUser owner, long salePrice) {
         Vehicle v = vehicle();
         v.setOwnership(Ownership.CONSIGNMENT);
         v.setActualPurchaseCents(null);

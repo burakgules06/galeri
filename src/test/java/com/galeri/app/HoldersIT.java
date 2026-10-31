@@ -24,6 +24,7 @@ import com.galeri.app.service.NetWorthService;
 import com.galeri.app.service.VehicleService;
 import com.galeri.app.support.LedgerInvariants;
 import com.galeri.app.support.TestSession;
+import com.galeri.app.support.TestUsers;
 import org.assertj.core.api.ThrowableAssert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,7 +73,7 @@ class HoldersIT {
     @Autowired private NetWorthService netWorthService;
 
     private final LocalDate today = LocalDate.of(2026, 8, 1);
-    private UUID tenant, cash, furkan, burak, veli;
+    private UUID tenant, cash, furkan, burak, selin, veli;
     private int plates;
 
     @BeforeEach
@@ -81,17 +82,15 @@ class HoldersIT {
         UUID user = UUID.randomUUID();
         String suffix = Long.toString(ThreadLocalRandom.current().nextLong(1_000_000_000L, 9_999_999_999L));
         jdbc.update("insert into tenant (id, slug, display_name) values (?, ?, 'Havuz')", tenant, "havuz-" + suffix);
-        jdbc.update("insert into panel_user (id, tenant_id, phone, password_hash, full_name, role) values (?, ?, ?, 'x', 'Test', 'ADMIN')",
+        jdbc.update("insert into panel_user (id, tenant_id, phone, password_hash, full_name, role) values (?, ?, ?, 'x', 'Furkan', 'ADMIN')",
                 user, tenant, "97" + suffix);
         TestSession.open(user, tenant, "ADMIN");
         cash = ledgerService.moneyAccounts().stream().filter(a -> a.type() == AccountType.CASH).findFirst().orElseThrow().id();
-        furkan = person("Furkan");
-        burak = person("Burak Şahin");
+        furkan = user;   // dukkan sahibi kullanici
+        burak = TestUsers.investor(jdbc, tenant, "Burak Şahin");
+        selin = TestUsers.investor(jdbc, tenant, "Selin");
         veli = person("Veli");
-        capitalService.addPartner(new CapitalRequests.Partner(furkan));
-        capitalService.setOwner(furkan);
         move(furkan, CapitalRequests.Direction.IN, 50 * M);
-        capitalService.addPartner(new CapitalRequests.Partner(burak));
         move(burak, CapitalRequests.Direction.IN, 6 * M);
         check("hazirlik");
     }
@@ -111,7 +110,7 @@ class HoldersIT {
         expect("galeri araci", burak, 6 * M, 6 * M, 0);
 
         // Ortak arac 5M: Havuz %20, Burak %80 sermayeden (kar payi da %80)
-        UUID shared = vehicle(5 * M, List.of(new ShareRequest(null, 2000), new ShareRequest(burak, 8000, null, ContributionSource.CAPITAL, null)));
+        UUID shared = vehicle(5 * M, List.of(new ShareRequest(furkan, 2000), new ShareRequest(burak, 8000, null, ContributionSource.CAPITAL, null)));
         expect("ortak arac", burak, 6 * M, 2 * M, 4 * M);
         expect("ortak arac", furkan, 50 * M, 29 * M, 21 * M);
         assertThat(holder(burak).vehicles()).singleElement().satisfies(v -> {
@@ -131,7 +130,7 @@ class HoldersIT {
         expect("aktarim", burak, 7 * M, 3 * M, 4 * M);
         expect("aktarim", furkan, 48_900 * K, 27_900 * K, 21 * M);
         assertThat(cashBalance()).isEqualTo(30_900 * K);
-        expectError(1036, () -> capitalService.transferCapital(new CapitalRequests.CapitalTransfer(burak, veli, today, 3 * M + 1, null)));
+        expectError(1036, () -> capitalService.transferCapital(new CapitalRequests.CapitalTransfer(burak, selin, today, 3 * M + 1, null)));
         check("aktarim");
 
         // Yuzde sadece bilgi: tabana gore
@@ -177,7 +176,7 @@ class HoldersIT {
     }
 
     private CapitalResponses.Holder holder(UUID contact) {
-        return holders().stream().filter(h -> contact.equals(h.contactId())).findFirst().orElseThrow();
+        return holders().stream().filter(h -> contact.equals(h.userId())).findFirst().orElseThrow();
     }
 
     private void expect(String step, UUID contact, long capital, long cashPart, long inVehicles) {

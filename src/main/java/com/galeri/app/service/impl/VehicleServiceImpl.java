@@ -299,7 +299,7 @@ public class VehicleServiceImpl implements VehicleService {
                 throw new ConsignmentDetailsRequiredException();
             }
             // Arac galerinin mali degil: alis bedeli ve saticisi yok, sahibi var
-            vehicle.setConsignor(getContact(r.consignorId(), vehicle.getTenantId()));
+            vehicle.setConsignor(getConsignor(r.consignorId(), vehicle.getTenantId()));
             vehicle.setCommissionType(type);
             vehicle.setCommissionRateBp(type == CommissionType.RATE ? r.commissionRateBp() : null);
             vehicle.setCommissionCents(type == CommissionType.FIXED ? r.commissionCents() : null);
@@ -429,8 +429,20 @@ public class VehicleServiceImpl implements VehicleService {
                 contactSummary(v.getSeller()), staffSummary(v.getBoughtBy()), v.getActualPurchaseCents(), v.getOfficialPurchaseCents(),
                 contactSummary(v.getBuyer()), staffSummary(v.getSoldBy()), v.getSalePriceCents(),
                 ledgerService.purchaseAccountId(v.getId()),
-                contactSummary(v.getConsignor()), v.getCommissionType(), v.getCommissionRateBp(), v.getCommissionCents(),
+                userSummary(v.getConsignor()), v.getCommissionType(), v.getCommissionRateBp(), v.getCommissionCents(),
                 coOwnershipService.owners(v), v.getShopCutType(), v.getShopCutRateBp(), v.getShopCutCents());
+    }
+
+    private static ContactSummary userSummary(PanelUser u) {
+        return u == null ? null : new ContactSummary(u.getId(), u.getFullName(), u.getPhone());
+    }
+
+    /** Konsinye sahibi: sermayedar kullanici (V22). */
+    private PanelUser getConsignor(UUID id, UUID tenantId) {
+        PanelUser u = panelUserRepository.findById(id).orElseThrow(RecordNotFoundException::new);
+        if (u.getTenant() == null || !u.getTenant().getId().equals(tenantId)) throw new SourceNotBelongToTenantException();
+        if (!u.isCapitalHolder() || u.isOwner()) throw new ConsignmentDetailsRequiredException();
+        return u;
     }
 
     private static ContactSummary contactSummary(Contact c) {
