@@ -57,13 +57,13 @@ class MoneyInvariantsIT {
     @Autowired private PaymentPlanService paymentPlanService;
     @Autowired private com.galeri.app.service.NetWorthService netWorthService;
 
-    private UUID tenant;
+    private UUID tenant, user;
     private LocalDate today;
 
     @BeforeEach
     void setUp() {
         tenant = UUID.randomUUID();
-        UUID user = UUID.randomUUID();
+        user = UUID.randomUUID();
         String suffix = Long.toString(ThreadLocalRandom.current().nextLong(1_000_000_000L, 9_999_999_999L));
         jdbc.update("insert into tenant (id, slug, display_name) values (?, ?, 'Defter Testi')", tenant, "inv-" + suffix);
         jdbc.update("insert into panel_user (id, tenant_id, phone, password_hash, full_name, role) values (?, ?, ?, 'x', 'Ortak A', 'ADMIN')",
