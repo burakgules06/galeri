@@ -61,6 +61,17 @@ UPDATE panel_user u SET role = 'INVESTOR' WHERE u.role = 'STAFF' AND u.id IN (SE
 UPDATE panel_user u SET capital_base = m.capital_base FROM moved_contact m WHERE m.user_id = u.id;
 
 -- ---------------------------------------------------------------- tasima
+-- V3'teki isimsiz "cari / sermaye hesabinin kisisi olur" kisiti kalkar (yerine asagida account_owner_check)
+DO $$
+DECLARE c text;
+BEGIN
+    FOR c IN SELECT conname FROM pg_constraint
+             WHERE conrelid = 'account'::regclass AND contype = 'c' AND pg_get_constraintdef(oid) LIKE '%contact_id IS NOT NULL%'
+    LOOP
+        EXECUTE format('ALTER TABLE account DROP CONSTRAINT %I', c);
+    END LOOP;
+END $$;
+
 -- Sermaye hesaplari her zaman; cari hesap kisinin baska (alici / satici / plan) baglantisi yoksa
 UPDATE account a SET user_id = m.user_id, contact_id = NULL
 FROM moved_contact m WHERE a.contact_id = m.contact_id AND a.type = 'CAPITAL';
