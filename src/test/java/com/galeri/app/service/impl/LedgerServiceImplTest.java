@@ -504,49 +504,14 @@ class LedgerServiceImplTest {
     // ------------------------------------------------------------------ konsinye
 
     @Test
-    void konsinyeSatis_sahibininCarisine_satisEksiKomisyonYazilir() {
+    void konsinyeSatis_sahibineBorcYazilmaz_dagitimTahsilataGoreYapilir() {
         PanelUser owner = consignor("Burak Gules");
-        Account ownerBalance = userBalance(owner);
-        Account income = account(AccountType.INCOME, tenantId);
-        when(accountRepository.findFirstByTenantIdAndType(tenantId, AccountType.INCOME)).thenReturn(Optional.of(income));
         Vehicle v = soldConsignment(owner, 130000000L);   // 1.300.000 TL, %3
-        when(entryRepository.findByVehicle_IdAndType(v.getId(), LedgerEntryType.CONSIGNMENT_SETTLEMENT)).thenReturn(List.of());
 
         service.syncConsignmentSettlement(v);
 
-        ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
-        verify(entryRepository).save(saved.capture());
-        LedgerEntry e = saved.getValue();
-        assertThat(e.getType()).isEqualTo(LedgerEntryType.CONSIGNMENT_SETTLEMENT);
-        assertThat(e.getSourceAccount()).isSameAs(ownerBalance);   // sahibinin carisinden cikar: galeri sahibine borclu
-        assertThat(e.getTargetAccount()).isSameAs(income);         // INCOME'da net komisyon kalir
-        assertThat(e.getAmountCents()).isEqualTo(126100000L);      // 1.261.000 TL
-        assertThat(e.getEntryDate()).isEqualTo(v.getSaleDate());
-    }
-
-    @Test
-    void konsinyeBorcu_degismediyseYenidenYazilmaz_satisGeriAlininca_terslenir() {
-        PanelUser owner = consignor("Burak Gules");
-        Account ownerBalance = userBalance(owner);
-        Account income = account(AccountType.INCOME, tenantId);
-        Vehicle v = soldConsignment(owner, 130000000L);
-        LedgerEntry existing = entry(LedgerEntryType.CONSIGNMENT_SETTLEMENT, ownerBalance, income, 126100000L);
-        existing.setEntryDate(v.getSaleDate());
-        when(entryRepository.findByVehicle_IdAndType(v.getId(), LedgerEntryType.CONSIGNMENT_SETTLEMENT)).thenReturn(List.of(existing));
-
-        service.syncConsignmentSettlement(v);
-        verify(entryRepository, never()).save(any());
-
-        v.setStatus(VehicleStatus.IN_STOCK);
-        v.setSalePriceCents(null);
-        v.setSaleDate(null);
-        service.syncConsignmentSettlement(v);
-
-        ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
-        verify(entryRepository).save(saved.capture());
-        assertThat(saved.getValue().getCorrectedEntryId()).isEqualTo(existing.getId());
-        assertThat(saved.getValue().getSourceAccount()).isSameAs(income);
-        assertThat(saved.getValue().getTargetAccount()).isSameAs(ownerBalance);
+        verify(entryRepository, never()).save(any());   // borc hareketi yok
+        verify(coOwnershipService).resyncProfitShares(v);   // tahsil edilen kisim sahibinin sermayesine
     }
 
     @Test
@@ -556,7 +521,6 @@ class LedgerServiceImplTest {
         v.setCommissionType(CommissionType.FIXED);
         v.setCommissionRateBp(null);
         v.setCommissionCents(2000000L);
-        when(entryRepository.findByVehicle_IdAndType(v.getId(), LedgerEntryType.CONSIGNMENT_SETTLEMENT)).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.syncConsignmentSettlement(v)).isInstanceOf(CommissionExceedsSaleException.class);
     }
@@ -615,7 +579,7 @@ class LedgerServiceImplTest {
         v.setSalePriceCents(72000001L);   // kar 0,01 TL
         when(vehicleRepository.findById(v.getId())).thenReturn(Optional.of(v));
         when(entryRepository.vehicleEntries(v.getId())).thenReturn(List.of());
-        List<ShareResponse> owners = List.of(new ShareResponse(null, "Havuz", true, 5000, 5000, ContributionSource.CAPITAL, null, 0, 1L, 1L));
+        List<ShareResponse> owners = List.of(new ShareResponse(null, "Havuz", true, 5000, 5000, ContributionSource.CAPITAL, null, 0, 1L, 1L, 0L));
         when(coOwnershipService.owners(v)).thenReturn(owners);
 
         VehicleCost cost = service.vehicleCost(v.getId());

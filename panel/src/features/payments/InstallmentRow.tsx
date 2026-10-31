@@ -25,12 +25,13 @@ const STRIPE: Record<InstallmentStatus, string> = {
 
 type Panel = "collect" | "undo" | "edit" | "endorse" | "bounce" | null;
 
-export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = true, allowDeleteOpenItem = false }: {
+export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = true, allowDeleteOpenItem = false, readOnly = false }: {
   i: InstallmentResponse;
   onChange: () => void;
   showVehicle?: boolean;
   showPayer?: boolean;
   allowDeleteOpenItem?: boolean;
+  readOnly?: boolean;   // sermayedar: sadece gorur
 }) {
   const [panel, setPanel] = useState<Panel>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -88,7 +89,7 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
           <span className={`sayi font-bold text-[21px] whitespace-nowrap ${paid ? "text-basari" : i.status === "OVERDUE" ? "text-tehlike" : "text-murekkep"}`}>
             {tl(i.amountCents)}
           </span>
-          {!paid && panel === null && (
+          {!readOnly && !paid && panel === null && (
             <div className="flex flex-wrap justify-end gap-1.5">
               {canDeleteOpenItem && <Button variant="quiet" className="h-9 px-2.5 text-tehlike" onClick={removeOpenItem}>Sil</Button>}
               <Button variant="quiet" className="h-9 px-2.5" onClick={() => setPanel("edit")} aria-label="Vadeyi düzenle">Düzenle</Button>
@@ -96,7 +97,7 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
               <Button className="h-9" onClick={() => setPanel("collect")}>{actionLabel}</Button>
             </div>
           )}
-          {paid && panel === null && (
+          {!readOnly && paid && panel === null && (
             <div className="flex gap-1.5">
               {instrument && <Button variant="quiet" className="h-9 text-tehlike" onClick={() => setPanel("bounce")}>Karşılıksız</Button>}
               {i.method === "OPEN_ACCOUNT" && <Button variant="quiet" className="h-9" aria-label="Açıklamayı düzenle" onClick={() => setPanel("edit")}>Düzenle</Button>}

@@ -6,6 +6,8 @@ import type { LoginResponse } from "../shared/types";
 export interface AuthContextValue {
   auth: LoginResponse | null;
   isAdmin: boolean;
+  /** Sermayedar: sadece kendi parasini gorur (Odemeler, Kasa, Masraflar kendi kayitlariyla, islem yok). */
+  isInvestor: boolean;
   login: (data: LoginResponse) => void;
   logout: () => void;
 }

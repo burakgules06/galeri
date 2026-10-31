@@ -115,7 +115,17 @@ public class LedgerServiceImpl implements LedgerService {
         UUID tenantId = CurrentUser.tenantId();
         PageRequest page = PageRequest.of(0, LIST_LIMIT);
         List<LedgerEntry> list;
-        if (accountId == null) {
+        if (CurrentUser.isInvestor()) {
+            // Sermayedar: kendi sermaye ve cari hesabina dokunan hareketler (hesap secimi yok sayilir)
+            UUID me = CurrentUser.principal().userId();
+            Map<UUID, LedgerEntry> mine = new java.util.LinkedHashMap<>();
+            for (AccountType type : List.of(AccountType.CAPITAL, AccountType.BALANCE)) {
+                Account own = userAccount(tenantId, me, type);
+                if (own != null) entryRepository.accountEntries(tenantId, own.getId(), page).forEach(e -> mine.put(e.getId(), e));
+            }
+            list = mine.values().stream().sorted(java.util.Comparator.comparing(LedgerEntry::getEntryDate)
+                    .thenComparing(LedgerEntry::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())).reversed()).toList();
+        } else if (accountId == null) {
             list = entryRepository.list(tenantId, page);
         } else {
             getAccount(accountId);
@@ -174,7 +184,9 @@ public class LedgerServiceImpl implements LedgerService {
 
     private LedgerEntry writeExpense(ExpenseRequest r) {
         UUID tenantId = CurrentUser.tenantId();
-        Account source = getMoneyAccount(r.sourceAccountId());
+        boolean pocket = Boolean.TRUE.equals(r.paidByOwner()) && r.vehicleId() == null;
+        if (!pocket && r.sourceAccountId() == null) throw new InvalidAccountException();
+        Account source = pocket ? ownerCapitalAccount(tenantId) : getMoneyAccount(r.sourceAccountId());
 
         Vehicle vehicle = null;
         Account target;
@@ -341,6 +353,35 @@ public class LedgerServiceImpl implements LedgerService {
     }
 
     /** Kullanicinin carisi (konsinye sahibi; V22). Yoksa ilk ihtiyacta acilir. */
+    /** Cepten odenen dukkan gideri icin dukkan sahibinin sermaye hesabi: istegi yapan dukkan sahibiyse o, degilse havuzun sahibi. */
+    private Account ownerCapitalAccount(UUID tenantId) {
+        PanelUser me = panelUserRepository.findById(CurrentUser.principal().userId()).orElseThrow(RecordNotFoundException::new);
+        PanelUser owner = me.isOwner() ? me : panelUserRepository.findPoolOwner(tenantId).orElseThrow(InvalidAccountException::new);
+        Account found = userAccount(tenantId, owner.getId(), AccountType.CAPITAL);
+        if (found != null) return found;
+        Account a = new Account();
+        a.setTenantId(tenantId);
+        a.setType(AccountType.CAPITAL);
+        a.setUserId(owner.getId());
+        a.setName(owner.getFullName());
+        return accountRepository.save(a);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<LedgerEntryResponse> expenses(LocalDate from, LocalDate to) {
+        UUID tenantId = CurrentUser.tenantId();
+        List<LedgerEntry> list = entryRepository.byTypes(tenantId, List.of(LedgerEntryType.VEHICLE_EXPENSE, LedgerEntryType.GENERAL_EXPENSE), from, to);
+        if (CurrentUser.isInvestor()) {
+            // Sermayedar: sadece sahibi oldugu (tek ya da ortak) araclarin masraflari; dukkan giderleri haric
+            UUID me = CurrentUser.principal().userId();
+            Map<UUID, List<UUID>> owners = coOwnershipService.vehicleUsers(tenantId,
+                    list.stream().filter(e -> e.getVehicle() != null).map(e -> e.getVehicle().getId()).distinct().toList());
+            list = list.stream().filter(e -> e.getVehicle() != null && owners.getOrDefault(e.getVehicle().getId(), List.of()).contains(me)).toList();
+        }
+        return toResponse(list);
+    }
+
     private Account userBalanceAccount(PanelUser user) {
         Account found = userAccount(user.getTenant().getId(), user.getId(), AccountType.BALANCE);
         if (found != null) return found;
@@ -405,8 +446,10 @@ public class LedgerServiceImpl implements LedgerService {
 
         // Ortak arac: sahipler, katkilari, satildiysa kar paylari (dukkan payi dusulmus) ve alacaklari
         List<ShareResponse> shares = coOwnershipService.owners(vehicle);
+        CoOwnershipService.ConsignmentShare share = consignment ? coOwnershipService.consignmentShare(vehicle) : null;
+        Long collected = share == null ? null : share.collectedCents();
         return new VehicleCost(vehicle.getId(), vehicle.getOwnership(), purchase, purchaseInLedger, expense, total, sale, profit,
-                commission, payout, consignment ? charged : 0, shares, toResponse(entries));
+                commission, payout, consignment ? charged : 0, collected, shares, toResponse(entries));
     }
 
     private static boolean touches(LedgerEntry e, AccountType type) {
@@ -423,35 +466,13 @@ public class LedgerServiceImpl implements LedgerService {
     @Override
     @Transactional
     public void syncConsignmentSettlement(Vehicle vehicle) {
-        List<LedgerEntry> active = activeVehicleEntries(vehicle.getId(), LedgerEntryType.CONSIGNMENT_SETTLEMENT);
-        Long sale = vehicle.getSalePriceCents();
-        boolean wanted = vehicle.getOwnership() == Ownership.CONSIGNMENT && vehicle.getStatus() != VehicleStatus.IN_STOCK
-                && sale != null && vehicle.getConsignor() != null;
-        long amount = 0;
-        if (wanted) {
-            Long commission = ConsignmentMath.commission(vehicle, sale);
-            if (commission == null || commission > sale) throw new CommissionExceedsSaleException();
-            amount = sale - commission;
+        // Konsinye satista sahibine borc yazilmaz: tahsil edildikce sahibinin sermayesine (CoOwnershipService)
+        if (vehicle.getOwnership() == Ownership.CONSIGNMENT && vehicle.getStatus() != VehicleStatus.IN_STOCK
+                && vehicle.getSalePriceCents() != null) {
+            Long commission = ConsignmentMath.commission(vehicle, vehicle.getSalePriceCents());
+            if (commission == null || commission > vehicle.getSalePriceCents()) throw new CommissionExceedsSaleException();
         }
-        wanted = wanted && amount > 0;   // komisyon satisin tamamiysa sahibine borc yok
-
-        if (wanted && active.size() == 1) {
-            LedgerEntry e = active.get(0);
-            if (e.getAmountCents() == amount && e.getEntryDate().equals(vehicle.getSaleDate())
-                    && vehicle.getConsignor().getId().equals(e.getSourceAccount().getUserId())) {
-                return;   // degisiklik yok
-            }
-        }
-        if (!wanted && active.isEmpty()) return;
-
-        active.forEach(this::writeReversal);
-        if (wanted) {
-            LedgerEntry e = newEntry(vehicle.getTenantId(), LedgerEntryType.CONSIGNMENT_SETTLEMENT, userBalanceAccount(vehicle.getConsignor()),
-                    systemAccount(vehicle.getTenantId(), AccountType.INCOME), amount, vehicle.getSaleDate());
-            e.setVehicle(vehicle);
-            e.setDescription("Konsinye satış: sahibine borç");
-            entryRepository.save(e);
-        }
+        coOwnershipService.resyncProfitShares(vehicle);
     }
 
     @Override

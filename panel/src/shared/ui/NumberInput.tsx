@@ -78,9 +78,10 @@ export function NumberInput({ value, onValueChange, kind = "money", preview = ki
   return (
     <span className="block">
       {input}
+      {/* Satir her zaman yer kaplar: yazmaya baslayinca form kaymaz */}
       {dotWarning
-        ? <span role="alert" className="block text-[12.5px] font-semibold text-uyari mt-1">Kuruş için virgül kullanın: 1.250,50 · şu an {cents != null && !Number.isNaN(cents) ? tlExact(cents) : "—"}</span>
-        : cents != null && !Number.isNaN(cents) && <span className="block text-[12.5px] text-murekkep-3 mt-1 sayi">{tlExact(cents)}</span>}
+        ? <span role="alert" className="block text-[12.5px] leading-[18px] min-h-[18px] font-semibold text-uyari mt-1 truncate">Kuruş için virgül kullanın: 1.250,50 · şu an {cents != null && !Number.isNaN(cents) ? tlExact(cents) : "—"}</span>
+        : <span className="block text-[12.5px] leading-[18px] min-h-[18px] text-murekkep-3 mt-1 sayi truncate">{cents != null && !Number.isNaN(cents) ? tlExact(cents) : ""}</span>}
     </span>
   );
 }

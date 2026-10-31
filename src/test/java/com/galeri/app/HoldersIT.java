@@ -69,6 +69,7 @@ class HoldersIT {
     @Autowired private ContactService contactService;
     @Autowired private LedgerService ledgerService;
     @Autowired private CapitalService capitalService;
+    @Autowired private com.galeri.app.service.CoOwnershipService coOwnershipService;
     @Autowired private VehicleService vehicleService;
     @Autowired private NetWorthService netWorthService;
 
@@ -155,6 +156,73 @@ class HoldersIT {
         check("sahip cekti");
     }
 
+    @Test
+    void kasaVeBanka_kisilereDagilir_transferOranindaTasinir_ortakAracKatkisiHesaptanDuser() {
+        UUID bank = ledgerService.addBank(new com.galeri.app.model.request.AccountRequest("Ziraat")).id();
+        capitalService.move(selin, new CapitalRequests.Movement(CapitalRequests.Direction.IN, bank, today, 4 * M, null));
+        // Kasa: Furkan 50 + Burak 6; Banka: Selin 4
+        expectHolding("giris", cash, burak, 6 * M);
+        expectHolding("giris", bank, selin, 4 * M);
+        expectHolding("giris", cash, null, 50 * M);
+
+        // Kasadan bankaya 28 milyon (kasanin yarisi): herkesin kasadaki parasinin yarisi tasinir
+        ledgerService.transfer(new CapitalRequests.Transfer(cash, bank, today, 28 * M, null));
+        expectHolding("transfer", cash, burak, 3 * M);
+        expectHolding("transfer", bank, burak, 3 * M);
+        expectHolding("transfer", bank, selin, 4 * M);
+        expectHolding("transfer", cash, null, 25 * M);
+
+        // Ortakli arac kasadan 4 milyon, Burak %50: Burak'in kasadaki parasindan 2 milyon araca
+        vehicle(4 * M, List.of(new ShareRequest(furkan, 5000), new ShareRequest(burak, 5000, null, ContributionSource.CAPITAL, null)));
+        expectHolding("ortak arac", cash, burak, 1 * M);
+        expectHolding("ortak arac", cash, null, 23 * M);
+        check("dagilim");
+    }
+
+    @Test
+    void cepten_dukkanGideri_kasaDegismez_kimseninSermayesiDusmez_donemKarindanDuser() {
+        long cashBefore = cashBalance();
+        CapitalResponses.Holder ownerBefore = holder(furkan), burakBefore = holder(burak);
+        ledgerService.addExpense(new ExpenseRequest(today, null, 5 * K, null, null, "Yemek", null, null, null, true));
+        assertThat(cashBalance()).as("kasa").isEqualTo(cashBefore);
+        assertThat(holder(furkan).capitalCents()).as("dukkan sahibi").isEqualTo(ownerBefore.capitalCents());
+        assertThat(holder(burak).capitalCents()).as("sermayedar").isEqualTo(burakBefore.capitalCents());
+        assertThat(ledgerService.expenses(today, today)).anySatisfy(e -> {
+            assertThat(e.source().type()).isEqualTo(AccountType.CAPITAL);
+            assertThat(e.amountCents()).isEqualTo(5 * K);
+        });
+        assertThat(capitalService.periodProfit(today, today).generalExpenseCents()).isEqualTo(5 * K);
+        check("cepten gider");
+    }
+
+    @Test
+    void sermayedar_sadeceKendiSermayesiniVeKasadakiPayiniGorur() {
+        TestSession.close();
+        TestSession.open(burak, tenant, "INVESTOR");
+        try {
+            assertThat(netWorthService.holders()).extracting(CapitalResponses.Holder::userId).containsExactly(burak);
+            var kasa = netWorthService.holdings().stream().filter(h -> h.accountId().equals(cash)).findFirst().orElseThrow();
+            assertThat(kasa.balanceCents()).as("kasada sadece kendi parasi").isEqualTo(6 * M);
+            assertThat(kasa.parts()).extracting(p -> p.userId()).containsExactly(burak);
+            assertThat(ledgerService.entries(null)).as("sadece kendi sermaye hareketleri")
+                    .allSatisfy(e -> assertThat(e.source().type() == AccountType.CAPITAL || e.target().type() == AccountType.CAPITAL).isTrue())
+                    .hasSize(1);
+        } finally {
+            TestSession.close();
+            TestSession.open(furkan, tenant, "ADMIN");
+        }
+    }
+
+    private void expectHolding(String step, UUID account, UUID user, long cents) {
+        var holdings = netWorthService.holdings();
+        assertThat(holdings).allSatisfy(h -> assertThat(h.parts().stream().mapToLong(p -> p.cents()).sum())
+                .as("%s: %s parcalar toplami", step, h.name()).isEqualTo(h.balanceCents()));
+        var acc = holdings.stream().filter(h -> h.accountId().equals(account)).findFirst().orElseThrow();
+        long actual = acc.parts().stream().filter(p -> user == null ? p.owner() : user.equals(p.userId()))
+                .mapToLong(p -> p.cents()).sum();
+        assertThat(actual).as("%s: %s / %s", step, acc.name(), user == null ? "dukkan sahibi" : user).isEqualTo(cents);
+    }
+
     // ------------------------------------------------------------------ yardimcilar
 
     private UUID person(String name) {
@@ -192,7 +260,7 @@ class HoldersIT {
     }
 
     private void check(String step) {
-        new LedgerInvariants(jdbc, capitalService).check(tenant, step);
+        new LedgerInvariants(jdbc, capitalService, coOwnershipService).check(tenant, step);
     }
 
     private static void expectError(int code, ThrowableAssert.ThrowingCallable call) {

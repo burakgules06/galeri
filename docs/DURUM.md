@@ -16,7 +16,24 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
 - V19 (sermayedarın dükkândan sermayesiyle araç alması) kaldırıldı; kolonlar duruyor, yeni kayıt yazılmıyor.
 - Panel: Kullanıcılar ekranında rol (Dükkân sahibi / Sermayedar / Çalışan), "Panele girebilir", "Araç alım / satımı girebilir".
   Ortaklı araç sahipleri ve konsinye sahibi kullanıcı listesinden seçilir; Ortaklar sekmesinde "Kişiyi ortak yap" ve "Sahip yap" kalktı.
-- Sıradaki: §0 PR 2 (kişi türleri ve etiketler). Yetkiler (sermayedarın kendi ekranı) PR 3.
+- Sıradaki: §0 PR 2 (kişi türleri ve etiketler), sermayedarın işlem yapması (§0 adım 4), araç ekranında sermayedarın kendi araçlarını fiyatlı görmesi.
+
+**Kasım 2026 gece paketi** (#59–#64, sırayla birbirinin üstünde; kurallar `MIMARI.md` §0 "Satış parasının dağıtımı"):
+- #59 Ortaklı / konsinye satışta para tahsil edildikçe dağıtılır. Ortaklı: satış gününde ortağın katkısı satışa geçer
+  (INCOME → CAPITAL), her tahsilat kâr payı oranlarıyla bölünür, ortağın parçası sermayesine (CAPITAL → INCOME). Ortağın masraf payı ve
+  satışta ödenmemiş alış borcundan payı (sahiplik oranıyla) ve dükkân payı ilk tahsilatlardan düşer; ortağın alacağı 0'ın altına inmez
+  (zarar tanımsız). Konsinye: sahibine borç yazılmaz; tahsilatın (satış − komisyon) / satış kadarı sahibinin sermayesine, yansıtılan
+  masraf önce bu paydan düşer. Tahsil edilmemiş pay sahibinin kartında alacak (`CoOwnershipService.pendingSaleShares`); karşılıksız çıkan
+  evrakta dağıtılan pay geri alınır. Dönem kârında ortakların payı hesaptan (`partnersProfit`).
+- #60 Satış ödeme şekilleri ayrı: Nakit, Senet, Çek, Açık hesap, Evim / kredi, Kredi kartı (`V23__credit_card_method.sql`), Karma.
+  Peşinat / adet / ilk vade yazarken plan kurulur. Açık hesap artık satış ve alış planında da kullanılır. Satış ve araç formu iki sütunlu.
+- #61 Ödemeler: "Ödemeler" (alacak) / "Ödeyeceklerim" (borç); Tümü, Çek, Senet, Açık hesap, Kredi kartı, Geciken; plan bazında açılır
+  satırlar; kişi seçimi (`InstallmentResponse.userIds`: aracın sahipleri ya da evrak sahibi) ve sıralama.
+- #62 Kasa ve banka: kişi seçimi, her hesapta kimin ne kadar parası olduğu (`GET /api/holdings`); "Virman" → "Hesaplar arası transfer",
+  açılış bakiyesi düğmesi kalktı (uç duruyor), düzeltmeler ayrı sekme, filtreler: hesap, işlemi yapan, giriş / çıkış; tarih sıralaması.
+- #63 Masraflar (`#/expenses`) ve Dükkân (`#/shop`) sayfaları; dükkân gideri kasa, banka ya da cepten (elden: dükkân sahibinin sermaye
+  hesabından gidere, kasa değişmez, kimsenin sermayesi düşmez). `GET /api/expenses?from=&to=`.
+- #64 Sermayedar girişi: Ana sayfa, Ödemeler, Kasa, Masraflar sadece kendi kayıtlarıyla, salt okunur. Araç ekranı şimdilik çalışan gibi.
 
 ## Yapılanlar
 

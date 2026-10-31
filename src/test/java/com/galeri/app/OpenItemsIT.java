@@ -62,6 +62,7 @@ class OpenItemsIT {
     @Autowired private ContactService contactService;
     @Autowired private LedgerService ledgerService;
     @Autowired private CapitalService capitalService;
+    @Autowired private com.galeri.app.service.CoOwnershipService coOwnershipService;
     @Autowired private PaymentPlanService paymentPlanService;
 
     private final LocalDate today = LocalDate.of(2026, 6, 1);
@@ -188,7 +189,7 @@ class OpenItemsIT {
     }
 
     private void check(String step) {
-        new LedgerInvariants(jdbc, capitalService).check(tenant, step);
+        new LedgerInvariants(jdbc, capitalService, coOwnershipService).check(tenant, step);
     }
 
     private static void expectError(int code, ThrowableAssert.ThrowingCallable call) {

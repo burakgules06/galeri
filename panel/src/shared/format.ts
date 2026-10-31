@@ -93,8 +93,8 @@ export function formatPlate(input: string): string {
 export const ENTRY_TYPE: Record<LedgerEntryType, string> = {
   VEHICLE_PURCHASE: "Araç alışı", VEHICLE_EXPENSE: "Araç masrafı", GENERAL_EXPENSE: "Genel gider", CAPITAL: "Sermaye",
   VEHICLE_SALE: "Araç satışı", COLLECTION: "Tahsilat", PAYMENT: "Ödeme", CONSIGNMENT_SETTLEMENT: "Konsinye borcu",
-  PROFIT_ALLOCATION: "Kâr payı sermayeye", TRANSFER: "Virman", OPENING_BALANCE: "Açılış bakiyesi",
-  VEHICLE_PROFIT_SHARE: "Ortak kâr payı", CAPITAL_TRANSFER: "Sermaye aktarımı", PARTNER_SALE_SETTLEMENT: "Ortak araç alımı · sermayeden",
+  PROFIT_ALLOCATION: "Kâr payı sermayeye", TRANSFER: "Hesaplar arası transfer", OPENING_BALANCE: "Açılış bakiyesi",
+  VEHICLE_PROFIT_SHARE: "Ortak satış payı", CAPITAL_TRANSFER: "Sermaye aktarımı", PARTNER_SALE_SETTLEMENT: "Ortak araç alımı · sermayeden",
 };
 
 export const OWNERSHIP: Record<Ownership, string> = { DEALER: "Galeri", CONSIGNMENT: "Konsinye", CO_OWNED: "Ortak" };
@@ -140,6 +140,7 @@ export const SERIES = ["var(--color-seri-1)", "var(--color-seri-2)", "var(--colo
 
 export const METHOD: Record<PaymentMethod, string> = {
   CASH: "Nakit", TRANSFER: "Havale", PROMISSORY_NOTE: "Senet", INSTITUTION: "Evim / kredi", CHEQUE: "Çek", OPEN_ACCOUNT: "Açık hesap",
+  CREDIT_CARD: "Kredi kartı",
 };
 
 /** ISO tarihe ay ekler; ayin son gunu tasarsa ay sonuna yaslar (31 Ocak + 1 ay -> 28/29 Subat). */

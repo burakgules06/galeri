@@ -29,6 +29,9 @@ public interface LedgerService {
     /** accountId null ise galerinin tum hareketleri; yeniden eskiye. */
     List<LedgerEntryResponse> entries(UUID accountId);
 
+    /** Donemdeki masraflar (arac masrafi ve genel gider), duzeltmeleriyle; yeni once. */
+    List<LedgerEntryResponse> expenses(java.time.LocalDate from, java.time.LocalDate to);
+
     LedgerEntryResponse addExpense(ExpenseRequest request);
 
     /** Toplu masraf: hepsi tek transaction'da, sirayla; biri hataliysa hicbiri yazilmaz. */
@@ -114,9 +117,8 @@ public interface LedgerService {
     // ------------------------------------------------------------------ konsinye
 
     /**
-     * Konsinye satisin sahibine borcunu aracin son haline esitler: satilmis konsinye aracta
-     * BALANCE(sahibi) -> INCOME (satis - komisyon), satis tarihinde. Arac stoktaysa, konsinye degilse ya da
-     * tutar/sahip/tarih degistiyse eski hareket terslenir. Satis, satisi geri alma ve arac guncellemesi cagirir.
+     * Konsinye satista sahibine borc yazilmaz: komisyonu dogrular (1034), tahsil edilen kisim sahibinin sermayesine
+     * CoOwnershipService.resyncProfitShares ile yazilir. Satis, satisi geri alma ve arac guncellemesi cagirir.
      */
     void syncConsignmentSettlement(Vehicle vehicle);
 

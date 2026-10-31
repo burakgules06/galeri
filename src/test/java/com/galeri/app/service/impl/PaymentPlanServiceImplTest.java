@@ -149,6 +149,13 @@ class PaymentPlanServiceImplTest {
     }
 
     @Test
+    void krediKartiVeAcikHesap_hareketAciklamasiYontemeGore() {
+        assertThat(PaymentPlanServiceImpl.description(PlanDirection.SALE, PaymentMethod.CREDIT_CARD)).isEqualTo("Kredi kartı tahsilatı");
+        assertThat(PaymentPlanServiceImpl.description(PlanDirection.PURCHASE, PaymentMethod.CREDIT_CARD)).isEqualTo("Kredi kartı ödemesi");
+        assertThat(PaymentPlanServiceImpl.description(PlanDirection.SALE, PaymentMethod.OPEN_ACCOUNT)).isEqualTo("Açık hesap tahsilatı");
+    }
+
+    @Test
     void gecmisAcikHesapAciklamasi_taksitVeCevaptaSaklanir() {
         String description = "Araç tamir masrafı için sözlü borç";
         InstallmentRequest row = new InstallmentRequest(TODAY, 100000L, PaymentMethod.OPEN_ACCOUNT,

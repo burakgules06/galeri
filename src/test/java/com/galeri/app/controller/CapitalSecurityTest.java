@@ -63,6 +63,21 @@ class CapitalSecurityTest {
     }
 
     @Test
+    void sermayedar_kendiPayiniGorur_sermayeVeKasaIslemiYapamaz() {
+        TestSession.open(UUID.randomUUID(), UUID.randomUUID(), "INVESTOR");
+        UUID id = UUID.randomUUID();
+        assertThatCode(() -> netWorth.holders()).doesNotThrowAnyException();
+        assertThatCode(() -> netWorth.holdings()).doesNotThrowAnyException();
+
+        assertThatThrownBy(() -> netWorth.summary()).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> capital.partners()).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> capital.move(id, new CapitalRequests.Movement(CapitalRequests.Direction.IN, id, DAY, 1L, null)))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> capital.periodProfit(DAY, DAY)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> capital.transfer(new CapitalRequests.Transfer(id, id, DAY, 1L, null))).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
     void yonetici_donemKarinaErisir() {
         TestSession.open(UUID.randomUUID(), UUID.randomUUID(), "ADMIN");
 

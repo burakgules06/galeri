@@ -38,6 +38,11 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
   ödemez). % girilirse her ortak **kendi kâr payının** yüzdesini öder. Ortaklar için masraf, galeri sahibi için gelir.
   Örnek: Furkan %50, Burak %30, Ali %20 kâr payı; kâr 1.000.000; komisyon %10 → Burak 30.000, Ali 20.000 öder;
   Furkan 550.000, Burak 270.000, Ali 180.000.
+- **Satış parasının dağıtımı (Kasım 2026, uygulandı):** ortaklı araçta satışta kâr yazılmaz; her tahsilat (peşin hemen, senet / çek /
+  açık hesap / kurum tahsil edildikçe) kâr payı oranlarıyla bölünür ve ortağın parçası sermayesine geçer. Ortağın masraf payı ve satışta
+  ödenmemiş alış borcundan payı sahiplik oranıyla ilk tahsilatlardan düşer. Tahsil edilmemiş pay sermayedarın kartında alacak; evrak
+  karşılıksız çıkarsa riski payı oranında onda. Konsinyede sahibine borç yazılmaz, tahsil edildikçe (satış − komisyon) oranında sermayesine;
+  komisyon galerinin kârı, para fiziksel olarak seçilen hesaba (varsayılan Kasa) girer.
 - **Tek sahipli sermayedar aracı = konsinye:** mevcut konsinye ekranı ve komisyonu aynen kalır; sadece sahibi kişi değil kullanıcıdır.
 - **Masraf:** ortaklı araca masraf sahiplik paylarına göre bölünür; herkesin payı kendi sermayesinden düşer (dükkân sahibininki kasadan).
 - **Zarar:** şimdilik tanımsız, sonra konuşulacak.
