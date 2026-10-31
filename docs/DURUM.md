@@ -2,6 +2,12 @@
 
 Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım bitince bu dosyayı güncelle.
 
+## Şu an
+
+**Kullanıcı / kişi ayrımı** (MIMARI §0) planlandı, uygulama sırası §0'ın sonunda. Açık sorular MIMARI §13'ün başında.
+Prod'da test verisi bozuk: 5 yetim `OPENING_BALANCE` hareketi var (planları silinmiş). Silinemez (trigger); §0 PR 1'deki
+veri taşımada ters hareketle kapatılacak.
+
 ## Yapılanlar
 
 - Geçmiş cari kaydı: `OPEN_ACCOUNT` yöntemiyle senetsiz sözlü borç girilebilir; her açık hesap satırına isteğe bağlı açıklama eklenebilir ve sonradan düzenlenebilir; tahsilattan sonra da yalnızca açıklama değişir.
