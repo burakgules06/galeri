@@ -1,11 +1,11 @@
-// Kasa: nakit (kasa + bankalar) ve uc sekme: hareketler (ortak payi, alacak / verecek, hareket listesi),
+// Kasa: nakit (kasa + bankalar; Tumu ya da secilen kisinin her hesaptaki parasi) ve dort sekme: hareketler (ortak payi, alacak / verecek, hareket listesi),
 // ortaklar (sermaye girisi / cekisi, dukkan sahibi), donem kari (kar payini sermayeye ekleme). Sadece ADMIN.
 // Bakiyeler ve paylar hareketlerden hesaplanir; ortak ve cari ozeti /api/dashboard'dan gelir.
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
 import { SplitBar } from "../../shared/charts/Donut";
-import { ENTRY_TYPE, entryDirection, percent, SERIES, tl } from "../../shared/format";
-import type { LedgerEntryType } from "../../shared/types";
+import { entryDirection, percent, SERIES, tl } from "../../shared/format";
+import type { LedgerEntryResponse } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, Empty, ErrorBox, inputClass, Segment } from "../../shared/ui/Common";
 import { BalancesCard } from "./BalancesCard";
@@ -15,9 +15,12 @@ import { LedgerEntryList } from "./LedgerEntryList";
 import { PartnersPanel } from "./PartnersPanel";
 import { PeriodProfitPanel } from "./PeriodProfitPanel";
 import { NetWorthPanel } from "./NetWorthPanel";
-import { OpeningBalanceForm, TransferForm } from "./TreasuryForms";
+import { TransferForm } from "./TreasuryForms";
 
 type Tab = "entries" | "partners" | "profit" | "assets";
+
+type Sort = "new" | "old";
+type Flow = "" | "in" | "out";
 
 export function LedgerPage() {
   const [selected, setSelected] = useState<string | null>(null);
@@ -25,33 +28,55 @@ export function LedgerPage() {
   const [revision, setRevision] = useState(0);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [bankOpen, setBankOpen] = useState(false);
-  const [dialog, setDialog] = useState<"transfer" | "opening" | null>(null);
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [person, setPerson] = useState("");
-  const [entryType, setEntryType] = useState<LedgerEntryType | "">("");
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [owner, setOwner] = useState("");           // kimin parasi: "" = Tumu
+  const [listTab, setListTab] = useState<"entries" | "corrections">("entries");
+  const [actor, setActor] = useState("");
+  const [flow, setFlow] = useState<Flow>("");
+  const [sort, setSort] = useState<Sort>("new");
   const [entryPage, setEntryPage] = useState(1);
   const accounts = useLoad(() => api.accounts(), []);
+  const holdings = useLoad(() => api.holdings(), [revision]);
   const summary = useLoad(() => api.dashboard(), []);
   const entries = useLoad(() => api.ledgerEntries(selected), [selected]);
 
   const reload = () => { accounts.reload(); entries.reload(); summary.reload(); setRevision(r => r + 1); };
   const list = accounts.data ?? [];
   const total = list.reduce((t, a) => t + a.balanceCents, 0);
-  const selectedName = list.find((a) => a.id === selected)?.name;
   const colored = list.map((a, i) => ({ ...a, color: SERIES[i % SERIES.length] }));
+  // Kisiler: hesaplarda parasi olanlar (dukkan sahibi once)
+  const people = new Map<string, { key: string; name: string; owner: boolean }>();
+  for (const h of holdings.data ?? []) for (const p of h.parts) {
+    const key = p.userId ?? "owner";
+    if (!people.has(key)) people.set(key, { key, name: p.name, owner: p.owner });
+  }
+  const peopleList = [...people.values()].sort((x, y) => Number(y.owner) - Number(x.owner) || x.name.localeCompare(y.name, "tr"));
+  const amountOf = (accountId: string) => {
+    const h = (holdings.data ?? []).find((x) => x.accountId === accountId);
+    if (!owner) return h?.balanceCents ?? list.find((a) => a.id === accountId)?.balanceCents ?? 0;
+    return (h?.parts ?? []).filter((p) => (p.userId ?? "owner") === owner).reduce((t, p) => t + p.cents, 0);
+  };
+  const shown = colored.map((a) => ({ ...a, amount: amountOf(a.id) }));
+  const shownTotal = owner ? shown.reduce((t, a) => t + a.amount, 0) : total;
+
   const allEntries = entries.data ?? [];
-  const people = [...new Set(allEntries.flatMap((e) => [e.source.name, e.target.name]))].sort((a, b) => a.localeCompare(b, "tr"));
-  const filteredEntries = allEntries.filter((e) =>
-    (!fromDate || e.date >= fromDate) && (!toDate || e.date <= toDate) &&
-    (!person || e.source.name === person || e.target.name === person) && (!entryType || e.type === entryType));
-  const hasEntryFilters = !!(fromDate || toDate || person || entryType);
-  const entryPageSize = 20;
-  const entryPageCount = Math.max(1, Math.ceil(filteredEntries.length / entryPageSize));
-  const currentEntryPage = Math.min(entryPage, entryPageCount);
-  const pageEntries = filteredEntries.slice((currentEntryPage - 1) * entryPageSize, currentEntryPage * entryPageSize);
+  const isCorrection = (e: LedgerEntryResponse) => e.corrected || e.correctedEntryId != null;
+  const actors = [...new Set(allEntries.map((e) => e.createdBy).filter((n): n is string => !!n))].sort((x, y) => x.localeCompare(y, "tr"));
+  const filtered = allEntries
+    .filter((e) => (listTab === "corrections") === isCorrection(e))
+    .filter((e) => (!actor || e.createdBy === actor)
+      && (!flow || (flow === "in" ? entryDirection(e, selected) > 0 : entryDirection(e, selected) < 0)))
+    .sort((x, y) => {
+      const c = x.date.localeCompare(y.date) || (x.createdAt ?? "").localeCompare(y.createdAt ?? "");
+      return sort === "new" ? -c : c;
+    });
+  const correctionCount = allEntries.filter(isCorrection).length;
+  const hasFilters = !!(actor || flow);
+  const pageSize = 20;
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const page = Math.min(entryPage, pageCount);
+  const pageEntries = filtered.slice((page - 1) * pageSize, page * pageSize);
   const changeAccount = (id: string | null) => { setSelected(id); setEntryPage(1); };
-  const resetEntryFilters = () => { setFromDate(""); setToDate(""); setPerson(""); setEntryType(""); setEntryPage(1); };
 
   return (
     <div className="space-y-5">
@@ -61,34 +86,38 @@ export function LedgerPage() {
           <h1 className="font-cond font-bold text-[30px] md:text-[34px] leading-tight tracking-tight">Kasa ve banka</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => setDialog("opening")}>Açılış bakiyesi</Button>
-          <Button variant="secondary" onClick={() => setDialog("transfer")}>Virman</Button>
+          <Button variant="secondary" onClick={() => setTransferOpen(true)}>Hesaplar arası transfer</Button>
           <Button onClick={() => setExpenseOpen(true)}>Masraf ekle</Button>
         </div>
       </header>
 
-      <ErrorBox message={accounts.error ?? summary.error} />
+      <ErrorBox message={accounts.error ?? summary.error ?? holdings.error} />
 
-      {/* Nakit: toplam ve hesaplara dagilimi. Karta dokununca hareketler o hesaba suzulur. */}
+      {/* Kimin parasi: Tumu ya da bir kisi; hesap kartlari secili kisinin o hesaptaki parasini gosterir. Karta dokununca hareketler suzulur. */}
       <section className="kart p-4 md:p-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Kimin parası">
+          <PersonChip label="Tümü" on={!owner} onClick={() => setOwner("")} />
+          {peopleList.map((p) => <PersonChip key={p.key} label={p.name} sub={p.owner ? "dükkân sahibi" : undefined} on={owner === p.key} onClick={() => setOwner(p.key)} />)}
+        </div>
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="etiket">Toplam nakit</p>
-            <p className={`sayi font-bold text-[34px] md:text-[40px] leading-none tracking-tight mt-1.5 ${total < 0 ? "text-tehlike" : ""}`}>
-              {accounts.data ? tl(total) : "…"}
+            <p className="etiket">{owner ? `${people.get(owner)?.name ?? ""} · kasa ve bankalarda` : "Toplam nakit"}</p>
+            <p className={`sayi font-bold text-[34px] md:text-[40px] leading-none tracking-tight mt-1.5 ${shownTotal < 0 ? "text-tehlike" : ""}`}>
+              {accounts.data ? tl(shownTotal) : "…"}
             </p>
           </div>
           {bankOpen
-            ? <BankForm onClose={() => setBankOpen(false)} onAdded={() => { setBankOpen(false); accounts.reload(); }} />
+            ? <BankForm onClose={() => setBankOpen(false)} onAdded={() => { setBankOpen(false); reload(); }} />
             : <Button variant="secondary" onClick={() => setBankOpen(true)}>+ Banka hesabı</Button>}
         </div>
-        <div className="mt-4"><SplitBar height={10} parts={colored.map((a) => ({ key: a.id, value: a.balanceCents, color: a.color }))} /></div>
+        <div className="mt-4"><SplitBar height={10} parts={shown.map((a) => ({ key: a.id, value: Math.max(0, a.amount), color: a.color }))} /></div>
         <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-          <AccountButton name="Tümü" balance={total} share={null} color={null} selected={selected === null} onClick={() => changeAccount(null)} />
-          {colored.map((a) => (
-            <AccountButton key={a.id} name={a.name} balance={a.balanceCents} color={a.color}
-              share={total > 0 && a.balanceCents > 0 ? Math.round((a.balanceCents * 10000) / total) : null}
-              selected={selected === a.id} onClick={() => changeAccount(a.id)} />
+          <AccountButton name="Tüm hesaplar" balance={shownTotal} share={null} color={null} selected={selected === null} onClick={() => changeAccount(null)} />
+          {shown.map((a) => (
+            <AccountButton key={a.id} name={a.name} balance={a.amount} color={a.color}
+              share={shownTotal > 0 && a.amount > 0 ? Math.round((a.amount * 10000) / shownTotal) : null}
+              selected={selected === a.id} onClick={() => changeAccount(a.id)}
+              parts={owner ? undefined : (holdings.data ?? []).find((h) => h.accountId === a.id)?.parts.filter((p) => p.cents !== 0)} />
           ))}
         </div>
       </section>
@@ -111,50 +140,82 @@ export function LedgerPage() {
       )}
 
       {tab === "entries" && <section className="kart p-4 md:p-5">
-        <div className="flex items-baseline justify-between gap-3 mb-3">
-          <h2 className="font-cond font-bold text-[22px]">{selectedName ? `${selectedName} hareketleri` : "Son hareketler"}</h2>
-          {entries.data && <span className="text-[13px] text-murekkep-2">{filteredEntries.length}{hasEntryFilters ? ` / ${allEntries.length}` : ""} kayıt</span>}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div className="flex gap-1 rounded-[12px] bg-yuzey-2 p-1" role="tablist" aria-label="Hareket listesi">
+            {([["entries", "Son hareketler"], ["corrections", "Düzeltmeler"]] as const).map(([v, label]) => (
+              <button key={v} type="button" role="tab" aria-selected={listTab === v} onClick={() => { setListTab(v); setEntryPage(1); }}
+                className={`basilir h-9 px-3.5 rounded-[9px] text-[14px] font-semibold flex items-center gap-2 ${
+                  listTab === v ? "bg-yuzey text-murekkep shadow-sm" : "text-murekkep-2 hover:text-murekkep"}`}>
+                {label}
+                {v === "corrections" && <span className="sayi text-[13px] rounded-full px-1.5 min-w-[22px] bg-cizgi text-murekkep-2">{correctionCount}</span>}
+              </button>
+            ))}
+          </div>
+          {entries.data && <span className="text-[13px] text-murekkep-2">{filtered.length} kayıt</span>}
         </div>
         <ErrorBox message={entries.error} />
-        {entries.data && allEntries.length > 0 && <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-[150px_150px_minmax(180px,1fr)_minmax(180px,1fr)_auto] xl:items-end">
-          <label className="text-[12px] text-murekkep-2">Başlangıç tarihi<input type="date" className={`${inputClass} mt-1 h-9 w-full`} value={fromDate} max={toDate || undefined} onChange={(e) => { setFromDate(e.target.value); setEntryPage(1); }} /></label>
-          <label className="text-[12px] text-murekkep-2">Bitiş tarihi<input type="date" className={`${inputClass} mt-1 h-9 w-full`} value={toDate} min={fromDate || undefined} onChange={(e) => { setToDate(e.target.value); setEntryPage(1); }} /></label>
-          <label className="text-[12px] text-murekkep-2">Kişi<select className={`${inputClass} mt-1 h-9 w-full`} value={person} onChange={(e) => { setPerson(e.target.value); setEntryPage(1); }}>
-            <option value="">Tüm kişiler</option>{people.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select></label>
-          <label className="text-[12px] text-murekkep-2">Hareket tipi<select className={`${inputClass} mt-1 h-9 w-full`} value={entryType} onChange={(e) => { setEntryType(e.target.value as LedgerEntryType | ""); setEntryPage(1); }}>
-            <option value="">Tüm hareketler</option>{Object.entries(ENTRY_TYPE).map(([type, label]) => <option key={type} value={type}>{label}</option>)}
-          </select></label>
-          {hasEntryFilters && <Button type="button" variant="quiet" className="h-9" onClick={resetEntryFilters}>Filtreleri temizle</Button>}
-        </div>}
-        {entries.data && allEntries.length === 0 && (
-          <Empty title="Henüz hareket yok" description="Masraf girdiğinde ya da kasadan araç aldığında burada görünür." />
+        <div className="mb-4 grid gap-2 grid-cols-2 lg:grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_160px_200px_auto] lg:items-end">
+          <label className="text-[12px] text-murekkep-2">İşlem yapılan yer
+            <select className={`${inputClass} mt-1 h-9 w-full`} value={selected ?? ""} onChange={(e) => changeAccount(e.target.value || null)}>
+              <option value="">Tüm hesaplar</option>{list.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </label>
+          <label className="text-[12px] text-murekkep-2">İşlemi yapan
+            <select className={`${inputClass} mt-1 h-9 w-full`} value={actor} onChange={(e) => { setActor(e.target.value); setEntryPage(1); }}>
+              <option value="">Herkes</option>{actors.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+          <label className="text-[12px] text-murekkep-2">İşlem tipi
+            <select className={`${inputClass} mt-1 h-9 w-full`} value={flow} onChange={(e) => { setFlow(e.target.value as Flow); setEntryPage(1); }}>
+              <option value="">Giriş ve çıkış</option><option value="in">Giriş</option><option value="out">Çıkış</option>
+            </select>
+          </label>
+          <label className="text-[12px] text-murekkep-2">Sıralama
+            <select className={`${inputClass} mt-1 h-9 w-full`} value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+              <option value="new">Tarih: yeni → eski</option><option value="old">Tarih: eski → yeni</option>
+            </select>
+          </label>
+          <div className="col-span-2 lg:col-span-1 min-h-9 flex items-end">
+            {hasFilters && <Button type="button" variant="quiet" className="h-9" onClick={() => { setActor(""); setFlow(""); setEntryPage(1); }}>Temizle</Button>}
+          </div>
+        </div>
+        {entries.data && filtered.length === 0 && (
+          <Empty title={listTab === "corrections" ? "Düzeltme yok" : allEntries.length === 0 ? "Henüz hareket yok" : "Filtreye uygun hareket yok"}
+            description={listTab === "entries" && allEntries.length === 0 ? "Masraf girdiğinde ya da kasadan araç aldığında burada görünür." : undefined} />
         )}
-        {entries.data && allEntries.length > 0 && filteredEntries.length === 0 && (
-          <Empty title="Filtreye uygun hareket yok" description="Tarih aralığını, kişiyi veya hareket tipini değiştirebilirsin." />
+        {entries.data && filtered.length > 0 && (
+          <LedgerEntryList entries={pageEntries} direction={(e) => entryDirection(e, selected)} onChange={reload}
+            corrections={listTab === "corrections" ? "only" : "hide"} />
         )}
-        {entries.data && filteredEntries.length > 0 && (
-          <LedgerEntryList entries={pageEntries} direction={(e) => entryDirection(e, selected)} onChange={reload} />
-        )}
-        {entries.data && filteredEntries.length > entryPageSize && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-cizgi pt-3">
-          <span className="text-[13px] text-murekkep-2">{(currentEntryPage - 1) * entryPageSize + 1}–{Math.min(currentEntryPage * entryPageSize, filteredEntries.length)} / {filteredEntries.length} hareket</span>
+        {entries.data && filtered.length > pageSize && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-cizgi pt-3">
+          <span className="text-[13px] text-murekkep-2">{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)} / {filtered.length} hareket</span>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="secondary" className="h-9" disabled={currentEntryPage === 1} onClick={() => setEntryPage((p) => Math.max(1, p - 1))}>Önceki</Button>
-            <span className="min-w-16 text-center text-[13px] font-semibold">{currentEntryPage} / {entryPageCount}</span>
-            <Button type="button" variant="secondary" className="h-9" disabled={currentEntryPage === entryPageCount} onClick={() => setEntryPage((p) => Math.min(entryPageCount, p + 1))}>Sonraki</Button>
+            <Button type="button" variant="secondary" className="h-9" disabled={page === 1} onClick={() => setEntryPage(Math.max(1, page - 1))}>Önceki</Button>
+            <span className="min-w-16 text-center text-[13px] font-semibold">{page} / {pageCount}</span>
+            <Button type="button" variant="secondary" className="h-9" disabled={page === pageCount} onClick={() => setEntryPage(Math.min(pageCount, page + 1))}>Sonraki</Button>
           </div>
         </div>}
       </section>}
 
-      {dialog === "transfer" && <TransferForm onClose={() => setDialog(null)} onSaved={() => { setDialog(null); reload(); }} />}
-      {dialog === "opening" && <OpeningBalanceForm onClose={() => setDialog(null)} onSaved={() => { setDialog(null); reload(); }} />}
+      {transferOpen && <TransferForm onClose={() => setTransferOpen(false)} onSaved={() => { setTransferOpen(false); reload(); }} />}
       {expenseOpen && <BulkExpenseForm onClose={() => setExpenseOpen(false)} onSaved={() => { setExpenseOpen(false); reload(); }} />}
     </div>
   );
 }
 
-function AccountButton({ name, balance, share, color, selected, onClick }: {
+function PersonChip({ label, sub, on, onClick }: { label: string; sub?: string; on: boolean; onClick: () => void }) {
+  return (
+    <button type="button" role="radio" aria-checked={on} onClick={onClick}
+      className={`basilir h-9 px-3 rounded-full border text-[14px] font-semibold whitespace-nowrap ${
+        on ? "bg-murekkep text-white border-murekkep" : "bg-yuzey text-murekkep-2 border-cizgi-2 hover:bg-yuzey-2"}`}>
+      {label}{sub && <span className={`ml-1 text-[12px] font-medium ${on ? "text-white/70" : "text-murekkep-3"}`}>· {sub}</span>}
+    </button>
+  );
+}
+
+function AccountButton({ name, balance, share, color, selected, onClick, parts }: {
   name: string; balance: number; share: number | null; color: string | null; selected: boolean; onClick: () => void;
+  parts?: { userId: string | null; name: string; cents: number }[];   // Tumu seciliyken hesaptaki paranin kisilere dagilimi
 }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={selected}
@@ -165,6 +226,16 @@ function AccountButton({ name, balance, share, color, selected, onClick }: {
         {share != null && <span className="ml-auto text-murekkep-3 font-medium">{percent(share, 0)}</span>}
       </span>
       <span className={`block sayi font-bold text-[20px] leading-tight mt-0.5 ${balance < 0 ? "text-tehlike" : selected ? "text-plaka-koyu" : "text-murekkep"}`}>{tl(balance)}</span>
+      {parts && parts.length > 0 && (
+        <span className="mt-1.5 block space-y-0.5">
+          {parts.map((p) => (
+            <span key={p.userId ?? "owner"} className="flex items-baseline justify-between gap-2 text-[12px] text-murekkep-2">
+              <span className="truncate">{p.name}</span>
+              <span className={`sayi whitespace-nowrap ${p.cents < 0 ? "text-tehlike" : ""}`}>{tl(p.cents)}</span>
+            </span>
+          ))}
+        </span>
+      )}
     </button>
   );
 }

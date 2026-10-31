@@ -1,4 +1,4 @@
-// Kasa islemleri: virman (kasa <-> banka) ve acilis bakiyesi (sisteme geciste, hesap basina bir kez).
+// Kasa islemleri: hesaplar arasi transfer (kasa <-> banka) ve acilis bakiyesi (sisteme geciste, hesap basina bir kez).
 // Yanlis girilen hareket Kasa listesinden "Duzelt" ile terslenir.
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
@@ -41,14 +41,14 @@ export function TransferForm({ onClose, onSaved }: { onClose: () => void; onSave
 
   const options = list.map((a) => ({ value: a.id, label: `${a.name} · ${tl(a.balanceCents)}` }));
   return (
-    <Modal title="Virman" open onClose={onClose}
+    <Modal title="Hesaplar arası transfer" open onClose={onClose}
       footer={<>
         <Button variant="secondary" type="button" onClick={onClose}>Vazgeç</Button>
         <Button type="submit" form="transfer-form" disabled={saving || list.length < 2}>{saving ? "Kaydediliyor…" : "Aktar"}</Button>
       </>}>
       <form id="transfer-form" onSubmit={submit} className="space-y-4">
         <ErrorBox message={error} />
-        {accounts.data && list.length < 2 && <p className="text-[14px] text-uyari">Virman için en az iki hesap gerekir; önce banka hesabı ekleyin.</p>}
+        {accounts.data && list.length < 2 && <p className="text-[14px] text-uyari">Transfer için en az iki hesap gerekir; önce banka hesabı ekleyin.</p>}
         <Field label="Nereden"><Segment<string> value={from} onChange={setFromId} options={options} /></Field>
         <Field label="Nereye"><Segment<string> value={to} onChange={setToId} options={options.filter((o) => o.value !== from)} /></Field>
         <Field label="Tutar">

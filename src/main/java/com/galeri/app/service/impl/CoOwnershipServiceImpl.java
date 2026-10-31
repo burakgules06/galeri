@@ -368,7 +368,7 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
     }
 
     /** Aracin satis tahsilati: plan taksitlerinden odenenler, tarih sirasiyla. Toplu satista aracin bedeli oraninda. */
-    record Collection(LocalDate date, long amountCents) {}
+    record Collection(LocalDate date, long amountCents, UUID entryId) {}
 
     private List<Collection> collections(Vehicle vehicle) {
         UUID planId;
@@ -403,24 +403,24 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         for (Paid p : list) {
             cum += p.amount();
             long mine = basket ? (total == 0 ? 0 : Math.floorDiv(cum * price, total)) : cum;
-            if (mine - prev != 0) result.add(new Collection(p.date(), mine - prev));
+            if (mine - prev != 0) result.add(new Collection(p.date(), mine - prev, p.id()));
             prev = mine;
         }
         return result;
     }
 
     /** Ortakli aracin dagitimi: sahip basina durum ve defterde istenen hareketler. */
-    record Distribution(List<Settlement> settlements, List<Wanted> wanted) {}
+    record Distribution(List<Settlement> settlements, List<Wanted> wanted, Map<UUID, Map<UUID, Long>> byEntry) {}
 
     private Distribution distribution(Vehicle vehicle, boolean entries) {
         List<VehicleShare> owners = owners(vehicle.getId(), vehicle.getOwnership());
-        if (owners.isEmpty()) return new Distribution(List.of(), List.of());
+        if (owners.isEmpty()) return new Distribution(List.of(), List.of(), Map.of());
         Map<UUID, Long> contributions = contributions(vehicle, owners, null);
         boolean sold = vehicle.getStatus() != VehicleStatus.IN_STOCK && vehicle.getSalePriceCents() != null;
         if (!sold) {
             List<Settlement> list = owners.stream()
                     .map(o -> new Settlement(o, contributions.getOrDefault(holderKey(o), 0L), null, null, null)).toList();
-            return new Distribution(list, List.of());
+            return new Distribution(list, List.of(), Map.of());
         }
         long sale = vehicle.getSalePriceCents();
         int pool = indexOfPool(owners.stream().map(VehicleShare::isPool).toList());
@@ -460,6 +460,7 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         }
         long[] given = new long[owners.size()];
         long cum = 0;
+        Map<UUID, Map<UUID, Long>> byEntry = new HashMap<>();
         for (Collection c : collections(vehicle)) {
             cum += c.amountCents();
             List<Long> parts = CoOwnershipMath.split(cum, profitBps, pool);
@@ -467,6 +468,7 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
                 long now = Math.max(0, parts.get(k) - deduct[k]);
                 long delta = now - given[k];
                 given[k] = now;
+                if (delta != 0) byEntry.computeIfAbsent(c.entryId(), x -> new HashMap<>()).merge(owners.get(k).getUser().getId(), delta, Long::sum);
                 if (!entries) continue;
                 Account capital = capitalAccount(owners.get(k).getUser());
                 if (delta > 0) wanted.add(new Wanted(capital, income, delta, c.date(), "Ortak tahsilat payı"));
@@ -491,11 +493,11 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
                 list.add(new Settlement(o, contribution, entitled - contribution, entitled, given[k]));
             }
         }
-        return new Distribution(list, wanted);
+        return new Distribution(list, wanted, byEntry);
     }
 
     /** Konsinye dagitimi: sahibin alacagi (satis - komisyon), tahsil edildikce sermayesine. */
-    record ConsignmentDistribution(long entitledCents, long givenCents, List<Wanted> wanted) {}
+    record ConsignmentDistribution(long entitledCents, long givenCents, List<Wanted> wanted, Map<UUID, Long> capitalByEntry) {}
 
     private ConsignmentDistribution consignmentDistribution(Vehicle vehicle, boolean entries) {
         long sale = vehicle.getSalePriceCents();
@@ -509,6 +511,7 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         Account balance = entries && charged > 0 ? balanceAccount(vehicle.getConsignor()) : null;
         List<Wanted> wanted = new ArrayList<>();
         long cum = 0, given = 0, netted = 0;
+        Map<UUID, Long> capitalByEntry = new HashMap<>();
         for (Collection c : collections(vehicle)) {
             cum += c.amountCents();
             long now = sale == 0 ? 0 : Math.min(entitled, Math.floorDiv(cum * entitled, sale));
@@ -516,13 +519,14 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
             long toBalance = nowNetted - netted, toCapital = (now - nowNetted) - (given - netted);
             given = now;
             netted = nowNetted;
+            if (toCapital != 0) capitalByEntry.merge(c.entryId(), toCapital, Long::sum);
             if (!entries) continue;
             if (toBalance > 0) wanted.add(new Wanted(balance, income, toBalance, c.date(), "Konsinye: yansıtılan masraf payından düşüldü"));
             else if (toBalance < 0) wanted.add(new Wanted(income, balance, -toBalance, c.date(), "Konsinye: masraf mahsubu (düzeltme)"));
             if (toCapital > 0) wanted.add(new Wanted(capital, income, toCapital, c.date(), "Konsinye tahsilat payı"));
             else if (toCapital < 0) wanted.add(new Wanted(income, capital, -toCapital, c.date(), "Konsinye tahsilat payı (düzeltme)"));
         }
-        return new ConsignmentDistribution(entitled, given, wanted);
+        return new ConsignmentDistribution(entitled, given, wanted, capitalByEntry);
     }
 
     /** Konsinye araçta sahibine yansitilan masraflar (aracin masraflarindan sahibinin carisine giden, duzeltmeler duser). */
@@ -571,6 +575,36 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
                 || vehicle.getStatus() == VehicleStatus.IN_STOCK || vehicle.getSalePriceCents() == null) return null;
         ConsignmentDistribution d = consignmentDistribution(vehicle, false);
         return new ConsignmentShare(d.entitledCents(), d.givenCents());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, Map<UUID, Long>> moneyEntryShares(UUID tenantId) {
+        Map<UUID, Map<UUID, Long>> result = new HashMap<>();
+        for (Vehicle v : vehicleRepository.findByTenantIdAndOwnership(tenantId, Ownership.CO_OWNED)) {
+            List<VehicleShare> owners = owners(v.getId(), v.getOwnership());
+            if (owners.isEmpty()) continue;
+            // Alis odemesi: ortagin katkisi o odemenin hesabindan cikti
+            for (Payment p : contributingPayments(v)) {
+                List<Long> parts = parts(p.amountCents(), owners);
+                for (int k = 0; k < owners.size(); k++) {
+                    if (owners.get(k).isPool() || parts.get(k) == 0) continue;
+                    result.computeIfAbsent(p.entryId(), x -> new HashMap<>()).merge(owners.get(k).getUser().getId(), -parts.get(k), Long::sum);
+                }
+            }
+            // Satis tahsilati: ortagin payi tahsilatin girdigi hesaba
+            if (v.getStatus() != VehicleStatus.IN_STOCK && v.getSalePriceCents() != null) {
+                distribution(v, false).byEntry().forEach((entry, users) ->
+                        users.forEach((user, cents) -> result.computeIfAbsent(entry, x -> new HashMap<>()).merge(user, cents, Long::sum)));
+            }
+        }
+        for (Vehicle v : vehicleRepository.findByTenantIdAndOwnership(tenantId, Ownership.CONSIGNMENT)) {
+            if (v.getStatus() == VehicleStatus.IN_STOCK || v.getSalePriceCents() == null || v.getConsignor() == null) continue;
+            UUID user = v.getConsignor().getId();
+            consignmentDistribution(v, false).capitalByEntry().forEach((entry, cents) ->
+                    result.computeIfAbsent(entry, x -> new HashMap<>()).merge(user, cents, Long::sum));
+        }
+        return result;
     }
 
     @Override

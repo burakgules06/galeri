@@ -20,6 +20,12 @@ public class NetWorthController {
         return responses.success(service.summary());
     }
 
+    @GetMapping("/api/holdings")
+    @PreAuthorize("hasRole('ADMIN')")
+    public GenericResponse<java.util.List<com.galeri.app.model.response.AccountHoldings>> holdings() {
+        return responses.success(service.holdings());
+    }
+
     @GetMapping("/api/holders")
     @PreAuthorize("hasRole('ADMIN')")
     public GenericResponse<java.util.List<com.galeri.app.model.response.CapitalResponses.Holder>> holders() {

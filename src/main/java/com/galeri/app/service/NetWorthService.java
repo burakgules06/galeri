@@ -9,4 +9,7 @@ public interface NetWorthService {
 
     /** Sermayedarlar ve dukkan sahibi: kimin ne kadar sermayesi var, ne kadari nakitte, hangi aracta ne kadar. */
     List<CapitalResponses.Holder> holders();
+
+    /** Kasa ve bankalardaki paranin kisilere dagilimi (dukkan sahibi kalan). */
+    List<com.galeri.app.model.response.AccountHoldings> holdings();
 }
