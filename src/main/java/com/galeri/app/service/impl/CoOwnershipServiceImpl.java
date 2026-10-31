@@ -1,5 +1,6 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.CommissionExceedsSaleException;
 import com.galeri.app.exception.runtime.InsufficientCapitalException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidOwnerReturnException;
@@ -11,6 +12,8 @@ import com.galeri.app.model.entity.Account;
 import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.Installment;
 import com.galeri.app.model.entity.LedgerEntry;
+import com.galeri.app.model.entity.PaymentPlan;
+import com.galeri.app.model.entity.PaymentPlanVehicle;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.entity.VehicleShare;
 import com.galeri.app.model.enums.AccountType;
@@ -23,17 +26,20 @@ import com.galeri.app.model.enums.VehicleStatus;
 import com.galeri.app.model.request.OwnerReturnRequest;
 import com.galeri.app.model.request.ShareRequest;
 import com.galeri.app.model.response.ShareResponse;
+import com.galeri.app.model.response.VehicleRef;
 import com.galeri.app.repository.AccountRepository;
 import com.galeri.app.repository.InstallmentRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.PaymentPlanRepository;
+import com.galeri.app.repository.PaymentPlanVehicleRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.repository.VehicleShareRepository;
 import com.galeri.app.security.CurrentUser;
 import com.galeri.app.service.CoOwnerSettlementPolicy;
 import com.galeri.app.service.CoOwnershipService;
 import com.galeri.app.util.CoOwnershipMath;
+import com.galeri.app.util.ConsignmentMath;
 import com.galeri.app.util.MoneyMath;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -48,6 +54,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -60,6 +67,7 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
     private final AccountRepository accountRepository;
     private final LedgerEntryRepository entryRepository;
     private final PaymentPlanRepository planRepository;
+    private final PaymentPlanVehicleRepository basketRepository;
     private final InstallmentRepository installmentRepository;
     private final PanelUserRepository panelUserRepository;
     private final CoOwnerSettlementPolicy policy;
@@ -68,12 +76,11 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
     /** Aracin alis bedelinden bir odeme: pesin alis hareketi ya da odenmis alis taksitinin hareketi. */
     record Payment(UUID entryId, LocalDate date, OffsetDateTime createdAt, long amountCents, Account moneyAccount) {}
 
-    /** Ortagin bu aractaki durumu: odenmis katkisi, cepten kismi; satildiysa kar payi (dukkan payi dusulmus). */
-    record Settlement(VehicleShare owner, long contributionCents, Long profitCents) {
-        Long receivableCents() {
-            return profitCents == null ? null : contributionCents + profitCents;
-        }
-    }
+    /**
+     * Ortagin bu aractaki durumu: odenmis katkisi; satildiysa kar payi, alacagi (tahsilattan alacagi toplam) ve su ana kadar
+     * tahsil edilip ona dagitilan.
+     */
+    record Settlement(VehicleShare owner, long contributionCents, Long profitCents, Long receivableCents, Long collectedCents) {}
 
     /** Defterde istenen hareket: kaynak, hedef, tutar, tarih (diff icin). */
     record Wanted(Account source, Account target, long amountCents, LocalDate date, String description) {
@@ -280,6 +287,7 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
                 : returns.stream().filter(r -> r.mode() != OwnerReturnMode.KEEP).toList();
         if (vehicle.getOwnership() != Ownership.CO_OWNED) {
             if (!requested.isEmpty()) throw new InvalidOwnerReturnException();
+            resyncProfitShares(vehicle);   // konsinye: tahsil edilen kisim sahibinin sermayesine
             return;
         }
         switch (policy.timing()) {
@@ -291,7 +299,10 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         checkCashCapital(vehicle.getTenantId(), owners(vehicle.getId(), vehicle.getOwnership()));
     }
 
-    /** Ortaga nakit donus: kasa / banka -> CAPITAL(ortak), satis gununde; en fazla alacagi (katki + kar payi) kadar. */
+    /**
+     * Ortaga nakit donus: kasa / banka -> CAPITAL(ortak), satis gununde; en fazla satis aninda ona dagitilan tahsilat payi
+     * kadar (pesin kisim). Kalan tahsil edildikce sermayesine gecer.
+     */
     private void writeReturns(Vehicle vehicle, List<OwnerReturnRequest> returns) {
         Map<UUID, Settlement> byUser = new HashMap<>();
         settlements(vehicle).stream().filter(s -> !s.owner().isPool()).forEach(s -> byUser.put(s.owner().getUser().getId(), s));
@@ -299,9 +310,9 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         for (OwnerReturnRequest r : returns) {
             Settlement s = byUser.get(r.userId());
             if (s == null || !seen.add(r.userId()) || r.accountId() == null) throw new InvalidOwnerReturnException();
-            long receivable = s.receivableCents();
-            long amount = r.mode() == OwnerReturnMode.CASH ? receivable : r.amountCents() == null ? 0 : r.amountCents();
-            if (amount <= 0 || amount > receivable) throw new InvalidOwnerReturnException();
+            long available = s.collectedCents() == null ? 0 : s.collectedCents();
+            long amount = r.mode() == OwnerReturnMode.CASH ? available : r.amountCents() == null ? 0 : r.amountCents();
+            if (amount <= 0 || amount > available) throw new InvalidOwnerReturnException();
             LedgerEntry e = newEntry(vehicle.getTenantId(), LedgerEntryType.CAPITAL, moneyAccount(r.accountId(), vehicle.getTenantId()),
                     capitalAccount(s.owner().getUser()), amount, vehicle.getSaleDate());
             e.setVehicle(vehicle);
@@ -316,6 +327,8 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         if (!activeReturns(vehicle).isEmpty()) throw new OwnerReturnExistsException();
         apply(vehicle, LedgerEntryType.VEHICLE_PROFIT_SHARE,
                 active(entryRepository.findByVehicle_IdAndType(vehicle.getId(), LedgerEntryType.VEHICLE_PROFIT_SHARE)), List.of());
+        apply(vehicle, LedgerEntryType.CONSIGNMENT_SETTLEMENT,
+                active(entryRepository.findByVehicle_IdAndType(vehicle.getId(), LedgerEntryType.CONSIGNMENT_SETTLEMENT)), List.of());
     }
 
     private List<LedgerEntry> activeReturns(Vehicle vehicle) {
@@ -323,75 +336,250 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
                 .filter(e -> e.getTargetAccount().getType() == AccountType.CAPITAL).toList();
     }
 
+    /**
+     * Satilmis aracin tahsilat dagitimini defterle esitler. Tahsilat geldikce dagitilir (pesin satista hemen):
+     * <ul>
+     *   <li>Ortakli arac: satis gununde ortagin katkisi satisa gecer (INCOME -> CAPITAL); her tahsilat kar payi oranlariyla
+     *       bolunur, ortagin parcasi sermayesine yazilir (CAPITAL -> INCOME). Ortagin masraf payi (sahiplik oraniyla) ve
+     *       dukkan payi ilk tahsilatlardan duser. Dukkan sahibinin parcasi kasada kalir (havuz).</li>
+     *   <li>Konsinye: sahibine borc yazilmaz; her tahsilatin (satis - komisyon) / satis kadari sahibinin sermayesine,
+     *       kalan (komisyon) galerinin karidir.</li>
+     * </ul>
+     * Tahsil edilmemis kisim sahibinin alacagidir (pendingSaleShares); karsiliksiz cikan evrakta payi oraninda ondan duser.
+     */
     @Override
     @Transactional
     public void resyncProfitShares(Vehicle vehicle) {
-        List<Wanted> wanted = new ArrayList<>();
-        boolean settled = policy.timing() == CoOwnerSettlementPolicy.Timing.AT_SALE && vehicle.getOwnership() == Ownership.CO_OWNED
-                && vehicle.getStatus() != VehicleStatus.IN_STOCK && vehicle.getSalePriceCents() != null;
-        if (settled) {
-            Account income = systemAccount(vehicle.getTenantId(), AccountType.INCOME);
-            for (Settlement s : settlements(vehicle)) {
-                if (s.owner().isPool() || s.profitCents() == null || s.profitCents() == 0) continue;
-                Account capital = capitalAccount(s.owner().getUser());
-                long share = s.profitCents();
-                if (share > 0) {
-                    wanted.add(new Wanted(capital, income, share, vehicle.getSaleDate(), "Ortak kâr payı"));
-                    continue;
-                }
-                // Zarar once katkidan (sermayeden) duser; katkiyi asan kisim ortagin carisine: galeriye borclanir
-                long loss = -share;
-                long fromCapital = Math.min(loss, Math.max(0, s.contributionCents()));
-                if (fromCapital > 0) wanted.add(new Wanted(income, capital, fromCapital, vehicle.getSaleDate(), "Ortak zarar payı"));
-                if (loss > fromCapital) {
-                    wanted.add(new Wanted(income, balanceAccount(s.owner().getUser()), loss - fromCapital, vehicle.getSaleDate(),
-                            "Ortak zarar payı (katkıyı aşan, cariye)"));
-                }
-            }
+        entryRepository.flush();
+        installmentRepository.flush();
+        boolean sold = vehicle.getStatus() != VehicleStatus.IN_STOCK && vehicle.getSalePriceCents() != null;
+        List<Wanted> coOwned = new ArrayList<>();
+        List<Wanted> consignment = new ArrayList<>();
+        if (sold && vehicle.getOwnership() == Ownership.CO_OWNED && policy.timing() == CoOwnerSettlementPolicy.Timing.AT_SALE) {
+            coOwned = distribution(vehicle, true).wanted();
+        }
+        if (sold && vehicle.getOwnership() == Ownership.CONSIGNMENT && vehicle.getConsignor() != null) {
+            consignment = consignmentDistribution(vehicle, true).wanted();
         }
         apply(vehicle, LedgerEntryType.VEHICLE_PROFIT_SHARE,
-                active(entryRepository.findByVehicle_IdAndType(vehicle.getId(), LedgerEntryType.VEHICLE_PROFIT_SHARE)), wanted);
+                active(entryRepository.findByVehicle_IdAndType(vehicle.getId(), LedgerEntryType.VEHICLE_PROFIT_SHARE)), coOwned);
+        apply(vehicle, LedgerEntryType.CONSIGNMENT_SETTLEMENT,
+                active(entryRepository.findByVehicle_IdAndType(vehicle.getId(), LedgerEntryType.CONSIGNMENT_SETTLEMENT)), consignment);
     }
 
-    /**
-     * Sahiplerin durumu. Kar = satis - (gercek alis + arac masraflari); kar payi orani ile bolunur (kurus farki Havuz'a).
-     * Kar varsa dukkan payi ortaklarin payindan dusulur (havuza kalir), ortaklar arasinda kar payi oranlarina gore.
-     */
-    private List<Settlement> settlements(Vehicle vehicle) {
+    /** Aracin satis tahsilati: plan taksitlerinden odenenler, tarih sirasiyla. Toplu satista aracin bedeli oraninda. */
+    record Collection(LocalDate date, long amountCents) {}
+
+    private List<Collection> collections(Vehicle vehicle) {
+        UUID planId;
+        long price = 0, total = 0;
+        boolean basket = false;
+        Optional<PaymentPlan> own = planRepository.findByVehicleIdAndDirection(vehicle.getId(), PlanDirection.SALE);
+        if (own.isPresent()) {
+            planId = own.get().getId();
+        } else {
+            Optional<PaymentPlanVehicle> link = basketRepository.findByVehicleId(vehicle.getId());
+            if (link.isEmpty()) return List.of();
+            planId = link.get().getPlanId();
+            price = link.get().getSalePriceCents();
+            total = planRepository.findById(planId).map(PaymentPlan::getTotalCents).orElse(0L);
+            basket = true;
+        }
+        record Paid(LocalDate date, OffsetDateTime createdAt, UUID id, long amount) {}
+        List<Installment> paid = installmentRepository.findByPlanIds(List.of(planId)).stream().filter(Installment::isPaid).toList();
+        Map<UUID, LedgerEntry> entries = new HashMap<>();
+        entryRepository.findAllById(paid.stream().map(Installment::getPaidEntryId).toList()).forEach(e -> entries.put(e.getId(), e));
+        List<Paid> list = new ArrayList<>();
+        for (Installment i : paid) {
+            LedgerEntry e = entries.get(i.getPaidEntryId());
+            if (e == null) continue;
+            list.add(new Paid(e.getEntryDate(), e.getCreatedAt(), e.getId(), i.getAmountCents()));
+        }
+        list.sort(Comparator.comparing(Paid::date)
+                .thenComparing(Paid::createdAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(Paid::id));
+        List<Collection> result = new ArrayList<>();
+        long cum = 0, prev = 0;
+        for (Paid p : list) {
+            cum += p.amount();
+            long mine = basket ? (total == 0 ? 0 : Math.floorDiv(cum * price, total)) : cum;
+            if (mine - prev != 0) result.add(new Collection(p.date(), mine - prev));
+            prev = mine;
+        }
+        return result;
+    }
+
+    /** Ortakli aracin dagitimi: sahip basina durum ve defterde istenen hareketler. */
+    record Distribution(List<Settlement> settlements, List<Wanted> wanted) {}
+
+    private Distribution distribution(Vehicle vehicle, boolean entries) {
         List<VehicleShare> owners = owners(vehicle.getId(), vehicle.getOwnership());
-        if (owners.isEmpty()) return List.of();
+        if (owners.isEmpty()) return new Distribution(List.of(), List.of());
         Map<UUID, Long> contributions = contributions(vehicle, owners, null);
-        List<Long> shares = null;
         boolean sold = vehicle.getStatus() != VehicleStatus.IN_STOCK && vehicle.getSalePriceCents() != null;
-        if (sold) {
-            long profit = vehicle.getSalePriceCents() - (vehicle.getActualPurchaseCents() == null ? 0 : vehicle.getActualPurchaseCents())
-                    - vehicleExpenses(vehicle.getId());
-            int poolIndex = indexOfPool(owners.stream().map(VehicleShare::isPool).toList());
-            shares = new ArrayList<>(CoOwnershipMath.split(profit, owners.stream().map(VehicleShare::getProfitShareBp).toList(), poolIndex));
-            List<Integer> partners = new ArrayList<>();
-            long partnersProfit = 0;
-            for (int k = 0; k < owners.size(); k++) {
-                if (owners.get(k).isPool()) continue;
-                partners.add(k);
-                partnersProfit += shares.get(k);
-            }
-            long cut = CoOwnershipMath.shopCut(partnersProfit, vehicle.getShopCutType(), vehicle.getShopCutRateBp(), vehicle.getShopCutCents());
-            if (cut > 0) {
-                List<Long> cuts = MoneyMath.splitByWeights(cut, partners.stream().map(k -> (long) owners.get(k).getProfitShareBp()).toList());
-                for (int j = 0; j < partners.size(); j++) {
-                    int k = partners.get(j);
-                    shares.set(k, shares.get(k) - cuts.get(j));
-                }
-                if (poolIndex >= 0) shares.set(poolIndex, shares.get(poolIndex) + cut);
+        if (!sold) {
+            List<Settlement> list = owners.stream()
+                    .map(o -> new Settlement(o, contributions.getOrDefault(holderKey(o), 0L), null, null, null)).toList();
+            return new Distribution(list, List.of());
+        }
+        long sale = vehicle.getSalePriceCents();
+        int pool = indexOfPool(owners.stream().map(VehicleShare::isPool).toList());
+        List<Integer> profitBps = owners.stream().map(VehicleShare::getProfitShareBp).toList();
+        List<Long> gross = CoOwnershipMath.split(sale, profitBps, pool);
+
+        // Ortagin dusulecek payi (sahiplik oraniyla): masraf payi + satista henuz odenmemis alis borcundan payi (kalan senetleri
+        // havuz satis parasindan oder); kar varsa dukkan payi (ortaklarin karindan, kar payi oranlariyla).
+        long expenses = vehicleExpenses(vehicle.getId());
+        long purchase = vehicle.getActualPurchaseCents() == null ? 0 : vehicle.getActualPurchaseCents();
+        List<Long> purchaseShares = CoOwnershipMath.split(purchase, owners.stream().map(VehicleShare::getShareBp).toList(), pool);
+        long[] deduct = new long[owners.size()];
+        List<Integer> partners = new ArrayList<>();
+        long partnersProfit = 0;
+        for (int k = 0; k < owners.size(); k++) {
+            if (owners.get(k).isPool()) continue;
+            partners.add(k);
+            long contribution = contributions.getOrDefault(holderKey(owners.get(k)), 0L);
+            deduct[k] = Math.floorDiv(expenses * owners.get(k).getShareBp(), CoOwnershipMath.FULL_BP)
+                    + Math.max(0, purchaseShares.get(k) - contribution);
+            partnersProfit += gross.get(k) - deduct[k] - contribution;
+        }
+        long cut = CoOwnershipMath.shopCut(partnersProfit, vehicle.getShopCutType(), vehicle.getShopCutRateBp(), vehicle.getShopCutCents());
+        if (cut > 0) {
+            List<Long> cuts = MoneyMath.splitByWeights(cut, partners.stream().map(k -> (long) owners.get(k).getProfitShareBp()).toList());
+            for (int j = 0; j < partners.size(); j++) deduct[partners.get(j)] += cuts.get(j);
+        }
+
+        Account income = entries ? systemAccount(vehicle.getTenantId(), AccountType.INCOME) : null;
+        List<Wanted> wanted = new ArrayList<>();
+        for (int k : entries ? partners : List.<Integer>of()) {
+            long contribution = contributions.getOrDefault(holderKey(owners.get(k)), 0L);
+            if (contribution > 0) {
+                wanted.add(new Wanted(income, capitalAccount(owners.get(k).getUser()), contribution, vehicle.getSaleDate(),
+                        "Ortak katkısı satışa geçti"));
             }
         }
-        List<Settlement> result = new ArrayList<>();
+        long[] given = new long[owners.size()];
+        long cum = 0;
+        for (Collection c : collections(vehicle)) {
+            cum += c.amountCents();
+            List<Long> parts = CoOwnershipMath.split(cum, profitBps, pool);
+            for (int k : partners) {
+                long now = Math.max(0, parts.get(k) - deduct[k]);
+                long delta = now - given[k];
+                given[k] = now;
+                if (!entries) continue;
+                Account capital = capitalAccount(owners.get(k).getUser());
+                if (delta > 0) wanted.add(new Wanted(capital, income, delta, c.date(), "Ortak tahsilat payı"));
+                else if (delta < 0) wanted.add(new Wanted(income, capital, -delta, c.date(), "Ortak tahsilat payı (düzeltme)"));
+            }
+        }
+
+        List<Settlement> list = new ArrayList<>();
+        long partnersProfitAfter = 0;
+        for (int k : partners) {
+            partnersProfitAfter += Math.max(0, gross.get(k) - deduct[k]) - contributions.getOrDefault(holderKey(owners.get(k)), 0L);
+        }
         for (int k = 0; k < owners.size(); k++) {
             VehicleShare o = owners.get(k);
             long contribution = contributions.getOrDefault(holderKey(o), 0L);
-            result.add(new Settlement(o, contribution, shares == null ? null : shares.get(k)));
+            if (o.isPool()) {
+                // Dukkan sahibi havuzun kalani: arac kari - ortaklarin kari; alacagi = katkisi + kari (parasi zaten kasada)
+                long profit = sale - purchase - expenses - partnersProfitAfter;
+                list.add(new Settlement(o, contribution, profit, contribution + profit, null));
+            } else {
+                long entitled = Math.max(0, gross.get(k) - deduct[k]);
+                list.add(new Settlement(o, contribution, entitled - contribution, entitled, given[k]));
+            }
+        }
+        return new Distribution(list, wanted);
+    }
+
+    /** Konsinye dagitimi: sahibin alacagi (satis - komisyon), tahsil edildikce sermayesine. */
+    record ConsignmentDistribution(long entitledCents, long givenCents, List<Wanted> wanted) {}
+
+    private ConsignmentDistribution consignmentDistribution(Vehicle vehicle, boolean entries) {
+        long sale = vehicle.getSalePriceCents();
+        Long commission = ConsignmentMath.commission(vehicle, sale);
+        if (commission == null || commission > sale) throw new CommissionExceedsSaleException();
+        long entitled = sale - commission;
+        // Sahibine yansitilan masraflar (carisinde borc) once onun payindan duser; kalani sermayesine
+        long charged = chargedToOwner(vehicle);
+        Account income = entries ? systemAccount(vehicle.getTenantId(), AccountType.INCOME) : null;
+        Account capital = entries ? capitalAccount(vehicle.getConsignor()) : null;
+        Account balance = entries && charged > 0 ? balanceAccount(vehicle.getConsignor()) : null;
+        List<Wanted> wanted = new ArrayList<>();
+        long cum = 0, given = 0, netted = 0;
+        for (Collection c : collections(vehicle)) {
+            cum += c.amountCents();
+            long now = sale == 0 ? 0 : Math.min(entitled, Math.floorDiv(cum * entitled, sale));
+            long nowNetted = Math.min(now, charged);
+            long toBalance = nowNetted - netted, toCapital = (now - nowNetted) - (given - netted);
+            given = now;
+            netted = nowNetted;
+            if (!entries) continue;
+            if (toBalance > 0) wanted.add(new Wanted(balance, income, toBalance, c.date(), "Konsinye: yansıtılan masraf payından düşüldü"));
+            else if (toBalance < 0) wanted.add(new Wanted(income, balance, -toBalance, c.date(), "Konsinye: masraf mahsubu (düzeltme)"));
+            if (toCapital > 0) wanted.add(new Wanted(capital, income, toCapital, c.date(), "Konsinye tahsilat payı"));
+            else if (toCapital < 0) wanted.add(new Wanted(income, capital, -toCapital, c.date(), "Konsinye tahsilat payı (düzeltme)"));
+        }
+        return new ConsignmentDistribution(entitled, given, wanted);
+    }
+
+    /** Konsinye araçta sahibine yansitilan masraflar (aracin masraflarindan sahibinin carisine giden, duzeltmeler duser). */
+    private long chargedToOwner(Vehicle vehicle) {
+        long total = 0;
+        for (LedgerEntry e : entryRepository.findByVehicle_IdAndType(vehicle.getId(), LedgerEntryType.VEHICLE_EXPENSE)) {
+            if (e.getTargetAccount().getType() == AccountType.BALANCE) total += e.getAmountCents();
+            else if (e.getSourceAccount().getType() == AccountType.BALANCE) total -= e.getAmountCents();
+        }
+        return Math.max(0, total);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PendingShare> pendingSaleShares(UUID tenantId) {
+        List<PendingShare> result = new ArrayList<>();
+        for (Vehicle v : vehicleRepository.findByTenantIdAndOwnership(tenantId, Ownership.CO_OWNED)) {
+            if (v.getStatus() == VehicleStatus.IN_STOCK || v.getSalePriceCents() == null) continue;
+            for (Settlement s : distribution(v, false).settlements()) {
+                if (s.owner().isPool() || s.receivableCents() == null) continue;
+                long left = s.receivableCents() - s.collectedCents();
+                if (left != 0) result.add(new PendingShare(s.owner().getUser().getId(), ref(v), left));
+            }
+        }
+        for (Vehicle v : vehicleRepository.findByTenantIdAndOwnership(tenantId, Ownership.CONSIGNMENT)) {
+            if (v.getStatus() == VehicleStatus.IN_STOCK || v.getSalePriceCents() == null || v.getConsignor() == null) continue;
+            ConsignmentDistribution d = consignmentDistribution(v, false);
+            long left = d.entitledCents() - d.givenCents();
+            if (left != 0) result.add(new PendingShare(v.getConsignor().getId(), ref(v), left));
         }
         return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long partnersProfit(Vehicle vehicle) {
+        if (vehicle.getOwnership() != Ownership.CO_OWNED) return 0;
+        return settlements(vehicle).stream().filter(s -> !s.owner().isPool() && s.profitCents() != null)
+                .mapToLong(Settlement::profitCents).sum();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ConsignmentShare consignmentShare(Vehicle vehicle) {
+        if (vehicle.getOwnership() != Ownership.CONSIGNMENT || vehicle.getConsignor() == null
+                || vehicle.getStatus() == VehicleStatus.IN_STOCK || vehicle.getSalePriceCents() == null) return null;
+        ConsignmentDistribution d = consignmentDistribution(vehicle, false);
+        return new ConsignmentShare(d.entitledCents(), d.givenCents());
+    }
+
+    private static VehicleRef ref(Vehicle v) {
+        return new VehicleRef(v.getId(), v.getPlate(), v.getMake(), v.getModel());
+    }
+
+    /** Sahiplerin durumu (katki; satildiysa kar payi, alacak ve tahsil edilip dagitilan). */
+    private List<Settlement> settlements(Vehicle vehicle) {
+        return distribution(vehicle, false).settlements();
     }
 
     /** Aracin maliyetine giren masraflar (VEHICLE hesabina net giris; duzeltmeler kendiliginden duser). */
@@ -410,18 +598,17 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
     @Transactional(readOnly = true)
     public List<ShareResponse> owners(Vehicle vehicle) {
         if (vehicle.getId() == null) return List.of();
-        // Satilmis aracta kar payi defterden degil hesaptan: AT_SALE'de ikisi aynidir (resyncProfitShares)
         return settlements(vehicle).stream().map(s -> {
             VehicleShare o = s.owner();
             return new ShareResponse(o.getUser().getId(), o.getUser().getFullName(), o.isPool(),
                     o.getShareBp(), o.getProfitShareBp(), o.getContributionSource(), o.getPocketCents(),
-                    s.contributionCents(), s.profitCents(), s.receivableCents());
+                    s.contributionCents(), s.profitCents(), s.receivableCents(), s.collectedCents());
         }).toList();
     }
 
     @Override
     public boolean isLinkedEntry(LedgerEntry e) {
-        return e.getType() == LedgerEntryType.VEHICLE_PROFIT_SHARE
+        return e.getType() == LedgerEntryType.VEHICLE_PROFIT_SHARE || e.getType() == LedgerEntryType.CONSIGNMENT_SETTLEMENT
                 || (e.getType() == LedgerEntryType.CAPITAL && e.getVehicle() != null && e.getSourceAccount().getType() == AccountType.CAPITAL);
     }
 

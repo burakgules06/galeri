@@ -75,6 +75,7 @@ class CoFinancingIT {
     @Autowired private ContactService contactService;
     @Autowired private LedgerService ledgerService;
     @Autowired private CapitalService capitalService;
+    @Autowired private com.galeri.app.service.CoOwnershipService coOwnershipService;
     @Autowired private VehicleService vehicleService;
     @Autowired private PaymentPlanService paymentPlanService;
     @Autowired private com.galeri.app.service.NetWorthService netWorthService;
@@ -178,19 +179,14 @@ class CoFinancingIT {
     }
 
     @Test
-    void zararKatkiyiAsarsa_farkOrtaginCarisineBorcYazilir() {
-        // Arac 400.000 (katki 200.000), masraf 250.000, satis 150.000: zarar 500.000, Burak'in payi 250.000
+    void zararKatkiyiAsarsa_ortaginAlacagiSifir_sermayedenSadeceKatkisiDuser() {
+        // Arac 400.000 (katki 200.000), masraf 250.000, satis 150.000: Burak'a 75.000 - 125.000 masraf payi = 0 dagitilir
         UUID v = coOwned(400_000 * TL, half(burak, ContributionSource.CAPITAL, null));
         ledgerService.addExpense(new ExpenseRequest(today, cash, 250_000 * TL, v, null, "Motor", null, null, null));
         sell(v, 150_000 * TL);
-        assertThat(owner(v, burak).profitCents()).isEqualTo(-250_000 * TL);
-        assertThat(owner(v, burak).receivableCents()).as("alacak eksi").isEqualTo(-50_000 * TL);
+        assertThat(owner(v, burak).receivableCents()).isZero();
+        assertThat(owner(v, burak).profitCents()).isEqualTo(-200_000 * TL);
         expectPartner("zarar", burak, 800_000 * TL, 800_000 * TL, 0);   // sermayeden sadece katkisi (200.000) duser
-        assertThat(jdbc.queryForObject("""
-                select coalesce((select sum(e.amount_cents) from ledger_entry e where e.target_account_id = a.id), 0)
-                     - coalesce((select sum(e.amount_cents) from ledger_entry e where e.source_account_id = a.id), 0)
-                from account a where a.type = 'BALANCE' and a.user_id = ?
-                """, Long.class, burak)).as("Burak galeriye borclu (kullanicinin carisi)").isEqualTo(50_000 * TL);
         check("zarar");
     }
 
@@ -206,14 +202,45 @@ class CoFinancingIT {
     }
 
     @Test
-    void karPayiOraniSahiplikPayindanFarkli_karOranaGoreBolunur() {
+    void karPayiOraniSahiplikPayindanFarkli_herTahsilatKarPayiOranlaBolunur() {
+        // Sahiplik %50 / %50, kar payi %40 / %60: satis 2.300.000'in %60'i Burak'a (katkisi 1.000.000)
         UUID v = coOwned(2_000_000 * TL, List.of(new ShareRequest(owner, 5000, 4000, null, null),
                 new ShareRequest(burak, 5000, 6000, null, null)));
         sell(v, 2_300_000 * TL);
-        assertThat(owner(v, burak).profitCents()).isEqualTo(180_000 * TL);   // 300.000 x %60
-        assertThat(monthProfit().netCents()).isEqualTo(120_000 * TL);
-        expectPartner("oran", burak, 1_180_000 * TL, 1_180_000 * TL, 0);
+        assertThat(owner(v, burak).receivableCents()).isEqualTo(1_380_000 * TL);
+        assertThat(owner(v, burak).profitCents()).isEqualTo(380_000 * TL);
+        assertThat(monthProfit().netCents()).isEqualTo(-80_000 * TL);   // dukkan sahibi: 920.000 - 1.000.000
+        expectPartner("oran", burak, 1_380_000 * TL, 1_380_000 * TL, 0);
         check("oran");
+    }
+
+    @Test
+    void taksitliSatis_herTahsilattaKarPayiOraniylaDagitilir_kalaniAlacak_karsiliksizdaGeriAlinir() {
+        // %50 / %50, alis 2.000.000; satis 2.300.000 = pesin 1.000.000 + senet 1.300.000
+        UUID v = coOwned(2_000_000 * TL, half(burak, ContributionSource.CAPITAL, null));
+        UUID buyer = person("Alici");
+        vehicleService.sell(v, sale(buyer, List.of(
+                new InstallmentRequest(today, 1_000_000 * TL, PaymentMethod.CASH, null, null, true, cash),
+                new InstallmentRequest(today.plusDays(30), 1_300_000 * TL, PaymentMethod.PROMISSORY_NOTE, null, null, false, null))));
+        ShareResponse b = owner(v, burak);
+        assertThat(b.receivableCents()).isEqualTo(1_150_000 * TL);
+        assertThat(b.collectedCents()).as("pesinin yarisi").isEqualTo(500_000 * TL);
+        expectPartner("pesin", burak, 500_000 * TL, 500_000 * TL, 0);   // katki satisa gecti, pesinin yarisi sermayede
+        assertThat(holder(burak).otherCents()).as("tahsil edilmemis payi alacak").isEqualTo(650_000 * TL);
+        assertThat(holder(burak).capitalCents()).isEqualTo(1_150_000 * TL);
+        check("pesin");
+
+        UUID note = paymentPlanService.plans(v).stream().filter(p -> p.direction() == PlanDirection.SALE).findFirst().orElseThrow()
+                .installments().stream().filter(i -> i.status() != InstallmentStatus.PAID).findFirst().orElseThrow().id();
+        paymentPlanService.collect(note, new CollectRequest(cash, today.plusDays(30)));
+        expectPartner("senet tahsil", burak, 1_150_000 * TL, 1_150_000 * TL, 0);
+        assertThat(holder(burak).otherCents()).isZero();
+        check("senet tahsil");
+
+        paymentPlanService.undo(note);
+        expectPartner("tahsilat geri", burak, 500_000 * TL, 500_000 * TL, 0);
+        assertThat(holder(burak).otherCents()).isEqualTo(650_000 * TL);
+        check("tahsilat geri");
     }
 
     @Test
@@ -275,7 +302,7 @@ class CoFinancingIT {
         assertThat(b.contributionCents()).isEqualTo(400_000 * TL);
         assertThat(b.profitCents()).as("kar tam maliyet uzerinden").isEqualTo(150_000 * TL);
         assertThat(b.receivableCents()).isEqualTo(550_000 * TL);
-        assertThat(owner(v, owner).receivableCents()).isEqualTo(550_000 * TL);   // 2.300.000 - 1.200.000 = 550.000 + 550.000
+        assertThat(owner(v, owner).receivableCents()).isEqualTo(550_000 * TL);   // katki 400.000 + kar 150.000 (kalan senet satis parasindan)
         expectPartner("satis", burak, 1_150_000 * TL, 1_150_000 * TL, 0);
         check("satis");
 
@@ -397,6 +424,14 @@ class CoFinancingIT {
                 List.of(new InstallmentRequest(today, price, PaymentMethod.CASH, null, null, true, cash)), List.of(returns)));
     }
 
+    private VehicleSaleRequest sale(UUID buyer, List<InstallmentRequest> rows) {
+        return new VehicleSaleRequest(today, buyer, null, rows.stream().mapToLong(InstallmentRequest::amountCents).sum(), rows);
+    }
+
+    private CapitalResponses.Holder holder(UUID user) {
+        return netWorthService.holders().stream().filter(h -> user.equals(h.userId())).findFirst().orElseThrow();
+    }
+
     /** Satisi geri almadan once alicinin pesin tahsilatini geri al (odenmis taksit varsa 1018). */
     private void undoCollections(UUID vehicle) {
         paymentPlanService.plans(vehicle).stream().filter(p -> p.direction() == PlanDirection.SALE)
@@ -429,7 +464,7 @@ class CoFinancingIT {
     }
 
     private void check(String step) {
-        new LedgerInvariants(jdbc, capitalService).check(tenant, step);
+        new LedgerInvariants(jdbc, capitalService, coOwnershipService).check(tenant, step);
         var worth = netWorthService.summary();
         assertThat(worth.differenceCents()).as("%s: varlik ekrani dengesi", step).isZero();
         assertThat(worth.partners()).allSatisfy(p -> {

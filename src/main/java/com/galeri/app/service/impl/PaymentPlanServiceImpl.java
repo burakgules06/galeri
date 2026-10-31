@@ -54,6 +54,8 @@ import com.galeri.app.repository.PaymentPlanRepository;
 import com.galeri.app.repository.PaymentPlanVehicleRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.security.CurrentUser;
+import com.galeri.app.model.enums.Ownership;
+import com.galeri.app.model.enums.VehicleStatus;
 import com.galeri.app.service.CoOwnershipService;
 import com.galeri.app.service.LedgerService;
 import com.galeri.app.service.PaymentPlanService;
@@ -598,6 +600,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         syncHolder(i, r.date());
         // Ortak aracin alis taksiti: odeme sahiplere paylarina gore bolunur (cepten kisim sermaye girisi)
         if (plan.getDirection() == PlanDirection.PURCHASE) coOwnershipService.syncContributions(vehicle);
+        afterSaleCollection(plan);   // ortakli / konsinye satista tahsilat sahiplere dagitilir
         return single(i, vehicle);
     }
 
@@ -624,6 +627,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
             coOwnershipService.syncContributions(vehicleOf(i.getPlan()));
         }
+        afterSaleCollection(i.getPlan());
         return single(i, null);
     }
 
@@ -688,6 +692,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
             coOwnershipService.syncContributions(toVehicle);
         }
+        afterSaleCollection(i.getPlan());
         return single(i, fromVehicle);
     }
 
@@ -705,6 +710,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             syncHolder(i, null);
         }
         i.setBouncedAt(now());
+        afterSaleCollection(i.getPlan());   // karsiliksiz: dagitilan pay geri alinir, risk payi oraninda sahiplerde
         return single(i, null);
     }
 
@@ -725,6 +731,22 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
             coOwnershipService.syncContributions(vehicleOf(t.getPlan()));
         });
+        afterSaleCollection(source.getPlan());
+    }
+
+    /** Satis planinda tahsilat degisti: planin ortakli / konsinye araclarinda tahsilat dagitimi yeniden yazilir. */
+    private void afterSaleCollection(PaymentPlan plan) {
+        if (plan.getDirection() != PlanDirection.SALE) return;
+        installmentRepository.flush();
+        List<UUID> ids = new ArrayList<>();
+        if (plan.getVehicleId() != null) ids.add(plan.getVehicleId());
+        else basketRepository.findByPlanIdOrderByCreatedAtAscIdAsc(plan.getId()).forEach(l -> ids.add(l.getVehicleId()));
+        for (Vehicle v : vehicleRepository.findAllById(ids)) {
+            if (v.getStatus() != VehicleStatus.IN_STOCK
+                    && (v.getOwnership() == Ownership.CO_OWNED || v.getOwnership() == Ownership.CONSIGNMENT)) {
+                coOwnershipService.resyncProfitShares(v);
+            }
+        }
     }
 
     /**
