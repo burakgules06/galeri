@@ -15,7 +15,7 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
 
 | Rol | Kim | Görür / yapar |
 |---|---|---|
-| `OWNER` (dükkân sahibi) | Galeride tek kişi | Her şey. Fiziksel kasa ve bankaları yönetir. Kullanıcılar ekranında herkesin alacak/verecek ve işlem geçmişini görür. Sermayesi = havuz − sermayedarların sermayesi. |
+| `ADMIN` (dükkân sahibi) | Şimdilik tek kişi (ileride birden fazla olabilir) | Her şey. Fiziksel kasa ve bankaları yönetir. Kullanıcılar ekranında herkesin alacak/verecek ve işlem geçmişini görür. Sermayesi = havuz − sermayedarların sermayesi. |
 | `INVESTOR` (sermayedar) | Dükkâna para koyan | Sadece kendi sermayesi, kendi para hareketleri, alacak/borcu. Kendi ve ortak olduğu araçları fiyatlarıyla; diğer araçları fiyatsız (çalışan gibi). Araç alımı ve satışı girer, kendi araçlarına masraf ekler. Kasa ve banka bakiyesini, başkalarının parasını görmez. |
 | `STAFF` (çalışan) | Çalışan | Hiçbir tutar görmez, sadece araç bilgileri. `can_trade` işaretliyse **peşin** araç alımı / satımı girebilir (girdiği tutarı sonra göremez). |
 
@@ -56,7 +56,7 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
 
 ### Veri değişikliği (özet, migration'larda kesinleşir)
 
-- `panel_user`: `role` OWNER / INVESTOR / STAFF, `can_trade`, `can_login`; telefon ve şifre `can_login` false ise boş olabilir; galeride tek OWNER.
+- `panel_user`: `role` ADMIN (dükkân sahibi) / INVESTOR / STAFF, `can_trade`, `can_login`, `capital_base`; telefon ve şifre `can_login` false ise boş olabilir. Havuzdan kalan, en önce açılan aktif ADMIN'in (birden çok dükkân sahibinde paylaşım sonra tanımlanacak).
 - Sermaye hesabı (`account` CAPITAL), `vehicle_share`, evrak sahibi (`payment_plan.holder_*`): kişi yerine kullanıcıya bağlanır.
 - `vehicle_share`: Havuz satırı (contact null) kalkar, dükkân sahibi de kullanıcı satırı olur; satırlar kullanıcı + sahiplik payı + kâr payı.
   Dükkân payı (`shop_cut_*`) kalkar. Konsinye sahibi (`consignor_id`) kullanıcıya bağlanır; komisyon alanları kalır.
@@ -67,6 +67,7 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
 ### Uygulama sırası (her biri ayrı PR)
 
 1. Kullanıcı rolleri ve veri taşıma: sermaye, araç payları, konsinye ve evrak sahibi kullanıcıya; Furkan / Burak birleştirme.
+   **Yapıldı** (`V22__users_own_capital.sql`). Sermayedarın dükkândan sermayesiyle araç alması (V19) kaldırıldı; yerini 5. madde alacak.
 2. Kişi türleri ve etiketler; kişi listesinden kullanıcıların çıkması.
 3. Yetkiler: sermayedar ve çalışan için backend kısıtları ve panel ekranları; Kullanıcılar ekranında alacak/verecek ve geçmiş.
 4. Sermayedarın alımı (sermayeden düşme) ve tahsilat seçenekleri (Sermayeme ekle / Nakit aldım).
