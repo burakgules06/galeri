@@ -31,9 +31,12 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
 - Sermayedara ait çek / senet tahsil edilene kadar onun kartında alacak; risk onda (V18 + #37 kuralı korunur, sahibi kişi değil kullanıcı olur).
 - **Araç sahipliği:** Bir araç bir ya da birkaç kullanıcıya aittir (paylar toplamı %100). **Havuz sahip değildir**; havuz herkesin
   parasının durduğu yer (kasa, bankalar, araçlar, alacaklar) ve dükkân sahibinindir. Dükkân sahibinin %100 aracı = galeri aracı.
-- **Ortaklı araç** (birden çok sahip): mevcut ekrandaki gibi her sahibin sahiplik payı ve kâr payı oranı girilir; sermayedar kendi kâr payını
-  oraya yazar, kalan kâr dükkân sahibinindir. Ayrı komisyon tanımı yok.
-- **Tek sahipli sermayedar aracı = konsinye:** sahibi bir sermayedar (kullanıcı), galeri komisyon oranı ya da tutarı alır (mevcut ekran).
+- **Ortaklı araç** (birden çok sahip): mevcut ekrandaki gibi her sahibin sahiplik payı ve kâr payı oranı girilir. Sahiplik payı sadece
+  kimin ne kadar para koyduğudur; kâr, kâr payı oranlarına göre bölünür.
+- **Galeri sahibine komisyon (ortaklı araç):** sahiplerden en az biri galeri sahibi değilse alışta "Galeri sahibine komisyon verilecek mi?"
+  sorulur; evetse % (kârın yüzdesi) ya da tutar girilir. Araç satılınca yazılır; galeri sahibi dışındaki ortaklar öder (galeri sahibi
+  ödemez), ortakların kâr payı oranına göre bölünür. Ortaklar için masraf, galeri sahibi için gelir.
+- **Tek sahipli sermayedar aracı = konsinye:** mevcut konsinye ekranı ve komisyonu aynen kalır; sadece sahibi kişi değil kullanıcıdır.
 - **Masraf:** ortaklı araca masraf sahiplik paylarına göre bölünür; herkesin payı kendi sermayesinden düşer (dükkân sahibininki kasadan).
 - **Zarar:** şimdilik tanımsız, sonra konuşulacak.
 - **Sermayedarlar arası araç devri:** alan kullanıcı satışta "satmak için al" işaretler. Satanın sermayesine satış bedeli (maliyet + kâr)
@@ -57,6 +60,7 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
   Dükkân payı (`shop_cut_*`) kalkar. Konsinye sahibi (`consignor_id`) kullanıcıya bağlanır; komisyon alanları kalır.
 - `contact`: `kind` (CUSTOMER / SELLER / SUPPLIER), etiketler; `is_owner` ve `capital_base` kullanıcıya taşınır / kalkar.
 - Prod verisi: hem kişi hem kullanıcı olan kayıtlar (Furkan, Burak Şahin) birleştirilir; tutarlar ve hareket geçmişi korunur.
+  Kişi kayıtlarında telefon boş, ad soyad kullanıcıyla birebir aynı: eşleme ad soyadla yapılır.
 
 ### Uygulama sırası (her biri ayrı PR)
 
