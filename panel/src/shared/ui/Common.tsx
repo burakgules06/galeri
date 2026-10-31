@@ -59,8 +59,9 @@ export function Segment<T extends string>({ value, options, onChange }: {
 }
 
 /** Telefonda alttan acilan tam ekran sayfa, genis ekranda ortada pencere. */
-export function Modal({ title, open, onClose, children, footer, wide = false }: {
+export function Modal({ title, open, onClose, children, footer, wide = false, size }: {
   title: string; open: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean;
+  size?: "xl";   // genis iki sutunlu formlar (satis, alis)
 }) {
   useEffect(() => {
     if (!open) return;
@@ -73,7 +74,7 @@ export function Modal({ title, open, onClose, children, footer, wide = false }: 
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
       <div className="absolute inset-0 bg-murekkep/40" onClick={onClose} />
       <div role="dialog" aria-modal="true" aria-label={title}
-        className={`relative bg-yuzey w-full ${wide ? "md:max-w-3xl" : "md:max-w-xl"} max-h-[100dvh] md:max-h-[88vh] md:rounded-2xl rounded-t-2xl flex flex-col shadow-xl`}>
+        className={`relative bg-yuzey w-full ${size === "xl" ? "md:max-w-5xl" : wide ? "md:max-w-3xl" : "md:max-w-xl"} max-h-[100dvh] md:max-h-[88vh] md:rounded-2xl rounded-t-2xl flex flex-col shadow-xl`}>
         <div className="flex items-center justify-between px-5 h-14 border-b border-cizgi shrink-0">
           <h2 className="font-cond font-bold text-[22px] tracking-tight">{title}</h2>
           <button onClick={onClose} aria-label="Kapat" className="basilir w-9 h-9 rounded-lg hover:bg-yuzey-2 grid place-items-center text-murekkep-2">
