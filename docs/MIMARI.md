@@ -35,7 +35,9 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
   kimin ne kadar para koyduğudur; kâr, kâr payı oranlarına göre bölünür.
 - **Galeri sahibine komisyon (ortaklı araç):** sahiplerden en az biri galeri sahibi değilse alışta "Galeri sahibine komisyon verilecek mi?"
   sorulur; evetse % (kârın yüzdesi) ya da tutar girilir. Araç satılınca yazılır; galeri sahibi dışındaki ortaklar öder (galeri sahibi
-  ödemez), ortakların kâr payı oranına göre bölünür. Ortaklar için masraf, galeri sahibi için gelir.
+  ödemez). % girilirse her ortak **kendi kâr payının** yüzdesini öder. Ortaklar için masraf, galeri sahibi için gelir.
+  Örnek: Furkan %50, Burak %30, Ali %20 kâr payı; kâr 1.000.000; komisyon %10 → Burak 30.000, Ali 20.000 öder;
+  Furkan 550.000, Burak 270.000, Ali 180.000.
 - **Tek sahipli sermayedar aracı = konsinye:** mevcut konsinye ekranı ve komisyonu aynen kalır; sadece sahibi kişi değil kullanıcıdır.
 - **Masraf:** ortaklı araca masraf sahiplik paylarına göre bölünür; herkesin payı kendi sermayesinden düşer (dükkân sahibininki kasadan).
 - **Zarar:** şimdilik tanımsız, sonra konuşulacak.
