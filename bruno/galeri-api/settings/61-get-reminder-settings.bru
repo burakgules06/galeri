@@ -1,0 +1,15 @@
+meta {
+  name: Get reminder settings
+  type: http
+  seq: 61
+}
+
+get {
+  url: {{baseUrl}}/api/settings/reminder
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

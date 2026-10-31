@@ -1,0 +1,28 @@
+meta {
+  name: Pay contact
+  type: http
+  seq: 19
+}
+
+post {
+  url: {{baseUrl}}/api/contacts/{{contactId}}/payments
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "accountId": "{{accountId}}",
+    "date": "2026-10-28",
+    "amountCents": 2500000,
+    "description": "Bruno örnek ödeme"
+  }
+}

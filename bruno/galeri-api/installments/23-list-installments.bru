@@ -1,0 +1,22 @@
+meta {
+  name: List installments
+  type: http
+  seq: 23
+}
+
+get {
+  url: {{baseUrl}}/api/installments
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+params:query {
+  status: UPCOMING
+  direction: SALE
+  from: 2026-10-01
+  to: 2026-12-31
+}

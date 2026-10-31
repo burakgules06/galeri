@@ -1,0 +1,27 @@
+meta {
+  name: Update panel user
+  type: http
+  seq: 58
+}
+
+patch {
+  url: {{baseUrl}}/api/users/{{userId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "fullName": "Bruno Örnek Kullanıcı",
+    "role": "STAFF",
+    "active": true
+  }
+}

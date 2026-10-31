@@ -1,0 +1,23 @@
+meta {
+  name: Correct ledger entry
+  type: http
+  seq: 32
+}
+
+post {
+  url: {{baseUrl}}/api/ledger-entries/{{ledgerEntryId}}/correct
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {}
+}

@@ -1,0 +1,26 @@
+meta {
+  name: Add partner
+  type: http
+  seq: 40
+}
+
+post {
+  url: {{baseUrl}}/api/partners
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "contactId": "{{contactId}}",
+    "base": "ALL"
+  }
+}

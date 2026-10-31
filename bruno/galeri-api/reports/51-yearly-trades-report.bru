@@ -1,0 +1,19 @@
+meta {
+  name: Yearly trades report
+  type: http
+  seq: 51
+}
+
+get {
+  url: {{baseUrl}}/api/reports/yearly-trades
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+params:query {
+  year: 2026
+}

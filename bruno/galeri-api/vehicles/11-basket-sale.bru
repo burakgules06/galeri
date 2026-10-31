@@ -1,0 +1,47 @@
+meta {
+  name: Basket sale
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/vehicles/basket-sale
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "saleDate": "2026-10-28",
+    "buyerId": "{{contactId}}",
+    "soldById": "{{userId}}",
+    "items": [
+      {
+        "vehicleId": "{{vehicleId}}",
+        "salePriceCents": 150000000
+      },
+      {
+        "vehicleId": "{{vehicleId2}}",
+        "salePriceCents": 75000000
+      }
+    ],
+    "installments": [
+      {
+        "dueDate": "2026-10-28",
+        "amountCents": 225000000,
+        "method": "CASH",
+        "paidNow": false,
+        "accountId": null,
+        "capitalCents": 0
+      }
+    ]
+  }
+}

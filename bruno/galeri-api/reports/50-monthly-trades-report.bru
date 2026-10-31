@@ -1,0 +1,20 @@
+meta {
+  name: Monthly trades report
+  type: http
+  seq: 50
+}
+
+get {
+  url: {{baseUrl}}/api/reports/monthly-trades
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+params:query {
+  year: 2026
+  month: 10
+}

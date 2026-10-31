@@ -1,0 +1,15 @@
+meta {
+  name: Remove partner
+  type: http
+  seq: 42
+}
+
+delete {
+  url: {{baseUrl}}/api/partners/{{contactId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

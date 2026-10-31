@@ -1,0 +1,25 @@
+meta {
+  name: Update reminder settings
+  type: http
+  seq: 62
+}
+
+put {
+  url: {{baseUrl}}/api/settings/reminder
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "time": "09:00"
+  }
+}

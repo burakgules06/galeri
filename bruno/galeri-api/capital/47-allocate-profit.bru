@@ -1,0 +1,29 @@
+meta {
+  name: Allocate profit
+  type: http
+  seq: 47
+}
+
+post {
+  url: {{baseUrl}}/api/profit-allocations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "contactId": "{{contactId}}",
+    "date": "2026-10-28",
+    "amountCents": 1000000,
+    "periodFrom": "2026-01-01",
+    "periodTo": "2026-10-28"
+  }
+}

@@ -1,0 +1,23 @@
+meta {
+  name: Mark installment bounced
+  type: http
+  seq: 27
+}
+
+post {
+  url: {{baseUrl}}/api/installments/{{installmentId}}/bounce
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {}
+}

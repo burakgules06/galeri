@@ -1,0 +1,41 @@
+meta {
+  name: Create bulk expenses
+  type: http
+  seq: 34
+}
+
+post {
+  url: {{baseUrl}}/api/expenses/bulk
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "items": [
+      {
+        "date": "2026-10-28",
+        "sourceAccountId": "{{accountId}}",
+        "amountCents": 500000,
+        "vehicleId": "{{vehicleId}}",
+        "categoryName": "Bakım",
+        "description": "Örnek araç masrafı"
+      },
+      {
+        "date": "2026-10-28",
+        "sourceAccountId": "{{accountId}}",
+        "amountCents": 100000,
+        "categoryName": "Genel gider",
+        "description": "Örnek genel gider"
+      }
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+meta {
+  name: Create contact
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{baseUrl}}/api/contacts
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Bruno Örnek Kişi",
+    "phone": "5550000000",
+    "type": "PERSON",
+    "notes": "Örnek kayıt"
+  }
+}

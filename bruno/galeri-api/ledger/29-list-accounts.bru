@@ -1,0 +1,15 @@
+meta {
+  name: List accounts
+  type: http
+  seq: 29
+}
+
+get {
+  url: {{baseUrl}}/api/accounts
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

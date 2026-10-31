@@ -1,0 +1,29 @@
+meta {
+  name: Update installment details
+  type: http
+  seq: 28
+}
+
+patch {
+  url: {{baseUrl}}/api/installments/{{installmentId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "dueDate": "2026-11-28",
+    "noteNo": "BRUNO-002",
+    "bankName": "Ziraat Bankası",
+    "drawerName": "Örnek keşideci",
+    "description": "Düzenlendi"
+  }
+}

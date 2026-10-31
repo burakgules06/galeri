@@ -1,0 +1,28 @@
+meta {
+  name: Update contact
+  type: http
+  seq: 17
+}
+
+put {
+  url: {{baseUrl}}/api/contacts/{{contactId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Bruno Örnek Kişi",
+    "phone": "5550000000",
+    "type": "PERSON",
+    "notes": "Güncellendi"
+  }
+}

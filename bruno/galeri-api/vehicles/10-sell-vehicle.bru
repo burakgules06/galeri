@@ -1,0 +1,42 @@
+meta {
+  name: Sell vehicle
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/vehicles/{{vehicleId}}/sale
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "saleDate": "2026-10-28",
+    "buyerId": "{{contactId}}",
+    "soldById": "{{userId}}",
+    "salePriceCents": 150000000,
+    "installments": [
+      {
+        "dueDate": "2026-10-28",
+        "amountCents": 150000000,
+        "method": "CASH",
+        "noteNo": null,
+        "payerId": null,
+        "paidNow": false,
+        "accountId": null,
+        "capitalCents": 0,
+        "description": null
+      }
+    ],
+    "ownerReturns": []
+  }
+}

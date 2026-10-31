@@ -1,0 +1,20 @@
+meta {
+  name: List vehicles
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/vehicles
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+params:query {
+  q: 06 ABC 123
+  status: IN_STOCK
+}

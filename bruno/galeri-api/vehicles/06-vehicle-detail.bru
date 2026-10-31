@@ -1,0 +1,15 @@
+meta {
+  name: Vehicle detail
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/vehicles/{{vehicleId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

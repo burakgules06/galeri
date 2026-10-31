@@ -1,0 +1,27 @@
+meta {
+  name: Endorse installment
+  type: http
+  seq: 26
+}
+
+post {
+  url: {{baseUrl}}/api/installments/{{installmentId}}/endorse
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "toContactId": "{{contactId2}}",
+    "targetInstallmentId": "{{targetInstallmentId}}",
+    "date": "2026-10-28"
+  }
+}

@@ -1,0 +1,27 @@
+meta {
+  name: Collect installment
+  type: http
+  seq: 24
+}
+
+post {
+  url: {{baseUrl}}/api/installments/{{installmentId}}/collect
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "accountId": "{{accountId}}",
+    "date": "2026-10-28",
+    "amountCents": 1000000
+  }
+}

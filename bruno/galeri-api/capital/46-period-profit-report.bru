@@ -1,0 +1,20 @@
+meta {
+  name: Period profit report
+  type: http
+  seq: 46
+}
+
+get {
+  url: {{baseUrl}}/api/reports/period-profit
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+params:query {
+  from: 2026-01-01
+  to: 2026-10-28
+}

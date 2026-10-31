@@ -1,0 +1,29 @@
+meta {
+  name: Capital transfer
+  type: http
+  seq: 44
+}
+
+post {
+  url: {{baseUrl}}/api/capital-transfers
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "fromContactId": "{{contactId}}",
+    "toContactId": "{{contactId2}}",
+    "date": "2026-10-28",
+    "amountCents": 1000000,
+    "description": "Örnek sermaye aktarımı"
+  }
+}

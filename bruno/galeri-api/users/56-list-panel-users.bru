@@ -1,0 +1,15 @@
+meta {
+  name: List panel users
+  type: http
+  seq: 56
+}
+
+get {
+  url: {{baseUrl}}/api/users
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

@@ -1,0 +1,15 @@
+meta {
+  name: Vehicle payment plans
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/api/vehicles/{{vehicleId}}/payment-plans
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

@@ -1,0 +1,19 @@
+meta {
+  name: List ledger entries
+  type: http
+  seq: 31
+}
+
+get {
+  url: {{baseUrl}}/api/ledger-entries
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+params:query {
+  accountId: {{accountId}}
+}
