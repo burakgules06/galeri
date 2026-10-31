@@ -9,7 +9,6 @@ import com.galeri.app.exception.runtime.InstallmentAlreadyPaidException;
 import com.galeri.app.exception.runtime.InstallmentNotPaidException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidPayerException;
-import com.galeri.app.exception.runtime.InvalidOpenAccountUsageException;
 import com.galeri.app.exception.runtime.PlanNotRemovableException;
 import com.galeri.app.exception.runtime.NotAPartnerException;
 import com.galeri.app.exception.runtime.PurchaseHasPaymentsException;
@@ -54,6 +53,8 @@ import com.galeri.app.repository.PaymentPlanRepository;
 import com.galeri.app.repository.PaymentPlanVehicleRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.security.CurrentUser;
+import com.galeri.app.model.enums.Ownership;
+import com.galeri.app.model.enums.VehicleStatus;
 import com.galeri.app.service.CoOwnershipService;
 import com.galeri.app.service.LedgerService;
 import com.galeri.app.service.PaymentPlanService;
@@ -102,7 +103,6 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     @Override
     @Transactional
     public void recordSale(Vehicle vehicle, Contact buyer, VehicleSaleRequest r) {
-        ensureNoOpenAccount(r.installments());
         long total = r.installments().stream().mapToLong(InstallmentRequest::amountCents).sum();
         if (total != r.salePriceCents()) throw new SaleTotalMismatchException();
         UUID tenantId = vehicle.getTenantId();
@@ -148,6 +148,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             i.setNoteNo(blankToNull(row.noteNo()));
             i.setBankName(blankToNull(row.bankName()));
             i.setDrawerName(blankToNull(row.drawerName()));
+            if (row.method() == PaymentMethod.OPEN_ACCOUNT) i.setDescription(blankToNull(row.description()));
             i.setPayer(payers.get(k));
             if (row.paidNow()) {
                 LedgerEntry paid = settle(i, PlanDirection.SALE, vehicle, row.accountId(), r.saleDate(),
@@ -181,7 +182,6 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     @Override
     @Transactional
     public void recordBasketSale(List<Vehicle> vehicles, List<Long> prices, Contact buyer, BasketSaleRequest r) {
-        ensureNoOpenAccount(r.installments());
         long total = prices.stream().mapToLong(Long::longValue).sum();
         if (r.installments().stream().mapToLong(InstallmentRequest::amountCents).sum() != total) throw new SaleTotalMismatchException();
         UUID tenantId = buyer.getTenantId();
@@ -246,6 +246,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             i.setNoteNo(blankToNull(row.noteNo()));
             i.setBankName(blankToNull(row.bankName()));
             i.setDrawerName(blankToNull(row.drawerName()));
+            if (row.method() == PaymentMethod.OPEN_ACCOUNT) i.setDescription(blankToNull(row.description()));
             i.setPayer(payers.get(k));
             if (row.paidNow()) {
                 LedgerEntry paid = settle(i, PlanDirection.SALE, null, row.accountId(), r.saleDate(),
@@ -281,7 +282,6 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     @Override
     @Transactional
     public void syncPurchase(Vehicle vehicle, UUID purchaseAccountId, List<InstallmentRequest> rows) {
-        if (rows != null) ensureNoOpenAccount(rows);
         Optional<PaymentPlan> existing = planRepository.findByVehicleIdAndDirection(vehicle.getId(), PlanDirection.PURCHASE);
         List<Installment> current = existing.map(p -> installmentRepository.findByPlanIds(List.of(p.getId()))).orElse(List.of());
         List<Installment> paid = current.stream().filter(Installment::isPaid).toList();
@@ -363,6 +363,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             i.setNoteNo(blankToNull(row.noteNo()));
             i.setBankName(blankToNull(row.bankName()));
             i.setDrawerName(blankToNull(row.drawerName()));
+            if (row.method() == PaymentMethod.OPEN_ACCOUNT) i.setDescription(blankToNull(row.description()));
             i.setPayer(payees.get(k));
             if (row.paidNow()) {
                 LedgerEntry e = ledgerService.writeSettlement(PlanDirection.PURCHASE, vehicle, payees.get(k), row.accountId(),
@@ -598,6 +599,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         syncHolder(i, r.date());
         // Ortak aracin alis taksiti: odeme sahiplere paylarina gore bolunur (cepten kisim sermaye girisi)
         if (plan.getDirection() == PlanDirection.PURCHASE) coOwnershipService.syncContributions(vehicle);
+        afterSaleCollection(plan);   // ortakli / konsinye satista tahsilat sahiplere dagitilir
         return single(i, vehicle);
     }
 
@@ -624,6 +626,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
             coOwnershipService.syncContributions(vehicleOf(i.getPlan()));
         }
+        afterSaleCollection(i.getPlan());
         return single(i, null);
     }
 
@@ -688,6 +691,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
             coOwnershipService.syncContributions(toVehicle);
         }
+        afterSaleCollection(i.getPlan());
         return single(i, fromVehicle);
     }
 
@@ -705,6 +709,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             syncHolder(i, null);
         }
         i.setBouncedAt(now());
+        afterSaleCollection(i.getPlan());   // karsiliksiz: dagitilan pay geri alinir, risk payi oraninda sahiplerde
         return single(i, null);
     }
 
@@ -725,6 +730,22 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             installmentRepository.flush();   // katki hesabi odenmis taksitleri sorgular
             coOwnershipService.syncContributions(vehicleOf(t.getPlan()));
         });
+        afterSaleCollection(source.getPlan());
+    }
+
+    /** Satis planinda tahsilat degisti: planin ortakli / konsinye araclarinda tahsilat dagitimi yeniden yazilir. */
+    private void afterSaleCollection(PaymentPlan plan) {
+        if (plan.getDirection() != PlanDirection.SALE) return;
+        installmentRepository.flush();
+        List<UUID> ids = new ArrayList<>();
+        if (plan.getVehicleId() != null) ids.add(plan.getVehicleId());
+        else basketRepository.findByPlanIdOrderByCreatedAtAscIdAsc(plan.getId()).forEach(l -> ids.add(l.getVehicleId()));
+        for (Vehicle v : vehicleRepository.findAllById(ids)) {
+            if (v.getStatus() != VehicleStatus.IN_STOCK
+                    && (v.getOwnership() == Ownership.CO_OWNED || v.getOwnership() == Ownership.CONSIGNMENT)) {
+                coOwnershipService.resyncProfitShares(v);
+            }
+        }
     }
 
     /**
@@ -798,12 +819,6 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
 
     // ------------------------------------------------------------------ yardimcilar
 
-    private static void ensureNoOpenAccount(List<InstallmentRequest> rows) {
-        if (rows.stream().anyMatch(row -> row.method() == PaymentMethod.OPEN_ACCOUNT)) {
-            throw new InvalidOpenAccountUsageException();
-        }
-    }
-
     private LedgerEntry settle(Installment i, PlanDirection direction, Vehicle vehicle, UUID accountId, LocalDate date, String description) {
         return ledgerService.writeSettlement(direction, vehicle, i.getPayer(), accountId, i.getAmountCents(), date, description);
     }
@@ -824,6 +839,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                 case PROMISSORY_NOTE -> "Senet ödemesi";
                 case OPEN_ACCOUNT -> "Açık hesap ödemesi";
                 case CHEQUE -> "Çek ödemesi";
+                case CREDIT_CARD -> "Kredi kartı ödemesi";
                 default -> "Ödeme";
             };
         }
@@ -832,6 +848,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             case OPEN_ACCOUNT -> "Açık hesap tahsilatı";
             case CHEQUE -> "Çek tahsilatı";
             case INSTITUTION -> "Kurum ödemesi";
+            case CREDIT_CARD -> "Kredi kartı tahsilatı";
             default -> "Tahsilat";
         };
     }

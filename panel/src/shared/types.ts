@@ -40,6 +40,7 @@ export interface ShareResponse {
   userId: string; name: string; owner: boolean;   // owner: dukkan sahibinin payi (parasi kasadan, kari donem karina)
   shareBp: number; profitShareBp: number; source: ContributionSource; pocketCents: number | null;
   contributionCents: number; profitCents: number | null; receivableCents: number | null;
+  collectedCents: number | null;   // satilmis aracta tahsil edildikce bu sahibe dagitilan (alacak - bu = bekleyen)
 }
 // Ortak arac satisinda ortagin alacagi: sermayede kalsin / nakit ode (tamami) / hibrit (amountCents kadari nakit)
 export type OwnerReturnMode = "KEEP" | "CASH" | "HYBRID";
@@ -201,7 +202,7 @@ export interface SaleRequest {
 
 // ---- Odeme plani ve taksitler (sadece ADMIN). Tutarlar kurus. ----
 export type PlanDirection = "SALE" | "PURCHASE";
-export type PaymentMethod = "CASH" | "TRANSFER" | "PROMISSORY_NOTE" | "INSTITUTION" | "CHEQUE" | "OPEN_ACCOUNT";
+export type PaymentMethod = "CASH" | "TRANSFER" | "PROMISSORY_NOTE" | "INSTITUTION" | "CHEQUE" | "OPEN_ACCOUNT" | "CREDIT_CARD";
 export type InstallmentStatus = "PAID" | "OVERDUE" | "UPCOMING";
 export interface VehicleRef { id: string; plate: string; make: string; model: string }
 
@@ -215,7 +216,7 @@ export interface InstallmentRequest {
   accountId: string | null;
   bankName?: string | null;     // cek
   drawerName?: string | null;   // cek: keside eden
-  description?: string | null; // gecmis acik hesap aciklamasi
+  description?: string | null; // acik hesap aciklamasi
 }
 
 export interface InstallmentResponse {
@@ -328,8 +329,9 @@ export interface VehicleCost {
   salePriceCents: number | null;
   profitCents: number | null;
   commissionCents: number | null;
-  ownerPayoutCents: number | null;   // konsinye: sahibine borc (satis - komisyon)
+  ownerPayoutCents: number | null;   // konsinye: sahibinin alacagi (satis - komisyon)
   ownerChargedCents: number;         // konsinye: sahibine yansitilan masraf
+  ownerCollectedCents: number | null;   // konsinye: alacaginin tahsil edilip sermayesine gecen kismi
   shares: ShareResponse[];           // ortak arac: sahipler, katkilar, kar paylari
   entries: LedgerEntryResponse[];
 }
