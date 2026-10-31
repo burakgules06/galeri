@@ -10,7 +10,8 @@ import { NumberInput } from "../../shared/ui/NumberInput";
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: "STAFF", label: "Çalışan" },
-  { value: "ADMIN", label: "Yönetici" },
+  { value: "INVESTOR", label: "Sermayedar" },
+  { value: "ADMIN", label: "Dükkân sahibi" },
 ];
 
 export function UsersPage() {
@@ -60,10 +61,13 @@ function UserList({ users, onEdit, onReset }: { users: UserResponse[]; onEdit: (
               <RoleBadge role={u.role} active={u.active} />
               {u.self && <span className="text-[12px] font-semibold text-murekkep-3">(siz)</span>}
             </span>
-            <span className="block sayi text-[15px] text-murekkep-2">{formatPhone(u.phone)}</span>
+            <span className="block sayi text-[15px] text-murekkep-2">
+              {u.canLogin && u.phone ? formatPhone(u.phone) : "Panele girişi yok"}
+              {u.role === "STAFF" && u.canTrade && <span className="font-sans text-[13px]"> · alım satım yapabilir</span>}
+            </span>
           </span>
           <span className="flex gap-1.5 ml-auto">
-            <Button variant="secondary" className="h-9 px-3 text-[14px]" onClick={() => onReset(u)}>Şifre sıfırla</Button>
+            {u.canLogin && <Button variant="secondary" className="h-9 px-3 text-[14px]" onClick={() => onReset(u)}>Şifre sıfırla</Button>}
             <Button variant="secondary" className="h-9 px-3 text-[14px]" onClick={() => onEdit(u)}>Düzenle</Button>
           </span>
         </li>
@@ -74,8 +78,9 @@ function UserList({ users, onEdit, onReset }: { users: UserResponse[]; onEdit: (
 
 function RoleBadge({ role, active }: { role: UserRole; active: boolean }) {
   if (!active) return <span className="text-[12px] font-semibold text-murekkep-2 bg-cizgi rounded px-1.5 py-0.5">Pasif</span>;
+  if (role === "INVESTOR") return <span className="text-[12px] font-semibold text-ortakli bg-yuzey-2 border border-cizgi rounded px-1.5 py-0.5">Sermayedar</span>;
   return role === "ADMIN"
-    ? <span className="text-[12px] font-semibold text-plaka bg-plaka-acik rounded px-1.5 py-0.5">Yönetici</span>
+    ? <span className="text-[12px] font-semibold text-plaka bg-plaka-acik rounded px-1.5 py-0.5">Dükkân sahibi</span>
     : <span className="text-[12px] font-semibold text-murekkep-2 bg-yuzey-2 border border-cizgi rounded px-1.5 py-0.5">Çalışan</span>;
 }
 
@@ -89,6 +94,10 @@ function UserForm({ existing, onClose, onSaved }: { existing: UserResponse | nul
   const [role, setRole] = useState<UserRole>(existing?.role ?? "STAFF");
   const [active, setActive] = useState(existing?.active ?? true);
   const [password, setPassword] = useState("");
+  const [canLogin, setCanLogin] = useState(existing?.canLogin ?? true);
+  const [canTrade, setCanTrade] = useState(existing?.canTrade ?? false);
+  // Girisi kapali kullanici sonradan acilirsa telefon ve sifre burada istenir
+  const needsLogin = canLogin && (!existing || !existing.canLogin);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const self = existing?.self ?? false;
@@ -98,8 +107,12 @@ function UserForm({ existing, onClose, onSaved }: { existing: UserResponse | nul
     setBusy(true);
     try {
       await (existing
-        ? api.updateUser(existing.id, { fullName, role, active })
-        : api.addUser({ fullName, phone, role, password }));
+        ? api.updateUser(existing.id, {
+            fullName, role, active, canLogin, canTrade: role === "STAFF" && canTrade,
+            ...(needsLogin ? { phone: phone || null, password: password || null } : {}),
+          })
+        : api.addUser({ fullName, phone: canLogin ? phone : null, role, password: canLogin ? password : null, canLogin,
+            canTrade: role === "STAFF" && canTrade }));
       onSaved();
     } catch (err) {
       setError(errorMessage(err));
@@ -114,23 +127,35 @@ function UserForm({ existing, onClose, onSaved }: { existing: UserResponse | nul
       <form id="user-form" onSubmit={submit} className="space-y-3">
         <ErrorBox message={error} />
         <Field label="Ad soyad"><input className={inputClass} value={fullName} onChange={(e) => setFullName(e.target.value)} required maxLength={120} /></Field>
-        {existing
+        <Field label="Rol" hint={self ? "Kendi rolünüzü düşüremezsiniz." : undefined}>
+          {self ? <p className="font-semibold">Dükkân sahibi</p> : <Segment<UserRole> value={role} onChange={setRole} options={ROLE_OPTIONS} />}
+        </Field>
+        {role === "STAFF" && (
+          <label className="flex items-center gap-2 text-[15px] cursor-pointer min-h-10">
+            <input type="checkbox" className="w-4 h-4 accent-plaka" checked={canTrade} onChange={(e) => setCanTrade(e.target.checked)} />
+            Araç alım / satımı girebilir
+          </label>
+        )}
+        {!self && (
+          <label className="flex items-center gap-2 text-[15px] cursor-pointer min-h-10">
+            <input type="checkbox" className="w-4 h-4 accent-plaka" checked={canLogin} onChange={(e) => setCanLogin(e.target.checked)} />
+            Panele girebilir
+          </label>
+        )}
+        {existing?.canLogin && canLogin
           ? <Field label="Telefon (giriş)">
               <p className="sayi text-[18px] text-murekkep-2">{formatPhone(existing.phone)}</p>
             </Field>
-          : <Field label="Cep telefonu (giriş için)">
+          : needsLogin && <Field label="Cep telefonu (giriş için)">
               <NumberInput kind="phone" value={phone} onValueChange={setPhone} placeholder="0530 111 22 33" required />
             </Field>}
-        <Field label="Rol" hint={self ? "Kendi rolünüzü düşüremezsiniz." : undefined}>
-          {self ? <p className="font-semibold">Yönetici</p> : <Segment<UserRole> value={role} onChange={setRole} options={ROLE_OPTIONS} />}
-        </Field>
         {existing && !self && (
           <Field label="Durum">
             <Segment<"on" | "off"> value={active ? "on" : "off"} onChange={(v) => setActive(v === "on")}
               options={[{ value: "on", label: "Aktif" }, { value: "off", label: "Pasif" }]} />
           </Field>
         )}
-        {!existing && (
+        {needsLogin && (
           <Field label="İlk şifre" hint="En az 8 karakter">
             <input className={inputClass} type="password" autoComplete="new-password" value={password}
               onChange={(e) => setPassword(e.target.value)} minLength={8} maxLength={72} required />

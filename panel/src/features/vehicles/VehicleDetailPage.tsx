@@ -93,7 +93,7 @@ export function VehicleDetailPage({ id }: { id: string }) {
             <Card title="Alış ve satış">
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
                 {v.ownership === "CONSIGNMENT" ? <>
-                  <ContactInfo label="Aracın sahibi (konsinye)" contact={admin.consignor} />
+                  <ContactInfo label="Aracın sahibi (konsinye)" contact={admin.consignor} link={false} />
                   <Info label="Alan çalışan" value={admin.boughtBy?.name ?? "—"} />
                   <Info label="Komisyon" numeric strong value={admin.commissionType === "RATE"
                     ? percent(admin.commissionRateBp ?? 0, 2) : tl(admin.commissionCents)} />
@@ -108,9 +108,9 @@ export function VehicleDetailPage({ id }: { id: string }) {
                     <dt className="etiket">Ortaklar</dt>
                     <dd className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[15px]">
                       {admin.shares.map((s) => (
-                        <a key={s.contactId} href={`#/contacts/${s.contactId}`} className="font-semibold hover:underline">
+                        <span key={s.userId} className="font-semibold">
                           {s.name} <span className="sayi text-[16px] text-ortakli">{percent(s.shareBp)}</span>
-                        </a>
+                        </span>
                       ))}
                     </dd>
                   </div>
@@ -207,7 +207,7 @@ function CostCard({ vehicle }: { vehicle: VehicleDetail }) {
               <h3 className="etiket mb-2">{data.profitCents == null ? "Ortak payları" : data.profitCents >= 0 ? "Kârın ortaklara bölünmesi" : "Zararın ortaklara bölünmesi"}</h3>
               <ul className="space-y-1.5">
                 {data.shares.map((s) => (
-                  <li key={s.contactId} className="flex items-center gap-3">
+                  <li key={s.userId} className="flex items-center gap-3">
                     <span className="grow min-w-0 truncate font-semibold">{s.name}</span>
                     <span className="sayi text-[16px] text-ortakli w-14 text-right">{percent(s.shareBp)}</span>
                     {s.profitCents != null && (
@@ -297,12 +297,13 @@ function ProfitInfo({ cents }: { cents: number }) {
   );
 }
 
-function ContactInfo({ label, contact }: { label: string; contact: ContactSummary | null }) {
+function ContactInfo({ label, contact, link = true }: { label: string; contact: ContactSummary | null; link?: boolean }) {
   return (
     <div className="min-w-0">
       <dt className="etiket">{label}</dt>
       <dd className="mt-1 truncate text-[16px] font-semibold">
-        {contact ? <a href={`#/contacts/${contact.id}`} className="text-konsinye hover:underline">{contact.name}</a> : "—"}
+        {contact ? (link ? <a href={`#/contacts/${contact.id}`} className="text-konsinye hover:underline">{contact.name}</a>
+          : <span className="text-konsinye">{contact.name}</span>) : "—"}
       </dd>
     </div>
   );

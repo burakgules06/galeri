@@ -49,7 +49,7 @@ public final class CapitalResponses {
      * katkisi dusulmus stok net degeridir (arac masraflari dahil). otherCents gercek alacak / borctur. shareBp sadece bilgi.
      */
     public record Holder(UUID userId, String name, boolean owner, CapitalBase base, long capitalCents, long cashCents,
-                         long vehicleCents, long otherCents, int shareBp, List<HolderVehicle> vehicles) {}
+                         long vehicleCents, long otherCents, int shareBp, List<HolderVehicle> vehicles, long balanceCents) {}
 
     public record HolderVehicle(VehicleRef vehicle, long cents) {}
 }

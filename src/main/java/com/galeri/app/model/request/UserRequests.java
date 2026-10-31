@@ -33,10 +33,11 @@ public final class UserRequests {
             @NotNull Boolean active,
             Boolean canLogin,   // bos: degismez
             Boolean canTrade,   // bos: degismez
-            @Size(max = 20) String phone   // bos: degismez
+            @Size(max = 20) String phone,   // bos: degismez
+            @Size(min = 8, max = 72) String password   // giris acilirken sifresi yoksa; bos: degismez
     ) {
         public Update(String fullName, String role, Boolean active) {
-            this(fullName, role, active, null, null, null);
+            this(fullName, role, active, null, null, null, null);
         }
     }
 

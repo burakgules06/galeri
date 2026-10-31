@@ -1,6 +1,7 @@
 package com.galeri.app.service.impl;
 
 import com.galeri.app.model.entity.Account;
+import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.enums.*;
 import com.galeri.app.model.response.*;
 import com.galeri.app.repository.*;
@@ -95,6 +96,15 @@ public class NetWorthServiceImpl implements NetWorthService {
         Map<UUID, Long> pending = new java.util.HashMap<>();
         for (Object[] row : installments.pendingByHolder(tenant)) pending.put((UUID) row[0], ((Number) row[1]).longValue());
 
+        // Kullanicinin carisi (konsinye sahibi gibi): artisi bize borclu, eksisi biz ona borcluyuz
+        Map<UUID, Long> userBalance = new java.util.HashMap<>();
+        Map<UUID, Long> balances = new java.util.HashMap<>();
+        for (Object[] r : entries.incomingTotals(tenant)) balances.merge((UUID) r[0], ((Number) r[1]).longValue(), Long::sum);
+        for (Object[] r : entries.outgoingTotals(tenant)) balances.merge((UUID) r[0], -((Number) r[1]).longValue(), Long::sum);
+        for (var a : accounts.findByTenantIdAndTypeInOrderByCreatedAtAsc(tenant, List.of(AccountType.BALANCE))) {
+            if (a.getUserId() != null) userBalance.merge(a.getUserId(), balances.getOrDefault(a.getId(), 0L), Long::sum);
+        }
+
         List<CapitalResponses.Holder> raw = new ArrayList<>();
         long investorsCapital = 0, investorsCash = 0;
         long investorsReceivable = 0;
@@ -104,7 +114,7 @@ public class NetWorthServiceImpl implements NetWorthService {
             CapitalBase base = users.findById(p.userId()).map(PanelUser::getCapitalBase).orElse(CapitalBase.ALL);
             long receivable = pending.getOrDefault(p.userId(), 0L);
             raw.add(new CapitalResponses.Holder(p.userId(), p.name(), false, base, p.capitalCents() + receivable, p.cashCents(),
-                    p.boundCents(), receivable, 0, list));
+                    p.boundCents(), receivable, 0, list, userBalance.getOrDefault(p.userId(), 0L)));
             investorsCapital += p.capitalCents() + receivable;
             investorsCash += p.cashCents();
             investorsReceivable += receivable;
@@ -119,7 +129,7 @@ public class NetWorthServiceImpl implements NetWorthService {
         long ownerOther = w.receivableCents() - w.payableCents() + stockDebt - investorsReceivable;
         raw.add(new CapitalResponses.Holder(ownerId, owner.map(PanelUser::getFullName).orElse("Dükkân sahibi"), true,
                 owner.map(PanelUser::getCapitalBase).orElse(CapitalBase.ALL), ownerCapital, ownerCash,
-                ownerInVehicles, ownerOther, 0, ownerVehicles));
+                ownerInVehicles, ownerOther, 0, ownerVehicles, ownerId == null ? 0 : userBalance.getOrDefault(ownerId, 0L)));
 
         long allVehicles = raw.stream().mapToLong(CapitalResponses.Holder::vehicleCents).sum();
         return raw.stream()
@@ -128,7 +138,7 @@ public class NetWorthServiceImpl implements NetWorthService {
                             case ALL -> MoneyMath.basisPoints(Math.max(0, h.capitalCents()), w.totalCents());
                             case VEHICLES -> MoneyMath.basisPoints(Math.max(0, h.vehicleCents()), allVehicles);
                             case CASH -> MoneyMath.basisPoints(Math.max(0, h.cashCents()), money);
-                        }, h.vehicles()))
+                        }, h.vehicles(), h.balanceCents()))
                 .sorted(Comparator.comparing(CapitalResponses.Holder::owner).reversed()
                         .thenComparing(Comparator.comparingLong(CapitalResponses.Holder::capitalCents).reversed()))
                 .toList();

@@ -89,6 +89,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const staff = useLoad(() => api.staff(), []);
   const accounts = useLoad(() => api.accounts(), []);
   const partners = useLoad(() => api.partners(), []);
+  const ownerId = (partners.data ?? []).find((p) => p.owner)?.userId ?? "";
   const me = useLoad(() => api.me(), []);
   const history = useLoad(() => api.vehicles("", null), []);
   const boughtById = boughtBy ?? me.data?.userId ?? "";
@@ -104,7 +105,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   };
   // Duzenlemede ortagin bu araca bagli katkisi nakitteki sermayesine eklenerek gosterilir (kayitta yeniden hesaplanir)
   const boundHere = Object.fromEntries((v?.status === "IN_STOCK" ? existing?.shares ?? [] : [])
-    .filter((s) => s.contactId).map((s) => [s.contactId!, s.contributionCents]));
+    .filter((s) => !s.owner).map((s) => [s.userId, s.contributionCents]));
   const purchaseAccountId = purchaseAccount ?? accounts.data?.[0]?.id ?? "";
   const [extraContacts, setExtraContacts] = useState<ContactResponse[]>([]);
   const allContacts = [...extraContacts, ...(contacts.data ?? [])];
@@ -151,7 +152,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       commissionType: consignment ? commissionType : null,
       commissionRateBp: consignment && commissionType === "RATE" ? percentToBp(commissionRate) : null,
       commissionCents: consignment && commissionType === "FIXED" ? tlToCents(commissionFixed) : null,
-      shares: coOwned ? toShareRequests(owners, profitDiffers) : null,
+      shares: coOwned ? toShareRequests(owners, profitDiffers, ownerId) : null,
       addToCatalog: makeModel.addToCatalog,
       catalogModel: makeModel.catalogModel,
       shopCutType: null,
@@ -229,8 +230,14 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
             <>
 
               <Field label="Aracın sahibi">
-                <ContactPicker contacts={allContacts} selected={consignor} onSelect={setConsignor}
-                  onCreated={(c) => setExtraContacts((l) => [c, ...l])} placeholder="İsim yaz ya da seç" />
+                <select className={inputClass} aria-label="Aracın sahibi" value={consignor?.id ?? ""}
+                  onChange={(e) => {
+                    const p = (partners.data ?? []).find((x) => x.userId === e.target.value);
+                    setConsignor(p ? { id: p.userId, name: p.name, phone: null } : null);
+                  }}>
+                  <option value="">Sermayedar seç</option>
+                  {(partners.data ?? []).filter((p) => !p.owner).map((p) => <option key={p.userId} value={p.userId}>{p.name}</option>)}
+                </select>
               </Field>
               <div className="grid grid-cols-[auto_1fr] gap-3 items-start">
                 <Field label="Komisyon">
@@ -249,8 +256,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
           )}
           {coOwned && (
             <CoOwnersEditor rows={owners} onRows={setOwners} profitDiffers={profitDiffers} onProfitDiffers={setProfitDiffers}
-              priceCents={price} contacts={allContacts}
-              onContactCreated={(c) => setExtraContacts((l) => [c, ...l])} partners={partners.data ?? []} boundHere={boundHere} />
+              priceCents={price} partners={partners.data ?? []} boundHere={boundHere} />
           )}
         </section>
 

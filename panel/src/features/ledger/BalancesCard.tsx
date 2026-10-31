@@ -53,11 +53,16 @@ function BalanceList({ title, rows }: { title: string; rows: ContactBalance[] })
         : (
           <ul className="space-y-2.5">
             {rows.map((r) => (
-              <li key={r.contactId}>
-                <a href={`#/contacts/${r.contactId}`} className="flex min-h-10 items-center justify-between gap-2 rounded-md text-plaka hover:bg-yuzey-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plaka">
-                  <span className="text-[14px] font-medium truncate">{r.name}</span>
-                  <span className="sayi font-semibold text-[15px] shrink-0">{tl(r.amountCents)}</span>
-                </a>
+              <li key={r.contactId ?? r.name}>
+                {r.contactId
+                  ? <a href={`#/contacts/${r.contactId}`} className="flex min-h-10 items-center justify-between gap-2 rounded-md text-plaka hover:bg-yuzey-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plaka">
+                      <span className="text-[14px] font-medium truncate">{r.name}</span>
+                      <span className="sayi font-semibold text-[15px] shrink-0">{tl(r.amountCents)}</span>
+                    </a>
+                  : <span className="flex min-h-10 items-center justify-between gap-2">   {/* kullanici (konsinye sahibi) carisi */}
+                      <span className="text-[14px] font-medium truncate">{r.name}</span>
+                      <span className="sayi font-semibold text-[15px] shrink-0">{tl(r.amountCents)}</span>
+                    </span>}
               </li>
             ))}
           </ul>

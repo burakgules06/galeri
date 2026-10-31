@@ -102,6 +102,7 @@ public class UserServiceImpl implements UserService {
             if (phone != null && !phone.equals(user.getPhone()) && panelUserRepository.existsByPhone(phone)) throw new PhoneAlreadyUsedException();
             user.setPhone(phone);
         }
+        if (blankToNull(request.password()) != null) user.setPasswordHash(passwordEncoder.encode(request.password()));
         boolean canLogin = request.canLogin() == null ? user.isCanLogin() : request.canLogin();
         if (canLogin && (user.getPhone() == null || user.getPasswordHash() == null)) throw new LoginDetailsRequiredException();
         if (user.getId().equals(me) && !canLogin) throw new SelfChangeNotAllowedException();

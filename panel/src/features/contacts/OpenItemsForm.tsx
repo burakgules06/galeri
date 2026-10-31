@@ -54,7 +54,7 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
         installments: filled.map((r) => ({
           dueDate: r.dueDate, amountCents: cents(r), method: r.method, noteNo: r.noteNo.trim() || null, payerId: null,
           description: r.method === "OPEN_ACCOUNT" ? r.description.trim() || null : null,
-          paidNow: false, accountId: null, capitalCents: 0,
+          paidNow: false, accountId: null,
           bankName: r.method === "CHEQUE" ? r.bankName.trim() || null : null,
           drawerName: r.method === "CHEQUE" ? r.drawerName.trim() || null : null,
         })),
@@ -89,7 +89,7 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
         {direction === "SALE" && investors.length > 0 && (
           <Field label="Kimin">
             <Segment<string> value={holder} onChange={setHolder}
-              options={[{ value: "", label: "Dükkân" }, ...investors.map((p) => ({ value: p.contactId, label: p.name }))]} />
+              options={[{ value: "", label: "Dükkân" }, ...investors.map((p) => ({ value: p.userId, label: p.name }))]} />
           </Field>
         )}
 

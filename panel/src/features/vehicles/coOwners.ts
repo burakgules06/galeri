@@ -4,8 +4,8 @@ import type { CommissionType, ContactSummary, ContributionSource, ShareRequest, 
 
 export interface OwnerRow {
   key: number;
-  pool: boolean;                    // Havuz: galeri kasasi (butun ortaklarin ortak parasi)
-  contact: ContactSummary | null;
+  pool: boolean;                    // dukkan sahibinin payi: parasi kasadan (eski Havuz)
+  contact: ContactSummary | null;   // sahip kullanici (dukkan sahibi ya da sermayedar)
   percent: string;                  // sahiplik payi
   profitPercent: string;            // kar payi orani (farkliysa)
   source: ContributionSource;
@@ -18,11 +18,11 @@ let ownerKey = 0;
 export const ownerRow = (pool: boolean, percent = "", contact: ContactSummary | null = null): OwnerRow =>
   ({ key: ++ownerKey, pool, contact, percent, profitPercent: percent, source: "CAPITAL", pocket: "" });
 
-/** Yeni ortak arac: Havuz %50 + secilecek ortak %50. Duzenlemede kayitli sahipler. */
+/** Yeni ortak arac: dukkan sahibi %50 + secilecek sermayedar %50. Duzenlemede kayitli sahipler. */
 export function initialOwners(existing?: VehicleDetailAdmin): OwnerRow[] {
   if (!existing?.shares.length) return [ownerRow(true, "50"), ownerRow(false, "50")];
   return existing.shares.map((s: ShareResponse) => ({
-    ...ownerRow(s.contactId == null, bpToInput(s.shareBp), s.contactId ? { id: s.contactId, name: s.name, phone: null } : null),
+    ...ownerRow(s.owner, bpToInput(s.shareBp), { id: s.userId, name: s.name, phone: null }),
     profitPercent: bpToInput(s.profitShareBp), source: s.source, pocket: centsToInput(s.pocketCents),
   }));
 }
@@ -57,8 +57,8 @@ export function ownerReceivables(
   profitCents: number, owners: ShareResponse[], shopCutType: CommissionType | null,
   shopCutRateBp: number | null, shopCutCents: number | null,
 ): Record<string, number> {
-  const poolIndex = owners.findIndex((o) => o.contactId == null);
-  const shares = owners.map((o) => o.contactId == null ? 0 : Math.floor(profitCents * o.profitShareBp / 10000));
+  const poolIndex = owners.findIndex((o) => o.owner);
+  const shares = owners.map((o) => o.owner ? 0 : Math.floor(profitCents * o.profitShareBp / 10000));
   if (poolIndex >= 0) shares[poolIndex] = profitCents - shares.reduce((sum, part) => sum + part, 0);
   else if (shares.length) {
     // Eşit toplamda partner ağırlıklarıyla böl; son kuruş(lar) en yüksek paya gider.
@@ -72,7 +72,7 @@ export function ownerReceivables(
     shares[largest] += profitCents - given;
   }
 
-  const partners = owners.map((o, i) => o.contactId == null ? -1 : i).filter((i) => i >= 0);
+  const partners = owners.map((o, i) => o.owner ? -1 : i).filter((i) => i >= 0);
   const partnersProfit = partners.reduce((sum, i) => sum + shares[i], 0);
   const cut = partnersProfit <= 0 || shopCutType == null ? 0
     : shopCutType === "FIXED" ? Math.min(shopCutCents ?? 0, partnersProfit)
@@ -91,7 +91,7 @@ export function ownerReceivables(
     if (poolIndex >= 0) shares[poolIndex] += cut;
   }
 
-  return Object.fromEntries(owners.flatMap((o, i) => o.contactId ? [[o.contactId, o.contributionCents + shares[i]]] : []));
+  return Object.fromEntries(owners.flatMap((o, i) => o.owner ? [] : [[o.userId, o.contributionCents + shares[i]]]));
 }
 
 export const totalBp = (bps: (number | null)[]) => bps.reduce<number>((t, b) => t + (b != null && !Number.isNaN(b) ? b : 0), 0);
@@ -99,8 +99,8 @@ export const totalBp = (bps: (number | null)[]) => bps.reduce<number>((t, b) => 
 /** Kaydetmeden once: hata metni ya da null. */
 export function ownersProblem(rows: OwnerRow[], profitDiffers: boolean, priceCents: number, shopCut: ShopCut): string | null {
   const people = rows.filter((r) => !r.pool);
-  if (people.length === 0) return "Ortak araçta en az bir ortak olmalı.";
-  if (people.some((r) => !r.contact)) return "Her ortak satırında kişi seç.";
+  if (people.length === 0) return "Ortak araçta en az bir sermayedar olmalı.";
+  if (people.some((r) => !r.contact)) return "Her ortak satırında sermayedarı seç.";
   if (new Set(people.map((r) => r.contact!.id)).size !== people.length) return "Bir kişi bir kez yazılabilir.";
   const bps = rows.map((r) => percentToBp(r.percent));
   if (bps.some((b) => b == null || Number.isNaN(b) || b <= 0)) return "Sahiplik paylarını 50 ya da 33,34 gibi yaz.";
@@ -124,9 +124,9 @@ export function ownersProblem(rows: OwnerRow[], profitDiffers: boolean, priceCen
   return null;
 }
 
-export function toShareRequests(rows: OwnerRow[], profitDiffers: boolean): ShareRequest[] {
+export function toShareRequests(rows: OwnerRow[], profitDiffers: boolean, ownerId: string): ShareRequest[] {
   return rows.map((r) => ({
-    contactId: r.pool ? null : r.contact!.id,
+    userId: r.pool ? ownerId : r.contact!.id,
     shareBp: percentToBp(r.percent)!,
     profitShareBp: profitDiffers ? percentToBp(r.profitPercent) : null,
     source: r.pool ? null : r.source,
