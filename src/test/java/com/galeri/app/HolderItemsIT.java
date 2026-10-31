@@ -74,6 +74,7 @@ class HolderItemsIT {
     @Autowired private ContactService contactService;
     @Autowired private LedgerService ledgerService;
     @Autowired private CapitalService capitalService;
+    @Autowired private com.galeri.app.service.CoOwnershipService coOwnershipService;
     @Autowired private NetWorthService netWorthService;
     @Autowired private PaymentPlanService paymentPlanService;
 
@@ -187,7 +188,7 @@ class HolderItemsIT {
     }
 
     private void check(String step) {
-        new LedgerInvariants(jdbc, capitalService).check(tenant, step);
+        new LedgerInvariants(jdbc, capitalService, coOwnershipService).check(tenant, step);
     }
 
     private static void expectError(int code, ThrowableAssert.ThrowingCallable call) {

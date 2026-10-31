@@ -1,6 +1,8 @@
 package com.galeri.app.service.impl;
 
 import com.galeri.app.model.entity.Account;
+import com.galeri.app.model.entity.Installment;
+import com.galeri.app.model.entity.LedgerEntry;
 import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.enums.*;
 import com.galeri.app.model.response.*;
@@ -78,6 +80,11 @@ public class NetWorthServiceImpl implements NetWorthService {
         long cap = -totals.getOrDefault(AccountType.CAPITAL, 0L), opening = -totals.getOrDefault(AccountType.OPENING, 0L);
         long soldCost = totals.getOrDefault(AccountType.VEHICLE, 0L) - stockTotal;
         long profit = -totals.getOrDefault(AccountType.INCOME, 0L) - totals.getOrDefault(AccountType.EXPENSE, 0L) - soldCost;
+        // Satilmis ortakli / konsinye araclarda sahiplerin tahsil edilmemis alacagi gelir hesabinda bekler: sahiplerin
+        // sermayesidir (kartlarinda alacak), dagitilmamis kar degil.
+        long pendingShares = coOwnership.pendingSaleShares(tenant).stream().mapToLong(CoOwnershipService.PendingShare::cents).sum();
+        cap += pendingShares;
+        profit -= pendingShares;
         long total = cash + bank + stockTotal + receivable - payable;
         return new NetWorthResponse(cash, bank, stockTotal, receivable, payable, total, cap, opening, profit,
                 total - cap - opening - profit, capital.partners(), stock);
@@ -95,6 +102,8 @@ public class NetWorthServiceImpl implements NetWorthService {
         // Sermayedara ait tahsil edilmemis evrak: onun alacagi (riski onda), dukkan sahibinin payinda sayilmaz
         Map<UUID, Long> pending = new java.util.HashMap<>();
         for (Object[] row : installments.pendingByHolder(tenant)) pending.put((UUID) row[0], ((Number) row[1]).longValue());
+        // Satilmis ortakli / konsinye araclardan tahsil edilmemis payi: tahsil edildikce sermayesine gecer
+        for (CoOwnershipService.PendingShare p : coOwnership.pendingSaleShares(tenant)) pending.merge(p.userId(), p.cents(), Long::sum);
 
         // Kullanicinin carisi (konsinye sahibi gibi): artisi bize borclu, eksisi biz ona borcluyuz
         Map<UUID, Long> userBalance = new java.util.HashMap<>();
@@ -142,6 +151,102 @@ public class NetWorthServiceImpl implements NetWorthService {
                 .sorted(Comparator.comparing(CapitalResponses.Holder::owner).reversed()
                         .thenComparing(Comparator.comparingLong(CapitalResponses.Holder::capitalCents).reversed()))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public List<AccountHoldings> holdings() {
+        UUID tenant = CurrentUser.tenantId();
+        List<Account> money = accounts.findByTenantIdAndTypeInOrderByCreatedAtAsc(tenant, List.of(AccountType.CASH, AccountType.BANK));
+        if (money.isEmpty()) return List.of();
+        List<CapitalResponses.Holder> people = holders();
+        Map<UUID, CapitalResponses.Holder> investors = new LinkedHashMap<>();
+        CapitalResponses.Holder owner = null;
+        for (CapitalResponses.Holder h : people) {
+            if (h.owner()) owner = h;
+            else if (h.userId() != null) investors.put(h.userId(), h);
+        }
+
+        // Kasa / bankaya dokunan hareketler zaman sirasiyla
+        Map<UUID, LedgerEntry> touching = new LinkedHashMap<>();
+        for (AccountType t : List.of(AccountType.CASH, AccountType.BANK)) {
+            for (LedgerEntry e : entries.touchingType(tenant, t)) touching.put(e.getId(), e);
+        }
+        List<LedgerEntry> ordered = new ArrayList<>(touching.values());
+        ordered.sort(Comparator.comparing(LedgerEntry::getEntryDate)
+                .thenComparing(LedgerEntry::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(LedgerEntry::getId));
+
+        Map<UUID, Map<UUID, Long>> shares = coOwnership.moneyEntryShares(tenant);
+        // Sermayedarin evraki tahsil edildi: tahsilatin girdigi hesapta onun parasi
+        for (Installment i : installments.findAllWithPlan(tenant)) {
+            UUID holder = i.getPlan().getHolderUserId();
+            if (holder == null || i.getPaidEntryId() == null || i.getHolderEntryId() == null) continue;
+            shares.computeIfAbsent(i.getPaidEntryId(), k -> new HashMap<>()).merge(holder, i.getAmountCents(), Long::sum);
+        }
+
+        Map<UUID, Long> balance = new HashMap<>();
+        Map<UUID, Map<UUID, Long>> held = new HashMap<>();
+        for (Account a : money) held.put(a.getId(), new HashMap<>());
+        for (LedgerEntry e : ordered) {
+            Account src = e.getSourceAccount(), tgt = e.getTargetAccount();
+            boolean srcMoney = held.containsKey(src.getId()), tgtMoney = held.containsKey(tgt.getId());
+            long amount = e.getAmountCents();
+            if (srcMoney && tgtMoney) {
+                // Hesaplar arasi transfer: kaynaktaki herkesin parasi oraninda tasinir
+                long before = balance.getOrDefault(src.getId(), 0L);
+                if (before > 0) {
+                    double f = Math.min(1.0, (double) amount / before);
+                    for (Map.Entry<UUID, Long> p : held.get(src.getId()).entrySet()) {
+                        long moved = Math.round(p.getValue() * f);
+                        p.setValue(p.getValue() - moved);
+                        held.get(tgt.getId()).merge(p.getKey(), moved, Long::sum);
+                    }
+                }
+                balance.merge(src.getId(), -amount, Long::sum);
+                balance.merge(tgt.getId(), amount, Long::sum);
+                continue;
+            }
+            UUID account = srcMoney ? src.getId() : tgt.getId();
+            long sign = tgtMoney ? 1 : -1;
+            balance.merge(account, sign * amount, Long::sum);
+            Account other = srcMoney ? tgt : src;
+            Map<UUID, Long> here = held.get(account);
+            if (other.getType() == AccountType.CAPITAL && other.getUserId() != null && investors.containsKey(other.getUserId())) {
+                here.merge(other.getUserId(), sign * amount, Long::sum);   // sermaye girisi / cekisi, cepten katki, ortaga donus
+            }
+            Map<UUID, Long> parts = shares.get(e.getId());
+            if (parts != null) parts.forEach((user, cents) -> { if (investors.containsKey(user)) here.merge(user, cents, Long::sum); });
+        }
+
+        // Izlenemeyen kisim (sermayeye eklenen kar payi, sermaye devri ...): hesaplara bakiyeleri oraninda
+        List<Long> weights = money.stream().map(a -> Math.max(0, balance.getOrDefault(a.getId(), 0L))).toList();
+        boolean anyPositive = weights.stream().anyMatch(w -> w > 0);
+        for (CapitalResponses.Holder h : investors.values()) {
+            long tracked = held.values().stream().mapToLong(m -> m.getOrDefault(h.userId(), 0L)).sum();
+            long rest = h.cashCents() - tracked;
+            if (rest == 0) continue;
+            List<Long> split = anyPositive ? MoneyMath.splitByWeights(rest, weights)
+                    : java.util.stream.IntStream.range(0, money.size()).mapToObj(k -> k == 0 ? rest : 0L).toList();
+            for (int k = 0; k < money.size(); k++) held.get(money.get(k).getId()).merge(h.userId(), split.get(k), Long::sum);
+        }
+
+        List<AccountHoldings> result = new ArrayList<>();
+        for (Account a : money) {
+            long bal = balance.getOrDefault(a.getId(), 0L);
+            List<AccountHoldings.Part> parts = new ArrayList<>();
+            long investorsHere = 0;
+            for (CapitalResponses.Holder h : investors.values()) {
+                long cents = held.get(a.getId()).getOrDefault(h.userId(), 0L);
+                if (cents == 0) continue;
+                parts.add(new AccountHoldings.Part(h.userId(), h.name(), false, cents));
+                investorsHere += cents;
+            }
+            parts.addFirst(new AccountHoldings.Part(owner == null ? null : owner.userId(), owner == null ? "Dükkân sahibi" : owner.name(), true,
+                    bal - investorsHere));
+            result.add(new AccountHoldings(a.getId(), a.getName(), a.getType(), bal, parts));
+        }
+        return result;
     }
 
     /** Stoktaki araclarda secilen sahiplerin odenmis katkisi, buyukten kucuge. */
