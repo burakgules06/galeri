@@ -62,6 +62,8 @@ export const api = {
   allocateProfit: (request: ProfitAllocationRequest) => apiFetch<LedgerEntryResponse>("/api/profit-allocations", json(request)),
   transfer: (request: TransferRequest) => apiFetch<LedgerEntryResponse>("/api/transfers", json(request)),
   openingBalance: (request: OpeningBalanceRequest) => apiFetch<LedgerEntryResponse>("/api/opening-balances", json(request)),
+  payUser: (userId: string, request: ContactPaymentRequest) =>
+    apiFetch<LedgerEntryResponse>(`/api/users/${userId}/payments`, json(request)),
   payContact: (contactId: string, request: ContactPaymentRequest) =>
     apiFetch<LedgerEntryResponse>(`/api/contacts/${contactId}/payments`, json(request)),
   statement: (contactId: string) => apiFetch<ContactStatement>(`/api/contacts/${contactId}/statement`),

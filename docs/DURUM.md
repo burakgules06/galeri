@@ -8,7 +8,8 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
 - Roller ADMIN (dükkân sahibi) / INVESTOR (sermayedar) / STAFF; `can_login` (kapalıysa telefon ve şifre boş olabilir), `can_trade`.
 - Sermaye hesabı (`account.user_id`), araç payı (`vehicle_share.user_id`; Havuz satırı dükkân sahibinin satırı oldu ve havuz gibi
   davranır), konsinye sahibi (`vehicle.consignor_user_id`), evrak sahibi (`payment_plan.holder_user_id`) kullanıcıda. Kullanıcının
-  carisi `account` BALANCE + `user_id` (konsinye sahibine ödeme `POST /api/users/{id}/payments` değil, şimdilik servis metodu `payUser`).
+  carisi `account` BALANCE + `user_id`; dükkânın ona borcu (konsinye satışı) `POST /api/users/{id}/payments` ile ödenir
+  (panel: Ortaklar listesinde "Ödeme yap").
 - Veri taşıma: kişi → aynı galeride aynı ad soyadlı kullanıcı (büyük/küçük harf ve baş/son boşluk farkı gözetilmez); dükkân sahibi kişi
   → aynı adlı ADMIN ya da galerinin ilk ADMIN'i; eşleşmeyen → girişi kapalı sermayedar. Sermayesi olan çalışan sermayedar olur.
   Başka kaydı kalmayan taşınan kişiler silinir. Planı silinmiş geçmiş evrak açılışları ters hareketle kapanır. Test: `UsersOwnCapitalMigrationIT`.

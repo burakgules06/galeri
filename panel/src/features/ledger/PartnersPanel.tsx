@@ -2,7 +2,7 @@
 // Tutarlar /api/holders'tan: sermayedarinki defterden, dukkan sahibininki havuzdan kalan. Yuzde sadece bilgi.
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
-import { formatPhone, percent, tl, tlToCents, todayIso } from "../../shared/format";
+import { centsToInput, formatPhone, percent, tl, tlToCents, todayIso } from "../../shared/format";
 import type { CapitalBase, CapitalDirection, Holder, Partner } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, Empty, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
@@ -18,6 +18,7 @@ export function PartnersPanel({ onChange }: { onChange: () => void }) {
   const { data, error, reload } = useLoad(() => Promise.all([api.partners(), api.holders()]), []);
   const [moving, setMoving] = useState<{ partner: Partner; direction: CapitalDirection } | null>(null);
   const [transferring, setTransferring] = useState(false);
+  const [paying, setPaying] = useState<{ partner: Partner; owedCents: number } | null>(null);
   const [revision, setRevision] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const partners = data?.[0] ?? [];
@@ -73,6 +74,11 @@ export function PartnersPanel({ onChange }: { onChange: () => void }) {
                   </span>
                 )}
                 <span className="flex flex-wrap gap-1.5 justify-end w-full sm:w-auto">
+                  {h && h.balanceCents < 0 && (
+                    <Button variant="secondary" className="h-9 px-3 text-[14px]" onClick={() => setPaying({ partner: p, owedCents: -h.balanceCents })}>
+                      Ödeme yap · {tl(-h.balanceCents)}
+                    </Button>
+                  )}
                   <Button variant="secondary" className="h-9 px-3 text-[14px]" onClick={() => setMoving({ partner: p, direction: "IN" })}>Sermaye girişi</Button>
                   <Button variant="secondary" className="h-9 px-3 text-[14px]" disabled={!p.owner && (h?.cashCents ?? 0) <= 0}
                     onClick={() => setMoving({ partner: p, direction: "OUT" })}>Çekiş</Button>
@@ -89,6 +95,8 @@ export function PartnersPanel({ onChange }: { onChange: () => void }) {
 
       {moving && <CapitalMovementForm partner={moving.partner} holder={holderOf(moving.partner)} direction={moving.direction}
         onClose={() => setMoving(null)} onSaved={() => { setMoving(null); changed(); }} />}
+      {paying && <PayUserForm partner={paying.partner} owedCents={paying.owedCents} onClose={() => setPaying(null)}
+        onSaved={() => { setPaying(null); changed(); }} />}
       {transferring && <TransferForm partners={partners} holders={holders} onClose={() => setTransferring(false)}
         onSaved={() => { setTransferring(false); changed(); }} />}
     </div>
@@ -227,6 +235,55 @@ function TransferForm({ partners, holders, onClose, onSaved }: {
           <Field label="Tarih"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
           <Field label="Açıklama"><input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="İsteğe bağlı" /></Field>
         </div>
+      </form>
+    </Modal>
+  );
+}
+
+// Dukkanin kullaniciya borcu (or. konsinye satisinda sahibine): kasa / bankadan odenir, kismi olabilir.
+function PayUserForm({ partner, owedCents, onClose, onSaved }: {
+  partner: Partner; owedCents: number; onClose: () => void; onSaved: () => void;
+}) {
+  const [amount, setAmount] = useState(centsToInput(owedCents));
+  const [accountId, setAccountId] = useState("");
+  const [date, setDate] = useState(todayIso());
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const accounts = useLoad(() => api.accounts(), []);
+  const selected = accountId || accounts.data?.[0]?.id || "";
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    const cents = tlToCents(amount);
+    if (cents == null || Number.isNaN(cents) || cents <= 0) return setError("Tutarı 100.000 gibi yaz.");
+    setSaving(true);
+    setError(null);
+    try {
+      await api.payUser(partner.userId, { accountId: selected, date, amountCents: cents, description: null });
+      onSaved();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal title={`${partner.name} · ödeme`} open onClose={onClose}
+      footer={<>
+        <Button variant="secondary" type="button" onClick={onClose}>Vazgeç</Button>
+        <Button type="submit" form="pay-user-form" disabled={saving}>{saving ? "Kaydediliyor…" : "Öde"}</Button>
+      </>}>
+      <form id="pay-user-form" onSubmit={submit} className="space-y-4">
+        <ErrorBox message={error} />
+        <Field label="Tutar"><NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount} autoFocus /></Field>
+        <Field label="Hangi hesaptan çıktı">
+          {accounts.data && (
+            <Segment<string> value={selected} onChange={setAccountId}
+              options={accounts.data.map((a) => ({ value: a.id, label: `${a.name} · ${tl(a.balanceCents)}` }))} />
+          )}
+        </Field>
+        <Field label="Tarih"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
       </form>
     </Modal>
   );
