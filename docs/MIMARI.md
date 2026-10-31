@@ -29,6 +29,11 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
 - Sermayedar kendi aracının tahsilatını yaparken iki seçenek: **Sermayeme ekle** (para dükkâna girer, sermayesi artar) ya da
   **Nakit aldım** (para cebine; alacak kapanır, sermaye değişmez).
 - Sermayedara ait çek / senet tahsil edilene kadar onun kartında alacak; risk onda (V18 + #37 kuralı korunur, sahibi kişi değil kullanıcı olur).
+- **Araç sahipliği:** Bir araç bir ya da birkaç kullanıcıya aittir (paylar toplamı %100). **Havuz sahip değildir**; havuz herkesin
+  parasının durduğu yer (kasa, bankalar, araçlar, alacaklar) ve dükkân sahibinindir. Dükkân sahibinin %100 aracı = galeri aracı.
+- **Kâr oranı bölüşümü kalkar** (`profit_share_bp`, dükkân payı, `VEHICLE_PROFIT_SHARE`). Sermayedar kendi payını satınca galeriye
+  **komisyon** verir; komisyon dükkânındır (dükkân sahibinin payına girer). Sermayedarın payına düşen satış − komisyon onun sermayesine
+  yazılır. Eski "konsinye" bu kuralın %100 sermayedar araçlı halidir; ayrı sahiplik türü kalkar.
 - **Sermayedarlar arası araç devri:** alan kullanıcı satışta "satmak için al" işaretler. Satanın sermayesine satış bedeli (maliyet + kâr)
   eklenir, araç onun araçlarından düşer; alanın sermayesinden bedel düşer, araç onun araçlarına eklenir. Kasa değişmez.
 
@@ -38,12 +43,16 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
 - **Biçim:** `PERSON` (bireysel) / `ORGANIZATION` (tüzel; Evim gibi kurumlar da burada).
 - **Etiketler (otomatik):** "Araç sattık", "Araç aldık" işlemlerden eklenir; ana tür değişmez.
 - Masrafa tedarikçi bağlama şimdilik **yok** (sadelik).
-- Araç sahipliği seçenekleri (ortaklı araç sahipleri, konsinye sahibi) sadece **kullanıcılardır**; kişi araç sahibi olmaz.
+- Araç sahipleri sadece **kullanıcılardır**; kişi araç sahibi olmaz.
+- Sermayedar satış girerken dükkân sahibiyle aynı ödeme seçeneklerini kullanır (peşin, taksit, senet, çek, açık hesap); kendi senet ve
+  açık hesaplarını kendi ekranından takip eder.
 
 ### Veri değişikliği (özet, migration'larda kesinleşir)
 
 - `panel_user`: `role` OWNER / INVESTOR / STAFF, `can_trade`, `can_login`; telefon ve şifre `can_login` false ise boş olabilir; galeride tek OWNER.
-- Sermaye hesabı (`account` CAPITAL), `vehicle_share`, konsinye sahibi, evrak sahibi (`payment_plan.holder_*`): kişi yerine kullanıcıya bağlanır.
+- Sermaye hesabı (`account` CAPITAL), `vehicle_share`, evrak sahibi (`payment_plan.holder_*`): kişi yerine kullanıcıya bağlanır.
+- `vehicle_share`: Havuz satırı (contact null) ve `profit_share_bp` kalkar; satırlar kullanıcı + pay. `vehicle.ownership` (DEALER /
+  CONSIGNMENT / CO_OWNED) paylardan türetilir ya da kalkar; komisyon alanları (`commission_*`) araçta kalır.
 - `contact`: `kind` (CUSTOMER / SELLER / SUPPLIER), etiketler; `is_owner` ve `capital_base` kullanıcıya taşınır / kalkar.
 - Prod verisi: hem kişi hem kullanıcı olan kayıtlar (Furkan, Burak Şahin) birleştirilir; tutarlar ve hareket geçmişi korunur.
 
@@ -391,10 +400,10 @@ Her adım ayrı bir PR; her biri bittiğinde galericiye gösterilebilir.
 
 ## 13. Açık sorular
 
-- §0 için: Konsinye ayrı kalacak mı, yoksa "sermayedarın kendi aracı" (%100 onun ortaklı araç) ile birleşecek mi? Fark: konsinyede galeri
-  komisyon alır, kendi aracında kâr payı oranıyla bölüşülür.
-- §0 için: Sermayedarlar arası devirde araç ortaklıysa (ör. Burak %50 + Havuz %50) sadece satanın payı mı devredilir?
-- §0 için: Sermayedarın girdiği satışta ödeme planı serbest mi (taksit, senet), yoksa çalışan gibi şimdilik peşin mi?
+- §0 komisyon: araçta mı tanımlanır (alışta, oran ya da sabit; satışta değiştirilebilir), yoksa sermayedar başına sabit oran mı?
+  Ortaklı araçta (Furkan %50 + Burak %50) komisyon sadece Burak'ın payından mı alınır?
+- §0 masraf ve zarar: ortaklı araca masraf paylara göre mi bölünür (herkesin sermayesinden payı kadar)? Araç zararına satılırsa
+  sermayedar payına düşen zararı ve komisyonu sermayesinden mi öder?
 
 - Konsinye araçlardan alınan komisyon sermaye havuzunun kârına giriyor mu? (Galerici "sonra konuşalım" dedi. Şimdilik INCOME'a yazılır ve dönem kârına dahil gösterilir; değişirse sadece rapor değişir. Ana ekranda ve raporlarda komisyon
   araç kârından ayrı satırda gösterilir.)
