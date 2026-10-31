@@ -272,7 +272,7 @@ class CoFinancingIT {
         UUID v = coOwned(2_000_000 * TL, half(burak, ContributionSource.CAPITAL, null));
         sell(v, 2_300_000 * TL, new OwnerReturnRequest(burak, OwnerReturnMode.HYBRID, 100_000 * TL, cash));
         expectError(1023, () -> ledgerService.correct(jdbc.queryForObject(
-                "select id from ledger_entry where vehicle_id = ? and type = 'VEHICLE_PROFIT_SHARE'", UUID.class, v)));   // kar payi bagli
+                "select id from ledger_entry where vehicle_id = ? and type = 'VEHICLE_PROFIT_SHARE' limit 1", UUID.class, v)));   // dagitim bagli
         undoCollections(v);
         expectError(1043, () -> vehicleService.undoSale(v));
 
