@@ -150,7 +150,7 @@ class UsersOwnCapitalMigrationIT {
                 insert into vehicle (id, tenant_id, plate, make, model, model_year, fuel, transmission, purchase_date, ownership,
                                      consignor_id, commission_type, commission_rate_bp)
                 values (?, ?, ?, 'Fiat', 'Egea', 2022, 'GASOLINE', 'MANUAL', current_date, ?, ?, ?, ?)""",
-                id, tenant, "34 MG " + (100 + ThreadLocalRandom.current().nextInt(800)), ownership, consignor,
+                id, tenant, "34 MG " + (consignment ? 101 : 102), ownership, consignor,
                 consignment ? "RATE" : null, consignment ? 300 : null);
     }
 

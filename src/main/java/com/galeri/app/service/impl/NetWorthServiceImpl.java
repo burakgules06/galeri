@@ -78,6 +78,11 @@ public class NetWorthServiceImpl implements NetWorthService {
         long cap = -totals.getOrDefault(AccountType.CAPITAL, 0L), opening = -totals.getOrDefault(AccountType.OPENING, 0L);
         long soldCost = totals.getOrDefault(AccountType.VEHICLE, 0L) - stockTotal;
         long profit = -totals.getOrDefault(AccountType.INCOME, 0L) - totals.getOrDefault(AccountType.EXPENSE, 0L) - soldCost;
+        // Satilmis ortakli / konsinye araclarda sahiplerin tahsil edilmemis alacagi gelir hesabinda bekler: sahiplerin
+        // sermayesidir (kartlarinda alacak), dagitilmamis kar degil.
+        long pendingShares = coOwnership.pendingSaleShares(tenant).stream().mapToLong(CoOwnershipService.PendingShare::cents).sum();
+        cap += pendingShares;
+        profit -= pendingShares;
         long total = cash + bank + stockTotal + receivable - payable;
         return new NetWorthResponse(cash, bank, stockTotal, receivable, payable, total, cap, opening, profit,
                 total - cap - opening - profit, capital.partners(), stock);
@@ -95,6 +100,8 @@ public class NetWorthServiceImpl implements NetWorthService {
         // Sermayedara ait tahsil edilmemis evrak: onun alacagi (riski onda), dukkan sahibinin payinda sayilmaz
         Map<UUID, Long> pending = new java.util.HashMap<>();
         for (Object[] row : installments.pendingByHolder(tenant)) pending.put((UUID) row[0], ((Number) row[1]).longValue());
+        // Satilmis ortakli / konsinye araclardan tahsil edilmemis payi: tahsil edildikce sermayesine gecer
+        for (CoOwnershipService.PendingShare p : coOwnership.pendingSaleShares(tenant)) pending.merge(p.userId(), p.cents(), Long::sum);
 
         // Kullanicinin carisi (konsinye sahibi gibi): artisi bize borclu, eksisi biz ona borcluyuz
         Map<UUID, Long> userBalance = new java.util.HashMap<>();
