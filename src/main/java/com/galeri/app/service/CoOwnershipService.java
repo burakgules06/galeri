@@ -40,6 +40,15 @@ public interface CoOwnershipService {
      */
     void resyncProfitShares(Vehicle vehicle);
 
+    /**
+     * Araclarin parasi kimin: ortakli aracta sahipler, konsinyede sahibi, galeri aracinda dukkan sahibi (havuz).
+     * Odemeler ekraninda kisi secimi ve sermayedarin kendi kayitlari icin.
+     */
+    Map<UUID, List<UUID>> vehicleUsers(UUID tenantId, java.util.Collection<UUID> vehicleIds);
+
+    /** Dukkan sahibi (havuz): galerinin ilk aktif yoneticisi; yoksa null. */
+    UUID poolOwnerId(UUID tenantId);
+
     /** Satilmis araclardan sahiplerin henuz tahsil edilmemis alacagi (sermayedarin kartinda alacak). */
     List<PendingShare> pendingSaleShares(UUID tenantId);
 

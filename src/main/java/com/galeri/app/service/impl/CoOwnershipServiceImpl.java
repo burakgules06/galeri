@@ -573,6 +573,34 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         return new ConsignmentShare(d.entitledCents(), d.givenCents());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, List<UUID>> vehicleUsers(UUID tenantId, java.util.Collection<UUID> vehicleIds) {
+        Map<UUID, List<UUID>> result = new HashMap<>();
+        if (vehicleIds.isEmpty()) return result;
+        UUID pool = poolOwnerId(tenantId);
+        Map<UUID, List<UUID>> shares = new HashMap<>();
+        for (VehicleShare s : shareRepository.findByVehicleIdIn(vehicleIds)) {
+            shares.computeIfAbsent(s.getVehicleId(), k -> new ArrayList<>()).add(s.getUser().getId());
+        }
+        for (Vehicle v : vehicleRepository.findAllById(vehicleIds)) {
+            if (!v.getTenantId().equals(tenantId)) continue;
+            List<UUID> users = switch (v.getOwnership()) {
+                case CO_OWNED -> shares.getOrDefault(v.getId(), List.of());
+                case CONSIGNMENT -> v.getConsignor() == null ? List.of() : List.of(v.getConsignor().getId());
+                default -> pool == null ? List.of() : List.of(pool);
+            };
+            result.put(v.getId(), users);
+        }
+        return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UUID poolOwnerId(UUID tenantId) {
+        return panelUserRepository.findPoolOwner(tenantId).map(PanelUser::getId).orElse(null);
+    }
+
     private static VehicleRef ref(Vehicle v) {
         return new VehicleRef(v.getId(), v.getPlate(), v.getMake(), v.getModel());
     }
