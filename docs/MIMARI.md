@@ -31,9 +31,11 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
 - Sermayedara ait çek / senet tahsil edilene kadar onun kartında alacak; risk onda (V18 + #37 kuralı korunur, sahibi kişi değil kullanıcı olur).
 - **Araç sahipliği:** Bir araç bir ya da birkaç kullanıcıya aittir (paylar toplamı %100). **Havuz sahip değildir**; havuz herkesin
   parasının durduğu yer (kasa, bankalar, araçlar, alacaklar) ve dükkân sahibinindir. Dükkân sahibinin %100 aracı = galeri aracı.
-- **Kâr oranı bölüşümü kalkar** (`profit_share_bp`, dükkân payı, `VEHICLE_PROFIT_SHARE`). Sermayedar kendi payını satınca galeriye
-  **komisyon** verir; komisyon dükkânındır (dükkân sahibinin payına girer). Sermayedarın payına düşen satış − komisyon onun sermayesine
-  yazılır. Eski "konsinye" bu kuralın %100 sermayedar araçlı halidir; ayrı sahiplik türü kalkar.
+- **Ortaklı araç** (birden çok sahip): mevcut ekrandaki gibi her sahibin sahiplik payı ve kâr payı oranı girilir; sermayedar kendi kâr payını
+  oraya yazar, kalan kâr dükkân sahibinindir. Ayrı komisyon tanımı yok.
+- **Tek sahipli sermayedar aracı = konsinye:** sahibi bir sermayedar (kullanıcı), galeri komisyon oranı ya da tutarı alır (mevcut ekran).
+- **Masraf:** ortaklı araca masraf sahiplik paylarına göre bölünür; herkesin payı kendi sermayesinden düşer (dükkân sahibininki kasadan).
+- **Zarar:** şimdilik tanımsız, sonra konuşulacak.
 - **Sermayedarlar arası araç devri:** alan kullanıcı satışta "satmak için al" işaretler. Satanın sermayesine satış bedeli (maliyet + kâr)
   eklenir, araç onun araçlarından düşer; alanın sermayesinden bedel düşer, araç onun araçlarına eklenir. Kasa değişmez.
 
@@ -51,8 +53,8 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
 
 - `panel_user`: `role` OWNER / INVESTOR / STAFF, `can_trade`, `can_login`; telefon ve şifre `can_login` false ise boş olabilir; galeride tek OWNER.
 - Sermaye hesabı (`account` CAPITAL), `vehicle_share`, evrak sahibi (`payment_plan.holder_*`): kişi yerine kullanıcıya bağlanır.
-- `vehicle_share`: Havuz satırı (contact null) ve `profit_share_bp` kalkar; satırlar kullanıcı + pay. `vehicle.ownership` (DEALER /
-  CONSIGNMENT / CO_OWNED) paylardan türetilir ya da kalkar; komisyon alanları (`commission_*`) araçta kalır.
+- `vehicle_share`: Havuz satırı (contact null) kalkar, dükkân sahibi de kullanıcı satırı olur; satırlar kullanıcı + sahiplik payı + kâr payı.
+  Dükkân payı (`shop_cut_*`) kalkar. Konsinye sahibi (`consignor_id`) kullanıcıya bağlanır; komisyon alanları kalır.
 - `contact`: `kind` (CUSTOMER / SELLER / SUPPLIER), etiketler; `is_owner` ve `capital_base` kullanıcıya taşınır / kalkar.
 - Prod verisi: hem kişi hem kullanıcı olan kayıtlar (Furkan, Burak Şahin) birleştirilir; tutarlar ve hareket geçmişi korunur.
 
@@ -400,10 +402,7 @@ Her adım ayrı bir PR; her biri bittiğinde galericiye gösterilebilir.
 
 ## 13. Açık sorular
 
-- §0 komisyon: araçta mı tanımlanır (alışta, oran ya da sabit; satışta değiştirilebilir), yoksa sermayedar başına sabit oran mı?
-  Ortaklı araçta (Furkan %50 + Burak %50) komisyon sadece Burak'ın payından mı alınır?
-- §0 masraf ve zarar: ortaklı araca masraf paylara göre mi bölünür (herkesin sermayesinden payı kadar)? Araç zararına satılırsa
-  sermayedar payına düşen zararı ve komisyonu sermayesinden mi öder?
+- §0 zarar: ortaklı ya da konsinye araç zararına satılırsa sermayedarın payı (şimdilik tanımsız).
 
 - Konsinye araçlardan alınan komisyon sermaye havuzunun kârına giriyor mu? (Galerici "sonra konuşalım" dedi. Şimdilik INCOME'a yazılır ve dönem kârına dahil gösterilir; değişirse sadece rapor değişir. Ana ekranda ve raporlarda komisyon
   araç kârından ayrı satırda gösterilir.)
