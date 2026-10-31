@@ -140,6 +140,7 @@ export const SERIES = ["var(--color-seri-1)", "var(--color-seri-2)", "var(--colo
 
 export const METHOD: Record<PaymentMethod, string> = {
   CASH: "Nakit", TRANSFER: "Havale", PROMISSORY_NOTE: "Senet", INSTITUTION: "Evim / kredi", CHEQUE: "Çek", OPEN_ACCOUNT: "Açık hesap",
+  CREDIT_CARD: "Kredi kartı",
 };
 
 /** ISO tarihe ay ekler; ayin son gunu tasarsa ay sonuna yaslar (31 Ocak + 1 ay -> 28/29 Subat). */

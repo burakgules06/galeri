@@ -1,16 +1,18 @@
-// Ortak arac satisinda ortaga donus: her ortak icin alacagi (katki + kar payi) sermayede mi kalsin, nakit mi odensin.
-// Alacak satis aninda yazilir (alicinin senetleri beklenmez); burada gosterilen tahmindir, kesin tutar kayitta hesaplanir.
+// Ortak arac satisinda ortaga donus: her tahsilat kar payi oranlariyla bolunur. Simdi alinan kisimdan ortagin payi sermayesine
+// gecer; burada sermayede mi kalsin, nakit mi odensin secilir. Kalan tahsil edildikce gelir. Tutarlar tahmin, kesini kayitta.
 import { tl } from "../../shared/format";
 import type { AccountResponse, CommissionType, OwnerReturnMode, ShareResponse } from "../../shared/types";
 import { inputClass, Segment } from "../../shared/ui/Common";
 import { NumberInput } from "../../shared/ui/NumberInput";
-import { ownerReceivables } from "./coOwners";
+import { ownerSaleShares } from "./coOwners";
 import type { OwnerReturnDraft } from "./ownerReturnDraft";
 
 interface Props {
   owners: ShareResponse[];
-  /** Tahmini kar (satis - maliyet); satis bedeli girilmediyse null */
-  profitCents: number | null;
+  saleCents: number;
+  paidNowCents: number;
+  purchaseCents: number;
+  expenseCents: number;
   shopCutType: CommissionType | null;
   shopCutRateBp: number | null;
   shopCutCents: number | null;
@@ -23,27 +25,33 @@ const MODES: { value: OwnerReturnMode; label: string }[] = [
   { value: "KEEP", label: "Sermayede kalsın" }, { value: "CASH", label: "Nakit öde" }, { value: "HYBRID", label: "Hibrit" },
 ];
 
-export function OwnerReturns({ owners, profitCents, shopCutType, shopCutRateBp, shopCutCents, accounts, value, onChange }: Props) {
+export function OwnerReturns({ owners, saleCents, paidNowCents, purchaseCents, expenseCents, shopCutType, shopCutRateBp, shopCutCents,
+  accounts, value, onChange }: Props) {
   const partners = owners.filter((o) => !o.owner);
   if (partners.length === 0) return null;
-  const receivables = profitCents == null ? null : ownerReceivables(profitCents, owners, shopCutType, shopCutRateBp, shopCutCents);
+  const shares = saleCents > 0 ? ownerSaleShares(saleCents, paidNowCents, purchaseCents, expenseCents, owners, shopCutType, shopCutRateBp, shopCutCents) : null;
   return (
     <section className="space-y-3">
-      <p className="etiket">Ortağa dönüş</p>
+      <div>
+        <p className="etiket">Ortaklar</p>
+        <p className="text-[13px] text-murekkep-2 mt-0.5">Her tahsilat kâr payı oranıyla bölünür. Şimdi alınan paradan ortağın payı sermayesine geçer; kalanı tahsil edildikçe.</p>
+      </div>
 
       {partners.map((o) => {
         const draft = value[o.userId] ?? { mode: "KEEP", amount: "", accountId: accounts[0]?.id ?? "" };
-        const receivable = receivables?.[o.userId];
+        const share = shares?.[o.userId];
         const set = (change: Partial<OwnerReturnDraft>) => onChange({ ...value, [o.userId]: { ...draft, ...change } });
         return (
           <div key={o.userId} className="border-l-[3px] border-ortakli pl-3 py-1 space-y-2">
             <p className="text-[14px]">
               <span className="font-semibold">{o.name}</span>
-              <span className="text-murekkep-2"> · katkı <b className="sayi text-[15px] text-murekkep">{tl(o.contributionCents)}</b></span>
-              {receivable != null && <span className="text-murekkep-2"> · {receivable < 0 ? "galeriye borcu" : "alacağı"} yaklaşık <b className={`sayi text-[15px] ${receivable < 0 ? "text-tehlike" : "text-murekkep"}`}>{tl(Math.abs(receivable))}</b></span>}
+              <span className="text-murekkep-2"> · kâr payı <b className="sayi text-[15px] text-ortakli">%{(o.profitShareBp / 100).toLocaleString("tr-TR")}</b></span>
+              <span className="text-murekkep-2"> · koyduğu <b className="sayi text-[15px] text-murekkep">{tl(o.contributionCents)}</b></span>
+              {share && <span className="text-murekkep-2"> · alacağı yaklaşık <b className="sayi text-[15px] text-murekkep">{tl(share.entitled)}</b>,
+                şimdi <b className="sayi text-[15px] text-basari">{tl(share.now)}</b></span>}
             </p>
-            {receivable != null && receivable <= 0
-              ? <p className="text-[13px] text-murekkep-2">Nakit dönüş yok; ortak zarar payı katkısını aşıyor.</p>
+            {share != null && share.now <= 0
+              ? <p className="text-[13px] text-murekkep-2">Şimdi alınan paradan payı yok; tahsil edildikçe sermayesine geçer.</p>
               : <div className="flex flex-wrap items-center gap-2">
                   <Segment<OwnerReturnMode> value={draft.mode} onChange={(mode) => set({ mode })} options={MODES} />
                   {draft.mode === "HYBRID" && (
