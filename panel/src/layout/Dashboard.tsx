@@ -7,6 +7,7 @@ import { ContactList } from "../features/contacts/ContactList";
 import { PaymentsPage } from "../features/payments/PaymentsPage";
 import { HomePage } from "../features/home/HomePage";
 import { LedgerPage } from "../features/ledger/LedgerPage";
+import { InvestorLedgerPage } from "../features/ledger/InvestorLedgerPage";
 import { ExpensesPage } from "../features/expenses/ExpensesPage";
 import { ShopPage } from "../features/expenses/ShopPage";
 import { MonthlyView } from "../features/monthly/MonthlyView";
@@ -56,13 +57,15 @@ function readMenuOpen(): boolean {
 }
 
 export function Dashboard() {
-  const { auth, isAdmin, logout: endSession } = useAuth();
+  const { auth, isAdmin, isInvestor, logout: endSession } = useAuth();
+  const money = isAdmin || isInvestor;   // kendi parasini gorebilen
   // Cikista bu cihazin bildirim aboneligi de kapanir (ayni cihazda calisan oturum acarsa tutar gormesin)
   const logout = () => { disablePush().catch(() => {}).finally(endSession); };
   const route = useRoute();
   const [open, setOpen] = useState(readMenuOpen);
   const sections: Section[] = isAdmin
-    ? ["home", "vehicles", "payments", "ledger", "expenses", "shop", "monthly", "contacts", "users"] : ["home", "vehicles", "monthly"];
+    ? ["home", "vehicles", "payments", "ledger", "expenses", "shop", "monthly", "contacts", "users"]
+    : isInvestor ? ["home", "vehicles", "payments", "ledger", "expenses", "monthly"] : ["home", "vehicles", "monthly"];
   // Telefon alt sekmesi dolu: Kullanicilar'a Hesabim'dan, Masraflar ve Dukkan'a Kasa sayfasindan gidilir
   const tabs = sections.filter((s) => s !== "users" && s !== "expenses" && s !== "shop");
   const active = sectionOf(route);
@@ -77,11 +80,12 @@ export function Dashboard() {
     route.page === "vehicle" ? <VehicleDetailPage key={route.id} id={route.id} />
     : route.page === "vehicles" ? <VehicleList />
     : route.page === "monthly" ? <MonthlyView />
-    : route.page === "payments" && isAdmin ? <PaymentsPage />
+    : route.page === "payments" && money ? <PaymentsPage />
     : route.page === "contact" && isAdmin ? <ContactDetailPage id={route.id} />
     : route.page === "contacts" && isAdmin ? <ContactList />
     : route.page === "ledger" && isAdmin ? <LedgerPage />
-    : route.page === "expenses" && isAdmin ? <ExpensesPage />
+    : route.page === "ledger" && isInvestor ? <InvestorLedgerPage />
+    : route.page === "expenses" && money ? <ExpensesPage />
     : route.page === "shop" && isAdmin ? <ShopPage />
     : route.page === "users" && isAdmin ? <UsersPage />
     : route.page === "account" ? <AccountPage />

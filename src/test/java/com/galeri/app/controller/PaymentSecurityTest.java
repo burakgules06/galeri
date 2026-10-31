@@ -77,6 +77,15 @@ class PaymentSecurityTest {
     }
 
     @Test
+    void sermayedar_taksitListesiniGorur_tahsilatYapamaz() {
+        TestSession.open(UUID.randomUUID(), UUID.randomUUID(), "INVESTOR");
+
+        assertThatCode(() -> installments.list(null, null, null, null)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> installments.undo(UUID.randomUUID())).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> vehicles.undoSale(UUID.randomUUID())).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
     void yonetici_taksitListesineErisir() {
         TestSession.open(UUID.randomUUID(), UUID.randomUUID(), "ADMIN");
 

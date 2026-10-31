@@ -8,7 +8,7 @@ import { InstallCard } from "./InstallCard";
 import { NotificationsCard } from "./NotificationsCard";
 
 export function AccountPage() {
-  const { auth, isAdmin } = useAuth();
+  const { auth, isAdmin, isInvestor } = useAuth();
 
   return (
     <div className="max-w-xl">
@@ -18,7 +18,7 @@ export function AccountPage() {
       <div className="kart p-5 mb-4 flex items-center gap-3">
         <div className="grow min-w-0">
           <p className="font-semibold text-[17px] truncate">{auth?.fullName}</p>
-          <p className="text-[14px] text-murekkep-2">{isAdmin ? "Yönetici" : "Çalışan"}</p>
+          <p className="text-[14px] text-murekkep-2">{isAdmin ? "Dükkân sahibi" : isInvestor ? "Sermayedar" : "Çalışan"}</p>
         </div>
         {isAdmin && <a href="#/users" className="basilir text-plaka font-semibold text-[15px] hover:underline shrink-0">Kullanıcıları yönet ›</a>}
       </div>

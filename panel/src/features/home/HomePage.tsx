@@ -18,7 +18,7 @@ const BOUGHT_COLOR = "var(--color-seri-1)";
 const SOLD_COLOR = "var(--color-seri-2)";
 
 export function HomePage() {
-  const { auth, isAdmin } = useAuth();
+  const { auth, isAdmin, isInvestor } = useAuth();
   const vehicles = useLoad(() => api.vehicles("", "IN_STOCK"), []);
   const now = new Date();
   const hour = now.getHours();
@@ -34,7 +34,7 @@ export function HomePage() {
         </h1>
       </header>
 
-      {isAdmin ? <AdminSummary /> : <StaffSummary stock={vehicles.data ?? []} />}
+      {isAdmin ? <AdminSummary /> : isInvestor ? <PartnerCapitalCard /> : <StaffSummary stock={vehicles.data ?? []} />}
 
       <section>
         <div className="flex items-end justify-between gap-3 mb-3">

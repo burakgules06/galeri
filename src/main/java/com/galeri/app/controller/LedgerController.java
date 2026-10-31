@@ -27,10 +27,17 @@ import java.util.UUID;
 public class LedgerController {
 
     private final LedgerService ledgerService;
+    private final com.galeri.app.service.NetWorthService netWorthService;
     private final GenericResponseService responseService;
 
     @GetMapping("/accounts")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")
     public GenericResponse<List<AccountResponse>> moneyAccounts() {
+        if (com.galeri.app.security.CurrentUser.isInvestor()) {
+            // Sermayedar: hesaplarda sadece kendi parasi (bakiye ve baskalarinin parasi donmez)
+            return responseService.success(netWorthService.holdings().stream()
+                    .map(h -> new AccountResponse(h.accountId(), h.type(), h.name(), h.balanceCents())).toList());
+        }
         return responseService.success(ledgerService.moneyAccounts());
     }
 
@@ -40,6 +47,7 @@ public class LedgerController {
     }
 
     @GetMapping("/ledger-entries")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")   // sermayedar: sadece kendi sermaye ve cari hareketleri
     public GenericResponse<List<LedgerEntryResponse>> entries(@RequestParam(required = false) UUID accountId) {
         return responseService.success(ledgerService.entries(accountId));
     }
@@ -50,6 +58,7 @@ public class LedgerController {
     }
 
     @GetMapping("/expenses")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")   // sermayedar: sadece sahibi oldugu araclarin masraflari
     public GenericResponse<List<LedgerEntryResponse>> expenses(
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
