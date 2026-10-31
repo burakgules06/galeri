@@ -7,6 +7,8 @@ import { ContactList } from "../features/contacts/ContactList";
 import { PaymentsPage } from "../features/payments/PaymentsPage";
 import { HomePage } from "../features/home/HomePage";
 import { LedgerPage } from "../features/ledger/LedgerPage";
+import { ExpensesPage } from "../features/expenses/ExpensesPage";
+import { ShopPage } from "../features/expenses/ShopPage";
 import { MonthlyView } from "../features/monthly/MonthlyView";
 import { VehicleDetailPage } from "../features/vehicles/VehicleDetailPage";
 import { VehicleList } from "../features/vehicles/VehicleList";
@@ -16,13 +18,15 @@ import { disablePush } from "../shared/push/push";
 import { useRoute, type Route } from "../shared/useRoute";
 import { NotificationButton } from "./NotificationButton";
 
-type Section = "home" | "vehicles" | "payments" | "ledger" | "monthly" | "contacts" | "users";
+type Section = "home" | "vehicles" | "payments" | "ledger" | "expenses" | "shop" | "monthly" | "contacts" | "users";
 
 const ICON: Record<Section, ReactNode> = {
   home: <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" />,
   vehicles: <path d="M5 16l1.6-5.2A2 2 0 0 1 8.5 9.4h7a2 2 0 0 1 1.9 1.4L19 16M4 16h16v3a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1h-9v1a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM7.5 13.5h.01M16.5 13.5h.01" />,
   payments: <path d="M7 3.5h10a1 1 0 0 1 1 1V21l-3-2-3 2-3-2-3 2V4.5a1 1 0 0 1 1-1zM9 8.5h6M9 12h6M9 15.5h3" />,
   monthly: <path d="M4 19V9M10 19V5M16 19v-7M3 19h18" />,
+  expenses: <path d="M6 3.5h12v17l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3-2 1.3zM9 8h6M9 11.5h6M9 15h3.5" />,
+  shop: <path d="M4 9.5 5.5 4h13L20 9.5M4 9.5h16M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0M5.5 12v8h13v-8M10 20v-4.5h4V20" />,
   ledger: <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h15A1.5 1.5 0 0 1 21 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 16.5zM3 10h18M7 14.5h3" />,
   contacts: <path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.6c2 .7 3.2 2.6 3.6 5.4" />,
   users: <path d="M12 3.5l7 2.6v5.2c0 4.4-3 7.9-7 9.2-4-1.3-7-4.8-7-9.2V6.1zM12 11.5a2.3 2.3 0 1 0 0-4.6 2.3 2.3 0 0 0 0 4.6zM8.3 16c.6-1.8 2-2.8 3.7-2.8s3.1 1 3.7 2.8" />,
@@ -30,10 +34,12 @@ const ICON: Record<Section, ReactNode> = {
 const ACCOUNT_ICON = <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20.5c.9-3.6 3.9-5.8 7.5-5.8s6.6 2.2 7.5 5.8" />;
 
 const LABEL: Record<Section, string> = {
-  home: "Ana sayfa", vehicles: "Araçlar", payments: "Ödemeler", ledger: "Kasa", monthly: "Alım ve satım", contacts: "Kişiler", users: "Kullanıcılar",
+  home: "Ana sayfa", vehicles: "Araçlar", payments: "Ödemeler", ledger: "Kasa", expenses: "Masraflar", shop: "Dükkân", monthly: "Alım ve satım",
+  contacts: "Kişiler", users: "Kullanıcılar",
 };
 const SHORT_LABEL: Record<Section, string> = {
-  home: "Ana sayfa", vehicles: "Araçlar", payments: "Ödemeler", ledger: "Kasa", monthly: "Alım-satım", contacts: "Kişiler", users: "Kullanıcılar",
+  home: "Ana sayfa", vehicles: "Araçlar", payments: "Ödemeler", ledger: "Kasa", expenses: "Masraf", shop: "Dükkân", monthly: "Alım-satım",
+  contacts: "Kişiler", users: "Kullanıcılar",
 };
 
 const MENU_KEY = "galeri_menu_open";
@@ -55,9 +61,10 @@ export function Dashboard() {
   const logout = () => { disablePush().catch(() => {}).finally(endSession); };
   const route = useRoute();
   const [open, setOpen] = useState(readMenuOpen);
-  const sections: Section[] = isAdmin ? ["home", "vehicles", "payments", "ledger", "monthly", "contacts", "users"] : ["home", "vehicles", "monthly"];
-  // Telefon alt sekmesi dolu: Kullanicilar'a Hesabim sayfasindan gidilir
-  const tabs = sections.filter((s) => s !== "users");
+  const sections: Section[] = isAdmin
+    ? ["home", "vehicles", "payments", "ledger", "expenses", "shop", "monthly", "contacts", "users"] : ["home", "vehicles", "monthly"];
+  // Telefon alt sekmesi dolu: Kullanicilar'a Hesabim'dan, Masraflar ve Dukkan'a Kasa sayfasindan gidilir
+  const tabs = sections.filter((s) => s !== "users" && s !== "expenses" && s !== "shop");
   const active = sectionOf(route);
   const initials = (auth?.tenantName || "Galeri").split(" ").map((w) => w[0]).slice(0, 2).join("").toLocaleUpperCase("tr-TR");
 
@@ -74,6 +81,8 @@ export function Dashboard() {
     : route.page === "contact" && isAdmin ? <ContactDetailPage id={route.id} />
     : route.page === "contacts" && isAdmin ? <ContactList />
     : route.page === "ledger" && isAdmin ? <LedgerPage />
+    : route.page === "expenses" && isAdmin ? <ExpensesPage />
+    : route.page === "shop" && isAdmin ? <ShopPage />
     : route.page === "users" && isAdmin ? <UsersPage />
     : route.page === "account" ? <AccountPage />
     : <HomePage />;

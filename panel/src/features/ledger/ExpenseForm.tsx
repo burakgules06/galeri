@@ -21,13 +21,17 @@ interface Props {
   vehicle?: VehicleChoice;
   /** Duzenlenecek masraf (arac ve masraf turu sabit kalir). */
   existing?: LedgerEntryResponse;
+  /** Dukkan sayfasindan: sadece genel gider (dukkan gideri). */
+  shop?: boolean;
 }
+
+const POCKET = "POCKET";   // "Cepten (elden ödendi)": kasa / banka degismez
 
 export function ExpenseForm(props: Props) {
   return props.open ? <ExpenseFormContent {...props} /> : null;
 }
 
-function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing }: Props) {
+function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing, shop = false }: Props) {
   // Duzenlemede arac kaydin kendisinden; aracin maliyet hesabina gitmeyen arac masrafi konsinye aractadir
   const vehicle: VehicleChoice | undefined = existing?.vehicle
     ? { ...existing.vehicle, ownership: fixedVehicle?.ownership ?? (existing.target.type !== "VEHICLE" ? "CONSIGNMENT" : undefined) }
@@ -37,7 +41,7 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing 
   const [vehicleId, setVehicleId] = useState(vehicle?.id ?? "");
   const [amount, setAmount] = useState(existing ? centsToInput(existing.amountCents) : "");
   const [category, setCategory] = useState(existing?.category ?? "");
-  const [accountId, setAccountId] = useState(existing?.source.id ?? "");
+  const [accountId, setAccountId] = useState(existing ? (existing.source.type === "CAPITAL" ? POCKET : existing.source.id) : "");
   const [date, setDate] = useState(existing?.date ?? todayIso());
   const [description, setDescription] = useState(existing?.description ?? "");
   const [chargeToOwner, setChargeToOwner] = useState(existing?.target.type === "BALANCE");
@@ -46,7 +50,8 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing 
 
   const accounts = useLoad(() => api.accounts(), []);
   const stock = useLoad(() => (vehicle ? Promise.resolve([]) : api.vehicles("", "IN_STOCK")), [vehicle?.id]);
-  const selectedAccount = accountId || accounts.data?.[0]?.id || "";
+  const selectedAccount = accountId || (accounts.data?.find((a) => a.type === "CASH") ?? accounts.data?.[0])?.id || "";
+  const pocket = root === "GENERAL" && selectedAccount === POCKET;
   const ownership = vehicle?.ownership ?? stock.data?.find((v) => v.id === vehicleId)?.ownership;
   const consignment = root === "VEHICLE" && ownership === "CONSIGNMENT";
 
@@ -57,12 +62,12 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing 
     if (!category.trim()) return setError("Kategori yaz ya da seç.");
     if (root === "VEHICLE" && !vehicleId) return setError("Aracı seç.");
     if (!selectedAccount) return setError("Ödemenin çıktığı hesabı seç.");
-    if (!existing && !(await confirmOwnerCash(cents))) return;
+    if (!existing && !pocket && !(await confirmOwnerCash(cents))) return;
     setSaving(true);
     setError(null);
     try {
       const request = {
-        date, sourceAccountId: selectedAccount, amountCents: cents,
+        date, sourceAccountId: pocket ? null : selectedAccount, paidByOwner: pocket, amountCents: cents,
         vehicleId: root === "VEHICLE" ? vehicleId : null, categoryId: null, categoryName: category.trim(),
         description: description.trim() || null,
         chargeToOwner: consignment ? chargeToOwner : null,
@@ -76,7 +81,7 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing 
   };
 
   return (
-    <Modal title={`${locked ? "Masrafı düzenle" : "Masraf ekle"}${vehicle ? ` · ${vehicle.plate}` : ""}`} open onClose={onClose}
+    <Modal title={`${locked ? "Masrafı düzenle" : shop ? "Dükkân gideri ekle" : "Masraf ekle"}${vehicle ? ` · ${vehicle.plate}` : ""}`} open onClose={onClose}
       footer={<>
         <Button variant="secondary" type="button" onClick={onClose}>Vazgeç</Button>
         <Button type="submit" form="expense-form" disabled={saving}>{saving ? "Kaydediliyor…" : locked ? "Değişikliği kaydet" : "Masrafı kaydet"}</Button>
@@ -84,7 +89,7 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing 
       <form id="expense-form" onSubmit={submit} className="space-y-4">
         <ErrorBox message={error} />
 
-        {!vehicle && !locked && (
+        {!vehicle && !locked && !shop && (
           <Field label="Masraf türü">
             <Segment<ExpenseRoot> value={root} onChange={(r) => { setRoot(r); setCategory(""); }}
               options={[{ value: "GENERAL", label: "Genel gider" }, { value: "VEHICLE", label: "Araca bağlı" }]} />
@@ -119,8 +124,10 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing 
         <Field label="Nereden ödendi">
           {accounts.data && (
             <Segment<string> value={selectedAccount} onChange={setAccountId}
-              options={accounts.data.map((a) => ({ value: a.id, label: `${a.name} · ${tl(a.balanceCents)}` }))} />
+              options={[...accounts.data.map((a) => ({ value: a.id, label: `${a.name} · ${tl(a.balanceCents)}` })),
+                ...(root === "GENERAL" ? [{ value: POCKET, label: "Cepten (elden ödendi)" }] : [])]} />
           )}
+          {pocket && <p className="text-[13px] text-murekkep-2 mt-1.5">Kasa ve banka değişmez, kimsenin sermayesinden düşmez; gider olarak kaydedilir.</p>}
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
