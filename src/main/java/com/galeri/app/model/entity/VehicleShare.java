@@ -26,9 +26,10 @@ public class VehicleShare extends BaseModel {
     @Column(name = "vehicle_id", nullable = false, updatable = false)
     private UUID vehicleId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "contact_id")
-    private Contact contact;
+    // Sahip her zaman kullanici (V22): dukkan sahibi ya da sermayedar
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id")
+    private PanelUser user;
 
     @Column(name = "share_bp", nullable = false)
     private int shareBp;
@@ -43,7 +44,8 @@ public class VehicleShare extends BaseModel {
     @Column(name = "pocket_cents")
     private Long pocketCents;
 
+    /** Dukkan sahibinin payi eski Havuz gibi davranir: parasi kasadan, kari donem karina. */
     public boolean isPool() {
-        return contact == null;
+        return user.isOwner();
     }
 }

@@ -52,18 +52,18 @@ export const api = {
     apiFetch<InstallmentResponse>(`/api/installments/${id}`, json({ dueDate, noteNo, bankName, drawerName, description }, "PATCH")),
   // Sermaye ve kasa islemleri (sadece ADMIN)
   partners: () => apiFetch<Partner[]>("/api/partners"),
-  addPartner: (contactId: string, base: CapitalBase) => apiFetch<Partner>("/api/partners", json({ contactId, base })),
-  removePartner: (contactId: string) => apiFetch<void>(`/api/partners/${contactId}`, { method: "DELETE" }),
-  setPartnerBase: (contactId: string, base: CapitalBase) => apiFetch<Partner>(`/api/partners/${contactId}/base`, json({ base }, "PUT")),
+  removePartner: (userId: string) => apiFetch<void>(`/api/partners/${userId}`, { method: "DELETE" }),
+  setPartnerBase: (userId: string, base: CapitalBase) => apiFetch<Partner>(`/api/partners/${userId}/base`, json({ base }, "PUT")),
   holders: () => apiFetch<Holder[]>("/api/holders"),
   capitalTransfer: (request: CapitalTransferRequest) => apiFetch<LedgerEntryResponse>("/api/capital-transfers", json(request)),
-  setOwner: (contactId: string) => apiFetch<Partner>(`/api/partners/${contactId}/owner`, { method: "PUT" }),
-  moveCapital: (contactId: string, request: CapitalMovementRequest) =>
-    apiFetch<LedgerEntryResponse>(`/api/partners/${contactId}/capital`, json(request)),
+  moveCapital: (userId: string, request: CapitalMovementRequest) =>
+    apiFetch<LedgerEntryResponse>(`/api/partners/${userId}/capital`, json(request)),
   periodProfit: (from: string, to: string) => apiFetch<PeriodProfit>(`/api/reports/period-profit?from=${from}&to=${to}`),
   allocateProfit: (request: ProfitAllocationRequest) => apiFetch<LedgerEntryResponse>("/api/profit-allocations", json(request)),
   transfer: (request: TransferRequest) => apiFetch<LedgerEntryResponse>("/api/transfers", json(request)),
   openingBalance: (request: OpeningBalanceRequest) => apiFetch<LedgerEntryResponse>("/api/opening-balances", json(request)),
+  payUser: (userId: string, request: ContactPaymentRequest) =>
+    apiFetch<LedgerEntryResponse>(`/api/users/${userId}/payments`, json(request)),
   payContact: (contactId: string, request: ContactPaymentRequest) =>
     apiFetch<LedgerEntryResponse>(`/api/contacts/${contactId}/payments`, json(request)),
   statement: (contactId: string) => apiFetch<ContactStatement>(`/api/contacts/${contactId}/statement`),
@@ -91,9 +91,9 @@ export const api = {
   vehicleCost: (vehicleId: string) => apiFetch<VehicleCost>(`/api/vehicles/${vehicleId}/cost`),
   // Kullanicilar (sadece ADMIN) ve herkesin kendi sifresi
   users: () => apiFetch<UserResponse[]>("/api/users"),
-  addUser: (request: { fullName: string; phone: string; role: UserRole; password: string }) =>
+  addUser: (request: { fullName: string; phone: string | null; role: UserRole; password: string | null; canLogin: boolean; canTrade: boolean }) =>
     apiFetch<UserResponse>("/api/users", json(request)),
-  updateUser: (id: string, request: { fullName: string; role: UserRole; active: boolean }) =>
+  updateUser: (id: string, request: { fullName: string; role: UserRole; active: boolean; canLogin?: boolean; canTrade?: boolean; phone?: string | null }) =>
     apiFetch<UserResponse>(`/api/users/${id}`, json(request, "PATCH")),
   resetUserPassword: (id: string, password: string) => apiFetch<void>(`/api/users/${id}/reset-password`, json({ password })),
   changePassword: (currentPassword: string, newPassword: string) =>

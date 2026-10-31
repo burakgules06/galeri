@@ -152,7 +152,7 @@ class PaymentPlanServiceImplTest {
     void gecmisAcikHesapAciklamasi_taksitVeCevaptaSaklanir() {
         String description = "Araç tamir masrafı için sözlü borç";
         InstallmentRequest row = new InstallmentRequest(TODAY, 100000L, PaymentMethod.OPEN_ACCOUNT,
-                null, null, false, null, null, null, 0L, description);
+                null, null, false, null, null, null, description);
         when(ledgerService.writeOpenItems(buyer, PlanDirection.SALE, 100000L, TODAY)).thenReturn(entry());
 
         var response = service.addOpenItems(buyer.getId(),

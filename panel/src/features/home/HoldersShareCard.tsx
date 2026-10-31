@@ -12,7 +12,7 @@ export function HoldersShareCard() {
   const rows = (data ?? []).filter((h) => h.capitalCents > 0);
   const total = rows.reduce((t, r) => t + r.capitalCents, 0);
   const colored = rows.map((r, i) => ({
-    key: r.contactId ?? "owner", name: r.name, owner: r.owner, capital: r.capitalCents, color: SERIES[i % SERIES.length],
+    key: r.userId ?? "owner", name: r.name, owner: r.owner, capital: r.capitalCents, color: SERIES[i % SERIES.length],
     bp: total > 0 ? Math.round((r.capitalCents * 10000) / total) : 0,
   }));
   const focus = colored.find((r) => r.key === active);

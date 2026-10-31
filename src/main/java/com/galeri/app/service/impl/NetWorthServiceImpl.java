@@ -1,6 +1,7 @@
 package com.galeri.app.service.impl;
 
 import com.galeri.app.model.entity.Account;
+import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.enums.*;
 import com.galeri.app.model.response.*;
 import com.galeri.app.repository.*;
@@ -24,7 +25,7 @@ public class NetWorthServiceImpl implements NetWorthService {
     private final InstallmentRepository installments;
     private final CapitalService capital;
     private final CoOwnershipService coOwnership;
-    private final ContactRepository contacts;
+    private final PanelUserRepository users;
 
     @Override
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -57,16 +58,16 @@ public class NetWorthServiceImpl implements NetWorthService {
             List<ShareResponse> owners = coOwnership.owners(v);
             List<NetWorthResponse.Owner> shares = new ArrayList<>();
             if (owners.isEmpty()) {
-                shares.add(new NetWorthResponse.Owner(null, "Havuz", 10000, cost, debt, cost - debt, cost - debt));
+                shares.add(new NetWorthResponse.Owner(null, "Dükkân", true, 10000, cost, debt, cost - debt, cost - debt));
             } else {
                 int pool = -1;
-                for (int k = 0; k < owners.size(); k++) if (owners.get(k).contactId() == null) pool = k;
+                for (int k = owners.size() - 1; k >= 0; k--) if (owners.get(k).owner()) pool = k;
                 List<Long> assets = CoOwnershipMath.split(cost, owners.stream().map(ShareResponse::shareBp).toList(), pool);
                 List<Long> ownerDebts = CoOwnershipMath.split(debt, owners.stream().map(ShareResponse::shareBp).toList(), pool);
                 for (int k = 0; k < owners.size(); k++) {
                     var o = owners.get(k);
                     long ownerDebt = ownerDebts.get(k);
-                    shares.add(new NetWorthResponse.Owner(o.contactId(), o.name(), o.shareBp(), assets.get(k), ownerDebt,
+                    shares.add(new NetWorthResponse.Owner(o.userId(), o.name(), o.owner(), o.shareBp(), assets.get(k), ownerDebt,
                             assets.get(k) - ownerDebt, o.contributionCents()));
                 }
             }
@@ -87,24 +88,33 @@ public class NetWorthServiceImpl implements NetWorthService {
     public List<CapitalResponses.Holder> holders() {
         UUID tenant = CurrentUser.tenantId();
         NetWorthResponse w = summary();
-        Optional<com.galeri.app.model.entity.Contact> owner = contacts.findFirstByTenantIdAndOwnerTrue(tenant);
-        UUID ownerId = owner.map(com.galeri.app.model.entity.Contact::getId).orElse(null);
+        Optional<PanelUser> owner = users.findPoolOwner(tenant);
+        UUID ownerId = owner.map(PanelUser::getId).orElse(null);
         long money = w.cashCents() + w.bankCents();
 
         // Sermayedara ait tahsil edilmemis evrak: onun alacagi (riski onda), dukkan sahibinin payinda sayilmaz
         Map<UUID, Long> pending = new java.util.HashMap<>();
         for (Object[] row : installments.pendingByHolder(tenant)) pending.put((UUID) row[0], ((Number) row[1]).longValue());
 
+        // Kullanicinin carisi (konsinye sahibi gibi): artisi bize borclu, eksisi biz ona borcluyuz
+        Map<UUID, Long> userBalance = new java.util.HashMap<>();
+        Map<UUID, Long> balances = new java.util.HashMap<>();
+        for (Object[] r : entries.incomingTotals(tenant)) balances.merge((UUID) r[0], ((Number) r[1]).longValue(), Long::sum);
+        for (Object[] r : entries.outgoingTotals(tenant)) balances.merge((UUID) r[0], -((Number) r[1]).longValue(), Long::sum);
+        for (var a : accounts.findByTenantIdAndTypeInOrderByCreatedAtAsc(tenant, List.of(AccountType.BALANCE))) {
+            if (a.getUserId() != null) userBalance.merge(a.getUserId(), balances.getOrDefault(a.getId(), 0L), Long::sum);
+        }
+
         List<CapitalResponses.Holder> raw = new ArrayList<>();
         long investorsCapital = 0, investorsCash = 0;
         long investorsReceivable = 0;
         for (CapitalResponses.Partner p : w.partners()) {
-            if (p.contactId().equals(ownerId)) continue;
-            List<CapitalResponses.HolderVehicle> list = vehiclesOf(w, o -> p.contactId().equals(o.contactId()));
-            CapitalBase base = contacts.findById(p.contactId()).map(com.galeri.app.model.entity.Contact::getCapitalBase).orElse(CapitalBase.ALL);
-            long receivable = pending.getOrDefault(p.contactId(), 0L);
-            raw.add(new CapitalResponses.Holder(p.contactId(), p.name(), false, base, p.capitalCents() + receivable, p.cashCents(),
-                    p.boundCents(), receivable, 0, list));
+            if (p.owner()) continue;   // dukkan sahipleri havuzun kalani
+            List<CapitalResponses.HolderVehicle> list = vehiclesOf(w, o -> p.userId().equals(o.userId()));
+            CapitalBase base = users.findById(p.userId()).map(PanelUser::getCapitalBase).orElse(CapitalBase.ALL);
+            long receivable = pending.getOrDefault(p.userId(), 0L);
+            raw.add(new CapitalResponses.Holder(p.userId(), p.name(), false, base, p.capitalCents() + receivable, p.cashCents(),
+                    p.boundCents(), receivable, 0, list, userBalance.getOrDefault(p.userId(), 0L)));
             investorsCapital += p.capitalCents() + receivable;
             investorsCash += p.cashCents();
             investorsReceivable += receivable;
@@ -117,18 +127,18 @@ public class NetWorthServiceImpl implements NetWorthService {
         long stockDebt = w.vehicles().stream().mapToLong(NetWorthResponse.StockVehicle::debtCents).sum();
         // Arac alis borcu arac net degerinden dusuldu; other'da yalnizca cari alacak/borc ve dukkan evraki kalir.
         long ownerOther = w.receivableCents() - w.payableCents() + stockDebt - investorsReceivable;
-        raw.add(new CapitalResponses.Holder(ownerId, owner.map(com.galeri.app.model.entity.Contact::getName).orElse("Dükkân sahibi"), true,
-                owner.map(com.galeri.app.model.entity.Contact::getCapitalBase).orElse(CapitalBase.ALL), ownerCapital, ownerCash,
-                ownerInVehicles, ownerOther, 0, ownerVehicles));
+        raw.add(new CapitalResponses.Holder(ownerId, owner.map(PanelUser::getFullName).orElse("Dükkân sahibi"), true,
+                owner.map(PanelUser::getCapitalBase).orElse(CapitalBase.ALL), ownerCapital, ownerCash,
+                ownerInVehicles, ownerOther, 0, ownerVehicles, ownerId == null ? 0 : userBalance.getOrDefault(ownerId, 0L)));
 
         long allVehicles = raw.stream().mapToLong(CapitalResponses.Holder::vehicleCents).sum();
         return raw.stream()
-                .map(h -> new CapitalResponses.Holder(h.contactId(), h.name(), h.owner(), h.base(), h.capitalCents(), h.cashCents(),
+                .map(h -> new CapitalResponses.Holder(h.userId(), h.name(), h.owner(), h.base(), h.capitalCents(), h.cashCents(),
                         h.vehicleCents(), h.otherCents(), switch (h.base()) {
                             case ALL -> MoneyMath.basisPoints(Math.max(0, h.capitalCents()), w.totalCents());
                             case VEHICLES -> MoneyMath.basisPoints(Math.max(0, h.vehicleCents()), allVehicles);
                             case CASH -> MoneyMath.basisPoints(Math.max(0, h.cashCents()), money);
-                        }, h.vehicles()))
+                        }, h.vehicles(), h.balanceCents()))
                 .sorted(Comparator.comparing(CapitalResponses.Holder::owner).reversed()
                         .thenComparing(Comparator.comparingLong(CapitalResponses.Holder::capitalCents).reversed()))
                 .toList();
@@ -145,10 +155,10 @@ public class NetWorthServiceImpl implements NetWorthService {
     }
 
     /** Dukkan sahibinin arac payi: stok net degerinden diger sermayedarlarin odenmis katkisi dusulur. */
-    private static List<CapitalResponses.HolderVehicle> ownerVehicles(NetWorthResponse w, UUID ownerId) {
+    private static List<CapitalResponses.HolderVehicle> ownerVehicles(NetWorthResponse w, UUID ownerId) {   // ownerId: bilgi
         return w.vehicles().stream().map(v -> {
             long investorContributions = v.owners().stream()
-                    .filter(o -> o.contactId() != null && !Objects.equals(o.contactId(), ownerId))
+                    .filter(o -> !o.owner())
                     .mapToLong(NetWorthResponse.Owner::contributionCents)
                     .sum();
             long cents = v.costCents() - v.debtCents() - investorContributions;

@@ -13,7 +13,7 @@ const CASH = "var(--color-seri-1)";
 const BOUND = "var(--color-seri-4)";
 const RECEIVABLE = "var(--color-seri-3)";
 
-const keyOf = (h: Holder) => h.contactId ?? "owner";
+const keyOf = (h: Holder) => h.userId ?? "owner";
 
 export function PartnerCapitalCard({ revision = 0, stackStatement = false }: { revision?: number; stackStatement?: boolean }) {
   const { data, error } = useLoad(() => api.holders(), [revision]);
@@ -21,7 +21,6 @@ export function PartnerCapitalCard({ revision = 0, stackStatement = false }: { r
   const [details, setDetails] = useState(false);
   const rows = (data ?? []).filter((h) => h.owner || h.capitalCents !== 0);
   const h = rows.find((r) => keyOf(r) === selected) ?? rows[0];
-  const statement = useLoad(() => h?.contactId ? api.statement(h.contactId) : Promise.resolve(null), [h?.contactId]);
 
   return (
     <section className="kart p-4 md:p-5">
@@ -93,27 +92,16 @@ export function PartnerCapitalCard({ revision = 0, stackStatement = false }: { r
             </div>
             <div className={`min-w-0 border-t border-cizgi pt-4 ${stackStatement ? "" : "lg:border-t-0 lg:border-l lg:pt-0 lg:pl-5"}`}>
               <p className="etiket">Alacak ve verecek</p>
-              {!h.contactId
-                ? <p className="mt-3 text-[14px] text-murekkep-3">Cari hesabı yok.</p>
-                : statement.loading
-                  ? <p className="mt-3 text-[14px] text-murekkep-3">Yükleniyor…</p>
-                  : statement.error
-                    ? <ErrorBox message={statement.error} />
-                    : statement.data && (
-                      <>
-                        <div className="grid grid-cols-2 gap-4 mt-4">
-                          <div className="min-w-0">
-                            <p className="text-[13px] font-semibold text-murekkep-2">Alacak</p>
-                            <p className="sayi font-bold text-[clamp(1.25rem,2.4vw,1.75rem)] leading-tight text-basari mt-1 break-words">{tl(Math.max(0, -statement.data.balanceCents) + Math.max(0, h.otherCents))}</p>
-                          </div>
-                          <div className="min-w-0 border-l border-cizgi pl-4">
-                            <p className="text-[13px] font-semibold text-murekkep-2">Verecek</p>
-                            <p className="sayi font-bold text-[clamp(1.25rem,2.4vw,1.75rem)] leading-tight text-tehlike mt-1 break-words">{tl(Math.max(0, statement.data.balanceCents))}</p>
-                          </div>
-                        </div>
-                        <a href={`#/contacts/${h.contactId}`} className="inline-block mt-4 text-sm font-semibold text-plaka hover:text-plaka-koyu">Cari detayını gör →</a>
-                      </>
-                    )}
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-murekkep-2">Alacak</p>
+                  <p className="sayi font-bold text-[clamp(1.25rem,2.4vw,1.75rem)] leading-tight text-basari mt-1 break-words">{tl(Math.max(0, -h.balanceCents) + Math.max(0, h.otherCents))}</p>
+                </div>
+                <div className="min-w-0 border-l border-cizgi pl-4">
+                  <p className="text-[13px] font-semibold text-murekkep-2">Verecek</p>
+                  <p className="sayi font-bold text-[clamp(1.25rem,2.4vw,1.75rem)] leading-tight text-tehlike mt-1 break-words">{tl(Math.max(0, h.balanceCents))}</p>
+                </div>
+              </div>
             </div>
           </div>
         </>

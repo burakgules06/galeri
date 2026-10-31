@@ -15,13 +15,12 @@ export interface PlanRow {
   payer: ContactSummary | null;   // null: alici
   paidNow: boolean;
   accountId: string;
-  capitalCents: number;
 }
 
 let nextKey = 1;
 
 export function row(partial: Partial<PlanRow> & Pick<PlanRow, "dueDate" | "amountCents">): PlanRow {
-  return { key: nextKey++, method: "CASH", noteNo: "", bankName: "", drawerName: "", payer: null, paidNow: false, accountId: "", capitalCents: 0, ...partial };
+  return { key: nextKey++, method: "CASH", noteNo: "", bankName: "", drawerName: "", payer: null, paidNow: false, accountId: "", ...partial };
 }
 
 /** Pesin: tek satir, vade satis gunu, "simdi alindi". */
@@ -68,13 +67,11 @@ export function institutionPlan(priceCents: number, downCents: number, instituti
 }
 
 /** Satir gecerli mi: tutar > 0, kurum satirinda kurum secili, "simdi alindi"da hesap secili. */
-export function rowProblem(r: PlanRow, capitalAllowed = false): string | null {
+export function rowProblem(r: PlanRow): string | null {
   if (!(r.amountCents > 0)) return "Tutar girilmeli";
   if (!r.dueDate) return "Vade girilmeli";
   if (r.method === "INSTITUTION" && !r.payer) return "Kurum seçilmeli";
-  if (r.capitalCents < 0 || r.capitalCents > r.amountCents) return "Sermaye tutarı taksit tutarını aşamaz";
-  if (r.capitalCents > 0 && (!capitalAllowed || r.method === "INSTITUTION")) return "Sermaye bu satırda kullanılamaz";
-  if (r.paidNow && r.amountCents > r.capitalCents && !r.accountId) return "Hesap seçilmeli";
+  if (r.paidNow && !r.accountId) return "Hesap seçilmeli";
   return null;
 }
 
@@ -86,8 +83,7 @@ export function toRequest(r: PlanRow): InstallmentRequest {
     noteNo: r.noteNo.trim() || null,
     payerId: r.payer?.id ?? null,
     paidNow: r.paidNow,
-    accountId: r.paidNow && r.amountCents > r.capitalCents ? r.accountId : null,
-    capitalCents: r.capitalCents,
+    accountId: r.paidNow ? r.accountId : null,
     bankName: r.method === "CHEQUE" ? r.bankName.trim() || null : null,
     drawerName: r.method === "CHEQUE" ? r.drawerName.trim() || null : null,
   };

@@ -22,10 +22,11 @@ public class PanelUser extends BaseModel {
     @JoinColumn(name = "tenant_id")
     private Tenant tenant;
 
-    @Column(nullable = false, unique = true, length = 20)
+    // Giris kapali kullanicida (or. telefonu olmayan sermayedar) bos olabilir (V22)
+    @Column(unique = true, length = 20)
     private String phone;
 
-    @Column(name = "password_hash", nullable = false, length = 100)
+    @Column(name = "password_hash", length = 100)
     private String passwordHash;
 
     @Column(name = "full_name", length = 120)
@@ -34,6 +35,29 @@ public class PanelUser extends BaseModel {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
+    // ADMIN = dukkan sahibi, INVESTOR = sermayedar, STAFF = calisan (V22; bir kullanicinin tek rolu var)
     @Column(nullable = false, length = 20)
     private String role = "STAFF";
+
+    @Column(name = "can_login", nullable = false)
+    private boolean canLogin = true;
+
+    // Calisan arac alim / satimi girebilir mi (V22)
+    @Column(name = "can_trade", nullable = false)
+    private boolean canTrade = false;
+
+    // Sermayedarin havuzdaki yuzdesi (sadece bilgi) neye gore gosterilir (V16, V22'de kisiden tasindi)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "capital_base", nullable = false, length = 8)
+    private com.galeri.app.model.enums.CapitalBase capitalBase = com.galeri.app.model.enums.CapitalBase.ALL;
+
+    /** Dukkan sahibi: sermayesi havuzdan kalan, arac payi havuz gibi (parasi kasadan). */
+    public boolean isOwner() {
+        return "ADMIN".equals(role);
+    }
+
+    /** Sermayesi olabilen kullanici: dukkan sahibi ya da sermayedar. */
+    public boolean isCapitalHolder() {
+        return "ADMIN".equals(role) || "INVESTOR".equals(role);
+    }
 }

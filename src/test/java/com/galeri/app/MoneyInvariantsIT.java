@@ -25,6 +25,7 @@ import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.service.VehicleService;
 import com.galeri.app.support.LedgerInvariants;
 import com.galeri.app.support.TestSession;
+import com.galeri.app.support.TestUsers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,16 +57,16 @@ class MoneyInvariantsIT {
     @Autowired private PaymentPlanService paymentPlanService;
     @Autowired private com.galeri.app.service.NetWorthService netWorthService;
 
-    private UUID tenant;
+    private UUID tenant, user;
     private LocalDate today;
 
     @BeforeEach
     void setUp() {
         tenant = UUID.randomUUID();
-        UUID user = UUID.randomUUID();
+        user = UUID.randomUUID();
         String suffix = Long.toString(ThreadLocalRandom.current().nextLong(1_000_000_000L, 9_999_999_999L));
         jdbc.update("insert into tenant (id, slug, display_name) values (?, ?, 'Defter Testi')", tenant, "inv-" + suffix);
-        jdbc.update("insert into panel_user (id, tenant_id, phone, password_hash, full_name, role) values (?, ?, ?, 'x', 'Test', 'ADMIN')",
+        jdbc.update("insert into panel_user (id, tenant_id, phone, password_hash, full_name, role) values (?, ?, ?, 'x', 'Ortak A', 'ADMIN')",
                 user, tenant, "91" + suffix);
         TestSession.open(user, tenant, "ADMIN");
         today = LocalDate.now(clock.withZone(ZoneId.of("Europe/Istanbul")));
@@ -78,20 +79,17 @@ class MoneyInvariantsIT {
 
     @Test
     void galeriSenaryosu_herAdimdanSonraDefterDegismezleriTutar() {
-        UUID partnerA = contact("Ortak A", ContactType.PERSON);
-        UUID partnerB = contact("Ortak B", ContactType.PERSON);
+        UUID partnerA = user;   // dukkan sahibi
+        UUID partnerB = TestUsers.investor(jdbc, tenant, "Ortak B");
         UUID seller = contact("Satici", ContactType.PERSON);
         UUID buyer = contact("Alici", ContactType.PERSON);
-        UUID consignor = contact("Konsinye Sahibi", ContactType.PERSON);
+        UUID consignor = TestUsers.investor(jdbc, tenant, "Konsinye Sahibi");
         UUID supplier = contact("Eski Tedarikci", ContactType.ORGANIZATION);
         UUID cash = ledgerService.moneyAccounts().stream().filter(a -> a.type() == AccountType.CASH).findFirst().orElseThrow().id();
         UUID bank = ledgerService.addBank(new AccountRequest("Ziraat")).id();
         check("baslangic");
 
         // Sermaye girisi ve virman
-        capitalService.addPartner(new CapitalRequests.Partner(partnerA));
-        capitalService.addPartner(new CapitalRequests.Partner(partnerB));
-        capitalService.setOwner(partnerA);
         capitalService.move(partnerA, new CapitalRequests.Movement(CapitalRequests.Direction.IN, cash, day(-60), 1_000_000 * TL, null));
         capitalService.move(partnerB, new CapitalRequests.Movement(CapitalRequests.Direction.IN, bank, day(-60), 500_000 * TL, null));
         check("sermaye girisi");
@@ -152,7 +150,7 @@ class MoneyInvariantsIT {
         vehicleService.sell(egea, new VehicleSaleRequest(day(-10), buyer, null, 300_000_33L, List.of(
                 installment(day(-10), 300_000_33L, PaymentMethod.TRANSFER, true, bank))));
         check("konsinye satis");
-        ledgerService.payContact(consignor, new ContactPaymentRequest(bank, day(-8), 200_000 * TL, null));
+        ledgerService.payUser(consignor, new ContactPaymentRequest(bank, day(-8), 200_000 * TL, null));
         check("konsinye sahibine kismi odeme");
 
         // Genel gider, kar payi, sermaye cekisi

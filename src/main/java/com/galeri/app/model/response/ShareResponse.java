@@ -8,8 +8,9 @@ import java.util.UUID;
 // odendikce artar). Satilmis aracta profitCents kar payi (dukkan payi dusulmus), receivableCents alacagi = katki + kar payi;
 // stoktaysa ikisi de null.
 public record ShareResponse(
-        UUID contactId,
+        UUID userId,
         String name,
+        boolean owner,   // dukkan sahibinin payi: parasi kasadan, kari donem karina (eski Havuz)
         int shareBp,
         int profitShareBp,
         ContributionSource source,

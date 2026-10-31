@@ -64,11 +64,11 @@ public final class LedgerInvariants {
 
         // 3) Ortak sermayeleri defterle ayni; her ortakta sermaye = nakitteki + araclarda bagli, nakitteki eksi degil
         Map<UUID, Long> capitalByContact = new HashMap<>();
-        jdbc.queryForList("select id, contact_id from account where tenant_id = ? and type = 'CAPITAL'", tenant)
-                .forEach(r -> capitalByContact.put((UUID) r.get("contact_id"), -balance.get((UUID) r.get("id"))));
+        jdbc.queryForList("select id, user_id from account where tenant_id = ? and type = 'CAPITAL'", tenant)
+                .forEach(r -> capitalByContact.put((UUID) r.get("user_id"), -balance.getOrDefault((UUID) r.get("id"), 0L)));
         List<CapitalResponses.Partner> partners = capitalService.partners();
         for (CapitalResponses.Partner p : partners) {
-            assertThat(p.capitalCents()).as("%s: %s sermayesi", step, p.name()).isEqualTo(capitalByContact.get(p.contactId()));
+            assertThat(p.capitalCents()).as("%s: %s sermayesi", step, p.name()).isEqualTo(capitalByContact.getOrDefault(p.userId(), 0L));
             assertThat(p.cashCents() + p.boundCents()).as("%s: %s sermaye = nakitteki + bagli", step, p.name()).isEqualTo(p.capitalCents());
             assertThat(p.cashCents()).as("%s: %s nakitteki sermaye", step, p.name()).isNotNegative();
             assertThat(p.boundCents()).as("%s: %s bagli sermaye", step, p.name()).isNotNegative();

@@ -9,7 +9,7 @@ import com.galeri.app.exception.runtime.SameAccountException;
 import com.galeri.app.exception.runtime.RecordNotFoundException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.model.entity.Account;
-import com.galeri.app.model.entity.Contact;
+import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.LedgerEntry;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.enums.AccountType;
@@ -24,7 +24,6 @@ import com.galeri.app.model.response.CapitalResponses.SoldVehicle;
 import com.galeri.app.model.response.LedgerEntryResponse;
 import com.galeri.app.model.response.VehicleRef;
 import com.galeri.app.repository.AccountRepository;
-import com.galeri.app.repository.ContactRepository;
 import com.galeri.app.repository.InstallmentRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
@@ -47,6 +46,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -60,7 +61,6 @@ public class CapitalServiceImpl implements CapitalService {
     private final AccountRepository accountRepository;
     private final LedgerEntryRepository entryRepository;
     private final InstallmentRepository installmentRepository;
-    private final ContactRepository contactRepository;
     private final VehicleRepository vehicleRepository;
     private final PanelUserRepository panelUserRepository;
     private final CoOwnershipService coOwnershipService;
@@ -68,22 +68,33 @@ public class CapitalServiceImpl implements CapitalService {
 
     // ------------------------------------------------------------------ ortaklar
 
+    /**
+     * Sermayedarlar: dukkan sahibi ve sermayedar kullanicilar (V22). Ortakliktan cikarilmis (sermaye hesabi kapali) olanlar
+     * listede yok. Sermaye hesabi olmayanin sermayesi 0.
+     */
     @Override
     @Transactional(readOnly = true)
     public List<Partner> partners() {
         UUID tenantId = CurrentUser.tenantId();
-        List<Account> accounts = capitalAccounts(tenantId);
+        Map<UUID, Account> accountOf = capitalAccounts(tenantId).stream()
+                .collect(Collectors.toMap(Account::getUserId, Function.identity(), (a, b) -> a));
+        Set<UUID> closed = accountRepository.findByTenantIdAndTypeInOrderByCreatedAtAsc(tenantId, List.of(AccountType.CAPITAL)).stream()
+                .filter(Account::isClosed).map(Account::getUserId).collect(Collectors.toSet());
+        List<PanelUser> users = panelUserRepository.findCapitalHolders(tenantId).stream()
+                .filter(u -> u.isActive() || accountOf.containsKey(u.getId()))
+                .filter(u -> !closed.contains(u.getId()) || accountOf.containsKey(u.getId()))
+                .toList();
         Map<UUID, Long> capital = capitalByAccount(entryRepository.touchingType(tenantId, AccountType.CAPITAL), null);
         Map<UUID, Long> bound = coOwnershipService.boundCapital(tenantId, today());
-        Map<UUID, Contact> contacts = contacts(accounts);
-        long total = accounts.stream().mapToLong(a -> Math.max(0, capital.getOrDefault(a.getId(), 0L))).sum();
-        return accounts.stream()
-                .map(a -> {
-                    Contact c = contacts.get(a.getContactId());
-                    long cap = capital.getOrDefault(a.getId(), 0L);
-                    long inVehicles = bound.getOrDefault(a.getContactId(), 0L);
-                    return new Partner(a.getContactId(), c != null ? c.getName() : a.getName(), c != null ? c.getPhone() : null,
-                            c != null && c.isOwner(), cap, cap - inVehicles, inVehicles, MoneyMath.basisPoints(Math.max(0, cap), total));
+        long total = users.stream().map(u -> accountOf.get(u.getId())).filter(Objects::nonNull)
+                .mapToLong(a -> Math.max(0, capital.getOrDefault(a.getId(), 0L))).sum();
+        return users.stream()
+                .map(u -> {
+                    Account a = accountOf.get(u.getId());
+                    long cap = a == null ? 0 : capital.getOrDefault(a.getId(), 0L);
+                    long inVehicles = bound.getOrDefault(u.getId(), 0L);
+                    return new Partner(u.getId(), u.getFullName(), u.getPhone(), u.isOwner(), cap, cap - inVehicles, inVehicles,
+                            MoneyMath.basisPoints(Math.max(0, cap), total));
                 })
                 .sorted(Comparator.comparing(Partner::owner).reversed().thenComparing(Comparator.comparingLong(Partner::capitalCents).reversed()))
                 .toList();
@@ -91,55 +102,26 @@ public class CapitalServiceImpl implements CapitalService {
 
     @Override
     @Transactional
-    public Partner addPartner(CapitalRequests.Partner request) {
-        Contact contact = getContact(request.contactId());
-        capitalAccount(contact, true);
-        if (request.base() != null) {
-            contact.setCapitalBase(request.base());
-            contactRepository.save(contact);
-        }
-        return find(contact.getId());
+    public Partner setBase(UUID userId, CapitalRequests.Base request) {
+        PanelUser user = getHolder(userId);
+        user.setCapitalBase(request.base());
+        panelUserRepository.save(user);
+        return find(user.getId());
     }
 
     @Override
     @Transactional
-    public Partner setOwner(UUID contactId) {
-        Contact contact = getContact(contactId);
-        if (capitalAccount(contact, false) == null) throw new NotAPartnerException();
-        contactRepository.findFirstByTenantIdAndOwnerTrue(contact.getTenantId())
-                .filter(c -> !c.getId().equals(contact.getId()))
-                .ifPresent(old -> {
-                    old.setOwner(false);
-                    contactRepository.saveAndFlush(old);   // uq_contact_owner: eski sahip once kalkmali
-                });
-        contact.setOwner(true);
-        contactRepository.saveAndFlush(contact);
-        return find(contact.getId());
-    }
-
-    @Override
-    @Transactional
-    public Partner setBase(UUID contactId, CapitalRequests.Base request) {
-        Contact contact = getContact(contactId);
-        if (capitalAccount(contact, false) == null) throw new NotAPartnerException();
-        contact.setCapitalBase(request.base());
-        contactRepository.save(contact);
-        return find(contact.getId());
-    }
-
-    @Override
-    @Transactional
-    public void removePartner(UUID contactId) {
-        Contact contact = getContact(contactId);
-        if (contact.isOwner()) throw new PartnerNotRemovableException("Dükkân sahibi kaldırılamaz. Önce başka birini sahip yapın.");
-        Account capital = capitalAccount(contact, false);
+    public void removePartner(UUID userId) {
+        PanelUser user = getHolder(userId);
+        if (user.isOwner()) throw new PartnerNotRemovableException("Dükkân sahibi kaldırılamaz.");
+        Account capital = capitalAccount(user, false);
         if (capital == null) throw new NotAPartnerException();
         accountRepository.lockById(capital.getId());
-        UUID tenantId = contact.getTenantId();
-        if (coOwnershipService.boundCapital(tenantId, today()).getOrDefault(contactId, 0L) > 0) {
+        UUID tenantId = user.getTenant().getId();
+        if (coOwnershipService.boundCapital(tenantId, today()).getOrDefault(userId, 0L) > 0) {
             throw new PartnerNotRemovableException("Araçta parası var. Önce o araçlar satılmalı.");
         }
-        boolean pendingItems = installmentRepository.pendingByHolder(tenantId).stream().anyMatch(r -> contactId.equals(r[0]));
+        boolean pendingItems = installmentRepository.pendingByHolder(tenantId).stream().anyMatch(r -> userId.equals(r[0]));
         if (pendingItems) throw new PartnerNotRemovableException("Adına tahsil edilmemiş çek / senet var. Önce tahsil edilmeli ya da silinmeli.");
         List<LedgerEntry> touching = entryRepository.touchingType(tenantId, AccountType.CAPITAL);
         long remaining = capitalByAccount(touching, null).getOrDefault(capital.getId(), 0L);
@@ -180,40 +162,42 @@ public class CapitalServiceImpl implements CapitalService {
     @Override
     @Transactional
     public LedgerEntryResponse transferCapital(CapitalRequests.CapitalTransfer r) {
-        if (r.fromContactId().equals(r.toContactId())) throw new SameAccountException();
-        Contact from = getContact(r.fromContactId());
-        Contact to = getContact(r.toContactId());
+        if (r.fromUserId().equals(r.toUserId())) throw new SameAccountException();
+        PanelUser from = getHolder(r.fromUserId());
+        PanelUser to = getHolder(r.toUserId());
         Account fromCapital = capitalAccount(from, from.isOwner());   // dukkan sahibinin hesabi yoksa acilir
         if (fromCapital == null) throw new NotAPartnerException();
         Account toCapital = capitalAccount(to, true);                 // alan kisi sermayedar olur
         if (!from.isOwner()) {
             accountRepository.lockById(fromCapital.getId());
-            long cash = capitalByAccount(entryRepository.touchingType(from.getTenantId(), AccountType.CAPITAL), null)
+            UUID tenantId = from.getTenant().getId();
+            long cash = capitalByAccount(entryRepository.touchingType(tenantId, AccountType.CAPITAL), null)
                     .getOrDefault(fromCapital.getId(), 0L)
-                    - coOwnershipService.boundCapital(from.getTenantId(), today()).getOrDefault(from.getId(), 0L);
+                    - coOwnershipService.boundCapital(tenantId, today()).getOrDefault(from.getId(), 0L);
             if (r.amountCents() > cash) throw new CapitalExceededException();
         }
         LedgerEntry e = newEntry(LedgerEntryType.CAPITAL_TRANSFER, toCapital, fromCapital, r.amountCents(), r.date());
         String description = blankToNull(r.description());
-        e.setDescription(description != null ? description : "Sermaye aktarımı: " + from.getName() + " → " + to.getName());
+        e.setDescription(description != null ? description : "Sermaye aktarımı: " + from.getFullName() + " → " + to.getFullName());
         return LedgerServiceImpl.toResponse(entryRepository.save(e), false);
     }
 
     @Override
     @Transactional
-    public LedgerEntryResponse move(UUID contactId, CapitalRequests.Movement r) {
-        Contact contact = getContact(contactId);
+    public LedgerEntryResponse move(UUID userId, CapitalRequests.Movement r) {
+        PanelUser contact = getHolder(userId);
         Account money = moneyAccount(r.accountId());
         boolean in = r.direction() == CapitalRequests.Direction.IN;
-        Account capital = capitalAccount(contact, in || contact.isOwner());   // giris kisiyi ortak yapar; cekis icin ortak olmali
+        Account capital = capitalAccount(contact, in || contact.isOwner());   // giriste hesap acilir; cekis icin hesap olmali
         if (capital == null) throw new NotAPartnerException();
         // Dukkan sahibinin cekisi sinirlanmaz: sermayesi havuzdan sermayedarlar cikinca kalandir (panel kasadaki payi bitince uyarir)
         if (!in && !contact.isOwner()) {
             accountRepository.lockById(capital.getId());   // es zamanli iki cekis ayni bakiyeyi gormesin
             // Cekis en fazla nakitteki sermaye kadar: araclarda bagli kisim arac satilinca nakde doner
-            long current = capitalByAccount(entryRepository.touchingType(contact.getTenantId(), AccountType.CAPITAL), null)
+            UUID tenantId = contact.getTenant().getId();
+            long current = capitalByAccount(entryRepository.touchingType(tenantId, AccountType.CAPITAL), null)
                     .getOrDefault(capital.getId(), 0L)
-                    - coOwnershipService.boundCapital(contact.getTenantId(), today()).getOrDefault(contact.getId(), 0L);
+                    - coOwnershipService.boundCapital(tenantId, today()).getOrDefault(contact.getId(), 0L);
             if (r.amountCents() > current) throw new CapitalExceededException();
         }
         LedgerEntry e = in
@@ -279,11 +263,11 @@ public class CapitalServiceImpl implements CapitalService {
         List<LedgerEntry> capitalEntries = entryRepository.touchingType(tenantId, AccountType.CAPITAL);
         Map<UUID, Long> allocated = allocatedByAccount(capitalEntries, from, to);
         Map<UUID, Long> bound = coOwnershipService.boundCapital(tenantId, to);
-        Map<UUID, UUID> contactOf = accounts.stream().collect(Collectors.toMap(Account::getId, Account::getContactId));
+        Map<UUID, UUID> userOf = accounts.stream().collect(Collectors.toMap(Account::getId, Account::getUserId));
         Map<UUID, Long> capital = new HashMap<>();
         capitalByAccount(capitalEntries, to).forEach((id, c) -> capital.put(id,
-                c - allocated.getOrDefault(id, 0L) - bound.getOrDefault(contactOf.get(id), 0L)));
-        Map<UUID, Contact> contacts = contacts(accounts);
+                c - allocated.getOrDefault(id, 0L) - bound.getOrDefault(userOf.get(id), 0L)));
+        Map<UUID, PanelUser> users = users(accounts);
 
         List<Account> involved = accounts.stream()
                 .filter(a -> capital.getOrDefault(a.getId(), 0L) > 0 || allocated.getOrDefault(a.getId(), 0L) != 0)
@@ -296,8 +280,8 @@ public class CapitalServiceImpl implements CapitalService {
         List<PartnerProfit> result = new ArrayList<>();
         for (int k = 0; k < involved.size(); k++) {
             Account a = involved.get(k);
-            Contact c = contacts.get(a.getContactId());
-            result.add(new PartnerProfit(a.getContactId(), c != null ? c.getName() : a.getName(), c != null && c.isOwner(),
+            PanelUser c = users.get(a.getUserId());
+            result.add(new PartnerProfit(a.getUserId(), c != null ? c.getFullName() : a.getName(), c != null && c.isOwner(),
                     weights.get(k), MoneyMath.basisPoints(weights.get(k), total), suggested.get(k), allocated.getOrDefault(a.getId(), 0L)));
         }
         return result;
@@ -307,11 +291,11 @@ public class CapitalServiceImpl implements CapitalService {
     @Transactional
     public LedgerEntryResponse allocate(CapitalRequests.Allocation r) {
         if (r.periodFrom().isAfter(r.periodTo())) throw new InvalidPeriodException();
-        Contact contact = getContact(r.contactId());
+        PanelUser contact = getHolder(r.userId());
         Account capital = capitalAccount(contact, false);
         if (capital == null) throw new NotAPartnerException();
         // Gelirdeki kar ortagin sermayesine gecer: sermaye hesabindan cikis = sermaye artar (giris CAPITAL -> kasa ile ayni yon)
-        LedgerEntry e = newEntry(LedgerEntryType.PROFIT_ALLOCATION, capital, incomeAccount(contact.getTenantId()), r.amountCents(), r.date());
+        LedgerEntry e = newEntry(LedgerEntryType.PROFIT_ALLOCATION, capital, incomeAccount(contact.getTenant().getId()), r.amountCents(), r.date());
         e.setDescription("Kâr payı sermayeye: " + TR_DATE.format(r.periodFrom()) + " – " + TR_DATE.format(r.periodTo()));
         return LedgerServiceImpl.toResponse(entryRepository.save(e), false);
     }
@@ -343,8 +327,8 @@ public class CapitalServiceImpl implements CapitalService {
         return result;
     }
 
-    private Partner find(UUID contactId) {
-        return partners().stream().filter(p -> p.contactId().equals(contactId)).findFirst().orElseThrow(RecordNotFoundException::new);
+    private Partner find(UUID userId) {
+        return partners().stream().filter(p -> p.userId().equals(userId)).findFirst().orElseThrow(RecordNotFoundException::new);
     }
 
     private List<Account> capitalAccounts(UUID tenantId) {
@@ -352,14 +336,15 @@ public class CapitalServiceImpl implements CapitalService {
                 .filter(a -> !a.isClosed()).toList();
     }
 
-    private Map<UUID, Contact> contacts(List<Account> accounts) {
-        return contactRepository.findAllById(accounts.stream().map(Account::getContactId).distinct().toList()).stream()
-                .collect(Collectors.toMap(Contact::getId, Function.identity()));
+    private Map<UUID, PanelUser> users(List<Account> accounts) {
+        return panelUserRepository.findAllById(accounts.stream().map(Account::getUserId).distinct().toList()).stream()
+                .collect(Collectors.toMap(PanelUser::getId, Function.identity()));
     }
 
-    /** Ortagin sermaye hesabi; yoksa (ya da kapaliysa) create ise acilir, degilse null. */
-    private Account capitalAccount(Contact contact, boolean create) {
-        Account found = accountRepository.findFirstByTenantIdAndTypeAndContactId(contact.getTenantId(), AccountType.CAPITAL, contact.getId())
+    /** Kullanicinin sermaye hesabi; yoksa (ya da kapaliysa) create ise acilir, degilse null. */
+    private Account capitalAccount(PanelUser contact, boolean create) {
+        UUID tenantId = contact.getTenant().getId();
+        Account found = accountRepository.findFirstByTenantIdAndTypeAndUserId(tenantId, AccountType.CAPITAL, contact.getId())
                 .orElse(null);
         if (found != null && !found.isClosed()) return found;
         if (!create) return null;
@@ -368,10 +353,10 @@ public class CapitalServiceImpl implements CapitalService {
             return accountRepository.save(found);
         }
         Account a = new Account();
-        a.setTenantId(contact.getTenantId());
+        a.setTenantId(tenantId);
         a.setType(AccountType.CAPITAL);
-        a.setContactId(contact.getId());
-        a.setName(contact.getName());
+        a.setUserId(contact.getId());
+        a.setName(contact.getFullName());
         return accountRepository.save(a);
     }
 
@@ -392,10 +377,12 @@ public class CapitalServiceImpl implements CapitalService {
         return a;
     }
 
-    private Contact getContact(UUID id) {
-        Contact c = contactRepository.findById(id).orElseThrow(RecordNotFoundException::new);
-        if (!c.getTenantId().equals(CurrentUser.tenantId())) throw new SourceNotBelongToTenantException();
-        return c;
+    /** Sermayesi olabilen kullanici (dukkan sahibi ya da sermayedar) bu galeriden. */
+    private PanelUser getHolder(UUID id) {
+        PanelUser u = panelUserRepository.findById(id).orElseThrow(RecordNotFoundException::new);
+        if (u.getTenant() == null || !u.getTenant().getId().equals(CurrentUser.tenantId())) throw new SourceNotBelongToTenantException();
+        if (!u.isCapitalHolder()) throw new NotAPartnerException();
+        return u;
     }
 
     private LedgerEntry newEntry(LedgerEntryType type, Account source, Account target, long amount, LocalDate date) {

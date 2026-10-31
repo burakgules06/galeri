@@ -12,31 +12,26 @@ import java.util.UUID;
 // ortaklarin karariyla elle girilen kar payi bir harekettir. Paylar her zaman CAPITAL bakiyelerinden hesaplanir.
 public interface CapitalService {
 
+    /** Dukkan sahibi ve sermayedar kullanicilar, sermayeleriyle (V22). */
     List<CapitalResponses.Partner> partners();
-
-    /** Kisiyi ortak yapar (CAPITAL hesabi acilir, sermaye 0). Zaten ortaksa ayni kalir. */
-    CapitalResponses.Partner addPartner(CapitalRequests.Partner request);
-
-    /** Dukkan sahibini isaretler (galeri basina bir); kisi ortak olmali. */
-    CapitalResponses.Partner setOwner(UUID contactId);
 
     /**
      * Ortagi kaldirir: nakitteki parasi, girislerini yaptigi hesaplara (en cok girilenden baslayarak) cekis olarak iade edilir,
      * kalan kasadan; sonra sermaye hesabi kapanir. Dukkan sahibi ve aracta parasi olan kaldirilamaz (1055).
      */
-    void removePartner(UUID contactId);
+    void removePartner(UUID userId);
 
     /** Sermayedarin havuzdaki yuzdesinin (bilgi) tabanini degistirir. */
-    CapitalResponses.Partner setBase(UUID contactId, CapitalRequests.Base request);
+    CapitalResponses.Partner setBase(UUID userId, CapitalRequests.Base request);
 
     /**
-     * Kisiler arasi sermaye aktarimi. Veren sermayedarsa en fazla nakitteki sermayesi kadar (araclardaki kismi arac satilinca
+     * Kullanicilar arasi sermaye aktarimi. Veren sermayedarsa en fazla nakitteki sermayesi kadar (araclardaki kismi arac satilinca
      * nakde doner); dukkan sahibinde sinir yok (panel uyarir).
      */
     LedgerEntryResponse transferCapital(CapitalRequests.CapitalTransfer request);
 
     /** Sermaye girisi (CAPITAL -> kasa/banka) ya da cekisi (ters yon, sermayeden fazla olamaz). */
-    LedgerEntryResponse move(UUID contactId, CapitalRequests.Movement request);
+    LedgerEntryResponse move(UUID userId, CapitalRequests.Movement request);
 
     /** Donem kari: iki tarih dahil. Satilan araclarin kari + komisyonlar - genel giderler; ortak paylari bilgi amacli. */
     CapitalResponses.PeriodProfit periodProfit(LocalDate from, LocalDate to);

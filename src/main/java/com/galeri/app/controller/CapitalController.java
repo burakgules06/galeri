@@ -33,25 +33,15 @@ public class CapitalController {
         return responseService.success(capitalService.partners());
     }
 
-    @PostMapping("/partners")
-    public GenericResponse<CapitalResponses.Partner> addPartner(@Valid @RequestBody CapitalRequests.Partner request) {
-        return responseService.success(capitalService.addPartner(request));
-    }
-
-    @PutMapping("/partners/{contactId}/owner")
-    public GenericResponse<CapitalResponses.Partner> setOwner(@PathVariable UUID contactId) {
-        return responseService.success(capitalService.setOwner(contactId));
-    }
-
-    @DeleteMapping("/partners/{contactId}")
-    public GenericResponse<Void> removePartner(@PathVariable UUID contactId) {
-        capitalService.removePartner(contactId);
+    @DeleteMapping("/partners/{userId}")
+    public GenericResponse<Void> removePartner(@PathVariable UUID userId) {
+        capitalService.removePartner(userId);
         return responseService.success(null);
     }
 
-    @PutMapping("/partners/{contactId}/base")
-    public GenericResponse<CapitalResponses.Partner> setBase(@PathVariable UUID contactId, @Valid @RequestBody CapitalRequests.Base request) {
-        return responseService.success(capitalService.setBase(contactId, request));
+    @PutMapping("/partners/{userId}/base")
+    public GenericResponse<CapitalResponses.Partner> setBase(@PathVariable UUID userId, @Valid @RequestBody CapitalRequests.Base request) {
+        return responseService.success(capitalService.setBase(userId, request));
     }
 
     @PostMapping("/capital-transfers")
@@ -59,9 +49,9 @@ public class CapitalController {
         return responseService.success(capitalService.transferCapital(request));
     }
 
-    @PostMapping("/partners/{contactId}/capital")
-    public GenericResponse<LedgerEntryResponse> move(@PathVariable UUID contactId, @Valid @RequestBody CapitalRequests.Movement request) {
-        return responseService.success(capitalService.move(contactId, request));
+    @PostMapping("/partners/{userId}/capital")
+    public GenericResponse<LedgerEntryResponse> move(@PathVariable UUID userId, @Valid @RequestBody CapitalRequests.Movement request) {
+        return responseService.success(capitalService.move(userId, request));
     }
 
     @GetMapping("/reports/period-profit")

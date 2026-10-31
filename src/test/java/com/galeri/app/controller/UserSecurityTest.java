@@ -28,7 +28,8 @@ class UserSecurityTest {
     static class Config {
         @Bean UserService userService() { return Mockito.mock(UserService.class); }
         @Bean GenericResponseService genericResponseService() { return new GenericResponseService(); }
-        @Bean UserController userController(UserService s, GenericResponseService r) { return new UserController(s, r); }
+        @Bean com.galeri.app.service.LedgerService ledgerService() { return Mockito.mock(com.galeri.app.service.LedgerService.class); }
+        @Bean UserController userController(UserService s, com.galeri.app.service.LedgerService l, GenericResponseService r) { return new UserController(s, l, r); }
     }
 
     @Autowired private UserController users;

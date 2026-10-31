@@ -1,8 +1,7 @@
 import { bpToInput, CONTRIBUTION_SOURCE, percentToBp, tl, tlToCents } from "../../shared/format";
-import type { ContactResponse, ContactSummary, ContributionSource, Partner } from "../../shared/types";
+import type { ContributionSource, Partner } from "../../shared/types";
 import { Button, inputClass } from "../../shared/ui/Common";
 import { NumberInput } from "../../shared/ui/NumberInput";
-import { ContactPicker } from "../contacts/ContactPicker";
 import { contributions, ownerRow, rebalance, totalBp, type OwnerRow } from "./coOwners";
 
 interface Props {
@@ -11,23 +10,23 @@ interface Props {
   profitDiffers: boolean;
   onProfitDiffers: (v: boolean) => void;
   priceCents: number;
-  contacts: ContactResponse[];
-  onContactCreated: (c: ContactResponse) => void;
-  partners: Partner[];
+  partners: Partner[];   // dukkan sahibi ve sermayedarlar (V22: araç sahibi her zaman kullanici)
   boundHere: Record<string, number>;
 }
 
 export function CoOwnersEditor({ rows, onRows, profitDiffers, onProfitDiffers, priceCents,
-  contacts, onContactCreated, partners, boundHere }: Props) {
+  partners, boundHere }: Props) {
   const bps = rows.map(r => percentToBp(r.percent));
   const total = totalBp(bps);
   const profitTotal = totalBp(rows.map(r => percentToBp(r.profitPercent)));
   const parts = contributions(priceCents, bps.map(b => b != null && !Number.isNaN(b) ? b : 0), rows.findIndex(r => r.pool));
   const update = (key: number, change: Partial<OwnerRow>) => onRows(rows.map(x => x.key === key ? { ...x, ...change } : x));
-  const partnerOf = (id: string | undefined) => partners.find(p => p.contactId === id);
-  const selectContact = (r: OwnerRow, c: ContactSummary | null) => {
-    const source = c && !partnerOf(c.id) && r.source === "CAPITAL" ? "POCKET" : r.source;
-    update(r.key, { contact: c, source });
+  const partnerOf = (id: string | undefined) => partners.find(p => p.userId === id);
+  const investors = partners.filter(p => !p.owner);
+  const ownerName = partners.find(p => p.owner)?.name ?? "Dükkân sahibi";
+  const selectUser = (r: OwnerRow, id: string) => {
+    const p = partnerOf(id);
+    update(r.key, { contact: p ? { id: p.userId, name: p.name, phone: null } : null });
   };
   return <div className="space-y-3">
     {rows.map((r, k) => {
@@ -36,11 +35,14 @@ export function CoOwnersEditor({ rows, onRows, profitDiffers, onProfitDiffers, p
       const hybrid = typed != null && !Number.isNaN(typed) && typed > 0 ? Math.min(parts[k], typed) : 0;
       const pocket = r.source === "POCKET" ? parts[k] : r.source === "HYBRID" ? hybrid : 0;
       const fromCapital = r.pool ? 0 : parts[k] - pocket;
-      const available = partner ? partner.cashCents + (boundHere[partner.contactId] ?? 0) : 0;
+      const available = partner ? partner.cashCents + (boundHere[partner.userId] ?? 0) : 0;
       return <div key={r.key} className={`border-l-[3px] pl-3 py-1 space-y-2 ${r.pool ? "border-plaka" : "border-ortakli"}`}>
         <div className="grid grid-cols-[minmax(0,1fr)_80px_40px] gap-2 items-start">
-          {r.pool ? <span className="h-10 flex items-center font-semibold">Havuz</span>
-            : <ContactPicker contacts={contacts} selected={r.contact} onSelect={c => selectContact(r, c)} onCreated={onContactCreated} placeholder="Ortak" />}
+          {r.pool ? <span className="h-10 flex items-center font-semibold truncate">{ownerName}</span>
+            : <select className={inputClass} aria-label="Sermayedar" value={r.contact?.id ?? ""} onChange={e => selectUser(r, e.target.value)}>
+                <option value="">Sermayedar seç</option>
+                {investors.map(p => <option key={p.userId} value={p.userId}>{p.name}</option>)}
+              </select>}
           <PercentInput value={r.percent} label="Sahiplik payı" onChange={percent => update(r.key, profitDiffers ? { percent } : { percent, profitPercent: percent })} />
           <button type="button" aria-label="Sahibi kaldır" disabled={rows.length <= 1}
             onClick={() => onRows(rebalance(rows.filter(x => x.key !== r.key)))}
@@ -63,8 +65,8 @@ export function CoOwnersEditor({ rows, onRows, profitDiffers, onProfitDiffers, p
     })}
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex gap-1">
-        <Button type="button" variant="quiet" className="px-2 text-plaka" onClick={() => onRows(rebalance([...rows, ownerRow(false)]))}>+ Ortak ekle</Button>
-        {!rows.some(r => r.pool) && <Button type="button" variant="quiet" className="px-2 text-plaka" onClick={() => onRows(rebalance([ownerRow(true), ...rows]))}>+ Havuz ekle</Button>}
+        <Button type="button" variant="quiet" className="px-2 text-plaka" onClick={() => onRows(rebalance([...rows, ownerRow(false)]))}>+ Sermayedar ekle</Button>
+        {!rows.some(r => r.pool) && <Button type="button" variant="quiet" className="px-2 text-plaka" onClick={() => onRows(rebalance([ownerRow(true), ...rows]))}>+ {ownerName} ekle</Button>}
       </div>
       <span className={`text-sm font-semibold ${total === 10000 ? "text-basari" : "text-uyari"}`}>
         Sahiplik %{bpToInput(total) || "0"}{total === 10000 ? " ✓" : " · %100 olmalı"}

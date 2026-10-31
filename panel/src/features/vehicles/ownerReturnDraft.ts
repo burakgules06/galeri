@@ -7,16 +7,16 @@ export interface OwnerReturnDraft { mode: OwnerReturnMode; amount: string; accou
 /** Sermayede kalanlar gonderilmez. Hata varsa metin, yoksa istek listesi. */
 export function toOwnerReturns(drafts: Record<string, OwnerReturnDraft>, receivables: Record<string, number>): OwnerReturnRequest[] | string {
   const result: OwnerReturnRequest[] = [];
-  for (const [contactId, d] of Object.entries(drafts)) {
+  for (const [userId, d] of Object.entries(drafts)) {
     if (d.mode === "KEEP") continue;
     if (!d.accountId) return "Ortağa ödeme için kasa ya da banka seç.";
-    const maximum = receivables[contactId];
+    const maximum = receivables[userId];
     if (maximum == null) return "Ortak alacağı hesaplanamadı; maliyet bilgisi yüklenince yeniden dene.";
     if (maximum <= 0) return "Ortağın pozitif alacağı yok; nakit dönüş yapılamaz.";
     const amount = d.mode === "HYBRID" ? tlToCents(d.amount) : null;
     if (d.mode === "HYBRID" && (amount == null || Number.isNaN(amount) || amount <= 0)) return "Ortağa nakit ödenecek tutarı yaz.";
     if (d.mode === "HYBRID" && amount! > maximum) return "Nakit dönüş ortağın alacağından büyük olamaz.";
-    result.push({ contactId, mode: d.mode, amountCents: amount, accountId: d.accountId });
+    result.push({ userId, mode: d.mode, amountCents: amount, accountId: d.accountId });
   }
   return result;
 }

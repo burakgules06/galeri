@@ -31,6 +31,7 @@ import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.service.VehicleService;
 import com.galeri.app.support.LedgerInvariants;
 import com.galeri.app.support.TestSession;
+import com.galeri.app.support.TestUsers;
 import org.assertj.core.api.ThrowableAssert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,7 +80,7 @@ class CoFinancingIT {
     @Autowired private com.galeri.app.service.NetWorthService netWorthService;
 
     private final LocalDate today = LocalDate.of(2026, 4, 15);
-    private UUID tenant, cash, furkan, burak, veli;
+    private UUID tenant, owner, cash, furkan, burak, veli;
     private int plates;
 
     @BeforeEach
@@ -92,8 +93,9 @@ class CoFinancingIT {
                 user, tenant, "93" + suffix);
         TestSession.open(user, tenant, "ADMIN");
         cash = ledgerService.moneyAccounts().stream().filter(a -> a.type() == AccountType.CASH).findFirst().orElseThrow().id();
-        furkan = person("Furkan");
-        burak = person("Burak");
+        owner = user;   // dukkan sahibi: payi eski Havuz gibi
+        furkan = TestUsers.investor(jdbc, tenant, "Furkan");
+        burak = TestUsers.investor(jdbc, tenant, "Burak");
         veli = person("Veli");
         capitalIn(furkan, 10_000_000 * TL);
         capitalIn(burak, 1_000_000 * TL);
@@ -113,7 +115,7 @@ class CoFinancingIT {
         expectPartner("alis", burak, 1_000_000 * TL, 0, 1_000_000 * TL);   // sermaye 1.000.000: nakitte 0, aracta 1.000.000
         expectCash("alis", 9_000_000 * TL);                                 // kasa -2.000.000
         // Havuz agirligi bagli sermayeyi dislar: Burak'in nakitteki sermayesi 0, havuz karindan pay almaz
-        assertThat(monthProfit().partners()).filteredOn(p -> p.contactId().equals(burak)).allSatisfy(p -> assertThat(p.capitalCents()).isZero());
+        assertThat(monthProfit().partners()).filteredOn(p -> p.userId().equals(burak)).allSatisfy(p -> assertThat(p.capitalCents()).isZero());
         check("alis");
 
         sell(v, 2_300_000 * TL);
@@ -184,7 +186,11 @@ class CoFinancingIT {
         assertThat(owner(v, burak).profitCents()).isEqualTo(-250_000 * TL);
         assertThat(owner(v, burak).receivableCents()).as("alacak eksi").isEqualTo(-50_000 * TL);
         expectPartner("zarar", burak, 800_000 * TL, 800_000 * TL, 0);   // sermayeden sadece katkisi (200.000) duser
-        assertThat(paymentPlanService.statement(burak).balanceCents()).as("Burak galeriye borclu").isEqualTo(50_000 * TL);
+        assertThat(jdbc.queryForObject("""
+                select coalesce((select sum(e.amount_cents) from ledger_entry e where e.target_account_id = a.id), 0)
+                     - coalesce((select sum(e.amount_cents) from ledger_entry e where e.source_account_id = a.id), 0)
+                from account a where a.type = 'BALANCE' and a.user_id = ?
+                """, Long.class, burak)).as("Burak galeriye borclu (kullanicinin carisi)").isEqualTo(50_000 * TL);
         check("zarar");
     }
 
@@ -201,7 +207,7 @@ class CoFinancingIT {
 
     @Test
     void karPayiOraniSahiplikPayindanFarkli_karOranaGoreBolunur() {
-        UUID v = coOwned(2_000_000 * TL, List.of(new ShareRequest(null, 5000, 4000, null, null),
+        UUID v = coOwned(2_000_000 * TL, List.of(new ShareRequest(owner, 5000, 4000, null, null),
                 new ShareRequest(burak, 5000, 6000, null, null)));
         sell(v, 2_300_000 * TL);
         assertThat(owner(v, burak).profitCents()).isEqualTo(180_000 * TL);   // 300.000 x %60
@@ -222,7 +228,7 @@ class CoFinancingIT {
 
     @Test
     void ucOrtak_kurusYuvarlama_paylarToplamiKaraEsit() {
-        UUID selin = person("Selin"), kerem = person("Kerem");
+        UUID selin = TestUsers.investor(jdbc, tenant, "Selin"), kerem = TestUsers.investor(jdbc, tenant, "Kerem");
         capitalIn(selin, 1_000_000 * TL);
         capitalIn(kerem, 1_000_000 * TL);
         UUID v = coOwned(1_500_000 * TL, List.of(new ShareRequest(furkan, 3334), new ShareRequest(selin, 3333), new ShareRequest(kerem, 3333)));
@@ -269,7 +275,7 @@ class CoFinancingIT {
         assertThat(b.contributionCents()).isEqualTo(400_000 * TL);
         assertThat(b.profitCents()).as("kar tam maliyet uzerinden").isEqualTo(150_000 * TL);
         assertThat(b.receivableCents()).isEqualTo(550_000 * TL);
-        assertThat(owner(v, null).receivableCents()).isEqualTo(550_000 * TL);   // 2.300.000 - 1.200.000 = 550.000 + 550.000
+        assertThat(owner(v, owner).receivableCents()).isEqualTo(550_000 * TL);   // 2.300.000 - 1.200.000 = 550.000 + 550.000
         expectPartner("satis", burak, 1_150_000 * TL, 1_150_000 * TL, 0);
         check("satis");
 
@@ -366,8 +372,8 @@ class CoFinancingIT {
         capitalService.move(partner, new CapitalRequests.Movement(CapitalRequests.Direction.IN, cash, today, cents, null));
     }
 
-    private static List<ShareRequest> half(UUID partner, ContributionSource source, Long pocketCents) {
-        return List.of(new ShareRequest(null, 5000), new ShareRequest(partner, 5000, null, source, pocketCents));
+    private List<ShareRequest> half(UUID partner, ContributionSource source, Long pocketCents) {
+        return List.of(new ShareRequest(owner, 5000), new ShareRequest(partner, 5000, null, source, pocketCents));
     }
 
     private UUID coOwned(long price, List<ShareRequest> owners) {
@@ -403,7 +409,7 @@ class CoFinancingIT {
     }
 
     private ShareResponse owner(UUID vehicle, UUID contact) {
-        return cost(vehicle).shares().stream().filter(s -> java.util.Objects.equals(s.contactId(), contact)).findFirst().orElseThrow();
+        return cost(vehicle).shares().stream().filter(s -> java.util.Objects.equals(s.userId(), contact)).findFirst().orElseThrow();
     }
 
     private CapitalResponses.PeriodProfit monthProfit() {
@@ -411,7 +417,7 @@ class CoFinancingIT {
     }
 
     private void expectPartner(String step, UUID contact, long capital, long cashPart, long bound) {
-        CapitalResponses.Partner p = capitalService.partners().stream().filter(x -> x.contactId().equals(contact)).findFirst().orElseThrow();
+        CapitalResponses.Partner p = capitalService.partners().stream().filter(x -> x.userId().equals(contact)).findFirst().orElseThrow();
         assertThat(p.capitalCents()).as("%s: sermaye", step).isEqualTo(capital);
         assertThat(p.cashCents()).as("%s: nakitteki", step).isEqualTo(cashPart);
         assertThat(p.boundCents()).as("%s: aracta bagli", step).isEqualTo(bound);
@@ -428,7 +434,7 @@ class CoFinancingIT {
         assertThat(worth.differenceCents()).as("%s: varlik ekrani dengesi", step).isZero();
         assertThat(worth.partners()).allSatisfy(p -> {
             long bound = worth.vehicles().stream().flatMap(v -> v.owners().stream())
-                    .filter(o -> p.contactId().equals(o.contactId())).mapToLong(o -> o.contributionCents()).sum();
+                    .filter(o -> !o.owner() && p.userId().equals(o.userId())).mapToLong(o -> o.contributionCents()).sum();
             assertThat(p.boundCents()).as("%s: araclara gore bagli sermaye", step).isEqualTo(bound);
         });
         assertThat(worth.vehicles()).allSatisfy(v -> {

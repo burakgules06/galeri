@@ -24,7 +24,7 @@ const MODES: { value: OwnerReturnMode; label: string }[] = [
 ];
 
 export function OwnerReturns({ owners, profitCents, shopCutType, shopCutRateBp, shopCutCents, accounts, value, onChange }: Props) {
-  const partners = owners.filter((o) => o.contactId);
+  const partners = owners.filter((o) => !o.owner);
   if (partners.length === 0) return null;
   const receivables = profitCents == null ? null : ownerReceivables(profitCents, owners, shopCutType, shopCutRateBp, shopCutCents);
   return (
@@ -32,11 +32,11 @@ export function OwnerReturns({ owners, profitCents, shopCutType, shopCutRateBp, 
       <p className="etiket">Ortağa dönüş</p>
 
       {partners.map((o) => {
-        const draft = value[o.contactId!] ?? { mode: "KEEP", amount: "", accountId: accounts[0]?.id ?? "" };
-        const receivable = receivables?.[o.contactId!];
-        const set = (change: Partial<OwnerReturnDraft>) => onChange({ ...value, [o.contactId!]: { ...draft, ...change } });
+        const draft = value[o.userId] ?? { mode: "KEEP", amount: "", accountId: accounts[0]?.id ?? "" };
+        const receivable = receivables?.[o.userId];
+        const set = (change: Partial<OwnerReturnDraft>) => onChange({ ...value, [o.userId]: { ...draft, ...change } });
         return (
-          <div key={o.contactId} className="border-l-[3px] border-ortakli pl-3 py-1 space-y-2">
+          <div key={o.userId} className="border-l-[3px] border-ortakli pl-3 py-1 space-y-2">
             <p className="text-[14px]">
               <span className="font-semibold">{o.name}</span>
               <span className="text-murekkep-2"> · katkı <b className="sayi text-[15px] text-murekkep">{tl(o.contributionCents)}</b></span>

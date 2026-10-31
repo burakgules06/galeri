@@ -25,12 +25,12 @@ export function NetWorthPanel({ revision }: { revision: number }) {
     <section className="kart p-4 md:p-5">
       <h2 className="font-cond text-2xl font-bold mb-3">Ortaklar</h2>
       {d.partners.length === 0 && <p>Kayıt yok</p>}
-      <ul className="divide-y divide-cizgi">{d.partners.map(p => <li key={p.contactId} className="py-3 first:pt-0">
+      <ul className="divide-y divide-cizgi">{d.partners.map(p => <li key={p.userId} className="py-3 first:pt-0">
         <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-3">
-          <a href={`#/contacts/${p.contactId}`} className="font-semibold text-plaka truncate">{p.name}</a>
+          <span className="font-semibold truncate">{p.name}</span>
           <span className="sayi text-xl">{tl(p.capitalCents)}</span><span className="sayi text-lg">{percent(p.shareBp)}</span>
         </div>
-        {d.vehicles.flatMap(v => v.owners.filter(o => o.contactId === p.contactId && o.contributionCents !== 0).map(o =>
+        {d.vehicles.flatMap(v => v.owners.filter(o => !o.owner && o.userId === p.userId && o.contributionCents !== 0).map(o =>
           <a key={v.vehicle.id} href={`#/vehicles/${v.vehicle.id}`} className="block text-sm text-murekkep-2 mt-1">
             {tl(o.contributionCents)} araçta ({v.vehicle.plate})
           </a>))}

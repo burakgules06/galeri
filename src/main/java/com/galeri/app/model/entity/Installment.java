@@ -58,14 +58,6 @@ public class Installment extends BaseModel {
     @Column(name = "paid_at")
     private OffsetDateTime paidAt;
 
-    // Ortagin alis bedelinden sermaye ile karsilanan kisim (kurus).
-    @Column(name = "capital_cents", nullable = false)
-    private long capitalCents;
-
-    // Tahsilat sirasinda sermaye ile kapatilan cariyi azaltma hareketi.
-    @Column(name = "capital_entry_id")
-    private UUID capitalEntryId;
-
     // Cek bilgisi (V12): bankasi ve keside eden (cekin asil sahibi, odeyenden farkli olabilir)
     @Column(name = "bank_name", length = 60)
     private String bankName;

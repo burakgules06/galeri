@@ -31,6 +31,7 @@ import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.service.VehicleService;
 import com.galeri.app.support.LedgerInvariants;
 import com.galeri.app.support.TestSession;
+import com.galeri.app.support.TestUsers;
 import org.assertj.core.api.ThrowableAssert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -85,16 +86,14 @@ class HolderItemsIT {
         UUID user = UUID.randomUUID();
         String suffix = Long.toString(ThreadLocalRandom.current().nextLong(1_000_000_000L, 9_999_999_999L));
         jdbc.update("insert into tenant (id, slug, display_name) values (?, ?, 'Evrak')", tenant, "evrak-" + suffix);
-        jdbc.update("insert into panel_user (id, tenant_id, phone, password_hash, full_name, role) values (?, ?, ?, 'x', 'Test', 'ADMIN')",
+        jdbc.update("insert into panel_user (id, tenant_id, phone, password_hash, full_name, role) values (?, ?, ?, 'x', 'Furkan', 'ADMIN')",
                 user, tenant, "94" + suffix);
         TestSession.open(user, tenant, "ADMIN");
         cash = ledgerService.moneyAccounts().stream().filter(a -> a.type() == AccountType.CASH).findFirst().orElseThrow().id();
-        furkan = person("Furkan");
-        burak = person("Burak Şahin");
+        furkan = user;   // dukkan sahibi kullanici
+        burak = TestUsers.investor(jdbc, tenant, "Burak Şahin");
         ali = person("Ali");
         veli = person("Veli");
-        capitalService.addPartner(new CapitalRequests.Partner(furkan));
-        capitalService.setOwner(furkan);
         move(furkan, 10_000 * K);
         move(burak, 1_000 * K);
         check("hazirlik");
@@ -144,7 +143,7 @@ class HolderItemsIT {
         expectError(1035, () -> paymentPlanService.addOpenItems(ali, new OpenItemsRequest(PlanDirection.SALE, today,
                 List.of(cheque(100 * K, "C-3")), furkan)));
         expectError(1035, () -> paymentPlanService.addOpenItems(ali, new OpenItemsRequest(PlanDirection.SALE, today,
-                List.of(cheque(100 * K, "C-4")), veli)));
+                List.of(cheque(100 * K, "C-4")), TestUsers.add(jdbc, tenant, "Çalışan", "STAFF"))));
         paymentPlanService.addOpenItems(ali, new OpenItemsRequest(PlanDirection.PURCHASE, today, List.of(cheque(100 * K, "C-5")), burak));
         UUID item = paymentPlanService.list(null, PlanDirection.PURCHASE, null, null).getFirst().id();
         paymentPlanService.collect(item, new CollectRequest(cash, today));
@@ -177,7 +176,7 @@ class HolderItemsIT {
     }
 
     private CapitalResponses.Holder holder(UUID contact) {
-        return holders().stream().filter(h -> contact.equals(h.contactId())).findFirst().orElseThrow();
+        return holders().stream().filter(h -> contact.equals(h.userId())).findFirst().orElseThrow();
     }
 
     private void expect(String step, UUID contact, long capital, long cashPart, long receivable) {

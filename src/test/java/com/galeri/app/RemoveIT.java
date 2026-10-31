@@ -29,6 +29,7 @@ import com.galeri.app.service.PaymentPlanService;
 import com.galeri.app.service.VehicleService;
 import com.galeri.app.support.LedgerInvariants;
 import com.galeri.app.support.TestSession;
+import com.galeri.app.support.TestUsers;
 import org.assertj.core.api.ThrowableAssert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,16 +87,14 @@ class RemoveIT {
         UUID user = UUID.randomUUID();
         String suffix = Long.toString(ThreadLocalRandom.current().nextLong(1_000_000_000L, 9_999_999_999L));
         jdbc.update("insert into tenant (id, slug, display_name) values (?, ?, 'Kaldir')", tenant, "kaldir-" + suffix);
-        jdbc.update("insert into panel_user (id, tenant_id, phone, password_hash, full_name, role) values (?, ?, ?, 'x', 'Test', 'ADMIN')",
+        jdbc.update("insert into panel_user (id, tenant_id, phone, password_hash, full_name, role) values (?, ?, ?, 'x', 'Furkan', 'ADMIN')",
                 user, tenant, "95" + suffix);
         TestSession.open(user, tenant, "ADMIN");
         cash = ledgerService.moneyAccounts().stream().filter(a -> a.type() == AccountType.CASH).findFirst().orElseThrow().id();
         bank = ledgerService.addBank(new AccountRequest("Ziraat")).id();
-        furkan = person("Furkan");
-        burak = person("Burak Şahin");
+        furkan = user;   // dukkan sahibi kullanici
+        burak = TestUsers.investor(jdbc, tenant, "Burak Şahin");
         veli = person("Veli");
-        capitalService.addPartner(new CapitalRequests.Partner(furkan));
-        capitalService.setOwner(furkan);
         move(furkan, cash, CapitalRequests.Direction.IN, 50 * M);
         move(burak, cash, CapitalRequests.Direction.IN, 4 * M);
         move(burak, bank, CapitalRequests.Direction.IN, 2 * M);
@@ -122,7 +121,7 @@ class RemoveIT {
         check("galeri araci");
 
         // Ortak arac: Burak %80 sermayeden; kaldirilinca parasi nakde doner
-        UUID shared = vehicle(5 * M, null, List.of(new ShareRequest(null, 2000), new ShareRequest(burak, 8000, null, ContributionSource.CAPITAL, null)));
+        UUID shared = vehicle(5 * M, null, List.of(new ShareRequest(furkan, 2000), new ShareRequest(burak, 8000, null, ContributionSource.CAPITAL, null)));
         assertThat(holder(burak).vehicleCents()).isEqualTo(4 * M);
         vehicleService.remove(shared);
         assertThat(holder(burak).cashCents()).isEqualTo(6 * M);
@@ -167,15 +166,15 @@ class RemoveIT {
         long cashBefore = balance(cash), bankBefore = balance(bank);
 
         expectError(1055, () -> capitalService.removePartner(furkan));
-        UUID shared = vehicle(1 * M, null, List.of(new ShareRequest(null, 5000), new ShareRequest(burak, 5000, null, ContributionSource.CAPITAL, null)));
+        UUID shared = vehicle(1 * M, null, List.of(new ShareRequest(furkan, 5000), new ShareRequest(burak, 5000, null, ContributionSource.CAPITAL, null)));
         expectError(1055, () -> capitalService.removePartner(burak));
         vehicleService.remove(shared);
 
         capitalService.removePartner(burak);
         assertThat(balance(bank)).as("bankaya girdigi 2M bankadan").isEqualTo(bankBefore - 2 * M);
         assertThat(balance(cash)).as("kasaya girdigi 4M + aktarilan 1M kasadan").isEqualTo(cashBefore - 5 * M);
-        assertThat(capitalService.partners()).extracting(CapitalResponses.Partner::contactId).containsExactly(furkan);
-        assertThat(holders()).noneMatch(h -> burak.equals(h.contactId()));
+        assertThat(capitalService.partners()).extracting(CapitalResponses.Partner::userId).containsExactly(furkan);
+        assertThat(holders()).noneMatch(h -> burak.equals(h.userId()));
         assertThat(holder(furkan).capitalCents()).isEqualTo(49 * M);
         expectError(1035, () -> move(burak, cash, CapitalRequests.Direction.OUT, 1));
         check("kaldirildi");
@@ -213,7 +212,7 @@ class RemoveIT {
     }
 
     private CapitalResponses.Holder holder(UUID contact) {
-        return holders().stream().filter(h -> contact.equals(h.contactId())).findFirst().orElseThrow();
+        return holders().stream().filter(h -> contact.equals(h.userId())).findFirst().orElseThrow();
     }
 
     private long balance(UUID account) {

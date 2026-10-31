@@ -4,7 +4,7 @@ import com.galeri.app.exception.runtime.CapitalExceededException;
 import com.galeri.app.exception.runtime.InvalidPeriodException;
 import com.galeri.app.exception.runtime.NotAPartnerException;
 import com.galeri.app.model.entity.Account;
-import com.galeri.app.model.entity.Contact;
+import com.galeri.app.model.entity.Tenant;
 import com.galeri.app.model.entity.LedgerEntry;
 import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.Vehicle;
@@ -18,7 +18,6 @@ import com.galeri.app.model.response.CapitalResponses.Partner;
 import com.galeri.app.model.response.CapitalResponses.PartnerProfit;
 import com.galeri.app.model.response.CapitalResponses.PeriodProfit;
 import com.galeri.app.repository.AccountRepository;
-import com.galeri.app.repository.ContactRepository;
 import com.galeri.app.repository.InstallmentRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
@@ -61,7 +60,6 @@ class CapitalServiceImplTest {
     @Mock private AccountRepository accountRepository;
     @Mock private LedgerEntryRepository entryRepository;
     @Mock private InstallmentRepository installmentRepository;
-    @Mock private ContactRepository contactRepository;
     @Mock private VehicleRepository vehicleRepository;
     @Mock private PanelUserRepository panelUserRepository;
     @Mock private CoOwnershipService coOwnershipService;
@@ -79,7 +77,7 @@ class CapitalServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new CapitalServiceImpl(accountRepository, entryRepository, installmentRepository, contactRepository, vehicleRepository, panelUserRepository,
+        service = new CapitalServiceImpl(accountRepository, entryRepository, installmentRepository, vehicleRepository, panelUserRepository,
                 coOwnershipService, Clock.fixed(Instant.parse("2026-10-01T06:00:00Z"), ZoneOffset.UTC));
         TestSession.open(userId, tenantId, "ADMIN");
         PanelUser me = new PanelUser();
@@ -91,6 +89,11 @@ class CapitalServiceImplTest {
         when(accountRepository.findFirstByTenantIdAndType(tenantId, AccountType.INCOME)).thenReturn(Optional.of(income));
         when(accountRepository.findByTenantIdAndTypeInOrderByCreatedAtAsc(tenantId, List.of(AccountType.CAPITAL))).thenReturn(capitalAccounts);
         when(entryRepository.touchingType(tenantId, AccountType.CAPITAL)).thenReturn(capitalEntries);
+        when(panelUserRepository.findCapitalHolders(tenantId)).thenReturn(holders);
+        when(panelUserRepository.findAllById(anyList())).thenAnswer(inv -> {
+            List<UUID> ids = inv.getArgument(0);
+            return ids.stream().map(usersById::get).filter(java.util.Objects::nonNull).toList();
+        });
         when(entryRepository.save(any(LedgerEntry.class))).thenAnswer(inv -> {
             LedgerEntry e = inv.getArgument(0);
             e.setId(UUID.randomUUID());
@@ -207,7 +210,7 @@ class CapitalServiceImplTest {
         Account selin = partner("Selin", false);
         capitalEntries.add(entry(LedgerEntryType.CAPITAL, selin, cash, 100000L, FROM));
 
-        assertThatThrownBy(() -> service.move(selin.getContactId(),
+        assertThatThrownBy(() -> service.move(selin.getUserId(),
                 new CapitalRequests.Movement(CapitalRequests.Direction.OUT, cash.getId(), FROM, 100001L, null)))
                 .isInstanceOf(CapitalExceededException.class);
         verify(entryRepository, never()).save(any());
@@ -217,9 +220,9 @@ class CapitalServiceImplTest {
     void sermayeCekisi_araclardaBagliKisimCekilemez_nakittekiKadar() {
         Account selin = partner("Selin", false);
         capitalEntries.add(entry(LedgerEntryType.CAPITAL, selin, cash, 100000L, FROM));
-        when(coOwnershipService.boundCapital(eq(tenantId), any())).thenReturn(Map.of(selin.getContactId(), 60000L));
+        when(coOwnershipService.boundCapital(eq(tenantId), any())).thenReturn(Map.of(selin.getUserId(), 60000L));
 
-        assertThatThrownBy(() -> service.move(selin.getContactId(),
+        assertThatThrownBy(() -> service.move(selin.getUserId(),
                 new CapitalRequests.Movement(CapitalRequests.Direction.OUT, cash.getId(), FROM, 40001L, null)))
                 .isInstanceOf(CapitalExceededException.class);
         Partner p = service.partners().getFirst();
@@ -234,7 +237,7 @@ class CapitalServiceImplTest {
         Account burak = partner("Burak", false);
         capitalEntries.add(entry(LedgerEntryType.CAPITAL, furkan, cash, 1000000L, FROM));
         capitalEntries.add(entry(LedgerEntryType.CAPITAL, burak, cash, 1000000L, FROM));
-        when(coOwnershipService.boundCapital(tenantId, TO)).thenReturn(Map.of(burak.getContactId(), 500000L));   // yarisi aracta
+        when(coOwnershipService.boundCapital(tenantId, TO)).thenReturn(Map.of(burak.getUserId(), 500000L));   // yarisi aracta
         when(vehicleRepository.findByTenantIdAndSaleDateBetween(tenantId, FROM, TO)).thenReturn(List.of());
         when(entryRepository.netInto(tenantId, AccountType.EXPENSE, FROM, TO)).thenReturn(-300000L);   // net 3.000 TL
 
@@ -246,8 +249,8 @@ class CapitalServiceImplTest {
 
     @Test
     void sermayeGirisi_sermayeHesabindanKasaya_yeniOrtakIcinHesapAcilir() {
-        Contact c = contact("Yeni Ortak", false);
-        when(accountRepository.findFirstByTenantIdAndTypeAndContactId(tenantId, AccountType.CAPITAL, c.getId())).thenReturn(Optional.empty());
+        PanelUser c = user("Yeni Ortak", "INVESTOR");
+        when(accountRepository.findFirstByTenantIdAndTypeAndUserId(tenantId, AccountType.CAPITAL, c.getId())).thenReturn(Optional.empty());
         when(accountRepository.save(any(Account.class))).thenAnswer(inv -> {
             Account a = inv.getArgument(0);
             a.setId(UUID.randomUUID());
@@ -259,7 +262,7 @@ class CapitalServiceImplTest {
         ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
         verify(entryRepository).save(saved.capture());
         assertThat(saved.getValue().getSourceAccount().getType()).isEqualTo(AccountType.CAPITAL);
-        assertThat(saved.getValue().getSourceAccount().getContactId()).isEqualTo(c.getId());
+        assertThat(saved.getValue().getSourceAccount().getUserId()).isEqualTo(c.getId());
         assertThat(saved.getValue().getTargetAccount()).isSameAs(cash);
         assertThat(saved.getValue().getDescription()).isEqualTo("Sermaye girişi");
     }
@@ -271,7 +274,7 @@ class CapitalServiceImplTest {
         Account furkan = partner("Furkan", true);
         capitalEntries.add(entry(LedgerEntryType.CAPITAL, furkan, cash, 1000000L, FROM));
 
-        service.allocate(new CapitalRequests.Allocation(furkan.getContactId(), TO, 250000L, FROM, TO));
+        service.allocate(new CapitalRequests.Allocation(furkan.getUserId(), TO, 250000L, FROM, TO));
 
         ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
         verify(entryRepository).save(saved.capture());
@@ -285,67 +288,52 @@ class CapitalServiceImplTest {
 
     @Test
     void ortakOlmayanaKarPayi_reddedilir() {
-        Contact c = contact("Ali", false);
-        when(accountRepository.findFirstByTenantIdAndTypeAndContactId(tenantId, AccountType.CAPITAL, c.getId())).thenReturn(Optional.empty());
+        PanelUser investor = user("Ali", "INVESTOR");
+        when(accountRepository.findFirstByTenantIdAndTypeAndUserId(tenantId, AccountType.CAPITAL, investor.getId())).thenReturn(Optional.empty());
+        PanelUser staff = user("Çalışan", "STAFF");
 
-        assertThatThrownBy(() -> service.allocate(new CapitalRequests.Allocation(c.getId(), TO, 1L, FROM, TO)))
+        assertThatThrownBy(() -> service.allocate(new CapitalRequests.Allocation(investor.getId(), TO, 1L, FROM, TO)))
                 .isInstanceOf(NotAPartnerException.class);
-        assertThatThrownBy(() -> service.setOwner(c.getId())).isInstanceOf(NotAPartnerException.class);
-    }
-
-    @Test
-    void dukkanSahibiDegisince_eskiSahipKalkar() {
-        Account furkan = partner("Furkan", true);
-        Account selin = partner("Selin", false);
-        Contact oldOwner = contactOf(furkan);
-        Contact newOwner = contactOf(selin);
-        when(contactRepository.findFirstByTenantIdAndOwnerTrue(tenantId)).thenReturn(Optional.of(oldOwner));
-
-        service.setOwner(newOwner.getId());
-
-        assertThat(oldOwner.isOwner()).isFalse();
-        assertThat(newOwner.isOwner()).isTrue();
+        assertThatThrownBy(() -> service.move(staff.getId(),
+                new CapitalRequests.Movement(CapitalRequests.Direction.IN, cash.getId(), FROM, 1L, null)))
+                .isInstanceOf(NotAPartnerException.class);   // calisanin sermayesi olmaz
     }
 
     // ------------------------------------------------------------------ yardimcilar
 
-    private final Map<UUID, Contact> contactsById = new java.util.HashMap<>();
+    private final Map<UUID, PanelUser> usersById = new java.util.HashMap<>();
+    private final List<PanelUser> holders = new ArrayList<>();
 
-    private Contact contact(String name, boolean owner) {
-        Contact c = new Contact();
-        c.setId(UUID.randomUUID());
-        c.setTenantId(tenantId);
-        c.setName(name);
-        c.setOwner(owner);
-        contactsById.put(c.getId(), c);
-        when(contactRepository.findById(c.getId())).thenReturn(Optional.of(c));
-        when(contactRepository.findAllById(anyList())).thenAnswer(inv -> {
-            List<UUID> ids = inv.getArgument(0);
-            return ids.stream().map(contactsById::get).filter(java.util.Objects::nonNull).toList();
-        });
-        return c;
-    }
-
-    private Contact contactOf(Account a) {
-        return contactsById.get(a.getContactId());
+    private PanelUser user(String name, String role) {
+        Tenant t = new Tenant();
+        t.setId(tenantId);
+        PanelUser u = new PanelUser();
+        u.setId(UUID.randomUUID());
+        u.setTenant(t);
+        u.setFullName(name);
+        u.setRole(role);
+        usersById.put(u.getId(), u);
+        if (u.isCapitalHolder()) holders.add(u);
+        when(panelUserRepository.findById(u.getId())).thenReturn(Optional.of(u));
+        return u;
     }
 
     private Account partner(String name, boolean owner) {
-        Contact c = contact(name, owner);
-        Account a = account(AccountType.CAPITAL, c.getId());
+        PanelUser u = user(name, owner ? "ADMIN" : "INVESTOR");
+        Account a = account(AccountType.CAPITAL, u.getId());
         a.setName(name);
         capitalAccounts.add(a);
-        when(accountRepository.findFirstByTenantIdAndTypeAndContactId(tenantId, AccountType.CAPITAL, c.getId())).thenReturn(Optional.of(a));
+        when(accountRepository.findFirstByTenantIdAndTypeAndUserId(tenantId, AccountType.CAPITAL, u.getId())).thenReturn(Optional.of(a));
         return a;
     }
 
-    private Account account(AccountType type, UUID contactId) {
+    private Account account(AccountType type, UUID userId) {
         Account a = new Account();
         a.setId(UUID.randomUUID());
         a.setTenantId(tenantId);
         a.setType(type);
         a.setName(type.name());
-        a.setContactId(contactId);
+        a.setUserId(userId);
         return a;
     }
 

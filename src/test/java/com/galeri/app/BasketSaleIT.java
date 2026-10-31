@@ -83,7 +83,7 @@ class BasketSaleIT {
                 user, tenant, "96" + suffix);
         TestSession.open(user, tenant, "ADMIN");
         cash = ledgerService.moneyAccounts().stream().filter(a -> a.type() == AccountType.CASH).findFirst().orElseThrow().id();
-        UUID furkan = contact("Furkan", ContactType.PERSON);
+        UUID furkan = user;   // dukkan sahibi kullanici (V22)
         ali = contact("Ali", ContactType.PERSON);
         eminevim = contact("Eminevim", ContactType.ORGANIZATION);
         capitalService.move(furkan, new CapitalRequests.Movement(CapitalRequests.Direction.IN, cash, today, 5_000_000 * TL, null));

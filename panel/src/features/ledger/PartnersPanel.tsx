@@ -2,11 +2,10 @@
 // Tutarlar /api/holders'tan: sermayedarinki defterden, dukkan sahibininki havuzdan kalan. Yuzde sadece bilgi.
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
-import { formatPhone, percent, tl, tlToCents, todayIso } from "../../shared/format";
-import type { CapitalBase, CapitalDirection, ContactResponse, ContactSummary, Holder, Partner } from "../../shared/types";
+import { centsToInput, formatPhone, percent, tl, tlToCents, todayIso } from "../../shared/format";
+import type { CapitalBase, CapitalDirection, Holder, Partner } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, Empty, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
-import { ContactPicker } from "../contacts/ContactPicker";
 import { PartnerCapitalCard } from "../home/PartnerCapitalCard";
 import { NumberInput } from "../../shared/ui/NumberInput";
 import { confirmOwnerCash } from "../../shared/ownerCash";
@@ -17,17 +16,14 @@ const BASES: { value: CapitalBase; label: string }[] = [
 
 export function PartnersPanel({ onChange }: { onChange: () => void }) {
   const { data, error, reload } = useLoad(() => Promise.all([api.partners(), api.holders()]), []);
-  const contacts = useLoad(() => api.contacts(), []);
-  const [extra, setExtra] = useState<ContactResponse[]>([]);
-  const [adding, setAdding] = useState<ContactSummary | null>(null);
-  const [addBase, setAddBase] = useState<CapitalBase>("ALL");
   const [moving, setMoving] = useState<{ partner: Partner; direction: CapitalDirection } | null>(null);
   const [transferring, setTransferring] = useState(false);
+  const [paying, setPaying] = useState<{ partner: Partner; owedCents: number } | null>(null);
   const [revision, setRevision] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const partners = data?.[0] ?? [];
   const holders = data?.[1] ?? [];
-  const holderOf = (p: Partner) => holders.find((h) => h.contactId === p.contactId);
+  const holderOf = (p: Partner) => holders.find((h) => h.userId === p.userId);
   const changed = () => { reload(); setRevision((r) => r + 1); onChange(); };
 
   const run = async (action: () => Promise<unknown>) => {
@@ -49,28 +45,18 @@ export function PartnersPanel({ onChange }: { onChange: () => void }) {
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 md:px-5 pt-4 pb-3 border-b border-cizgi">
           <h2 className="font-cond font-bold text-[21px] tracking-tight">Ortaklar</h2>
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <div className="grow sm:w-60">
-              <ContactPicker contacts={[...extra, ...(contacts.data ?? [])]} selected={adding} onSelect={setAdding}
-                onCreated={(c) => setExtra((l) => [c, ...l])} placeholder="Kişiyi ortak yap" />
-            </div>
-            <span className="w-36 shrink-0">
-              <select className={inputClass} aria-label="Ortaklık tabanı" value={addBase} onChange={(e) => setAddBase(e.target.value as CapitalBase)}>
-                {BASES.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
-              </select>
-            </span>
-            <Button disabled={!adding} onClick={() => adding && run(async () => { await api.addPartner(adding.id, addBase); setAdding(null); })}>Ekle</Button>
             {partners.length > 1 && <Button variant="secondary" onClick={() => setTransferring(true)}>Para aktar</Button>}
           </div>
         </div>
-        {data && partners.length === 0 && <Empty title="Henüz ortak yok" description="Kişiyi ortak yapın, sonra sermaye girişi yapın." />}
+        {data && partners.length === 0 && <Empty title="Henüz sermayedar yok" description="Kullanıcılar ekranından sermayedar ekleyin." />}
         <ul className="divide-y divide-cizgi">
           {partners.map((p) => {
             const h = holderOf(p);
             return (
-              <li key={p.contactId} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 md:px-5 py-3">
+              <li key={p.userId} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 md:px-5 py-3">
                 <span className="grow min-w-0 basis-48">
                   <span className="flex items-center gap-2 flex-wrap">
-                    <a href={`#/contacts/${p.contactId}`} className="font-semibold hover:underline">{p.name}</a>
+                    <span className="font-semibold">{p.name}</span>
                     {p.owner && <span className="text-[12px] font-semibold text-plaka bg-plaka-acik rounded px-1.5 py-0.5">Dükkân sahibi</span>}
                   </span>
                   {p.phone && <span className="block sayi text-[14px] text-murekkep-3">{formatPhone(p.phone)}</span>}
@@ -82,19 +68,23 @@ export function PartnersPanel({ onChange }: { onChange: () => void }) {
                 {!p.owner && (
                   <span className="w-36 shrink-0">
                     <select className={`${inputClass} h-9 text-[14px]`} aria-label="Ortaklık tabanı" value={h?.base ?? "ALL"}
-                      onChange={(e) => run(() => api.setPartnerBase(p.contactId, e.target.value as CapitalBase))}>
+                      onChange={(e) => run(() => api.setPartnerBase(p.userId, e.target.value as CapitalBase))}>
                       {BASES.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
                     </select>
                   </span>
                 )}
                 <span className="flex flex-wrap gap-1.5 justify-end w-full sm:w-auto">
+                  {h && h.balanceCents < 0 && (
+                    <Button variant="secondary" className="h-9 px-3 text-[14px]" onClick={() => setPaying({ partner: p, owedCents: -h.balanceCents })}>
+                      Ödeme yap · {tl(-h.balanceCents)}
+                    </Button>
+                  )}
                   <Button variant="secondary" className="h-9 px-3 text-[14px]" onClick={() => setMoving({ partner: p, direction: "IN" })}>Sermaye girişi</Button>
                   <Button variant="secondary" className="h-9 px-3 text-[14px]" disabled={!p.owner && (h?.cashCents ?? 0) <= 0}
                     onClick={() => setMoving({ partner: p, direction: "OUT" })}>Çekiş</Button>
-                  {!p.owner && <Button variant="quiet" className="h-9 px-3 text-[14px]" onClick={() => run(() => api.setOwner(p.contactId))}>Sahip yap</Button>}
                   {!p.owner && <Button variant="quiet" className="h-9 px-3 text-[14px] text-tehlike" onClick={() => {
                     const back = h && h.cashCents > 0 ? ` ${tl(h.cashCents)} girdiği hesaplara geri ödenir.` : "";
-                    if (window.confirm(`${p.name} ortaklıktan çıkarılsın mı?${back}`)) run(() => api.removePartner(p.contactId));
+                    if (window.confirm(`${p.name} ortaklıktan çıkarılsın mı?${back}`)) run(() => api.removePartner(p.userId));
                   }}>Kaldır</Button>}
                 </span>
               </li>
@@ -105,6 +95,8 @@ export function PartnersPanel({ onChange }: { onChange: () => void }) {
 
       {moving && <CapitalMovementForm partner={moving.partner} holder={holderOf(moving.partner)} direction={moving.direction}
         onClose={() => setMoving(null)} onSaved={() => { setMoving(null); changed(); }} />}
+      {paying && <PayUserForm partner={paying.partner} owedCents={paying.owedCents} onClose={() => setPaying(null)}
+        onSaved={() => { setPaying(null); changed(); }} />}
       {transferring && <TransferForm partners={partners} holders={holders} onClose={() => setTransferring(false)}
         onSaved={() => { setTransferring(false); changed(); }} />}
     </div>
@@ -143,7 +135,7 @@ function CapitalMovementForm({ partner, holder, direction, onClose, onSaved }: {
     setSaving(true);
     setError(null);
     try {
-      await api.moveCapital(partner.contactId, { direction, accountId: selected, date, amountCents: cents, description: description.trim() || null });
+      await api.moveCapital(partner.userId, { direction, accountId: selected, date, amountCents: cents, description: description.trim() || null });
       onSaved();
     } catch (err) {
       setError(errorMessage(err));
@@ -183,15 +175,15 @@ function CapitalMovementForm({ partner, holder, direction, onClose, onSaved }: {
 function TransferForm({ partners, holders, onClose, onSaved }: {
   partners: Partner[]; holders: Holder[]; onClose: () => void; onSaved: () => void;
 }) {
-  const [from, setFrom] = useState(partners[0]?.contactId ?? "");
-  const [to, setTo] = useState(partners[1]?.contactId ?? "");
+  const [from, setFrom] = useState(partners[0]?.userId ?? "");
+  const [to, setTo] = useState(partners[1]?.userId ?? "");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(todayIso());
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const label = (p: Partner) => {
-    const h = holders.find((x) => x.contactId === p.contactId);
+    const h = holders.find((x) => x.userId === p.userId);
     return `${p.name} · ${tl(h?.cashCents ?? 0)}`;
   };
 
@@ -200,14 +192,14 @@ function TransferForm({ partners, holders, onClose, onSaved }: {
     const cents = tlToCents(amount);
     if (cents == null || Number.isNaN(cents) || cents <= 0) return setError("Tutarı 1.000.000 gibi yaz.");
     if (!from || !to || from === to) return setError("Gönderen ve alan farklı kişiler olmalı.");
-    const sender = partners.find((p) => p.contactId === from)!;
-    const check = await allowed(sender, holders.find((h) => h.contactId === from), cents);
+    const sender = partners.find((p) => p.userId === from)!;
+    const check = await allowed(sender, holders.find((h) => h.userId === from), cents);
     if (check === false) return;
     if (check) return setError(check);
     setSaving(true);
     setError(null);
     try {
-      await api.capitalTransfer({ fromContactId: from, toContactId: to, date, amountCents: cents, description: description.trim() || null });
+      await api.capitalTransfer({ fromUserId: from, toUserId: to, date, amountCents: cents, description: description.trim() || null });
       onSaved();
     } catch (err) {
       setError(errorMessage(err));
@@ -227,12 +219,12 @@ function TransferForm({ partners, holders, onClose, onSaved }: {
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Kimden">
             <select className={inputClass} value={from} onChange={(e) => setFrom(e.target.value)}>
-              {partners.map((p) => <option key={p.contactId} value={p.contactId}>{label(p)}</option>)}
+              {partners.map((p) => <option key={p.userId} value={p.userId}>{label(p)}</option>)}
             </select>
           </Field>
           <Field label="Kime">
             <select className={inputClass} value={to} onChange={(e) => setTo(e.target.value)}>
-              {partners.map((p) => <option key={p.contactId} value={p.contactId}>{label(p)}</option>)}
+              {partners.map((p) => <option key={p.userId} value={p.userId}>{label(p)}</option>)}
             </select>
           </Field>
         </div>
@@ -243,6 +235,55 @@ function TransferForm({ partners, holders, onClose, onSaved }: {
           <Field label="Tarih"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
           <Field label="Açıklama"><input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="İsteğe bağlı" /></Field>
         </div>
+      </form>
+    </Modal>
+  );
+}
+
+// Dukkanin kullaniciya borcu (or. konsinye satisinda sahibine): kasa / bankadan odenir, kismi olabilir.
+function PayUserForm({ partner, owedCents, onClose, onSaved }: {
+  partner: Partner; owedCents: number; onClose: () => void; onSaved: () => void;
+}) {
+  const [amount, setAmount] = useState(centsToInput(owedCents));
+  const [accountId, setAccountId] = useState("");
+  const [date, setDate] = useState(todayIso());
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const accounts = useLoad(() => api.accounts(), []);
+  const selected = accountId || accounts.data?.[0]?.id || "";
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    const cents = tlToCents(amount);
+    if (cents == null || Number.isNaN(cents) || cents <= 0) return setError("Tutarı 100.000 gibi yaz.");
+    setSaving(true);
+    setError(null);
+    try {
+      await api.payUser(partner.userId, { accountId: selected, date, amountCents: cents, description: null });
+      onSaved();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal title={`${partner.name} · ödeme`} open onClose={onClose}
+      footer={<>
+        <Button variant="secondary" type="button" onClick={onClose}>Vazgeç</Button>
+        <Button type="submit" form="pay-user-form" disabled={saving}>{saving ? "Kaydediliyor…" : "Öde"}</Button>
+      </>}>
+      <form id="pay-user-form" onSubmit={submit} className="space-y-4">
+        <ErrorBox message={error} />
+        <Field label="Tutar"><NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount} autoFocus /></Field>
+        <Field label="Hangi hesaptan çıktı">
+          {accounts.data && (
+            <Segment<string> value={selected} onChange={setAccountId}
+              options={accounts.data.map((a) => ({ value: a.id, label: `${a.name} · ${tl(a.balanceCents)}` }))} />
+          )}
+        </Field>
+        <Field label="Tarih"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
       </form>
     </Modal>
   );

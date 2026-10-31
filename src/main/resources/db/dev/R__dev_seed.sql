@@ -4,10 +4,19 @@ INSERT INTO tenant (id, slug, display_name)
 VALUES ('00000000-0000-0000-0000-000000000001', 'demo-galeri', 'Demo Galeri')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO panel_user (tenant_id, phone, password_hash, full_name, role)
-VALUES ('00000000-0000-0000-0000-000000000001', '905550000000',
-        '$2b$10$x2nG.NANpgalZyfDs3w.4enIbpeoWlBLLvpacvPx8CAx3iarYrIOW', 'Demo Yonetici', 'ADMIN')
+-- Dukkan sahibi (ADMIN): Furkan Kaya
+INSERT INTO panel_user (id, tenant_id, phone, password_hash, full_name, role)
+VALUES ('00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', '905550000000',
+        '$2b$10$x2nG.NANpgalZyfDs3w.4enIbpeoWlBLLvpacvPx8CAx3iarYrIOW', 'Furkan Kaya', 'ADMIN')
 ON CONFLICT (phone) DO NOTHING;
+
+-- Sermayedarlar (INVESTOR, girisi kapali): Selin ve Kerem sermaye ortagi; Burak ve Deniz konsinye arac sahibi
+INSERT INTO panel_user (id, tenant_id, phone, password_hash, full_name, role, can_login) VALUES
+  ('00000000-0000-0000-0000-000000000105', '00000000-0000-0000-0000-000000000001', NULL, NULL, 'Selin Arslan', 'INVESTOR', FALSE),
+  ('00000000-0000-0000-0000-000000000106', '00000000-0000-0000-0000-000000000001', NULL, NULL, 'Kerem Dogan',  'INVESTOR', FALSE),
+  ('00000000-0000-0000-0000-000000000110', '00000000-0000-0000-0000-000000000001', NULL, NULL, 'Burak Gules',  'INVESTOR', FALSE),
+  ('00000000-0000-0000-0000-000000000111', '00000000-0000-0000-0000-000000000001', NULL, NULL, 'Deniz Aksoy',  'INVESTOR', FALSE)
+ON CONFLICT (id) DO NOTHING;
 
 -- Calisanlar (STAFF): 5551111111 ve 5552222222, sifre demo1234
 INSERT INTO panel_user (id, tenant_id, phone, password_hash, full_name, role) VALUES
@@ -17,20 +26,16 @@ INSERT INTO panel_user (id, tenant_id, phone, password_hash, full_name, role) VA
    '$2b$10$x2nG.NANpgalZyfDs3w.4enIbpeoWlBLLvpacvPx8CAx3iarYrIOW', 'Mert Yildiz', 'STAFF')
 ON CONFLICT (phone) DO NOTHING;
 
--- Kisiler: musteriler, saticilar, kurum ve sermaye ortaklari (Furkan dukkan sahibi)
+-- Kisiler: musteriler, saticilar ve kurum (sermayedarlar kullanici, yukarida)
 INSERT INTO contact (id, tenant_id, name, phone, type) VALUES
   ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-000000000001', 'Mehmet Yilmaz', '905301112233', 'PERSON'),
   ('00000000-0000-0000-0000-000000000102', '00000000-0000-0000-0000-000000000001', 'Ayse Demir',    '905324445566', 'PERSON'),
   ('00000000-0000-0000-0000-000000000103', '00000000-0000-0000-0000-000000000001', 'Eminevim',      NULL,           'ORGANIZATION'),
-  ('00000000-0000-0000-0000-000000000104', '00000000-0000-0000-0000-000000000001', 'Furkan Kaya',   '905339998877', 'PERSON'),
-  ('00000000-0000-0000-0000-000000000105', '00000000-0000-0000-0000-000000000001', 'Selin Arslan',  '905357776655', 'PERSON'),
-  ('00000000-0000-0000-0000-000000000106', '00000000-0000-0000-0000-000000000001', 'Kerem Dogan',   '905421234567', 'PERSON'),
   ('00000000-0000-0000-0000-000000000107', '00000000-0000-0000-0000-000000000001', 'Emre Can',      '905445556677', 'PERSON'),
   ('00000000-0000-0000-0000-000000000108', '00000000-0000-0000-0000-000000000001', 'Zeynep Koc',    '905062223344', 'PERSON'),
   ('00000000-0000-0000-0000-000000000109', '00000000-0000-0000-0000-000000000001', 'Hakan Oz',      '905558889900', 'PERSON')
 ON CONFLICT (id) DO NOTHING;
 
-UPDATE contact SET is_owner = TRUE WHERE id = '00000000-0000-0000-0000-000000000104';
 
 -- Araclar (tutarlar kurus). Tarihler bugune gore: son 8 aya yayilmis alim ve satimlar.
 INSERT INTO vehicle (id, tenant_id, plate, make, model, model_year, fuel, transmission, mileage_km, color, tramer_cents,
@@ -87,9 +92,6 @@ INSERT INTO account (id, tenant_id, type, name, contact_id, vehicle_id) VALUES
   ('00000000-0000-0000-0000-000000000301', '00000000-0000-0000-0000-000000000001', 'CASH',    'Kasa',             NULL, NULL),
   ('00000000-0000-0000-0000-000000000302', '00000000-0000-0000-0000-000000000001', 'BANK',    'Ziraat Bankası',   NULL, NULL),
   ('00000000-0000-0000-0000-000000000303', '00000000-0000-0000-0000-000000000001', 'EXPENSE', 'Genel giderler',   NULL, NULL),
-  ('00000000-0000-0000-0000-000000000304', '00000000-0000-0000-0000-000000000001', 'CAPITAL', 'Furkan Kaya',      '00000000-0000-0000-0000-000000000104', NULL),
-  ('00000000-0000-0000-0000-000000000305', '00000000-0000-0000-0000-000000000001', 'CAPITAL', 'Selin Arslan',     '00000000-0000-0000-0000-000000000105', NULL),
-  ('00000000-0000-0000-0000-000000000306', '00000000-0000-0000-0000-000000000001', 'CAPITAL', 'Kerem Dogan',      '00000000-0000-0000-0000-000000000106', NULL),
   ('00000000-0000-0000-0000-000000000307', '00000000-0000-0000-0000-000000000001', 'INCOME',  'Gelirler',         NULL, NULL),
   ('00000000-0000-0000-0000-000000000311', '00000000-0000-0000-0000-000000000001', 'VEHICLE', 'Araç 06 ABC 123',  NULL, '00000000-0000-0000-0000-000000000201'),
   ('00000000-0000-0000-0000-000000000312', '00000000-0000-0000-0000-000000000001', 'VEHICLE', 'Araç 34 KLM 4521', NULL, '00000000-0000-0000-0000-000000000202'),
@@ -110,6 +112,13 @@ INSERT INTO account (id, tenant_id, type, name, contact_id, vehicle_id) VALUES
   ('00000000-0000-0000-0000-000000000327', '00000000-0000-0000-0000-000000000001', 'VEHICLE', 'Araç 34 SK 815',   NULL, '00000000-0000-0000-0000-000000000212'),
   ('00000000-0000-0000-0000-000000000328', '00000000-0000-0000-0000-000000000001', 'VEHICLE', 'Araç 06 SL 2023',  NULL, '00000000-0000-0000-0000-000000000213'),
   ('00000000-0000-0000-0000-000000000329', '00000000-0000-0000-0000-000000000001', 'BALANCE', 'Hakan Oz',         '00000000-0000-0000-0000-000000000109', NULL)
+ON CONFLICT DO NOTHING;
+
+-- Sermaye hesaplari kullanicinin (V22)
+INSERT INTO account (id, tenant_id, type, name, user_id) VALUES
+  ('00000000-0000-0000-0000-000000000304', '00000000-0000-0000-0000-000000000001', 'CAPITAL', 'Furkan Kaya',  '00000000-0000-0000-0000-000000000010'),
+  ('00000000-0000-0000-0000-000000000305', '00000000-0000-0000-0000-000000000001', 'CAPITAL', 'Selin Arslan', '00000000-0000-0000-0000-000000000105'),
+  ('00000000-0000-0000-0000-000000000306', '00000000-0000-0000-0000-000000000001', 'CAPITAL', 'Kerem Dogan',  '00000000-0000-0000-0000-000000000106')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO expense_category (id, tenant_id, name, root) VALUES
@@ -244,17 +253,13 @@ ON CONFLICT DO NOTHING;
 -- 214 Golf: Burak Gules'in araci, stokta, komisyon %3. Masraf: 4.500 TL sahibine yansitildi, 1.500 TL galeri ustlendi.
 -- 215 C-HR: Deniz Aksoy'un araci, sabit komisyon 40.000 TL, 8 gun once 1.450.000'e Zeynep'e satildi (pesin, bankaya).
 --      Sahibine borc 1.410.000; 1.000.000 odendi, 410.000 kaldi.
--- 216 Megane: ortak arac (Havuz %50, Kerem %50; kar payi orani ayni), kasadan pesin 980.000.
+-- 216 Megane: ortak arac (Furkan %50, Kerem %50; kar payi orani ayni), kasadan pesin 980.000.
 -- ---------------------------------------------------------------------------
-INSERT INTO contact (id, tenant_id, name, phone, type) VALUES
-  ('00000000-0000-0000-0000-000000000110', '00000000-0000-0000-0000-000000000001', 'Burak Gules', '905367771122', 'PERSON'),
-  ('00000000-0000-0000-0000-000000000111', '00000000-0000-0000-0000-000000000001', 'Deniz Aksoy', '905419990011', 'PERSON')
-ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO vehicle (id, tenant_id, plate, make, model, model_year, fuel, transmission, mileage_km, color, tramer_cents,
                      purchase_date, seller_id, bought_by_id, actual_purchase_cents, official_purchase_cents, status,
                      sale_date, buyer_id, sold_by_id, sale_price_cents,
-                     ownership, consignor_id, commission_type, commission_rate_bp, commission_cents)
+                     ownership, consignor_user_id, commission_type, commission_rate_bp, commission_cents)
 VALUES
   ('00000000-0000-0000-0000-000000000214', '00000000-0000-0000-0000-000000000001', '34 BG 1907', 'Volkswagen', 'Golf 1.5 TSI Style', 2022, 'GASOLINE', 'AUTOMATIC', 36000, 'Gri', NULL,
    CURRENT_DATE - 18, NULL, '00000000-0000-0000-0000-000000000011', NULL, NULL, 'IN_STOCK', NULL, NULL, NULL, NULL,
@@ -267,16 +272,19 @@ VALUES
    'CO_OWNED', NULL, NULL, NULL, NULL)
 ON CONFLICT (id) DO NOTHING;
 
--- Sahipler: Havuz (contact NULL) ve Kerem; Kerem'in 490.000 katkisi sermayesinden (aracta bagli)
-INSERT INTO vehicle_share (id, tenant_id, vehicle_id, contact_id, share_bp, profit_share_bp, contribution_source, pocket_cents) VALUES
-  ('00000000-0000-0000-0000-000000000801', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000216', NULL, 5000, 5000, 'CAPITAL', NULL),
+-- Sahipler: dukkan sahibi Furkan ve Kerem; Kerem'in 490.000 katkisi sermayesinden (aracta bagli)
+INSERT INTO vehicle_share (id, tenant_id, vehicle_id, user_id, share_bp, profit_share_bp, contribution_source, pocket_cents) VALUES
+  ('00000000-0000-0000-0000-000000000801', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000216', '00000000-0000-0000-0000-000000000010', 5000, 5000, 'CAPITAL', NULL),
   ('00000000-0000-0000-0000-000000000802', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000216', '00000000-0000-0000-0000-000000000106', 5000, 5000, 'CAPITAL', NULL)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO account (id, tenant_id, type, name, contact_id, vehicle_id) VALUES
-  ('00000000-0000-0000-0000-000000000330', '00000000-0000-0000-0000-000000000001', 'VEHICLE', 'Araç 35 KO 735', NULL, '00000000-0000-0000-0000-000000000216'),
-  ('00000000-0000-0000-0000-000000000331', '00000000-0000-0000-0000-000000000001', 'BALANCE', 'Burak Gules',    '00000000-0000-0000-0000-000000000110', NULL),
-  ('00000000-0000-0000-0000-000000000332', '00000000-0000-0000-0000-000000000001', 'BALANCE', 'Deniz Aksoy',    '00000000-0000-0000-0000-000000000111', NULL)
+  ('00000000-0000-0000-0000-000000000330', '00000000-0000-0000-0000-000000000001', 'VEHICLE', 'Araç 35 KO 735', NULL, '00000000-0000-0000-0000-000000000216')
+ON CONFLICT DO NOTHING;
+-- Konsinye sahiplerinin carisi (kullanici)
+INSERT INTO account (id, tenant_id, type, name, user_id) VALUES
+  ('00000000-0000-0000-0000-000000000331', '00000000-0000-0000-0000-000000000001', 'BALANCE', 'Burak Gules', '00000000-0000-0000-0000-000000000110'),
+  ('00000000-0000-0000-0000-000000000332', '00000000-0000-0000-0000-000000000001', 'BALANCE', 'Deniz Aksoy', '00000000-0000-0000-0000-000000000111')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO ledger_entry (id, tenant_id, entry_date, type, source_account_id, target_account_id, amount_cents, vehicle_id,

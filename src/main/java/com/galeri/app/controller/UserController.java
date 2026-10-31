@@ -21,6 +21,7 @@ import java.util.UUID;
 public class UserController {
 
     private final UserService userService;
+    private final com.galeri.app.service.LedgerService ledgerService;
     private final GenericResponseService responseService;
 
     @GetMapping
@@ -42,5 +43,12 @@ public class UserController {
     public GenericResponse<Void> resetPassword(@PathVariable UUID id, @Valid @RequestBody UserRequests.ResetPassword request) {
         userService.resetPassword(id, request);
         return responseService.success(null);
+    }
+
+    /** Kullaniciya (konsinye sahibi sermayedar) odeme: kasa / banka -> kullanicinin carisi. */
+    @PostMapping("/{id}/payments")
+    public GenericResponse<com.galeri.app.model.response.LedgerEntryResponse> pay(@PathVariable UUID id,
+            @Valid @RequestBody com.galeri.app.model.request.ContactPaymentRequest request) {
+        return responseService.success(ledgerService.payUser(id, request));
     }
 }

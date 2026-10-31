@@ -47,7 +47,8 @@ public class AuthController {
         String phone = PhoneUtil.normalize(req.phone());
         PanelUser user = phone == null ? null : panelUserRepository.findByPhoneAndActiveTrue(phone).orElse(null);
 
-        if (user == null || !passwordEncoder.matches(req.password(), user.getPasswordHash())) {
+        if (user == null || !user.isCanLogin() || user.getPasswordHash() == null
+                || !passwordEncoder.matches(req.password(), user.getPasswordHash())) {
             log.warn("Basarisiz giris denemesi: telefon={}", PhoneUtil.mask(phone));
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(responseService.createResponseWithError("Telefon veya şifre hatalı", ErrorMessageConstant.INVALID_CREDENTIALS));

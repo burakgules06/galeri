@@ -43,6 +43,9 @@ class UserServiceImplTest {
     @Mock private PanelUserRepository panelUserRepository;
     @Mock private TenantRepository tenantRepository;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private com.galeri.app.repository.AccountRepository accountRepository;
+    @Mock private com.galeri.app.repository.VehicleShareRepository shareRepository;
+    @Mock private com.galeri.app.repository.VehicleRepository vehicleRepository;
 
     private UserServiceImpl service;
     private Tenant tenant;
@@ -50,7 +53,7 @@ class UserServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new UserServiceImpl(panelUserRepository, tenantRepository, passwordEncoder);
+        service = new UserServiceImpl(panelUserRepository, tenantRepository, passwordEncoder, accountRepository, shareRepository, vehicleRepository);
         tenant = new Tenant();
         tenant.setId(UUID.randomUUID());
         me = user(tenant, "ADMIN", true);

@@ -4,9 +4,19 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
 
 ## Şu an
 
-**Kullanıcı / kişi ayrımı** (MIMARI §0) planlandı, uygulama sırası §0'ın sonunda. Açık sorular MIMARI §13'ün başında.
-Prod'da test verisi bozuk: 5 yetim `OPENING_BALANCE` hareketi var (planları silinmiş). Silinemez (trigger); §0 PR 1'deki
-veri taşımada ters hareketle kapatılacak.
+**Kullanıcı / kişi ayrımı** (MIMARI §0). PR 1 yapıldı (`feat/users-own-capital`, `V22__users_own_capital.sql`):
+- Roller ADMIN (dükkân sahibi) / INVESTOR (sermayedar) / STAFF; `can_login` (kapalıysa telefon ve şifre boş olabilir), `can_trade`.
+- Sermaye hesabı (`account.user_id`), araç payı (`vehicle_share.user_id`; Havuz satırı dükkân sahibinin satırı oldu ve havuz gibi
+  davranır), konsinye sahibi (`vehicle.consignor_user_id`), evrak sahibi (`payment_plan.holder_user_id`) kullanıcıda. Kullanıcının
+  carisi `account` BALANCE + `user_id`; dükkânın ona borcu (konsinye satışı) `POST /api/users/{id}/payments` ile ödenir
+  (panel: Ortaklar listesinde "Ödeme yap").
+- Veri taşıma: kişi → aynı galeride aynı ad soyadlı kullanıcı (büyük/küçük harf ve baş/son boşluk farkı gözetilmez); dükkân sahibi kişi
+  → aynı adlı ADMIN ya da galerinin ilk ADMIN'i; eşleşmeyen → girişi kapalı sermayedar. Sermayesi olan çalışan sermayedar olur.
+  Başka kaydı kalmayan taşınan kişiler silinir. Planı silinmiş geçmiş evrak açılışları ters hareketle kapanır. Test: `UsersOwnCapitalMigrationIT`.
+- V19 (sermayedarın dükkândan sermayesiyle araç alması) kaldırıldı; kolonlar duruyor, yeni kayıt yazılmıyor.
+- Panel: Kullanıcılar ekranında rol (Dükkân sahibi / Sermayedar / Çalışan), "Panele girebilir", "Araç alım / satımı girebilir".
+  Ortaklı araç sahipleri ve konsinye sahibi kullanıcı listesinden seçilir; Ortaklar sekmesinde "Kişiyi ortak yap" ve "Sahip yap" kalktı.
+- Sıradaki: §0 PR 2 (kişi türleri ve etiketler). Yetkiler (sermayedarın kendi ekranı) PR 3.
 
 ## Yapılanlar
 

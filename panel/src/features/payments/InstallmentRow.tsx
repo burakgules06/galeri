@@ -79,7 +79,6 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
             <span>{METHOD[i.method]}{i.noteNo ? ` no ${i.noteNo}` : ""}{i.bankName ? ` · ${i.bankName}` : ""}</span>
             {i.drawerName && <span className="text-murekkep-3">keşideci {i.drawerName}</span>}
             {i.description && <span className="max-w-full break-words text-murekkep-2">{i.description}</span>}
-            {i.capitalCents > 0 && <span className="text-plaka-koyu font-semibold">Sermayeden {tl(i.capitalCents)}</span>}
             {i.holder && <span className="text-[12px] font-semibold text-plaka-koyu bg-plaka-acik rounded px-1.5 py-0.5">{i.holder.name}</span>}
             {showPayer && <><span className="text-murekkep-3">·</span><span>{i.downPayment ? "Peşinat" : `${i.number}/${i.installmentCount}`}</span></>}
             {showPayer && i.payer.phone && <span className="sayi text-[14px] text-murekkep-3">{formatPhone(i.payer.phone)}</span>}
@@ -134,9 +133,7 @@ function CollectPanel({ i, label, onClose, onDone }: { i: InstallmentResponse; l
     setBusy(true);
     setError(null);
     try {
-      const collected = partialAllowed ? cents : i.amountCents;
-      const cashPart = collected - Math.min(i.capitalCents, collected);
-      await api.collect(i.id, cashPart > 0 ? selected : null, date, partialAllowed && cents !== i.amountCents ? cents : null);
+      await api.collect(i.id, selected, date, partialAllowed && cents !== i.amountCents ? cents : null);
       onDone();
     } catch (e) {
       setError(errorMessage(e));
@@ -149,7 +146,7 @@ function CollectPanel({ i, label, onClose, onDone }: { i: InstallmentResponse; l
     <div className="mx-1 mb-3 rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
       <ErrorBox message={error} />
       <div className={`grid gap-3 ${partialAllowed ? "sm:grid-cols-[1fr_150px_160px]" : "sm:grid-cols-[1fr_170px]"}`}>
-        {(i.capitalCents === 0 || cents > i.capitalCents) && (
+        {(
           <Field label={i.direction === "SALE" ? "Para hangi hesaba girdi" : "Para hangi hesaptan çıktı"}>
             {accounts.data && (
               <Segment<string> value={selected} onChange={setAccountId}
@@ -162,18 +159,12 @@ function CollectPanel({ i, label, onClose, onDone }: { i: InstallmentResponse; l
         )}
         <Field label="Tarih"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
       </div>
-      {cents > 0 && i.capitalCents > 0 && (
-        <p className="text-[13px] text-murekkep-2">
-          Sermayeden {tl(Math.min(i.capitalCents, cents))}{cents > i.capitalCents ? " · Hesaptan " + tl(cents - i.capitalCents) : ""}
-          {partialAllowed && cents < i.amountCents ? " · Kalan " + tl(i.amountCents - cents) + " aynı vadeyle bekleyecek." : ""}
-        </p>
-      )}
-      {partialAllowed && cents > 0 && cents < i.amountCents && i.capitalCents === 0 && (
+      {partialAllowed && cents > 0 && cents < i.amountCents && (
         <p className="text-[13px] text-murekkep-2">Kalan {tl(i.amountCents - cents)} aynı vadeyle bekleyecek.</p>
       )}
       <div className="flex justify-end gap-2">
         <Button variant="quiet" onClick={onClose}>Vazgeç</Button>
-        <Button onClick={submit} disabled={busy || ((partialAllowed ? cents : i.amountCents) > Math.min(i.capitalCents, partialAllowed ? cents : i.amountCents) && !selected)}>
+        <Button onClick={submit} disabled={busy || !selected}>
           {busy ? "Kaydediliyor…" : `${tl(partialAllowed && cents > 0 ? cents : i.amountCents)} ${label.toLocaleLowerCase("tr-TR")}`}
         </Button>
       </div>
