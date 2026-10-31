@@ -86,7 +86,7 @@ public class CapitalServiceImpl implements CapitalService {
                 .toList();
         Map<UUID, Long> capital = capitalByAccount(entryRepository.touchingType(tenantId, AccountType.CAPITAL), null);
         Map<UUID, Long> bound = coOwnershipService.boundCapital(tenantId, today());
-        long total = users.stream().map(accountOf::get).filter(Objects::nonNull)
+        long total = users.stream().map(u -> accountOf.get(u.getId())).filter(Objects::nonNull)
                 .mapToLong(a -> Math.max(0, capital.getOrDefault(a.getId(), 0L))).sum();
         return users.stream()
                 .map(u -> {

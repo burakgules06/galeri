@@ -222,7 +222,7 @@ public class LedgerServiceImpl implements LedgerService {
                 || original.getSourceAccount().getType() == AccountType.PORTFOLIO
                 || original.getTargetAccount().getType() == AccountType.PORTFOLIO
                 || installmentRepository.existsByPaidEntryId(original.getId())
-                || installmentRepository.existsByCapitalEntryId(original.getId())) {
+                || original.getType() == LedgerEntryType.PARTNER_SALE_SETTLEMENT) {
             throw new LinkedEntryException();
         }
         LedgerEntry reversal = writeReversal(original);

@@ -59,7 +59,6 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
 
     boolean existsByPaidEntryId(UUID entryId);
 
-    boolean existsByCapitalEntryId(UUID entryId);
 
     Optional<Installment> findByPaidEntryId(UUID entryId);
 
