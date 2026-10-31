@@ -186,7 +186,11 @@ class CoFinancingIT {
         assertThat(owner(v, burak).profitCents()).isEqualTo(-250_000 * TL);
         assertThat(owner(v, burak).receivableCents()).as("alacak eksi").isEqualTo(-50_000 * TL);
         expectPartner("zarar", burak, 800_000 * TL, 800_000 * TL, 0);   // sermayeden sadece katkisi (200.000) duser
-        assertThat(paymentPlanService.statement(burak).balanceCents()).as("Burak galeriye borclu").isEqualTo(50_000 * TL);
+        assertThat(jdbc.queryForObject("""
+                select coalesce((select sum(e.amount_cents) from ledger_entry e where e.target_account_id = a.id), 0)
+                     - coalesce((select sum(e.amount_cents) from ledger_entry e where e.source_account_id = a.id), 0)
+                from account a where a.type = 'BALANCE' and a.user_id = ?
+                """, Long.class, burak)).as("Burak galeriye borclu (kullanicinin carisi)").isEqualTo(50_000 * TL);
         check("zarar");
     }
 
@@ -271,7 +275,7 @@ class CoFinancingIT {
         assertThat(b.contributionCents()).isEqualTo(400_000 * TL);
         assertThat(b.profitCents()).as("kar tam maliyet uzerinden").isEqualTo(150_000 * TL);
         assertThat(b.receivableCents()).isEqualTo(550_000 * TL);
-        assertThat(owner(v, null).receivableCents()).isEqualTo(550_000 * TL);   // 2.300.000 - 1.200.000 = 550.000 + 550.000
+        assertThat(owner(v, owner).receivableCents()).isEqualTo(550_000 * TL);   // 2.300.000 - 1.200.000 = 550.000 + 550.000
         expectPartner("satis", burak, 1_150_000 * TL, 1_150_000 * TL, 0);
         check("satis");
 
