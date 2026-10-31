@@ -16,5 +16,7 @@ public interface VehicleShareRepository extends JpaRepository<VehicleShare, UUID
 
     List<VehicleShare> findByVehicleId(UUID vehicleId);
 
+    List<VehicleShare> findByVehicleIdIn(java.util.Collection<UUID> vehicleIds);
+
     boolean existsByUser_Id(UUID userId);
 }

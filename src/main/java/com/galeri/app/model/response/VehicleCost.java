@@ -8,7 +8,8 @@ import java.util.UUID;
 // Arac maliyeti ve kari (kurus). Kar sadece satilmis aracta hesaplanir.
 // - DEALER / CO_OWNED: maliyet = gercek alis + araca bagli masraflar, kar = satis - maliyet.
 // - CONSIGNMENT: alis yok; expenseCents = galerinin ustlendigi masraflar, ownerChargedCents = sahibine yansitilanlar,
-//   kar = komisyon - galerinin ustlendigi masraflar. ownerPayoutCents = sahibine borclanilan (satis - komisyon).
+//   kar = komisyon - galerinin ustlendigi masraflar. ownerPayoutCents = sahibinin alacagi (satis - komisyon);
+//   ownerCollectedCents bunun tahsil edilip sermayesine gecen kismi.
 // purchaseInLedger: alis odemesi deftere yazildi mi. shares: ortakli aracta karin ortaklara bolunmesi (sadece gosterim).
 public record VehicleCost(
         UUID vehicleId,
@@ -22,6 +23,7 @@ public record VehicleCost(
         Long commissionCents,
         Long ownerPayoutCents,
         long ownerChargedCents,
+        Long ownerCollectedCents,
         List<ShareResponse> shares,
         List<LedgerEntryResponse> entries
 ) {}

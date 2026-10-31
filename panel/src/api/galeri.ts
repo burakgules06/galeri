@@ -1,5 +1,6 @@
 import { apiFetch } from "./client";
 import type {
+  AccountHoldings,
   NetWorthResponse, AccountResponse, BodyPart, CategoryResponse, ContactRequest, ContactResponse, DashboardResponse, ExpenseRequest, ExpenseRoot,
   YearlyTrades, PaymentPlanResponse, OpenItemsRequest, BasketSaleRequest, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
   LedgerEntryResponse, MonthlyTrades, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
@@ -55,6 +56,7 @@ export const api = {
   removePartner: (userId: string) => apiFetch<void>(`/api/partners/${userId}`, { method: "DELETE" }),
   setPartnerBase: (userId: string, base: CapitalBase) => apiFetch<Partner>(`/api/partners/${userId}/base`, json({ base }, "PUT")),
   holders: () => apiFetch<Holder[]>("/api/holders"),
+  holdings: () => apiFetch<AccountHoldings[]>("/api/holdings"),
   capitalTransfer: (request: CapitalTransferRequest) => apiFetch<LedgerEntryResponse>("/api/capital-transfers", json(request)),
   moveCapital: (userId: string, request: CapitalMovementRequest) =>
     apiFetch<LedgerEntryResponse>(`/api/partners/${userId}/capital`, json(request)),
@@ -83,6 +85,8 @@ export const api = {
     apiFetch<LedgerEntryResponse[]>(`/api/ledger-entries${accountId ? `?accountId=${accountId}` : ""}`),
   correctEntry: (id: string) => apiFetch<LedgerEntryResponse>(`/api/ledger-entries/${id}/correct`, { method: "POST" }),
   addExpense: (request: ExpenseRequest) => apiFetch<LedgerEntryResponse>("/api/expenses", json(request)),
+  expenses: (from: string | null, to: string | null) =>
+    apiFetch<LedgerEntryResponse[]>(`/api/expenses?${new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}) })}`),
   // Duzenle: eski kayit terslenir + yeni kayit; sil: ters kayit (defter degismez)
   addExpenses: (items: ExpenseRequest[]) => apiFetch<LedgerEntryResponse[]>("/api/expenses/bulk", json({ items })),
   updateExpense: (id: string, request: ExpenseRequest) => apiFetch<LedgerEntryResponse>(`/api/expenses/${id}`, json(request, "PUT")),

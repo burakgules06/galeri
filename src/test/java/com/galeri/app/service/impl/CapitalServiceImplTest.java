@@ -118,9 +118,8 @@ class CapitalServiceImplTest {
         when(vehicleRepository.findByTenantIdAndSaleDateBetween(tenantId, FROM, TO)).thenReturn(List.of(coOwned, consigned, dealer));
         when(entryRepository.vehicleExpenseTotals(tenantId, LedgerEntryType.VEHICLE_EXPENSE, AccountType.VEHICLE))
                 .thenReturn(List.<Object[]>of(new Object[]{dealer.getId(), 5000000L}));
-        // Ortaga satista yazilan kar payi 72.000 (%60); havuza 48.000 kalir
-        when(entryRepository.partnerProfitShareTotals(tenantId, LedgerEntryType.VEHICLE_PROFIT_SHARE, AccountType.CAPITAL))
-                .thenReturn(List.<Object[]>of(new Object[]{coOwned.getId(), 7200000L}));
+        // Ortaklarin payi 72.000 (%60, tahsil edildikce sermayelerine); havuza 48.000 kalir
+        when(coOwnershipService.partnersProfit(coOwned)).thenReturn(7200000L);
         when(entryRepository.netInto(tenantId, AccountType.EXPENSE, FROM, TO)).thenReturn(8000000L);
 
         PeriodProfit p = service.periodProfit(FROM, TO);

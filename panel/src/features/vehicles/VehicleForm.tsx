@@ -18,7 +18,7 @@ import type {
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
 import { ContactPicker } from "../contacts/ContactPicker";
-import { row, rowProblem, toRequest, type PlanMode, type PlanRow } from "../payments/plan";
+import { row, rowProblem, toRequest, usePlan, type PlanRow } from "../payments/plan";
 import { PlanBuilder, PlanSummary } from "../payments/PlanBuilder";
 
 interface Props {
@@ -46,13 +46,13 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const locked = (purchasePlan?.installments ?? []).filter((i) => i.status === "PAID");
   const lockedCents = locked.reduce((t, i) => t + i.amountCents, 0);
   const [payMode, setPayMode] = useState<"CASH" | "PLAN">(purchasePlan ? "PLAN" : "CASH");
-  const [planMode, setPlanMode] = useState<PlanMode | null>(purchasePlan ? "MIXED" : null);
-  const [rows, setRows] = useState<PlanRow[]>(() => (purchasePlan?.installments ?? [])
+  const [initialRows] = useState<PlanRow[] | null>(() => purchasePlan ? (purchasePlan.installments ?? [])
     .filter((i) => i.status !== "PAID")
     .map((i) => row({
       dueDate: i.dueDate, amountCents: i.amountCents, method: i.method, noteNo: i.noteNo ?? "",
+      bankName: i.bankName ?? "", drawerName: i.drawerName ?? "", description: i.description ?? "",
       payer: i.payer.id !== i.counterparty.id ? i.payer : null,
-    })));
+    })) : null);
   const [plate, setPlate] = useState(v?.plate ?? "");
   // Katalogdan secilen marka / model; ilk deger sabit kalsin (secici her render'da yeniden eslestirmesin)
   const [initialMakeModel] = useState(() => (v ? { make: v.make, model: v.model } : null));
@@ -112,6 +112,10 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
 
   const actualCents = tlToCents(actual);
   const price = actualCents != null && !Number.isNaN(actualCents) ? actualCents : 0;
+  const plan = usePlan({ priceCents: Math.max(0, price - lockedCents), date: purchaseDate,
+    defaultAccount: (accounts.data?.find((a) => a.type === "CASH") ?? accounts.data?.[0])?.id ?? "",
+    initialMode: purchasePlan ? "MIXED" : null, initialRows });
+  const rows = plan.rows;
   const planned = lockedCents + rows.reduce((t, r) => t + (r.amountCents > 0 ? r.amountCents : 0), 0);
   const remaining = price - planned;
 
@@ -174,16 +178,17 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
     <Modal
       title={v ? "Aracı düzenle" : "Araç ekle"}
       open
-      wide={!consignment && payMode === "PLAN"}
+      size="xl"
       onClose={onClose}
       footer={<>
         <Button variant="secondary" type="button" onClick={onClose}>Vazgeç</Button>
         <Button type="submit" form="vehicle-form" disabled={saving || (!existing && !me.data)}>{saving ? "Kaydediliyor…" : "Kaydet"}</Button>
       </>}
     >
-      <form id="vehicle-form" onSubmit={submit} className="space-y-6">
-        <ErrorBox message={error ?? me.error} />
+      <form id="vehicle-form" onSubmit={submit} className="grid gap-x-8 gap-y-6 md:grid-cols-2 md:items-start">
+        <div className="md:col-span-2 empty:hidden"><ErrorBox message={error ?? me.error} /></div>
 
+        <div className="space-y-6 min-w-0">
         <section className="space-y-3">
           <h3 className="font-cond font-semibold text-[18px]">Araç</h3>
           <Field label="Plaka">
@@ -191,16 +196,28 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
               onChange={(e) => setPlate(formatPlate(e.target.value))} required autoCapitalize="characters" placeholder="34 ABC 123" />
           </Field>
           <MakeModelPicker initial={initialMakeModel} onChange={setMakeModel} onModelSelect={selectModelDefaults} />
-          <Field label="Model yılı">
-            <input className={`${inputClass} max-w-40`} value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))} required inputMode="numeric" placeholder="2021" />
-          </Field>
           <div className="grid grid-cols-2 gap-3">
+            <Field label="Model yılı">
+              <input className={inputClass} value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))} required inputMode="numeric" placeholder="2021" />
+            </Field>
             <Field label="Kilometre"><NumberInput kind="integer" value={mileage} onValueChange={setMileage} required placeholder="64.000" /></Field>
+            <Field label="Yakıt"><select className={inputClass} value={fuel} onChange={e => setFuel(e.target.value as Fuel)}>
+              {(Object.keys(FUEL) as Fuel[]).map(f => <option key={f} value={f}>{FUEL[f]}</option>)}
+            </select></Field>
+            <Field label="Vites"><select className={inputClass} value={transmission} onChange={e => setTransmission(e.target.value as Transmission)}>
+              {(Object.keys(TRANSMISSION) as Transmission[]).map(t => <option key={t} value={t}>{TRANSMISSION[t]}</option>)}
+            </select></Field>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="font-cond font-semibold text-[18px]">Alış</h3>
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Alış tarihi"><input type="date" className={inputClass} value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} required /></Field>
+            {!consignment && <Field label="Alış bedeli"><NumberInput className={`${inputClass} sayi text-[18px] font-semibold`} value={actual} onValueChange={setActual} placeholder="1.250.000" /></Field>}
           </div>
           {!consignment && <>
-            <Field label="Alış bedeli"><NumberInput value={actual} onValueChange={setActual} placeholder="1.250.000" /></Field>
-            <label className="flex items-center gap-2 text-sm min-h-10 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm min-h-8 cursor-pointer">
               <input type="checkbox" className="w-4 h-4 accent-plaka" checked={officialDiffers} onChange={e => {
                 setOfficialDiffers(e.target.checked);
                 if (e.target.checked) setDetailsOpen(true);
@@ -212,16 +229,10 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
                 onCreated={c => setExtraContacts(l => [c, ...l])} placeholder="İsim yaz ya da seç" />
             </Field>
           </>}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Yakıt"><select className={inputClass} value={fuel} onChange={e => setFuel(e.target.value as Fuel)}>
-              {(Object.keys(FUEL) as Fuel[]).map(f => <option key={f} value={f}>{FUEL[f]}</option>)}
-            </select></Field>
-            <Field label="Vites"><select className={inputClass} value={transmission} onChange={e => setTransmission(e.target.value as Transmission)}>
-              {(Object.keys(TRANSMISSION) as Transmission[]).map(t => <option key={t} value={t}>{TRANSMISSION[t]}</option>)}
-            </select></Field>
-          </div>
         </section>
+        </div>
 
+        <div className="space-y-6 min-w-0">
         <section className="space-y-3">
           <h3 className="font-cond font-semibold text-[18px]">Sahiplik</h3>
           <Segment<Ownership> value={ownership} onChange={setOwnership}
@@ -263,7 +274,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
         {!consignment && <section className="space-y-3">
           <h3 className="font-cond font-semibold text-[18px]">Ödeme</h3>
           <Segment<"CASH" | "PLAN"> value={payMode} onChange={setPayMode}
-            options={[{ value: "CASH", label: "Peşin" }, { value: "PLAN", label: "Senetli / taksitli" }]} />
+            options={[{ value: "CASH", label: "Peşin" }, { value: "PLAN", label: "Vadeli (senet, çek, açık hesap, kart)" }]} />
           {payMode === "CASH" && (
             <Field label="Ödeme nereden">
               <select className={inputClass} value={purchaseAccountId} onChange={(e) => setPurchaseAccount(e.target.value)}>
@@ -283,16 +294,17 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
                   </ul>
                 </div>
               )}
-              <PlanBuilder baseCents={Math.max(0, price - lockedCents)} date={purchaseDate} mode={planMode} onMode={setPlanMode}
-                rows={rows} onRows={setRows} remaining={remaining} accounts={accounts.data ?? []} organizations={[]}
-                modes={["INSTALLMENTS", "MIXED"]} methods={["CASH", "TRANSFER", "PROMISSORY_NOTE", "CHEQUE"]}
-                paidNowLabel="Şimdi ödendi" downHint="Şimdi ödenir" />
+              <PlanBuilder plan={plan} baseCents={Math.max(0, price - lockedCents)} accounts={accounts.data ?? []} organizations={[]}
+                modes={["PROMISSORY_NOTE", "CHEQUE", "OPEN_ACCOUNT", "CREDIT_CARD", "MIXED"]}
+                methods={["CASH", "TRANSFER", "CREDIT_CARD", "PROMISSORY_NOTE", "CHEQUE", "OPEN_ACCOUNT"]}
+                nowLabel="Şimdi ödendi" downLabel="Peşinat (şimdi ödenir)" />
               <PlanSummary planned={planned} remaining={remaining} ready={price > 0} />
             </>
           )}
         </section>}
+        </div>
 
-        <details className="border-t border-cizgi pt-3" open={detailsOpen} onToggle={e => setDetailsOpen(e.currentTarget.open)}>
+        <details className="md:col-span-2 border-t border-cizgi pt-3" open={detailsOpen} onToggle={e => setDetailsOpen(e.currentTarget.open)}>
           <summary className="cursor-pointer min-h-10 font-semibold">Diğer bilgiler</summary>
           <div className="space-y-3 pt-2">
             <Field label="Renk"><input className={inputClass} value={color} onChange={e => setColor(e.target.value)} placeholder="Beyaz" /></Field>

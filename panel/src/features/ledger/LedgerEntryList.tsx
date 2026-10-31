@@ -3,7 +3,7 @@
 // "Düzeltmeleri göster" ile gri ve ustu cizili gorunur. Maliyet karti ve Kasa listesi bu bileseni kullanir.
 import { useState } from "react";
 import { api } from "../../api/galeri";
-import { ENTRY_TYPE, shortDateTime, tl } from "../../shared/format";
+import { ENTRY_TYPE, formatDate, shortDateTime, tl } from "../../shared/format";
 import type { LedgerEntryResponse, LedgerEntryType } from "../../shared/types";
 import { errorMessage } from "../../shared/useLoad";
 import { Plate } from "../../shared/ui/Plate";
@@ -14,16 +14,20 @@ import { ExpenseForm } from "./ExpenseForm";
 const LINKED: LedgerEntryType[] = ["VEHICLE_SALE", "COLLECTION", "PAYMENT", "CONSIGNMENT_SETTLEMENT", "PARTNER_SALE_SETTLEMENT"];
 const EXPENSE: LedgerEntryType[] = ["VEHICLE_EXPENSE", "GENERAL_EXPENSE"];
 
-export function LedgerEntryList({ entries, direction, onChange, showVehicle = true }: {
+export function LedgerEntryList({ entries, direction, onChange, showVehicle = true, corrections }: {
   entries: LedgerEntryResponse[];
   /** +1 giris (yesil), -1 cikis (kirmizi), 0 notr */
   direction: (e: LedgerEntryResponse) => number;
   onChange: () => void;
   showVehicle?: boolean;
+  /** Kasa ekrani: "hide" duzeltmeleri hic gostermez, "only" sadece duzeltilen + duzeltmeleri. Bos: "Düzeltmeleri göster" kutusu. */
+  corrections?: "hide" | "only";
 }) {
   const [showCorrections, setShowCorrections] = useState(false);
-  const hidden = entries.filter((e) => e.corrected || e.correctedEntryId != null).length;
-  const visible = showCorrections ? entries : entries.filter((e) => !e.corrected && e.correctedEntryId == null);
+  const isCorrection = (e: LedgerEntryResponse) => e.corrected || e.correctedEntryId != null;
+  const hidden = corrections ? 0 : entries.filter(isCorrection).length;
+  const visible = corrections === "only" ? entries.filter(isCorrection)
+    : corrections === "hide" || !showCorrections ? entries.filter((e) => !isCorrection(e)) : entries;
 
   return (
     <div>
@@ -89,7 +93,8 @@ function Row({ e, direction, onChange, showVehicle }: { e: LedgerEntryResponse; 
             </a>
           )}
           <p className="text-[14px] text-murekkep-2 mt-0.5">
-            {shortDateTime(e.createdAt)} · {e.source.name} → {e.target.name}
+            {e.source.type === "CAPITAL" && EXPENSE.includes(e.type) ? `Cepten (${e.source.name})` : e.source.name} → {e.target.name}
+            {e.createdBy && <span className="text-murekkep-3"> · {e.createdBy}</span>}
           </p>
           {e.description && e.description !== title && e.description !== "Düzeltme" && <p className="text-[14px] text-murekkep-3 mt-0.5">{e.description}</p>}
         </div>
@@ -97,6 +102,7 @@ function Row({ e, direction, onChange, showVehicle }: { e: LedgerEntryResponse; 
           <p className={`font-cond font-semibold text-[19px] whitespace-nowrap ${amountColor} ${cancelled ? "line-through" : ""}`}>
             {sign}{sign && " "}{tl(e.amountCents)}
           </p>
+          <p className="text-[12.5px] text-murekkep-2 whitespace-nowrap" title={`Kayıt: ${shortDateTime(e.createdAt)}`}>{formatDate(e.date)}</p>
           {active && expense && !confirming && (
             <span className="inline-flex gap-3">
               <button type="button" onClick={() => setEditing(true)} className="text-[13px] font-semibold text-plaka hover:underline">Düzenle</button>

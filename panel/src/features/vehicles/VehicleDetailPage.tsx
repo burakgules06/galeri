@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { api, isAdminDetail } from "../../api/galeri";
 import { formatDate, formatNumber, FUEL, percent, STATUS, tl, TRANSMISSION } from "../../shared/format";
-import type { BodyPart, ContactSummary, PartCondition, VehicleDetail, VehicleDetailAdmin, VehicleStatus } from "../../shared/types";
+import type { BodyPart, ContactSummary, ShareResponse, PartCondition, VehicleDetail, VehicleDetailAdmin, VehicleStatus } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Plate } from "../../shared/ui/Plate";
 import { Button, ErrorBox } from "../../shared/ui/Common";
@@ -126,7 +126,7 @@ export function VehicleDetailPage({ id }: { id: string }) {
 
           {admin && (
             <CostCard key={`${admin.actualPurchaseCents}-${admin.salePriceCents}-${admin.purchaseAccountId}-${v.ownership}-${admin.commissionRateBp}-${admin.commissionCents}`}
-              vehicle={v} />
+              vehicle={v} ownerName={admin.consignor?.name} />
           )}
 
           {admin && v.ownership !== "CONSIGNMENT" && (
@@ -162,7 +162,7 @@ export function VehicleDetailPage({ id }: { id: string }) {
 // Maliyet = gercek alis + araca bagli masraflar (defterden). Kar sadece satilmis aracta.
 // Konsinye: alis yok; kar = komisyon - galerinin ustlendigi masraflar, sahibine borc ve yansitilan masraf ayri.
 // Ortakli: kar, ortaklarin payina gore bolunur (sadece gosterim).
-function CostCard({ vehicle }: { vehicle: VehicleDetail }) {
+function CostCard({ vehicle, ownerName }: { vehicle: VehicleDetail; ownerName?: string }) {
   const { data, error, reload } = useLoad(() => api.vehicleCost(vehicle.id), [vehicle.id]);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const expenses = (data?.entries ?? []).filter((e) => e.type === "VEHICLE_EXPENSE");
@@ -180,11 +180,14 @@ function CostCard({ vehicle }: { vehicle: VehicleDetail }) {
             <Info label="Sahibine yansıtılan" value={tl(data.ownerChargedCents)} numeric />
             {data.profitCents != null && <>
               <Info label="Satış bedeli" value={tl(data.salePriceCents)} numeric />
-              <Info label="Sahibine borç" value={tl(data.ownerPayoutCents)} numeric />
-              <ProfitInfo cents={data.profitCents} />
+              <ProfitInfo cents={data.profitCents} label="Galerinin kârı" />
             </>}
           </dl>
-
+          {data.ownerPayoutCents != null && (
+            <CollectedBar title={`${ownerName ?? "Sahibi"} · satıştan alacağı`}
+              total={data.ownerPayoutCents} collected={data.ownerCollectedCents ?? 0}
+              note="Borç yazılmaz: tahsil edildikçe sahibinin sermayesine geçer. Komisyon galerinin kârıdır." />
+          )}
         </>
       )}
       {data && !consignment && (
@@ -202,25 +205,7 @@ function CostCard({ vehicle }: { vehicle: VehicleDetail }) {
               <ProfitInfo cents={data.profitCents} />
             </>}
           </dl>
-          {data.shares.length > 0 && (
-            <div className="mt-4 pt-3 border-t border-cizgi">
-              <h3 className="etiket mb-2">{data.profitCents == null ? "Ortak payları" : data.profitCents >= 0 ? "Kârın ortaklara bölünmesi" : "Zararın ortaklara bölünmesi"}</h3>
-              <ul className="space-y-1.5">
-                {data.shares.map((s) => (
-                  <li key={s.userId} className="flex items-center gap-3">
-                    <span className="grow min-w-0 truncate font-semibold">{s.name}</span>
-                    <span className="sayi text-[16px] text-ortakli w-14 text-right">{percent(s.shareBp)}</span>
-                    {s.profitCents != null && (
-                      <span className={`sayi text-[17px] w-32 text-right font-semibold ${s.profitCents >= 0 ? "text-basari" : "text-tehlike"}`}>
-                        {s.profitCents < 0 ? "−" : ""}{tl(Math.abs(s.profitCents))}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-
-            </div>
-          )}
+          {data.shares.length > 0 && <SharesTable shares={data.shares} sold={data.profitCents != null} />}
         </>
       )}
       {data && (
@@ -239,6 +224,76 @@ function CostCard({ vehicle }: { vehicle: VehicleDetail }) {
       {expenseOpen && <BulkExpenseForm vehicle={vehicle} onClose={() => setExpenseOpen(false)}
         onSaved={() => { setExpenseOpen(false); reload(); }} />}
     </Card>
+  );
+}
+
+// Ortakli aracin sahipleri: sahiplik (koydugu para) ve kar payi orani her zaman; satildiysa her tahsilatin kar payi
+// oraniyla bolundugu, sahibin alacagi, su ana kadar ona dagitilan ve bekleyen.
+function SharesTable({ shares, sold }: { shares: ShareResponse[]; sold: boolean }) {
+  return (
+    <div className="mt-4 pt-3 border-t border-cizgi">
+      <h3 className="etiket mb-1">{sold ? "Satış parasının dağıtımı" : "Ortak payları"}</h3>
+      {sold && <p className="text-[13px] text-murekkep-2 mb-3">Her tahsilat kâr payı oranıyla bölünür; ortağın masraf payı ilk tahsilattan düşer.</p>}
+      <div className="overflow-x-auto -mx-1 px-1">
+        <table className="w-full text-[14px] min-w-[420px]">
+          <thead>
+            <tr className="text-left text-murekkep-2 text-[12px]">
+              <th className="font-semibold py-1.5 pr-2">Sahip</th>
+              <th className="font-semibold py-1.5 px-2 text-right">Sahiplik</th>
+              <th className="font-semibold py-1.5 px-2 text-right">Kâr payı</th>
+              <th className="font-semibold py-1.5 px-2 text-right">Koyduğu</th>
+              {sold && <th className="font-semibold py-1.5 px-2 text-right">Kâr</th>}
+              {sold && <th className="font-semibold py-1.5 pl-2 text-right">Tahsil / alacak</th>}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-cizgi">
+            {shares.map((s) => (
+              <tr key={s.userId}>
+                <td className="py-2 pr-2 font-semibold">
+                  <span className="block truncate max-w-[160px]">{s.name}</span>
+                  {s.owner && <span className="text-[11px] font-semibold text-plaka-koyu">Dükkân sahibi</span>}
+                </td>
+                <td className="py-2 px-2 text-right sayi">{percent(s.shareBp)}</td>
+                <td className="py-2 px-2 text-right sayi font-bold text-ortakli">{percent(s.profitShareBp)}</td>
+                <td className="py-2 px-2 text-right sayi whitespace-nowrap">{tl(s.contributionCents)}</td>
+                {sold && (
+                  <td className={`py-2 px-2 text-right sayi font-semibold whitespace-nowrap ${(s.profitCents ?? 0) >= 0 ? "text-basari" : "text-tehlike"}`}>
+                    {(s.profitCents ?? 0) < 0 ? "−" : ""}{tl(Math.abs(s.profitCents ?? 0))}
+                  </td>
+                )}
+                {sold && (
+                  <td className="py-2 pl-2 text-right sayi whitespace-nowrap">
+                    {s.owner || s.collectedCents == null ? <span className="text-murekkep-3">kasada</span>
+                      : <>{tl(s.collectedCents)}<span className="text-murekkep-3"> / {tl(s.receivableCents)}</span></>}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// Satistan alacagin ne kadari tahsil edilip sahibine gecti
+function CollectedBar({ title, total, collected, note }: { title: string; total: number; collected: number; note: string }) {
+  const pct = total > 0 ? Math.min(100, Math.round((collected * 100) / total)) : 0;
+  return (
+    <div className="mt-4 pt-3 border-t border-cizgi">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="etiket">{title}</h3>
+        <span className="sayi font-bold text-[17px]">{tl(total)}</span>
+      </div>
+      <div className="mt-2 h-2.5 rounded-full bg-yuzey-2 overflow-hidden">
+        <div className="h-full bg-basari rounded-full" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="mt-1.5 flex justify-between text-[13px]">
+        <span className="text-basari font-semibold">Sermayesine geçen {tl(collected)}</span>
+        <span className="text-murekkep-2">Bekleyen {tl(total - collected)}</span>
+      </div>
+      <p className="text-[12px] text-murekkep-3 mt-1.5">{note}</p>
+    </div>
   );
 }
 
@@ -288,10 +343,10 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function ProfitInfo({ cents }: { cents: number }) {
+function ProfitInfo({ cents, label }: { cents: number; label?: string }) {
   return (
     <div className="min-w-0">
-      <dt className="etiket">{cents >= 0 ? "Kâr" : "Zarar"}</dt>
+      <dt className="etiket">{cents >= 0 ? label ?? "Kâr" : "Zarar"}</dt>
       <dd className={`mt-1 sayi text-[21px] leading-tight font-bold ${cents >= 0 ? "text-basari" : "text-tehlike"}`}>{tl(Math.abs(cents))}</dd>
     </div>
   );

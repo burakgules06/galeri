@@ -1,75 +1,143 @@
-// Odeme plani kurucusu: hazir secenekler satirlari uretir, satirlar sonra duzenlenebilir. Satis formu ve
-// arac formundaki planli alis ayni bileseni kullanir; fark sadece etiketler ve izin verilen secenekler.
+// Odeme plani kurucusu: once odeme sekli (Nakit, Senet, Cek, Acik hesap, Evim / kredi, Kredi karti, Karma) secilir, sonra
+// pesinat / adet / ilk vade girilir; satirlar yazarken kurulur ve asagida gorunur. Satirlar elle de duzenlenebilir.
+// Satis formu ve arac formundaki planli alis ayni bileseni kullanir; fark etiketler ve izin verilen sekiller.
 import { useState } from "react";
-import { addMonthsIso, centsToInput, METHOD, tl, tlToCents } from "../../shared/format";
-import type { AccountResponse, ContactResponse, ContactSummary, PaymentMethod } from "../../shared/types";
+import { centsToInput, METHOD, tl, tlToCents } from "../../shared/format";
+import type { AccountResponse, ContactResponse, PaymentMethod } from "../../shared/types";
 import { ContactPicker } from "../contacts/ContactPicker";
-import { Button, Field, inputClass, Segment } from "../../shared/ui/Common";
-import { cashPlan, chequePlan, installmentPlan, institutionPlan, row, rowProblem, type PlanMode, type PlanRow } from "./plan";
+import { Button, Field, inputClass } from "../../shared/ui/Common";
+import { centsOrZero, row, rowProblem, type PlanMode, type PlanRow, type PlanState } from "./plan";
 import { NumberInput } from "../../shared/ui/NumberInput";
 
-const MODE_LABEL: Record<PlanMode, string> = {
-  CASH: "Peşin", INSTALLMENTS: "Taksit / senet", CHEQUE: "Çek", INSTITUTION: "Evim / kredi", MIXED: "Karma",
+const MODE: Record<PlanMode, { label: string; hint: string }> = {
+  CASH: { label: "Nakit", hint: "Tek seferde" },
+  PROMISSORY_NOTE: { label: "Senet", hint: "Vadeli senetler" },
+  CHEQUE: { label: "Çek", hint: "Vadeli çekler" },
+  OPEN_ACCOUNT: { label: "Açık hesap", hint: "Senetsiz vade" },
+  INSTITUTION: { label: "Evim / kredi", hint: "Kurum öder" },
+  CREDIT_CARD: { label: "Kredi kartı", hint: "Tek çekim / taksit" },
+  MIXED: { label: "Karma", hint: "Satırları sen kur" },
+};
+
+const COUNT_LABEL: Partial<Record<PlanMode, string>> = {
+  PROMISSORY_NOTE: "Senet sayısı", CHEQUE: "Çek sayısı", OPEN_ACCOUNT: "Taksit sayısı", INSTITUTION: "Ödeme sayısı", CREDIT_CARD: "Taksit sayısı",
 };
 
 export function PlanBuilder({
-  baseCents, date, mode, onMode, rows, onRows, remaining, accounts, organizations, modes, methods, paidNowLabel, downHint,
+  plan, baseCents, accounts, organizations, onOrgCreated = () => {}, modes, methods, nowLabel, downLabel,
 }: {
+  plan: PlanState;
   baseCents: number;                 // plana dagitilacak tutar (bedel - odenmis taksitler)
-  date: string;                      // satis / alis gunu: pesin ve pesinat vadesi
-  mode: PlanMode | null;
-  onMode: (m: PlanMode) => void;
-  rows: PlanRow[];
-  onRows: (rows: PlanRow[]) => void;
-  remaining: number;
   accounts: AccountResponse[];
   organizations: ContactResponse[];
+  onOrgCreated?: (c: ContactResponse) => void;
   modes: PlanMode[];
-  methods: PaymentMethod[];
-  paidNowLabel: string;              // "Şimdi alındı" / "Şimdi ödendi"
-  downHint: string;                  // "Şimdi alınır" / "Şimdi ödenir"
+  methods: PaymentMethod[];          // satirlarda secilebilecek yontemler
+  nowLabel: string;                  // "Şimdi alındı" / "Şimdi ödendi"
+  downLabel: string;                 // "Peşinat (şimdi alınır)" / "Peşinat (şimdi ödenir)"
 }) {
-  const firstAccount = accounts[0]?.id ?? "";
+  const { mode, config: cfg, rows } = plan;
+  const defaultAccount = (accounts.find((a) => a.type === "CASH") ?? accounts[0])?.id ?? "";
   const problems = rows.map((r) => rowProblem(r));
-  // "+ Yeni kurum" ile eklenenler hemen listede olsun (form kapanmaz)
-  const [newOrgs, setNewOrgs] = useState<ContactResponse[]>([]);
-  const orgs = [...newOrgs, ...organizations.filter((o) => !newOrgs.some((n) => n.id === o.id))];
-  const orgCreated = (c: ContactResponse) => setNewOrgs((l) => [c, ...l]);
-
-  const choose = (m: PlanMode) => {
-    onMode(m);
-    if (m === "CASH") onRows(cashPlan(baseCents, date, firstAccount));
-    if (m === "MIXED" && rows.length === 0 && baseCents > 0) onRows([row({ dueDate: date, amountCents: baseCents })]);
-  };
-  const update = (key: number, patch: Partial<PlanRow>) => onRows(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  const generated = mode != null && mode !== "CASH" && mode !== "MIXED";
+  const down = centsOrZero(cfg.downText);
 
   return (
-    <div className="space-y-3">
-      <Segment<PlanMode> value={mode ?? ("" as PlanMode)} onChange={choose} options={modes.map((m) => ({ value: m, label: MODE_LABEL[m] }))} />
-      {mode === "INSTALLMENTS" && (
-        <InstallmentGenerator price={baseCents} date={date} account={firstAccount} methods={methods} downHint={downHint} onBuild={onRows} />
+    <div className="space-y-4">
+      <div role="radiogroup" aria-label="Ödeme şekli" className="grid grid-cols-2 min-[420px]:grid-cols-3 md:grid-cols-4 gap-2">
+        {modes.map((m) => {
+          const on = mode === m;
+          return (
+            <button key={m} type="button" role="radio" aria-checked={on} onClick={() => plan.choose(m)}
+              className={`basilir text-left rounded-[12px] border px-3 py-2.5 transition-colors ${
+                on ? "border-plaka bg-plaka-acik ring-1 ring-plaka" : "border-cizgi-2 bg-yuzey hover:bg-yuzey-2"}`}>
+              <span className={`block font-semibold text-[15px] leading-tight ${on ? "text-plaka-koyu" : ""}`}>{MODE[m].label}</span>
+              <span className="block text-[12px] text-murekkep-2 mt-0.5">{MODE[m].hint}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {mode === "CASH" && (
+        <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 grid gap-3 sm:grid-cols-2">
+          <Field label="Para nereye">
+            <select className={inputClass} value={cfg.accountId || defaultAccount} onChange={(e) => plan.update({ accountId: e.target.value })}>
+              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </Field>
+          <div className="self-end text-[14px] text-murekkep-2 pb-2">Tamamı <b className="sayi text-[17px] text-murekkep">{tl(baseCents)}</b> şimdi</div>
+        </div>
       )}
-      {mode === "CHEQUE" && (
-        <ChequeGenerator price={baseCents} date={date} account={firstAccount} downHint={downHint} onBuild={onRows} />
-      )}
-      {mode === "INSTITUTION" && (
-        <InstitutionGenerator price={baseCents} date={date} account={firstAccount} organizations={orgs} onOrgCreated={orgCreated} downHint={downHint} onBuild={onRows} />
+
+      {generated && (
+        <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+            <Field label={downLabel}><NumberInput value={cfg.downText} onValueChange={(downText) => plan.update({ downText })} placeholder="0" /></Field>
+            <Field label="Peşinat nereye">
+              <select className={inputClass} value={cfg.accountId || defaultAccount} disabled={down <= 0}
+                onChange={(e) => plan.update({ accountId: e.target.value })}>
+                {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </Field>
+            <Field label={COUNT_LABEL[mode] ?? "Adet"}>
+              <NumberInput kind="integer" value={cfg.count} onValueChange={(count) => plan.update({ count })} />
+            </Field>
+            <Field label={mode === "INSTITUTION" ? "Kurumun ödeme günü" : "İlk vade"}>
+              <input type="date" className={inputClass} value={cfg.firstDue} onChange={(e) => plan.update({ firstDue: e.target.value })} />
+            </Field>
+            {mode === "CHEQUE" && <>
+              <Field label="Banka"><input className={inputClass} value={cfg.bankName} onChange={(e) => plan.update({ bankName: e.target.value })} /></Field>
+              <Field label="Keşideci"><input className={inputClass} value={cfg.drawerName} onChange={(e) => plan.update({ drawerName: e.target.value })} /></Field>
+            </>}
+            {mode === "INSTITUTION" && (
+              <div className="col-span-2">
+                <Field label="Kurum">
+                  <ContactPicker kind="ORGANIZATION" contacts={organizations} selected={cfg.institution}
+                    onSelect={(institution) => plan.update({ institution })} onCreated={onOrgCreated} placeholder="Evim şirketi, banka…" />
+                </Field>
+              </div>
+            )}
+            {mode === "OPEN_ACCOUNT" && (
+              <div className="col-span-2">
+                <Field label="Açıklama"><input className={inputClass} value={cfg.description} placeholder="İsteğe bağlı"
+                  onChange={(e) => plan.update({ description: e.target.value })} /></Field>
+              </div>
+            )}
+          </div>
+          <p className={`text-[13px] min-h-5 ${plan.problem ? "text-uyari font-semibold" : "text-murekkep-2"}`}>
+            {plan.problem ?? <>Kalan {tl(baseCents - down)} → {cfg.count} × ~{tl(Math.floor((baseCents - down) / Math.max(1, Number(cfg.count) || 1)))}, aylık</>}
+          </p>
+        </div>
       )}
 
       {rows.length > 0 && (
         <div className="space-y-2">
+          <div className="flex items-center justify-between min-h-8">
+            <p className="etiket">Plan · {rows.length} satır</p>
+            {plan.edited && (
+              <span className="flex items-center gap-2 text-[13px] text-murekkep-2">
+                Elle düzenlendi
+                <Button type="button" variant="quiet" className="h-8 px-2 text-plaka" onClick={plan.rebuild}>Yeniden kur</Button>
+              </span>
+            )}
+          </div>
           <div className="hidden md:grid grid-cols-[140px_150px_140px_1fr_40px] gap-2 px-1 etiket">
             <span>Vade</span><span>Tutar</span><span>Yöntem</span><span>Ayrıntı</span><span />
           </div>
           {rows.map((r, k) => (
-            <RowEditor key={r.key} r={r} problem={problems[k]} accounts={accounts} organizations={orgs} onOrgCreated={orgCreated} methods={methods}
-              paidNowLabel={paidNowLabel} onChange={(patch) => update(r.key, patch)} onRemove={() => onRows(rows.filter((x) => x.key !== r.key))} />
+            <RowEditor key={r.key} r={r} problem={problems[k]} accounts={accounts} organizations={organizations} onOrgCreated={onOrgCreated}
+              methods={methods} nowLabel={nowLabel}
+              onChange={(patch) => plan.setRows(rows.map((x) => (x.key === r.key ? { ...x, ...patch } : x)))}
+              onRemove={() => plan.setRows(rows.filter((x) => x.key !== r.key))} />
           ))}
         </div>
       )}
-      {mode != null && (
+      {mode != null && mode !== "CASH" && (
         <Button type="button" variant="secondary" disabled={baseCents <= 0}
-          onClick={() => onRows([...rows, row({ dueDate: date, amountCents: Math.max(0, remaining) })])}>
+          onClick={() => {
+            const planned = rows.reduce((t, r) => t + (r.amountCents > 0 ? r.amountCents : 0), 0);
+            plan.setRows([...rows, row({ dueDate: rows.at(-1)?.dueDate ?? cfg.firstDue, amountCents: Math.max(0, baseCents - planned) })]);
+          }}>
           + Satır ekle
         </Button>
       )}
@@ -88,122 +156,27 @@ export function PlanSummary({ planned, remaining, ready }: { planned: number; re
   );
 }
 
-function InstallmentGenerator({ price, date, account, methods, downHint, onBuild }: {
-  price: number; date: string; account: string; methods: PaymentMethod[]; downHint: string; onBuild: (rows: PlanRow[]) => void;
-}) {
-  const [down, setDown] = useState("");
-  const [count, setCount] = useState("6");
-  const [firstDue, setFirstDue] = useState(addMonthsIso(date, 1));
-  const [method, setMethod] = useState<PaymentMethod>("PROMISSORY_NOTE");
-  const downCents = tlToCents(down) ?? 0;
-  const n = Number(count);
-  const valid = price > 0 && !Number.isNaN(downCents) && downCents < price && Number.isInteger(n) && n >= 1 && n <= 60;
-
-  return (
-    <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
-        <Field label="Peşinat" hint={downHint}><NumberInput value={down} onValueChange={setDown} placeholder="300.000" /></Field>
-        <Field label="Taksit sayısı"><NumberInput kind="integer" value={count} onValueChange={setCount} /></Field>
-        <Field label="İlk vade"><input type="date" className={inputClass} value={firstDue} onChange={(e) => setFirstDue(e.target.value)} /></Field>
-        <Field label="Yöntem">
-          <select className={inputClass} value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
-            {methods.filter((m) => m !== "INSTITUTION").map((m) => <option key={m} value={m}>{METHOD[m]}</option>)}
-          </select>
-        </Field>
-      </div>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[13px] text-murekkep-2">
-          {valid ? <>Kalan {tl(price - downCents)} → {n} × ~{tl(Math.floor((price - downCents) / n))}, aylık</> : "Önce bedeli gir."}
-        </p>
-        <Button type="button" onClick={() => onBuild(installmentPlan(price, downCents, n, firstDue, method, date, account))} disabled={!valid}>Planı kur</Button>
-      </div>
-    </div>
-  );
-}
-
-function ChequeGenerator({ price, date, account, downHint, onBuild }: {
-  price: number; date: string; account: string; downHint: string; onBuild: (rows: PlanRow[]) => void;
-}) {
-  const [down, setDown] = useState("");
-  const [count, setCount] = useState("1");
-  const [firstDue, setFirstDue] = useState(addMonthsIso(date, 1));
-  const [bank, setBank] = useState("");
-  const [drawer, setDrawer] = useState("");
-  const downCents = tlToCents(down) ?? 0;
-  const n = Number(count);
-  const valid = price > 0 && !Number.isNaN(downCents) && downCents < price && Number.isInteger(n) && n >= 1 && n <= 60;
-
-  return (
-    <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
-        <Field label="Peşinat" hint={downHint}><NumberInput value={down} onValueChange={setDown} placeholder="0" /></Field>
-        <Field label="Çek sayısı"><NumberInput kind="integer" value={count} onValueChange={setCount} /></Field>
-        <Field label="İlk vade"><input type="date" className={inputClass} value={firstDue} onChange={(e) => setFirstDue(e.target.value)} /></Field>
-        <Field label="Banka"><input className={inputClass} value={bank} onChange={(e) => setBank(e.target.value)} /></Field>
-        <Field label="Keşideci"><input className={inputClass} value={drawer} onChange={(e) => setDrawer(e.target.value)} /></Field>
-      </div>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[13px] text-murekkep-2">
-          {valid ? <>{n} çek × ~{tl(Math.floor((price - downCents) / n))}</> : "Önce bedeli gir."}
-        </p>
-        <Button type="button" disabled={!valid}
-          onClick={() => onBuild(chequePlan(price, downCents, n, firstDue, bank.trim(), drawer.trim(), date, account))}>Planı kur</Button>
-      </div>
-    </div>
-  );
-}
-
-function InstitutionGenerator({ price, date, account, organizations, onOrgCreated, downHint, onBuild }: {
-  price: number; date: string; account: string; organizations: ContactResponse[]; onOrgCreated: (c: ContactResponse) => void;
-  downHint: string; onBuild: (rows: PlanRow[]) => void;
-}) {
-  const [down, setDown] = useState("");
-  const [org, setOrg] = useState<ContactSummary | null>(null);
-  const [due, setDue] = useState(date);
-  const downCents = tlToCents(down) ?? 0;
-  const valid = price > 0 && !Number.isNaN(downCents) && downCents < price && !!org;
-
-  return (
-    <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
-        <Field label="Peşinat (alıcıdan)" hint={downHint}><NumberInput value={down} onValueChange={setDown} placeholder="290.000" /></Field>
-        <Field label="Kurum">
-          <ContactPicker kind="ORGANIZATION" contacts={organizations} selected={org} onSelect={setOrg} onCreated={onOrgCreated} placeholder="Evim şirketi, banka…" />
-        </Field>
-        <Field label="Kurumun ödeme tarihi"><input type="date" className={inputClass} value={due} onChange={(e) => setDue(e.target.value)} /></Field>
-      </div>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm">{valid ? <>Kurumdan {tl(price - downCents)}</> : "Bedel ve kurum gerekli."}</p>
-        <Button type="button" disabled={!valid}
-          onClick={() => onBuild(institutionPlan(price, downCents, org, due, date, account))}>
-          Planı kur
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods, paidNowLabel, onChange, onRemove }: {
+function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods, nowLabel, onChange, onRemove }: {
   r: PlanRow; problem: string | null; accounts: AccountResponse[]; organizations: ContactResponse[];
   onOrgCreated: (c: ContactResponse) => void; methods: PaymentMethod[];
-  paidNowLabel: string; onChange: (patch: Partial<PlanRow>) => void; onRemove: () => void;
+  nowLabel: string; onChange: (patch: Partial<PlanRow>) => void; onRemove: () => void;
 }) {
   const [text, setText] = useState(centsToInput(r.amountCents));
   const changeAmount = (t: string) => {
     setText(t);
     const cents = tlToCents(t);
-    const amountCents = cents != null && !Number.isNaN(cents) ? cents : 0;
-    onChange({ amountCents });
+    onChange({ amountCents: cents != null && !Number.isNaN(cents) ? cents : 0 });
   };
+  const options = methods.includes(r.method) ? methods : [r.method, ...methods];
 
   return (
     <div className={`rounded-[12px] border p-2.5 md:p-2 grid gap-2 grid-cols-2 md:grid-cols-[140px_150px_140px_1fr_40px] md:items-center ${
       problem ? "border-uyari bg-uyari-zemin/40" : r.paidNow ? "border-basari/30 bg-basari-zemin/50" : "border-cizgi bg-yuzey"}`}>
       <input type="date" className={`${inputClass} h-9`} value={r.dueDate} onChange={(e) => onChange({ dueDate: e.target.value })} aria-label="Vade" />
-      <NumberInput className={`${inputClass} h-9 sayi text-[16px]`} value={text} onValueChange={changeAmount} aria-label="Tutar" />
+      <NumberInput className={`${inputClass} h-9 sayi text-[16px]`} value={text} onValueChange={changeAmount} aria-label="Tutar" preview={false} />
       <select className={`${inputClass} h-9`} value={r.method} aria-label="Yöntem"
-        onChange={(e) => { const method = e.target.value as PaymentMethod; onChange({ method, payer: null }); }}>
-        {methods.map((m) => <option key={m} value={m}>{METHOD[m]}</option>)}
+        onChange={(e) => onChange({ method: e.target.value as PaymentMethod, payer: null })}>
+        {options.map((m) => <option key={m} value={m}>{METHOD[m]}</option>)}
       </select>
       <div className="col-span-2 md:col-span-1 flex flex-wrap items-center gap-2 min-w-0">
         {r.method === "INSTITUTION" && (
@@ -215,6 +188,9 @@ function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods,
         {r.method === "PROMISSORY_NOTE" && (
           <input className={`${inputClass} h-9 md:w-32`} value={r.noteNo} onChange={(e) => onChange({ noteNo: e.target.value })} placeholder="Senet no" aria-label="Senet no" />
         )}
+        {r.method === "OPEN_ACCOUNT" && (
+          <input className={`${inputClass} h-9 md:w-48`} value={r.description} onChange={(e) => onChange({ description: e.target.value })} placeholder="Açıklama" aria-label="Açıklama" />
+        )}
         {r.method === "CHEQUE" && (
           <div className="w-full grid grid-cols-3 gap-2">
             <input className={`${inputClass} h-9`} value={r.noteNo} onChange={(e) => onChange({ noteNo: e.target.value })} placeholder="Çek no" aria-label="Çek no" />
@@ -224,8 +200,8 @@ function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods,
         )}
         <label className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold whitespace-nowrap">
           <input type="checkbox" checked={r.paidNow} className="w-4 h-4 accent-[var(--color-basari)]"
-            onChange={(e) => onChange({ paidNow: e.target.checked, accountId: e.target.checked ? (r.accountId || accounts[0]?.id || "") : "" })} />
-          {paidNowLabel}
+            onChange={(e) => onChange({ paidNow: e.target.checked, accountId: e.target.checked ? (r.accountId || accounts.find((a) => a.type === "CASH")?.id || accounts[0]?.id || "") : "" })} />
+          {nowLabel}
         </label>
         {r.paidNow && (
           <select className={`${inputClass} h-9 md:w-36`} value={r.accountId} onChange={(e) => onChange({ accountId: e.target.value })} aria-label="Hesap">
