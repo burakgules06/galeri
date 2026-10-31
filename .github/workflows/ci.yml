@@ -55,6 +55,11 @@ jobs:
           grep -E '^\[ERROR\] /.*\.java:\[[0-9]+' mvn.log | head -20 | while IFS= read -r line; do
             echo "::error title=Derleme::${line#\[ERROR\] }"
           done
+          # Uygulama acilmadiysa (migration / sema / bean hatasi) asil neden "Caused by" satirlarinda
+          grep -hE 'Caused by:' mvn.log target/surefire-reports/*.txt target/failsafe-reports/*.txt 2>/dev/null \
+            | sed 's/^[[:space:]]*//' | sort | uniq -c | sort -rn | head -8 | while IFS= read -r line; do
+            echo "::error title=Neden::${line:0:900}"
+          done
           python3 - <<'PY'
           import glob, xml.etree.ElementTree as ET
           n = 0
