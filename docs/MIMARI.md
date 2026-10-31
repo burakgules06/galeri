@@ -3,6 +3,76 @@
 Bu belge galericiyle yapılan görüşmelerden çıkan kararları tutar. Kod yazarken buradaki
 kavramlara ve kurallara uy; bir karar değişirse önce bu belgeyi güncelle.
 
+## 0. Kullanıcılar ve kişiler (Kasım 2026 kararı, uygulanıyor)
+
+Bu bölüm aşağıdaki eski kurallarla çelişirse **bu bölüm geçerlidir**. Eski bölümler (kişi altında ortak, `is_owner`, kişiye bağlı
+sermaye) uygulama bitene kadar mevcut kodu anlatır.
+
+**Ayrım:** Kullanıcılar dükkânın içindekilerdir (parası ve/veya yetkisi olanlar). Kişiler dışarıdaki taraflardır (müşteri, araç
+aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayedar ve dükkân sahibi artık kişi listesinde yer almaz.
+
+### Kullanıcı rolleri
+
+| Rol | Kim | Görür / yapar |
+|---|---|---|
+| `OWNER` (dükkân sahibi) | Galeride tek kişi | Her şey. Fiziksel kasa ve bankaları yönetir. Kullanıcılar ekranında herkesin alacak/verecek ve işlem geçmişini görür. Sermayesi = havuz − sermayedarların sermayesi. |
+| `INVESTOR` (sermayedar) | Dükkâna para koyan | Sadece kendi sermayesi, kendi para hareketleri, alacak/borcu. Kendi ve ortak olduğu araçları fiyatlarıyla; diğer araçları fiyatsız (çalışan gibi). Araç alımı ve satışı girer, kendi araçlarına masraf ekler. Kasa ve banka bakiyesini, başkalarının parasını görmez. |
+| `STAFF` (çalışan) | Çalışan | Hiçbir tutar görmez, sadece araç bilgileri. `can_trade` işaretliyse **peşin** araç alımı / satımı girebilir (girdiği tutarı sonra göremez). |
+
+- Panele giriş isteğe bağlı: `can_login = false` olan kullanıcı (ör. telefonu olmayan sermayedar) sadece kayıt olarak tutulur.
+- Kısıtlar backend'de uygulanır; para alanları yetkisi olmayana DTO'da hiç dönmez.
+
+### Sermayedarın parası
+
+- Sermayedar araç alırken para **kendi sermayesinden** düşer; kasa seçmez. Ortaklı alımda her ortağın payı kendi sermayesinden otomatik düşer.
+  Dükkân sahibinin payı kasa/bankadan çıkar (fiziksel kasayı o yönetir).
+- Sermayedar kendi aracının tahsilatını yaparken iki seçenek: **Sermayeme ekle** (para dükkâna girer, sermayesi artar) ya da
+  **Nakit aldım** (para cebine; alacak kapanır, sermaye değişmez).
+- Sermayedara ait çek / senet tahsil edilene kadar onun kartında alacak; risk onda (V18 + #37 kuralı korunur, sahibi kişi değil kullanıcı olur).
+- **Araç sahipliği:** Bir araç bir ya da birkaç kullanıcıya aittir (paylar toplamı %100). **Havuz sahip değildir**; havuz herkesin
+  parasının durduğu yer (kasa, bankalar, araçlar, alacaklar) ve dükkân sahibinindir. Dükkân sahibinin %100 aracı = galeri aracı.
+- **Ortaklı araç** (birden çok sahip): mevcut ekrandaki gibi her sahibin sahiplik payı ve kâr payı oranı girilir. Sahiplik payı sadece
+  kimin ne kadar para koyduğudur; kâr, kâr payı oranlarına göre bölünür.
+- **Galeri sahibine komisyon (ortaklı araç):** sahiplerden en az biri galeri sahibi değilse alışta "Galeri sahibine komisyon verilecek mi?"
+  sorulur; evetse % (kârın yüzdesi) ya da tutar girilir. Araç satılınca yazılır; galeri sahibi dışındaki ortaklar öder (galeri sahibi
+  ödemez). % girilirse her ortak **kendi kâr payının** yüzdesini öder. Ortaklar için masraf, galeri sahibi için gelir.
+  Örnek: Furkan %50, Burak %30, Ali %20 kâr payı; kâr 1.000.000; komisyon %10 → Burak 30.000, Ali 20.000 öder;
+  Furkan 550.000, Burak 270.000, Ali 180.000.
+- **Tek sahipli sermayedar aracı = konsinye:** mevcut konsinye ekranı ve komisyonu aynen kalır; sadece sahibi kişi değil kullanıcıdır.
+- **Masraf:** ortaklı araca masraf sahiplik paylarına göre bölünür; herkesin payı kendi sermayesinden düşer (dükkân sahibininki kasadan).
+- **Zarar:** şimdilik tanımsız, sonra konuşulacak.
+- **Sermayedarlar arası araç devri:** alan kullanıcı satışta "satmak için al" işaretler. Satanın sermayesine satış bedeli (maliyet + kâr)
+  eklenir, araç onun araçlarından düşer; alanın sermayesinden bedel düşer, araç onun araçlarına eklenir. Kasa değişmez.
+
+### Kişiler
+
+- **Ana tür (kalıcı, kayıtta seçilir):** `CUSTOMER` (müşteri), `SELLER` (araç aldığımız kişi), `SUPPLIER` (tedarikçi: usta, fotoğrafçı...).
+- **Biçim:** `PERSON` (bireysel) / `ORGANIZATION` (tüzel; Evim gibi kurumlar da burada).
+- **Etiketler (otomatik):** "Araç sattık", "Araç aldık" işlemlerden eklenir; ana tür değişmez.
+- Masrafa tedarikçi bağlama şimdilik **yok** (sadelik).
+- Araç sahipleri sadece **kullanıcılardır**; kişi araç sahibi olmaz.
+- Sermayedar satış girerken dükkân sahibiyle aynı ödeme seçeneklerini kullanır (peşin, taksit, senet, çek, açık hesap); kendi senet ve
+  açık hesaplarını kendi ekranından takip eder.
+
+### Veri değişikliği (özet, migration'larda kesinleşir)
+
+- `panel_user`: `role` OWNER / INVESTOR / STAFF, `can_trade`, `can_login`; telefon ve şifre `can_login` false ise boş olabilir; galeride tek OWNER.
+- Sermaye hesabı (`account` CAPITAL), `vehicle_share`, evrak sahibi (`payment_plan.holder_*`): kişi yerine kullanıcıya bağlanır.
+- `vehicle_share`: Havuz satırı (contact null) kalkar, dükkân sahibi de kullanıcı satırı olur; satırlar kullanıcı + sahiplik payı + kâr payı.
+  Dükkân payı (`shop_cut_*`) kalkar. Konsinye sahibi (`consignor_id`) kullanıcıya bağlanır; komisyon alanları kalır.
+- `contact`: `kind` (CUSTOMER / SELLER / SUPPLIER), etiketler; `is_owner` ve `capital_base` kullanıcıya taşınır / kalkar.
+- Prod verisi: hem kişi hem kullanıcı olan kayıtlar (Furkan, Burak Şahin) birleştirilir; tutarlar ve hareket geçmişi korunur.
+  Kişi kayıtlarında telefon boş, ad soyad kullanıcıyla birebir aynı: eşleme ad soyadla yapılır.
+
+### Uygulama sırası (her biri ayrı PR)
+
+1. Kullanıcı rolleri ve veri taşıma: sermaye, araç payları, konsinye ve evrak sahibi kullanıcıya; Furkan / Burak birleştirme.
+2. Kişi türleri ve etiketler; kişi listesinden kullanıcıların çıkması.
+3. Yetkiler: sermayedar ve çalışan için backend kısıtları ve panel ekranları; Kullanıcılar ekranında alacak/verecek ve geçmiş.
+4. Sermayedarın alımı (sermayeden düşme) ve tahsilat seçenekleri (Sermayeme ekle / Nakit aldım).
+5. Sermayedarlar arası araç devri ("satmak için al").
+6. `can_trade` çalışanın peşin alım / satımı.
+
 ## 1. Uygulama ne işe yarar
 
 Oto galeri sahibinin parasını takip etmesi için:
@@ -23,7 +93,8 @@ Fotoğraf yok. Döviz yok (her şey TL; ileride gerekirse eklenir).
 | Kavram | Anlamı |
 |---|---|
 | **Galeri (tenant)** | Uygulamayı kullanan işletme. Örnek: Furkan'ın dükkânı. |
-| **Kişi** | Uygulamada adı geçen her insan ya da kurum: ortaklar, müşteriler, araç sattığımız kişiler, Evim şirketi, banka. Rolü sabit değildir; aynı kişi bir araçta alıcı, başka araçta konsinye sahibi olabilir. |
+| **Kullanıcı** | Dükkânın içindekiler: dükkân sahibi, sermayedar, çalışan (§0). Sermaye ve araç sahipliği kullanıcıdadır. |
+| **Kişi** | Dışarıdaki taraf: müşteri, araç aldığımız kişi, tedarikçi, kurum (§0). Ortak ya da araç sahibi olmaz. |
 | **Sermaye ortağı** | Galeriye sermaye koymuş kişi. Genel dönem kârı önerisindeki ağırlığı, araçlarda bağlı olmayan nakit sermayesidir. |
 | **Konsinye araç** | Aracın sahibi galeri değil bir kişidir (örn. Burak'ın kendi aracı). Galeride satılır, galeri satıştan komisyon alır. Galerinin bu araca maliyeti yoktur, kârı sadece komisyondur. |
 | **Ortak araç** | Aracın maliyeti Havuz (galerinin ortak parası) ve/veya sermaye ortaklarınca karşılanır. Her sahibin katkı ve kâr payı hesaplanır. |
@@ -336,6 +407,8 @@ Her adım ayrı bir PR; her biri bittiğinde galericiye gösterilebilir.
 6. **Raporlar ve ana ekran:** kategori bazında giderler, araç kârlılığı, stok yaşı; ana ekran özeti.
 
 ## 13. Açık sorular
+
+- §0 zarar: ortaklı ya da konsinye araç zararına satılırsa sermayedarın payı (şimdilik tanımsız).
 
 - Konsinye araçlardan alınan komisyon sermaye havuzunun kârına giriyor mu? (Galerici "sonra konuşalım" dedi. Şimdilik INCOME'a yazılır ve dönem kârına dahil gösterilir; değişirse sadece rapor değişir. Ana ekranda ve raporlarda komisyon
   araç kârından ayrı satırda gösterilir.)
