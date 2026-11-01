@@ -54,36 +54,33 @@ export function contributions(priceCents: number, bps: number[], poolIndex: numb
 
 /**
  * Ortakli arac satisinda sahip basina tahmin (kayitta kesin tutar hesaplanir; backend CoOwnershipServiceImpl ile ayni kural):
- * her tahsilat kar payi oranlariyla bolunur; ortagin masraf payi ve satista odenmemis alis borcundan payi (sahiplik oraniyla)
- * ve varsa dukkan payi ilk tahsilattan duser. entitled: satistan toplam alacagi, now: simdi alinan kisimdan payi.
+ * kar (satis - alis - masraflar) kar payi oranlariyla bolunur, varsa dukkan payi ortaklarin karindan duser; ortagin alacagi =
+ * koydugu para + kar payi (0'in altina inmez). Her tahsilattan alacagi oraninda pay alir. entitled: toplam alacagi,
+ * now: simdi alinan kisimdan payi.
  */
 export function ownerSaleShares(
   saleCents: number, paidNowCents: number, purchaseCents: number, expenseCents: number, owners: ShareResponse[],
   shopCutType: CommissionType | null, shopCutRateBp: number | null, shopCutCents: number | null,
 ): Record<string, { entitled: number; now: number }> {
-  const part = (amount: number, bp: number) => Math.floor((amount * bp) / 10000);
+  const profit = saleCents - purchaseCents - expenseCents;
   const partners = owners.filter((o) => !o.owner);
-  const deduct = new Map<string, number>();
-  let partnersProfit = 0;
-  for (const o of partners) {
-    const d = part(expenseCents, o.shareBp) + Math.max(0, part(purchaseCents, o.shareBp) - o.contributionCents);
-    deduct.set(o.userId, d);
-    partnersProfit += part(saleCents, o.profitShareBp) - d - o.contributionCents;
-  }
+  const share = new Map(partners.map((o) => [o.userId, Math.floor((profit * o.profitShareBp) / 10000)]));
+  const partnersProfit = [...share.values()].reduce((t, v) => t + v, 0);
   const cut = partnersProfit <= 0 || shopCutType == null ? 0
     : shopCutType === "FIXED" ? Math.min(shopCutCents ?? 0, partnersProfit)
       : Math.floor((partnersProfit * (shopCutRateBp ?? 0) + 5000) / 10000);
   if (cut > 0 && partners.length) {
     const total = partners.reduce((t, o) => t + o.profitShareBp, 0);
     let given = 0;
-    partners.forEach((o) => { const c = Math.floor((cut * o.profitShareBp) / total); given += c; deduct.set(o.userId, deduct.get(o.userId)! + c); });
+    partners.forEach((o) => { const c = Math.floor((cut * o.profitShareBp) / total); given += c; share.set(o.userId, share.get(o.userId)! - c); });
     const largest = partners.reduce((best, o) => (o.profitShareBp > best.profitShareBp ? o : best), partners[0]);
-    deduct.set(largest.userId, deduct.get(largest.userId)! + cut - given);
+    share.set(largest.userId, share.get(largest.userId)! - (cut - given));
   }
-  return Object.fromEntries(partners.map((o) => [o.userId, {
-    entitled: Math.max(0, part(saleCents, o.profitShareBp) - deduct.get(o.userId)!),
-    now: Math.max(0, part(paidNowCents, o.profitShareBp) - deduct.get(o.userId)!),
-  }]));
+  return Object.fromEntries(partners.map((o) => {
+    const entitled = Math.max(0, o.contributionCents + share.get(o.userId)!);
+    const now = saleCents > 0 ? Math.min(entitled, Math.floor((paidNowCents * entitled) / saleCents)) : 0;
+    return [o.userId, { entitled, now }];
+  }));
 }
 
 export const totalBp = (bps: (number | null)[]) => bps.reduce<number>((t, b) => t + (b != null && !Number.isNaN(b) ? b : 0), 0);
