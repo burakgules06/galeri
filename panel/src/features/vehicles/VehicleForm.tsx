@@ -225,7 +225,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
               Resmi bedel farklı
             </label>
             <Field label="Kimden alındı">
-              <ContactPicker contacts={allContacts} selected={seller} onSelect={setSeller}
+              <ContactPicker contacts={allContacts} selected={seller} onSelect={setSeller} role="SELLER"
                 onCreated={c => setExtraContacts(l => [c, ...l])} placeholder="İsim yaz ya da seç" />
             </Field>
           </>}

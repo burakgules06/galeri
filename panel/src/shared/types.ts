@@ -122,7 +122,12 @@ export interface VehicleDetailAdmin {
   shopCutCents: number | null;
 }
 
-export interface ContactResponse { id: string; name: string; phone: string | null; type: ContactType; notes: string | null }
+// Ana tur: musteri / alis yaptiklarim (arac aldigimiz kisi) / tedarikci. Bicim (type): bireysel / tuzel.
+export type ContactKind = "CUSTOMER" | "SELLER" | "SUPPLIER";
+export interface ContactResponse {
+  id: string; name: string; phone: string | null; type: ContactType; notes: string | null;
+  kind?: ContactKind; tags?: ("SOLD_TO" | "BOUGHT_FROM")[];   // tags: islemlerden otomatik
+}
 
 export interface MonthlyVehicle { vehicleId: string; plate: string; make: string; model: string; date: string }
 export interface StaffMonthly { staffId: string | null; name: string; bought: MonthlyVehicle[]; sold: MonthlyVehicle[] }
@@ -291,7 +296,7 @@ export interface ContactStatement {
   lines: StatementLine[];
   openInstallments: InstallmentResponse[];
 }
-export interface ContactRequest { name: string; phone: string | null; type: ContactType; notes: string | null }
+export interface ContactRequest { name: string; phone: string | null; type: ContactType; notes: string | null; kind?: ContactKind | null }
 
 // ---- Para defteri (sadece ADMIN). Tutarlar kurus. ----
 export type AccountType = "CASH" | "BANK" | "BALANCE" | "CAPITAL" | "VEHICLE" | "EXPENSE" | "INCOME" | "OPENING";

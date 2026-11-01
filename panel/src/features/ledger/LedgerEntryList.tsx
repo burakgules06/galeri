@@ -106,7 +106,9 @@ function Row({ e, direction, onChange, showVehicle, readOnly }: {
           <p className={`font-cond font-semibold text-[19px] whitespace-nowrap ${amountColor} ${cancelled ? "line-through" : ""}`}>
             {sign}{sign && " "}{tl(e.amountCents)}
           </p>
-          <p className="text-[12.5px] text-murekkep-2 whitespace-nowrap" title={`Kayıt: ${shortDateTime(e.createdAt)}`}>{formatDate(e.date)}</p>
+          <p className="text-[12.5px] text-murekkep-2 whitespace-nowrap" title={`Kayıt: ${shortDateTime(e.createdAt)}`}>
+            {formatDate(e.date)}{e.createdAt && <span className="text-murekkep-3"> · {timeOf(e.createdAt)}</span>}
+          </p>
           {active && expense && !confirming && (
             <span className="inline-flex gap-3">
               <button type="button" onClick={() => setEditing(true)} className="text-[13px] font-semibold text-plaka hover:underline">Düzenle</button>
@@ -135,6 +137,12 @@ function Row({ e, direction, onChange, showVehicle, readOnly }: {
       <ExpenseForm open={editing} existing={e} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onChange(); }} />
     </li>
   );
+}
+
+/** Kaydin saati (yerel), 14:05 */
+function timeOf(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d);
 }
 
 function Tag({ children }: { children: string }) {

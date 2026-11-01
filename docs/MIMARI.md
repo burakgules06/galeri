@@ -75,6 +75,8 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
 1. Kullanıcı rolleri ve veri taşıma: sermaye, araç payları, konsinye ve evrak sahibi kullanıcıya; Furkan / Burak birleştirme.
    **Yapıldı** (`V22__users_own_capital.sql`). Sermayedarın dükkândan sermayesiyle araç alması (V19) kaldırıldı; yerini 5. madde alacak.
 2. Kişi türleri ve etiketler; kişi listesinden kullanıcıların çıkması.
+   **Yapıldı** (`V24__contact_kind.sql`): `contact.kind` (CUSTOMER / SELLER / SUPPLIER); mevcut kayıtta bize araç satmış ama bizden almamış
+   kişi SELLER, diğerleri CUSTOMER. Etiketler saklanmaz, araçlardan hesaplanır ("Araç sattık" alıcı, "Araç aldık" satıcı).
 3. Yetkiler: sermayedar ve çalışan için backend kısıtları ve panel ekranları; Kullanıcılar ekranında alacak/verecek ve geçmiş.
 4. Sermayedarın alımı (sermayeden düşme) ve tahsilat seçenekleri (Sermayeme ekle / Nakit aldım).
 5. Sermayedarlar arası araç devri ("satmak için al").
