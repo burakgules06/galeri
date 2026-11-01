@@ -402,7 +402,7 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         long cum = 0, prev = 0;
         for (Paid p : list) {
             cum += p.amount();
-            long mine = basket ? (total == 0 ? 0 : Math.floorDiv(cum * price, total)) : cum;
+            long mine = basket ? (total == 0 ? 0 : mulDiv(cum, price, total)) : cum;
             if (mine - prev != 0) result.add(new Collection(p.date(), mine - prev, p.id()));
             prev = mine;
         }
@@ -461,7 +461,7 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
             cum += c.amountCents();
             // Her tahsilattan ortaga alacagi oraninda pay (alacak / satis bedeli); tamami tahsil edilince alacagin tamami
             for (int k : partners) {
-                long now = sale <= 0 ? 0 : Math.min(entitled[k], Math.floorDiv(cum * entitled[k], sale));
+                long now = sale <= 0 ? 0 : Math.min(entitled[k], mulDiv(cum, entitled[k], sale));
                 long delta = now - given[k];
                 given[k] = now;
                 if (delta != 0) byEntry.computeIfAbsent(c.entryId(), x -> new HashMap<>()).merge(owners.get(k).getUser().getId(), delta, Long::sum);
@@ -507,7 +507,7 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         Map<UUID, Long> capitalByEntry = new HashMap<>();
         for (Collection c : collections(vehicle)) {
             cum += c.amountCents();
-            long now = sale == 0 ? 0 : Math.min(entitled, Math.floorDiv(cum * entitled, sale));
+            long now = sale == 0 ? 0 : Math.min(entitled, mulDiv(cum, entitled, sale));
             long nowNetted = Math.min(now, charged);
             long toBalance = nowNetted - netted, toCapital = (now - nowNetted) - (given - netted);
             given = now;
@@ -626,6 +626,12 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
     @Transactional(readOnly = true)
     public UUID poolOwnerId(UUID tenantId) {
         return panelUserRepository.findPoolOwner(tenantId).map(PanelUser::getId).orElse(null);
+    }
+
+    /** a * b / c asagi yuvarlanir; carpim long'a sigmayabilir (kurus x kurus). */
+    private static long mulDiv(long a, long b, long c) {
+        return java.math.BigInteger.valueOf(a).multiply(java.math.BigInteger.valueOf(b))
+                .divide(java.math.BigInteger.valueOf(c)).longValue();
     }
 
     private static VehicleRef ref(Vehicle v) {
