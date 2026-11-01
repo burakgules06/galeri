@@ -10,6 +10,7 @@ import { Plate } from "../../shared/ui/Plate";
 import { useLoad } from "../../shared/useLoad";
 import { ErrorBox } from "../../shared/ui/Common";
 import { StatTile } from "../../shared/ui/StatTile";
+import { Money } from "../../shared/ui/Money";
 import { VehicleCard } from "../vehicles/VehicleCard";
 import { PartnerCapitalCard } from "./PartnerCapitalCard";
 import { HoldersShareCard } from "./HoldersShareCard";
@@ -69,16 +70,19 @@ function AdminSummary() {
   return (
     <>
       <div className="grid w-full grid-cols-1 sm:grid-cols-2 gap-4">
-        <StatTile label="Kasa ve banka" value={tlShort(money)} tone="brand"
-          sub={<span>Kasa <b className="sayi font-semibold text-murekkep text-[14px]">{tlShort(data.cashCents)}</b> · Banka <b className="sayi font-semibold text-murekkep text-[14px]">{tlShort(data.bankCents)}</b></span>}>
+        <StatTile label="Kasa ve banka" value={<Money cents={money} />} tone="brand"
+          sub={<span className="flex flex-wrap gap-x-4 gap-y-0.5">
+            <span className="flex items-baseline gap-1.5"><span className="w-2 h-2 rounded-[3px] bg-seri-1 self-center" />Kasa <Money cents={data.cashCents} className="font-semibold text-murekkep text-[16px]" compact /></span>
+            <span className="flex items-baseline gap-1.5"><span className="w-2 h-2 rounded-[3px] bg-seri-3 self-center" />Banka <Money cents={data.bankCents} className="font-semibold text-murekkep text-[16px]" compact /></span>
+          </span>}>
           <SplitBar height={6} parts={[
             { key: "c", value: data.cashCents, color: "var(--color-seri-1)" },
             { key: "b", value: data.bankCents, color: "var(--color-seri-3)" },
           ]} />
         </StatTile>
-        <StatTile label="Stok" value={`${data.inStockCount} araç`}
+        <StatTile label="Stoktaki araç maliyeti" value={<Money cents={data.stockCostCents} />}
           sub={<span>
-            Maliyet <b className="sayi font-semibold text-murekkep text-[14px]">{tlShort(data.stockCostCents)}</b> · ort. {data.averageDaysInStock} gün
+            <b className="font-semibold text-murekkep">{data.inStockCount} araç</b> · ort. {data.averageDaysInStock} gün stokta
             {data.consignmentCount > 0 && <span className="block text-konsinye font-semibold">+ {data.consignmentCount} konsinye araç</span>}
           </span>} />
       </div>
