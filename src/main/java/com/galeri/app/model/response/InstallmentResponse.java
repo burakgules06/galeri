@@ -6,6 +6,7 @@ import com.galeri.app.model.enums.PlanDirection;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 // Taksit satiri: plan ve arac bilgisiyle. Sadece ADMIN'e doner. seq / count: "2 / 5" gosterimi icin.
@@ -36,13 +37,15 @@ public record InstallmentResponse(
         int number,                // pesinat haric taksit no (pesinatta 0)
         int installmentCount,      // pesinat haric taksit sayisi
         ContactSummary holder,     // gecmis senet / cek sermayedarinsa (V18)
-        String description
+        String description,
+        OffsetDateTime planCreatedAt,   // planin kuruldugu an (siralama)
+        List<UUID> userIds              // parasi kimin: aracin sahipleri ya da evrak sahibi; bos degilse kisi seciminde
 ) {
     public InstallmentResponse(UUID id, UUID planId, PlanDirection direction, VehicleRef vehicle, int seq, int count, LocalDate dueDate,
                                long amountCents, PaymentMethod method, String noteNo, ContactSummary payer, ContactSummary counterparty,
                                InstallmentStatus status, long daysLate, UUID paidEntryId, OffsetDateTime paidAt) {
         this(id, planId, direction, vehicle, seq, count, dueDate, amountCents, method, noteNo, payer, counterparty, status, daysLate,
-                paidEntryId, paidAt, null, null, null, false, false, seq, count, null, null);
+                paidEntryId, paidAt, null, null, null, false, false, seq, count, null, null, null, List.of());
     }
 
     public InstallmentResponse(UUID id, UUID planId, PlanDirection direction, VehicleRef vehicle, int seq, int count, LocalDate dueDate,
@@ -51,6 +54,6 @@ public record InstallmentResponse(
                                String bankName, String drawerName, ContactSummary endorsedTo, boolean bounced,
                                boolean downPayment, int number, int installmentCount, ContactSummary holder) {
         this(id, planId, direction, vehicle, seq, count, dueDate, amountCents, method, noteNo, payer, counterparty, status, daysLate,
-                paidEntryId, paidAt, bankName, drawerName, endorsedTo, bounced, downPayment, number, installmentCount, holder, null);
+                paidEntryId, paidAt, bankName, drawerName, endorsedTo, bounced, downPayment, number, installmentCount, holder, null, null, List.of());
     }
 }

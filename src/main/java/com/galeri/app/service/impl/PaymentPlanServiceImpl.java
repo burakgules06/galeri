@@ -431,7 +431,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
 
     private static PaymentPlanResponse planResponse(PaymentPlan p, List<Installment> installments, VehicleRef ref, LocalDate today,
                                                     List<PaymentPlanResponse.BasketItem> basket) {
-        List<InstallmentResponse> rows = installments.stream().map(i -> toResponse(i, ref, installments, today)).toList();
+        List<InstallmentResponse> rows = installments.stream().map(i -> toResponse(i, ref, installments, today, List.of())).toList();
         long paid = rows.stream().filter(i -> i.status() == InstallmentStatus.PAID).mapToLong(InstallmentResponse::amountCents).sum();
         long overdue = rows.stream().filter(i -> i.status() == InstallmentStatus.OVERDUE).mapToLong(InstallmentResponse::amountCents).sum();
         return new PaymentPlanResponse(p.getId(), p.getDirection(), p.getVehicleId(), summary(p.getContact()),
@@ -563,13 +563,44 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                         .filter(Objects::nonNull).distinct().toList())
                 .stream().collect(Collectors.toMap(Vehicle::getId, PaymentPlanServiceImpl::ref));
         LocalDate today = today();
+        Map<UUID, List<UUID>> usersOf = planUsers(tenantId, all.stream().map(Installment::getPlan).distinct().toList());
         return all.stream()
                 .filter(i -> direction == null || i.getPlan().getDirection() == direction)
                 .filter(i -> from == null || !i.getDueDate().isBefore(from))
                 .filter(i -> to == null || !i.getDueDate().isAfter(to))
-                .map(i -> toResponse(i, vehicles.get(vehicleIdOf.apply(i.getPlan())), byPlan.get(i.getPlan().getId()), today))
+                .map(i -> toResponse(i, vehicles.get(vehicleIdOf.apply(i.getPlan())), byPlan.get(i.getPlan().getId()), today,
+                        usersOf.getOrDefault(i.getPlan().getId(), List.of())))
                 .filter(i -> status == null || i.status() == status)
                 .toList();
+    }
+
+    /**
+     * Planin parasi kimin: evrak sermayedarinsa o; araca bagliysa aracin (sepette araclarin) sahipleri; gecmis cari
+     * kaydi dukkan sahibinin (havuz).
+     */
+    private Map<UUID, List<UUID>> planUsers(UUID tenantId, List<PaymentPlan> plans) {
+        Map<UUID, List<UUID>> vehiclesOf = new HashMap<>();
+        for (PaymentPlan p : plans) if (p.getVehicleId() != null) vehiclesOf.put(p.getId(), List.of(p.getVehicleId()));
+        List<UUID> rest = plans.stream().filter(p -> p.getVehicleId() == null).map(PaymentPlan::getId).toList();
+        if (!rest.isEmpty()) {
+            basketRepository.findByPlanIdIn(rest)
+                    .forEach(l -> vehiclesOf.computeIfAbsent(l.getPlanId(), k -> new ArrayList<>()).add(l.getVehicleId()));
+        }
+        Map<UUID, List<UUID>> byVehicle = coOwnershipService.vehicleUsers(tenantId,
+                vehiclesOf.values().stream().flatMap(List::stream).distinct().toList());
+        UUID pool = coOwnershipService.poolOwnerId(tenantId);
+        Map<UUID, List<UUID>> result = new HashMap<>();
+        for (PaymentPlan p : plans) {
+            if (p.getHolderUserId() != null) {
+                result.put(p.getId(), List.of(p.getHolderUserId()));
+                continue;
+            }
+            List<UUID> vs = vehiclesOf.getOrDefault(p.getId(), List.of());
+            List<UUID> users = vs.isEmpty() ? (pool == null ? List.of() : List.of(pool))
+                    : vs.stream().flatMap(v -> byVehicle.getOrDefault(v, List.of()).stream()).distinct().toList();
+            result.put(p.getId(), users);
+        }
+        return result;
     }
 
     // ------------------------------------------------------------------ tahsilat
@@ -855,7 +886,8 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
 
     private InstallmentResponse single(Installment i, Vehicle vehicle) {
         Vehicle v = vehicle != null ? vehicle : vehicleOf(i.getPlan());
-        return toResponse(i, ref(v), installmentRepository.findByPlanIds(List.of(i.getPlan().getId())), today());
+        return toResponse(i, ref(v), installmentRepository.findByPlanIds(List.of(i.getPlan().getId())), today(),
+                planUsers(i.getTenantId(), List.of(i.getPlan())).getOrDefault(i.getPlan().getId(), List.of()));
     }
 
     /** Pesinat: plan kurulurken ayni islemde tahsil / odenen satir (V15 isareti). Geri alinip sonra tahsil edilse de pesinattir. */
@@ -864,7 +896,8 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     }
 
     /** siblings: ayni planin butun taksitleri. Taksit no ve sayisi pesinat haric sayilir ("Pesinat", "1. taksit" ...). */
-    private static InstallmentResponse toResponse(Installment i, VehicleRef vehicle, List<Installment> siblings, LocalDate today) {
+    private static InstallmentResponse toResponse(Installment i, VehicleRef vehicle, List<Installment> siblings, LocalDate today,
+                                                  List<UUID> users) {
         int count = siblings.size();
         List<UUID> regular = siblings.stream().filter(s -> !isDownPayment(s))
                 .sorted(Comparator.comparing(Installment::getSeq)).map(Installment::getId).toList();
@@ -877,7 +910,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                 i.getAmountCents(), i.getMethod(), i.getNoteNo(), summary(i.getPayer()), summary(p.getContact()),
                 status, daysLate, i.getPaidEntryId(), i.getPaidAt(), i.getBankName(), i.getDrawerName(), summary(i.getEndorsedTo()),
                 i.getBouncedAt() != null && !i.isPaid(), down, down ? 0 : regular.indexOf(i.getId()) + 1, regular.size(),
-                userSummary(p.getHolder()), i.getDescription());
+                userSummary(p.getHolder()), i.getDescription(), p.getCreatedAt(), users);
     }
 
     private Installment lockInstallment(UUID id) {

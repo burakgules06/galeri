@@ -245,6 +245,8 @@ export interface InstallmentResponse {
   installmentCount: number;             // pesinat haric taksit sayisi
   holder: ContactSummary | null;        // gecmis senet / cek sermayedarinsa: tahsil edildikce onun sermayesine
   description: string | null;           // acik hesap aciklamasi
+  planCreatedAt: string | null;         // planin kuruldugu an (siralama)
+  userIds: string[];                    // parasi kimin: aracin sahipleri ya da evrak sahibi (kisi secimi)
 }
 
 // Toplu satis: ayni aliciya birden fazla arac, toplam uzerinden tek plan.
