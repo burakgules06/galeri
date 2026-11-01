@@ -750,7 +750,23 @@ public class LedgerServiceImpl implements LedgerService {
     private List<LedgerEntryResponse> toResponse(List<LedgerEntry> list) {
         if (list.isEmpty()) return List.of();
         Set<UUID> corrected = new HashSet<>(entryRepository.correctedIds(list.stream().map(LedgerEntry::getId).toList()));
-        return list.stream().map(e -> toResponse(e, corrected.contains(e.getId()))).toList();
+        UUID tenantId = list.getFirst().getTenantId();
+        Map<UUID, List<UUID>> owners = coOwnershipService.vehicleUsers(tenantId,
+                list.stream().filter(e -> e.getVehicle() != null).map(e -> e.getVehicle().getId()).distinct().toList());
+        Map<UUID, Map<UUID, Long>> shares = coOwnershipService.moneyEntryShares(tenantId);
+        UUID pool = coOwnershipService.poolOwnerId(tenantId);
+        return list.stream().map(e -> {
+            LedgerEntryResponse r = toResponse(e, corrected.contains(e.getId()));
+            java.util.LinkedHashSet<UUID> users = new java.util.LinkedHashSet<>();
+            if (e.getSourceAccount().getUserId() != null) users.add(e.getSourceAccount().getUserId());
+            if (e.getTargetAccount().getUserId() != null) users.add(e.getTargetAccount().getUserId());
+            if (e.getVehicle() != null) users.addAll(owners.getOrDefault(e.getVehicle().getId(), List.of()));
+            UUID original = e.getCorrectedEntryId() != null ? e.getCorrectedEntryId() : e.getId();
+            users.addAll(shares.getOrDefault(original, Map.of()).keySet());
+            if (users.isEmpty() && pool != null) users.add(pool);
+            return new LedgerEntryResponse(r.id(), r.date(), r.type(), r.source(), r.target(), r.amountCents(), r.vehicle(), r.category(),
+                    r.description(), r.correctedEntryId(), r.corrected(), r.createdBy(), r.createdAt(), List.copyOf(users));
+        }).toList();
     }
 
     /** Sermaye islemleri de (CapitalServiceImpl) ayni cevap bicimini kullanir. */

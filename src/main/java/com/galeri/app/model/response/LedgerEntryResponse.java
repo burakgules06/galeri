@@ -4,6 +4,7 @@ import com.galeri.app.model.enums.LedgerEntryType;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 // correctedEntryId doluysa bu bir duzeltme (ters) hareketidir; corrected=true ise bu hareket iptal edilmistir.
@@ -20,5 +21,15 @@ public record LedgerEntryResponse(
         UUID correctedEntryId,
         boolean corrected,
         String createdBy,
-        OffsetDateTime createdAt
-) {}
+        OffsetDateTime createdAt,
+        // Hareketin ilgili oldugu kullanicilar (sermayesi / carisi, aracin sahipleri, tahsilattan payi olanlar); kimse yoksa
+        // dukkan sahibi. Kasa ekraninda kisi filtresi icin; tek hareket donen uclarda bos.
+        List<UUID> userIds
+) {
+    public LedgerEntryResponse(UUID id, LocalDate date, LedgerEntryType type, AccountSummary source, AccountSummary target, long amountCents,
+                               VehicleRef vehicle, String category, String description, UUID correctedEntryId, boolean corrected,
+                               String createdBy, OffsetDateTime createdAt) {
+        this(id, date, type, source, target, amountCents, vehicle, category, description, correctedEntryId, corrected, createdBy, createdAt,
+                List.of());
+    }
+}
