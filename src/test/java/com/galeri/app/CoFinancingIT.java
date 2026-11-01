@@ -202,15 +202,16 @@ class CoFinancingIT {
     }
 
     @Test
-    void karPayiOraniSahiplikPayindanFarkli_herTahsilatKarPayiOranlaBolunur() {
-        // Sahiplik %50 / %50, kar payi %40 / %60: satis 2.300.000'in %60'i Burak'a (katkisi 1.000.000)
+    void karPayiOraniSahiplikPayindanFarkli_sadeceKarKarPayiOranlaBolunur() {
+        // Sahiplik %50 / %50, kar payi %40 / %60: kar 300.000'in %60'i (180.000) Burak'in, koydugu 1.000.000 ona doner
         UUID v = coOwned(2_000_000 * TL, List.of(new ShareRequest(owner, 5000, 4000, null, null),
                 new ShareRequest(burak, 5000, 6000, null, null)));
         sell(v, 2_300_000 * TL);
-        assertThat(owner(v, burak).receivableCents()).isEqualTo(1_380_000 * TL);
-        assertThat(owner(v, burak).profitCents()).isEqualTo(380_000 * TL);
-        assertThat(monthProfit().netCents()).isEqualTo(-80_000 * TL);   // dukkan sahibi: 920.000 - 1.000.000
-        expectPartner("oran", burak, 1_380_000 * TL, 1_380_000 * TL, 0);
+        assertThat(owner(v, burak).profitCents()).isEqualTo(180_000 * TL);
+        assertThat(owner(v, burak).receivableCents()).isEqualTo(1_180_000 * TL);
+        assertThat(owner(v, owner).profitCents()).isEqualTo(120_000 * TL);
+        assertThat(monthProfit().netCents()).isEqualTo(120_000 * TL);
+        expectPartner("oran", burak, 1_180_000 * TL, 1_180_000 * TL, 0);
         check("oran");
     }
 

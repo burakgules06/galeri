@@ -233,7 +233,7 @@ function SharesTable({ shares, sold }: { shares: ShareResponse[]; sold: boolean 
   return (
     <div className="mt-4 pt-3 border-t border-cizgi">
       <h3 className="etiket mb-1">{sold ? "Satış parasının dağıtımı" : "Ortak payları"}</h3>
-      {sold && <p className="text-[13px] text-murekkep-2 mb-3">Her tahsilat kâr payı oranıyla bölünür; ortağın masraf payı ilk tahsilattan düşer.</p>}
+      {sold && <p className="text-[13px] text-murekkep-2 mb-3">Kâr, kâr payı oranlarıyla bölünür; ortağın alacağı koyduğu para + kâr payı. Her tahsilattan alacağı oranında payı sermayesine geçer.</p>}
       <div className="overflow-x-auto -mx-1 px-1">
         <table className="w-full text-[14px] min-w-[420px]">
           <thead>
