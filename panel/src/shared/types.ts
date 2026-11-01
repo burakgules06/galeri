@@ -246,6 +246,7 @@ export interface InstallmentResponse {
   holder: ContactSummary | null;        // gecmis senet / cek sermayedarinsa: tahsil edildikce onun sermayesine
   description: string | null;           // acik hesap aciklamasi
   planCreatedAt: string | null;         // planin kuruldugu an (siralama)
+  planCreatedBy: string | null;         // plani (senedi / ceki) kaydeden kullanici
   userIds: string[];                    // parasi kimin: aracin sahipleri ya da evrak sahibi (kisi secimi)
 }
 
