@@ -3,17 +3,19 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { api } from "../../api/galeri";
 import { formatPhone } from "../../shared/format";
-import type { ContactResponse, ContactSummary, ContactType } from "../../shared/types";
+import type { ContactResponse, ContactSummary, ContactType, ContactKind } from "../../shared/types";
 import { errorMessage } from "../../shared/useLoad";
 import { inputClass } from "../../shared/ui/Common";
 
-export function ContactPicker({ contacts, selected, onSelect, onCreated, placeholder, kind = "PERSON", className = inputClass }: {
+export function ContactPicker({ contacts, selected, onSelect, onCreated, placeholder, kind = "PERSON", role = "CUSTOMER", className = inputClass }: {
   contacts: ContactResponse[];
   selected: ContactSummary | null;
   onSelect: (c: ContactSummary | null) => void;
   onCreated: (c: ContactResponse) => void;
   placeholder: string;
   kind?: ContactType;
+  /** Yeni eklenen kisinin ana turu: satista musteri, alista "alis yaptiklarim". */
+  role?: ContactKind;
   className?: string;
 }) {
   const [text, setText] = useState("");
@@ -55,7 +57,7 @@ export function ContactPicker({ contacts, selected, onSelect, onCreated, placeho
     setAdding(true);
     setError(null);
     try {
-      const c = await api.addContact({ name, phone: null, type: kind, notes: null });
+      const c = await api.addContact({ name, phone: null, type: kind, notes: null, kind: role });
       onCreated(c);
       choose(c);
     } catch (err) {

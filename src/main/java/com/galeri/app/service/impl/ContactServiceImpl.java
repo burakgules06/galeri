@@ -28,7 +28,15 @@ public class ContactServiceImpl implements ContactService {
     @Transactional(readOnly = true)
     public List<ContactResponse> search(String q) {
         String query = q == null ? "" : q.trim();
-        return contactRepository.search(CurrentUser.tenantId(), query).stream().map(ContactServiceImpl::toResponse).toList();
+        UUID tenantId = CurrentUser.tenantId();
+        java.util.Set<UUID> soldTo = new java.util.HashSet<>(contactRepository.buyerIds(tenantId));
+        java.util.Set<UUID> boughtFrom = new java.util.HashSet<>(contactRepository.sellerIds(tenantId));
+        return contactRepository.search(tenantId, query).stream().map(c -> {
+            List<String> tags = new java.util.ArrayList<>();
+            if (soldTo.contains(c.getId())) tags.add("SOLD_TO");
+            if (boughtFrom.contains(c.getId())) tags.add("BOUGHT_FROM");
+            return toResponse(c, tags);
+        }).toList();
     }
 
     @Override
@@ -54,9 +62,14 @@ public class ContactServiceImpl implements ContactService {
         contact.setPhone(PhoneUtil.normalize(request.phone()));
         contact.setType(request.type() != null ? request.type() : ContactType.PERSON);
         contact.setNotes(request.notes());
+        if (request.kind() != null) contact.setKind(request.kind());   // duzenlemede bos gelirse ana tur korunur
     }
 
     static ContactResponse toResponse(Contact c) {
-        return new ContactResponse(c.getId(), c.getName(), c.getPhone(), c.getType(), c.getNotes());
+        return toResponse(c, List.of());
+    }
+
+    static ContactResponse toResponse(Contact c, List<String> tags) {
+        return new ContactResponse(c.getId(), c.getName(), c.getPhone(), c.getType(), c.getNotes(), c.getKind(), tags);
     }
 }

@@ -1,5 +1,6 @@
 package com.galeri.app.model.entity;
 
+import com.galeri.app.model.enums.ContactKind;
 import com.galeri.app.model.enums.ContactType;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -7,7 +8,7 @@ import lombok.Setter;
 
 import java.util.UUID;
 
-// Musteri, arac aldigimiz kisi, ortak ya da kurum. Rolu araca gore degisir (bkz. docs/MIMARI.md).
+// Dukkan disindaki taraf: musteri, arac aldigimiz kisi, tedarikci ya da kurum (bkz. docs/MIMARI.md §0 Kisiler).
 @Entity
 @Table(name = "contact")
 @Getter
@@ -34,4 +35,9 @@ public class Contact extends BaseModel {
 
     @Column(columnDefinition = "text")
     private String notes;
+
+    // Ana tur: musteri / alis yaptiklarim / tedarikci (V24). Bicim type'ta (bireysel / tuzel).
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 12)
+    private ContactKind kind = ContactKind.CUSTOMER;
 }
