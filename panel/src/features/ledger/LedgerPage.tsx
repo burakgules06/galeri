@@ -31,12 +31,13 @@ export function LedgerPage() {
   const [transferOpen, setTransferOpen] = useState(false);
   const [owner, setOwner] = useState("");           // kimin parasi: "" = Tumu
   const [listTab, setListTab] = useState<"entries" | "corrections">("entries");
-  const [actor, setActor] = useState("");
+  const [related, setRelated] = useState("");   // ilgili kisi (kullanici id)
   const [flow, setFlow] = useState<Flow>("");
   const [sort, setSort] = useState<Sort>("new");
   const [entryPage, setEntryPage] = useState(1);
   const accounts = useLoad(() => api.accounts(), []);
   const holdings = useLoad(() => api.holdings(), [revision]);
+  const holders = useLoad(() => api.holders(), [revision]);
   const summary = useLoad(() => api.dashboard(), []);
   const entries = useLoad(() => api.ledgerEntries(selected), [selected]);
 
@@ -61,17 +62,17 @@ export function LedgerPage() {
 
   const allEntries = entries.data ?? [];
   const isCorrection = (e: LedgerEntryResponse) => e.corrected || e.correctedEntryId != null;
-  const actors = [...new Set(allEntries.map((e) => e.createdBy).filter((n): n is string => !!n))].sort((x, y) => x.localeCompare(y, "tr"));
+  const relatedPeople = (holders.data ?? []).filter((h) => h.userId);
   const filtered = allEntries
     .filter((e) => (listTab === "corrections") === isCorrection(e))
-    .filter((e) => (!actor || e.createdBy === actor)
+    .filter((e) => (!related || (e.userIds ?? []).includes(related))
       && (!flow || (flow === "in" ? entryDirection(e, selected) > 0 : entryDirection(e, selected) < 0)))
     .sort((x, y) => {
       const c = x.date.localeCompare(y.date) || (x.createdAt ?? "").localeCompare(y.createdAt ?? "");
       return sort === "new" ? -c : c;
     });
   const correctionCount = allEntries.filter(isCorrection).length;
-  const hasFilters = !!(actor || flow);
+  const hasFilters = !!(related || flow);
   const pageSize = 20;
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const page = Math.min(entryPage, pageCount);
@@ -162,9 +163,9 @@ export function LedgerPage() {
               <option value="">Tüm hesaplar</option>{list.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </label>
-          <label className="text-[12px] text-murekkep-2">İşlemi yapan
-            <select className={`${inputClass} mt-1 h-9 w-full`} value={actor} onChange={(e) => { setActor(e.target.value); setEntryPage(1); }}>
-              <option value="">Herkes</option>{actors.map((n) => <option key={n} value={n}>{n}</option>)}
+          <label className="text-[12px] text-murekkep-2">İlgili kişi
+            <select className={`${inputClass} mt-1 h-9 w-full`} value={related} onChange={(e) => { setRelated(e.target.value); setEntryPage(1); }}>
+              <option value="">Herkes</option>{relatedPeople.map((h) => <option key={h.userId!} value={h.userId!}>{h.name}</option>)}
             </select>
           </label>
           <label className="text-[12px] text-murekkep-2">İşlem tipi
@@ -178,7 +179,7 @@ export function LedgerPage() {
             </select>
           </label>
           <div className="col-span-2 lg:col-span-1 min-h-9 flex items-end">
-            {hasFilters && <Button type="button" variant="quiet" className="h-9" onClick={() => { setActor(""); setFlow(""); setEntryPage(1); }}>Temizle</Button>}
+            {hasFilters && <Button type="button" variant="quiet" className="h-9" onClick={() => { setRelated(""); setFlow(""); setEntryPage(1); }}>Temizle</Button>}
           </div>
         </div>
         {entries.data && filtered.length === 0 && (

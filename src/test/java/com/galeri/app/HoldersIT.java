@@ -213,6 +213,23 @@ class HoldersIT {
         }
     }
 
+    @Test
+    void kasaHareketleri_ilgiliKisiyleGelir_galeriAraciDukkanSahibinin() {
+        UUID shared = vehicle(4 * M, List.of(new ShareRequest(furkan, 5000), new ShareRequest(burak, 5000, null, ContributionSource.CAPITAL, null)));
+        UUID dealer = vehicle(1 * M, null);
+        var entries = ledgerService.entries(null);
+        assertThat(entries).filteredOn(e -> e.source().type() == AccountType.CAPITAL && burak.equals(userOfCapital(e.source().id())))
+                .allSatisfy(e -> assertThat(e.userIds()).contains(burak));
+        assertThat(entries).filteredOn(e -> e.vehicle() != null && e.vehicle().id().equals(shared))
+                .allSatisfy(e -> assertThat(e.userIds()).contains(furkan, burak));
+        assertThat(entries).filteredOn(e -> e.vehicle() != null && e.vehicle().id().equals(dealer))
+                .allSatisfy(e -> assertThat(e.userIds()).containsExactly(furkan));
+    }
+
+    private UUID userOfCapital(UUID account) {
+        return jdbc.queryForObject("select user_id from account where id = ?", UUID.class, account);
+    }
+
     private void expectHolding(String step, UUID account, UUID user, long cents) {
         var holdings = netWorthService.holdings();
         assertThat(holdings).allSatisfy(h -> assertThat(h.parts().stream().mapToLong(p -> p.cents()).sum())

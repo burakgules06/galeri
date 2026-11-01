@@ -322,6 +322,7 @@ export interface LedgerEntryResponse {
   correctedEntryId: string | null;   // doluysa bu bir duzeltme hareketi
   corrected: boolean;                // true ise bu hareket ters hareketle iptal edildi
   createdBy: string | null;
+  userIds?: string[];   // hareketin ilgili oldugu kullanicilar (Kasa'da kisi filtresi)
   createdAt: string;
 }
 
