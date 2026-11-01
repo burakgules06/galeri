@@ -29,7 +29,7 @@ public interface InstallmentRepository extends JpaRepository<Installment, UUID> 
     // null tarih parametreleri PostgreSQL tip cikarimini bozuyor).
     @Query("""
             select i from Installment i
-            join fetch i.plan p join fetch p.contact join fetch i.payer
+            join fetch i.plan p join fetch p.contact join fetch i.payer left join fetch p.createdBy
             where i.tenantId = :tenantId
             order by i.dueDate, i.seq
             """)
