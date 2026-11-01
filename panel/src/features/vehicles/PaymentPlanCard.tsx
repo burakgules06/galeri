@@ -9,6 +9,7 @@ import type { PlanDirection, VehicleDetailAdmin } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox } from "../../shared/ui/Common";
 import { InstallmentRow } from "../payments/InstallmentRow";
+import { useAuth } from "../../auth/useAuth";
 import { Plate } from "../../shared/ui/Plate";
 
 export function PaymentPlanCard({ vehicleId, direction = "SALE", onChanged, onUndone }: {
@@ -17,6 +18,7 @@ export function PaymentPlanCard({ vehicleId, direction = "SALE", onChanged, onUn
   onChanged: () => void;
   onUndone?: (d: VehicleDetailAdmin) => void;
 }) {
+  const { isInvestor } = useAuth();   // sermayedar: sadece tahsil eder, satisi geri alamaz
   const { data, error, reload } = useLoad(() => api.paymentPlans(vehicleId), [vehicleId]);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -84,13 +86,14 @@ export function PaymentPlanCard({ vehicleId, direction = "SALE", onChanged, onUn
 
           <ul className="mt-3 divide-y divide-cizgi -mx-1">
             {plan.installments.map((i) => (
-              <InstallmentRow key={i.id} i={i} onChange={changed} showVehicle={false} showPayer={i.payer.id !== plan.counterparty.id} />
+              <InstallmentRow key={i.id} i={i} onChange={changed} showVehicle={false} showPayer={i.payer.id !== plan.counterparty.id}
+                readOnly={isInvestor} investor={isInvestor} />
             ))}
           </ul>
         </>
       )}
 
-      {data && sale && (
+      {data && sale && !isInvestor && (
         <div className="mt-4 pt-3 border-t border-cizgi">
           <ErrorBox message={undoError} />
           {!confirming ? (

@@ -19,15 +19,21 @@ interface Props {
   accounts: AccountResponse[];
   value: Record<string, OwnerReturnDraft>;
   onChange: (v: Record<string, OwnerReturnDraft>) => void;
+  /** Sermayedar satiyor: sadece kendi satiri, "Sermayeme ekle" / "Nakit aldım", hesap secimi yok. */
+  investorId?: string;
 }
+
+const INVESTOR_MODES: { value: OwnerReturnMode; label: string }[] = [
+  { value: "KEEP", label: "Sermayeme ekle" }, { value: "CASH", label: "Nakit aldım" },
+];
 
 const MODES: { value: OwnerReturnMode; label: string }[] = [
   { value: "KEEP", label: "Sermayede kalsın" }, { value: "CASH", label: "Nakit öde" }, { value: "HYBRID", label: "Hibrit" },
 ];
 
 export function OwnerReturns({ owners, saleCents, paidNowCents, purchaseCents, expenseCents, shopCutType, shopCutRateBp, shopCutCents,
-  accounts, value, onChange }: Props) {
-  const partners = owners.filter((o) => !o.owner);
+  accounts, value, onChange, investorId }: Props) {
+  const partners = owners.filter((o) => !o.owner && (!investorId || o.userId === investorId));
   if (partners.length === 0) return null;
   const shares = saleCents > 0 ? ownerSaleShares(saleCents, paidNowCents, purchaseCents, expenseCents, owners, shopCutType, shopCutRateBp, shopCutCents) : null;
   return (
@@ -53,12 +59,12 @@ export function OwnerReturns({ owners, saleCents, paidNowCents, purchaseCents, e
             {share != null && share.now <= 0
               ? <p className="text-[13px] text-murekkep-2">Şimdi alınan paradan payı yok; tahsil edildikçe sermayesine geçer.</p>
               : <div className="flex flex-wrap items-center gap-2">
-                  <Segment<OwnerReturnMode> value={draft.mode} onChange={(mode) => set({ mode })} options={MODES} />
+                  <Segment<OwnerReturnMode> value={draft.mode} onChange={(mode) => set({ mode })} options={investorId ? INVESTOR_MODES : MODES} />
                   {draft.mode === "HYBRID" && (
                     <NumberInput className={`${inputClass} w-40`} value={draft.amount} onValueChange={(amount) => set({ amount })}
                       placeholder="Nakit TL" aria-label={`${o.name} nakit tutar`} />
                   )}
-                  {draft.mode !== "KEEP" && (
+                  {draft.mode !== "KEEP" && !investorId && (
                     <select className={`${inputClass} w-auto`} value={draft.accountId} onChange={(e) => set({ accountId: e.target.value })}
                       aria-label={`${o.name} ödeme hesabı`}>
                       {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}

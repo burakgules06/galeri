@@ -621,8 +621,15 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         }
         PaymentPlan plan = i.getPlan();
         Vehicle vehicle = vehicleOf(plan);
-        if (r.accountId() == null) throw new InvalidAccountException();
-        LedgerEntry entry = settle(i, plan.getDirection(), vehicle, r.accountId(), r.date(),
+        // Sermayedar: sadece parasi kendisinin olan satis planinda tahsil eder; para galerinin kasasina girer
+        UUID investor = CurrentUser.isInvestor() ? CurrentUser.principal().userId() : null;
+        if (investor != null && (plan.getDirection() != PlanDirection.SALE
+                || !planUsers(i.getTenantId(), List.of(plan)).getOrDefault(plan.getId(), List.of()).contains(investor))) {
+            throw new org.springframework.security.access.AccessDeniedException("Bu tahsilat sermayedara ait degil");
+        }
+        UUID accountId = investor != null ? ledgerService.cashAccountId() : r.accountId();
+        if (accountId == null) throw new InvalidAccountException();
+        LedgerEntry entry = settle(i, plan.getDirection(), vehicle, accountId, r.date(),
                 description(plan.getDirection(), i.getMethod()));
         OffsetDateTime paidAt = now();
         // Kosullu guncelleme: baska bir istek ayni anda tahsil ettiyse 0 satir; hata transaction'i (tahsilat hareketiyle) geri alir
@@ -633,6 +640,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         // Ortak aracin alis taksiti: odeme sahiplere paylarina gore bolunur (cepten kisim sermaye girisi)
         if (plan.getDirection() == PlanDirection.PURCHASE) coOwnershipService.syncContributions(vehicle);
         afterSaleCollection(plan);   // ortakli / konsinye satista tahsilat sahiplere dagitilir
+        if (investor != null && Boolean.TRUE.equals(r.cashToMe())) cashToInvestor(i, entry, investor, accountId, r.date(), vehicle);
         return single(i, vehicle);
     }
 
@@ -651,6 +659,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             undoEndorsement(endorsedSource.get());
             return single(i, null);
         }
+        undoCashToInvestor(i);
         ledgerService.reverse(i.getPaidEntryId());
         i.setPaidEntryId(null);
         i.setPaidAt(null);
@@ -736,6 +745,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         if (i.isEndorsed()) {
             undoEndorsement(i);
         } else if (i.isPaid()) {
+            undoCashToInvestor(i);
             ledgerService.reverse(i.getPaidEntryId());
             i.setPaidEntryId(null);
             i.setPaidAt(null);
@@ -764,6 +774,26 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             coOwnershipService.syncContributions(vehicleOf(t.getPlan()));
         });
         afterSaleCollection(source.getPlan());
+    }
+
+    /**
+     * "Nakit aldım": tahsilattan sermayedara dusen pay (ortakli / konsinye satis payi ya da kendi evraki) kasaya girmis sayilip
+     * hemen sermayesinden cekilir; kasa net degismez, alacak kapanir, sermayesi artmaz.
+     */
+    private void cashToInvestor(Installment i, LedgerEntry collection, UUID investor, UUID accountId, LocalDate date, Vehicle vehicle) {
+        long share = investor.equals(i.getPlan().getHolderUserId()) ? i.getAmountCents()
+                : coOwnershipService.moneyEntryShares(i.getTenantId()).getOrDefault(collection.getId(), Map.of()).getOrDefault(investor, 0L);
+        if (share <= 0) return;
+        LedgerEntry out = ledgerService.withdrawToUser(investor, i.getTenantId(), accountId, share, date, vehicle,
+                "Nakit aldım: " + i.getPayer().getName());
+        i.setCapitalEntryId(out.getId());
+    }
+
+    /** Odemesi geri alinan taksitte sermayedarin nakit aldigi pay da geri doner. */
+    private void undoCashToInvestor(Installment i) {
+        if (i.getCapitalEntryId() == null) return;
+        ledgerService.reverse(i.getCapitalEntryId());
+        i.setCapitalEntryId(null);
     }
 
     /** Satis planinda tahsilat degisti: planin ortakli / konsinye araclarinda tahsilat dagitimi yeniden yazilir. */

@@ -29,8 +29,13 @@ public class CapitalController {
     private final GenericResponseService responseService;
 
     @GetMapping("/partners")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")   // sermayedar: ortak secmek icin isimler; baskasinin parasi donmez
     public GenericResponse<List<CapitalResponses.Partner>> partners() {
-        return responseService.success(capitalService.partners());
+        List<CapitalResponses.Partner> all = capitalService.partners();
+        if (!com.galeri.app.security.CurrentUser.isInvestor()) return responseService.success(all);
+        UUID me = com.galeri.app.security.CurrentUser.principal().userId();
+        return responseService.success(all.stream().map(p -> me.equals(p.userId()) ? p
+                : new CapitalResponses.Partner(p.userId(), p.name(), null, p.owner(), 0, 0, 0, 0)).toList());
     }
 
     @DeleteMapping("/partners/{userId}")

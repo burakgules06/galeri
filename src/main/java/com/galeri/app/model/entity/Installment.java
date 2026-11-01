@@ -81,6 +81,11 @@ public class Installment extends BaseModel {
     @Column(name = "holder_entry_id")
     private UUID holderEntryId;
 
+    // Sermayedar tahsilatta "Nakit aldım" dediyse: tahsilattan payinin sermayesinden cekisi (V19 kolonu). Odeme geri
+    // alininca terslenir.
+    @Column(name = "capital_entry_id")
+    private UUID capitalEntryId;
+
     // Karsiliksiz cikti (V12): odemesi geri alindi, borc yeniden acik
     @Column(name = "bounced_at")
     private OffsetDateTime bouncedAt;

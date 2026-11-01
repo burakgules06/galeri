@@ -25,13 +25,15 @@ const STRIPE: Record<InstallmentStatus, string> = {
 
 type Panel = "collect" | "undo" | "edit" | "endorse" | "bounce" | null;
 
-export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = true, allowDeleteOpenItem = false, readOnly = false }: {
+export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = true, allowDeleteOpenItem = false, readOnly = false,
+  investor = false }: {
   i: InstallmentResponse;
   onChange: () => void;
   showVehicle?: boolean;
   showPayer?: boolean;
   allowDeleteOpenItem?: boolean;
-  readOnly?: boolean;   // sermayedar: sadece gorur
+  readOnly?: boolean;   // sadece gorur
+  investor?: boolean;   // sermayedar: sadece kendi satis taksitini "Tahsil et" (Sermayeme ekle / Nakit aldım), baska islem yok
 }) {
   const [panel, setPanel] = useState<Panel>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -89,7 +91,10 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
           <span className={`sayi font-bold text-[21px] whitespace-nowrap ${paid ? "text-basari" : i.status === "OVERDUE" ? "text-tehlike" : "text-murekkep"}`}>
             {tl(i.amountCents)}
           </span>
-          {!readOnly && !paid && panel === null && (
+          {investor && !paid && panel === null && i.direction === "SALE" && (
+            <Button className="h-9" onClick={() => setPanel("collect")}>Tahsil et</Button>
+          )}
+          {!readOnly && !investor && !paid && panel === null && (
             <div className="flex flex-wrap justify-end gap-1.5">
               {canDeleteOpenItem && <Button variant="quiet" className="h-9 px-2.5 text-tehlike" onClick={removeOpenItem}>Sil</Button>}
               <Button variant="quiet" className="h-9 px-2.5" onClick={() => setPanel("edit")} aria-label="Vadeyi düzenle">Düzenle</Button>
@@ -97,7 +102,7 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
               <Button className="h-9" onClick={() => setPanel("collect")}>{actionLabel}</Button>
             </div>
           )}
-          {!readOnly && paid && panel === null && (
+          {!readOnly && !investor && paid && panel === null && (
             <div className="flex gap-1.5">
               {instrument && <Button variant="quiet" className="h-9 text-tehlike" onClick={() => setPanel("bounce")}>Karşılıksız</Button>}
               {i.method === "OPEN_ACCOUNT" && <Button variant="quiet" className="h-9" aria-label="Açıklamayı düzenle" onClick={() => setPanel("edit")}>Düzenle</Button>}
@@ -107,7 +112,7 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
         </div>
       </div>
       {deleteError && <div className="px-4 pb-2"><ErrorBox message={deleteError} /></div>}
-      {panel === "collect" && <CollectPanel i={i} label={actionLabel} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
+      {panel === "collect" && <CollectPanel i={i} label={actionLabel} investor={investor} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
       {panel === "undo" && <UndoPanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
       {panel === "edit" && <EditPanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
       {panel === "endorse" && <EndorsePanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
@@ -116,8 +121,11 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
   );
 }
 
-function CollectPanel({ i, label, onClose, onDone }: { i: InstallmentResponse; label: string; onClose: () => void; onDone: () => void }) {
+function CollectPanel({ i, label, investor, onClose, onDone }: {
+  i: InstallmentResponse; label: string; investor: boolean; onClose: () => void; onDone: () => void;
+}) {
   const accounts = useLoad(() => api.accounts(), []);
+  const [cashToMe, setCashToMe] = useState(false);   // sermayedar: "Nakit aldım" (payi cebine) / "Sermayeme ekle"
   const [accountId, setAccountId] = useState("");
   const [date, setDate] = useState(todayIso());
   const [amount, setAmount] = useState(centsToInput(i.amountCents));
@@ -134,7 +142,7 @@ function CollectPanel({ i, label, onClose, onDone }: { i: InstallmentResponse; l
     setBusy(true);
     setError(null);
     try {
-      await api.collect(i.id, selected, date, partialAllowed && cents !== i.amountCents ? cents : null);
+      await api.collect(i.id, investor ? null : selected, date, partialAllowed && cents !== i.amountCents ? cents : null, investor ? cashToMe : null);
       onDone();
     } catch (e) {
       setError(errorMessage(e));
@@ -147,7 +155,12 @@ function CollectPanel({ i, label, onClose, onDone }: { i: InstallmentResponse; l
     <div className="mx-1 mb-3 rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
       <ErrorBox message={error} />
       <div className={`grid gap-3 ${partialAllowed ? "sm:grid-cols-[1fr_150px_160px]" : "sm:grid-cols-[1fr_170px]"}`}>
-        {(
+        {investor ? (
+          <Field label="Para">
+            <Segment<"capital" | "cash"> value={cashToMe ? "cash" : "capital"} onChange={(v) => setCashToMe(v === "cash")}
+              options={[{ value: "capital", label: "Sermayeme ekle" }, { value: "cash", label: "Nakit aldım" }]} />
+          </Field>
+        ) : (
           <Field label={i.direction === "SALE" ? "Para hangi hesaba girdi" : "Para hangi hesaptan çıktı"}>
             {accounts.data && (
               <Segment<string> value={selected} onChange={setAccountId}
@@ -165,7 +178,7 @@ function CollectPanel({ i, label, onClose, onDone }: { i: InstallmentResponse; l
       )}
       <div className="flex justify-end gap-2">
         <Button variant="quiet" onClick={onClose}>Vazgeç</Button>
-        <Button onClick={submit} disabled={busy || !selected}>
+        <Button onClick={submit} disabled={busy || (!investor && !selected)}>
           {busy ? "Kaydediliyor…" : `${tl(partialAllowed && cents > 0 ? cents : i.amountCents)} ${label.toLocaleLowerCase("tr-TR")}`}
         </Button>
       </div>

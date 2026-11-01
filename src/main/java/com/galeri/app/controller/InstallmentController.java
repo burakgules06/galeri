@@ -41,6 +41,7 @@ public class InstallmentController {
     }
 
     @PostMapping("/{id}/collect")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")   // sermayedar: kendi aracinin / evrakinin taksiti (serviste)
     public GenericResponse<InstallmentResponse> collect(@PathVariable UUID id, @Valid @RequestBody CollectRequest request) {
         return responseService.success(paymentPlanService.collect(id, request));
     }

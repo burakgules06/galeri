@@ -17,6 +17,9 @@ public interface VehicleService {
     /** ADMIN'e VehicleDetailAdmin, STAFF'a VehicleDetail (para alanlari olmadan) doner. */
     Object detail(UUID id);
 
+    /** Yonetici her araca; sermayedar sadece sahibi oldugu (tek ya da ortak, konsinye) araca erisir; degilse 403. */
+    void requireAccess(UUID vehicleId);
+
     VehicleDetailAdmin create(VehicleRequest request);
 
     VehicleDetailAdmin update(UUID id, VehicleRequest request);

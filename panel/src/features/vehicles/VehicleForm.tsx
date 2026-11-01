@@ -3,7 +3,7 @@
 // katki kaynagi ve kar payi orani: CoOwnersEditor).
 import { useState, type FormEvent } from "react";
 import { CoOwnersEditor } from "./CoOwnersEditor";
-import { initialOwners, ownersProblem, toShareRequests, type OwnerRow } from "./coOwners";
+import { initialOwners, ownerRow, ownersProblem, toShareRequests, type OwnerRow } from "./coOwners";
 import { MakeModelPicker } from "./MakeModelPicker";
 import type { MakeModelValue } from "./makeModel";
 import { api } from "../../api/galeri";
@@ -19,6 +19,7 @@ import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
 import { ContactPicker } from "../contacts/ContactPicker";
 import { row, rowProblem, toRequest, usePlan, type PlanRow } from "../payments/plan";
+import { useAuth } from "../../auth/useAuth";
 import { PlanBuilder, PlanSummary } from "../payments/PlanBuilder";
 
 interface Props {
@@ -73,7 +74,8 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const [detailsOpen, setDetailsOpen] = useState(false);
   // null: henuz secilmedi, yeni aracta kasa varsayilir. "": deftere yazilmaz.
   const [purchaseAccount, setPurchaseAccount] = useState<string | null>(existing ? (existing.purchaseAccountId ?? "") : null);
-  const [ownership, setOwnership] = useState<Ownership>(v?.ownership ?? "DEALER");
+  const { isInvestor } = useAuth();   // sermayedar: her zaman ortakli alim, payi kendi sermayesinden, kasa secmez
+  const [ownership, setOwnership] = useState<Ownership>(v?.ownership ?? (isInvestor ? "CO_OWNED" : "DEALER"));
   const [consignor, setConsignor] = useState<ContactSummary | null>(existing?.consignor ?? null);
   const [commissionType, setCommissionType] = useState<CommissionType>(existing?.commissionType ?? "RATE");
   const [commissionRate, setCommissionRate] = useState(bpToInput(existing?.commissionRateBp));
@@ -93,6 +95,13 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const me = useLoad(() => api.me(), []);
   const history = useLoad(() => api.vehicles("", null), []);
   const boughtById = boughtBy ?? me.data?.userId ?? "";
+  // Sermayedarin yeni araci: tek sahip kendisi (%100); isterse ortak ekler
+  const [mePicked, setMePicked] = useState(!!existing);
+  const myPartner = (partners.data ?? []).find((p) => p.userId === me.data?.userId);
+  if (isInvestor && !mePicked && myPartner) {
+    setMePicked(true);
+    setOwners([ownerRow(false, "100", { id: myPartner.userId, name: myPartner.name, phone: null })]);
+  }
   const selectModelDefaults = (make: string, model: string) => {
     const matches = (history.data ?? []).filter(v => v.make === make && (v.model === model || v.model.startsWith(`${model} `)));
     const frequent = <T extends string,>(values: T[], fallback: T): T => {
@@ -138,7 +147,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       const problem = ownersProblem(owners, profitDiffers, price, { enabled: false, type: "RATE", rate: "", fixed: "" });
       if (problem) return setError(problem);
     }
-    if (!consignment && payMode === "PLAN") {
+    if (!consignment && !isInvestor && payMode === "PLAN") {
       if (!seller) return setError("Senetli alışta kimden alındığını seç.");
       if (price <= 0 || remaining !== 0) return setError("Ödeme planının toplamı gerçek alış bedeline eşit olmalı.");
       if (rows.some((r) => rowProblem(r) != null)) return setError("Plan satırlarını tamamla.");
@@ -149,8 +158,8 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       color: color.trim() || null, tramerCents: amounts[0], notes: notes.trim() || null,
       purchaseDate, sellerId: seller?.id ?? null, boughtById: boughtById || null,
       actualPurchaseCents: amounts[1], officialPurchaseCents: amounts[2],
-      purchaseAccountId: !consignment && payMode === "CASH" ? purchaseAccountId || null : null,
-      purchasePlan: !consignment && payMode === "PLAN" ? rows.map(toRequest) : null,
+      purchaseAccountId: !consignment && !isInvestor && payMode === "CASH" ? purchaseAccountId || null : null,
+      purchasePlan: !consignment && !isInvestor && payMode === "PLAN" ? rows.map(toRequest) : null,
       ownership,
       consignorId: consignment ? consignor?.id ?? null : null,
       commissionType: consignment ? commissionType : null,
@@ -235,8 +244,10 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
         <div className="space-y-6 min-w-0">
         <section className="space-y-3">
           <h3 className="font-cond font-semibold text-[18px]">Sahiplik</h3>
-          <Segment<Ownership> value={ownership} onChange={setOwnership}
-            options={[{ value: "DEALER", label: "Galeri" }, { value: "CONSIGNMENT", label: "Konsinye" }, { value: "CO_OWNED", label: "Ortaklı" }]} />
+          {isInvestor
+            ? <p className="text-[13.5px] text-murekkep-2">Senin payın sermayenden düşer; para galerinin kasasından çıkar. İstersen başka sermayedarı ya da dükkân sahibini ortak ekle.</p>
+            : <Segment<Ownership> value={ownership} onChange={setOwnership}
+                options={[{ value: "DEALER", label: "Galeri" }, { value: "CONSIGNMENT", label: "Konsinye" }, { value: "CO_OWNED", label: "Ortaklı" }]} />}
           {consignment && (
             <>
 
@@ -267,11 +278,11 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
           )}
           {coOwned && (
             <CoOwnersEditor rows={owners} onRows={setOwners} profitDiffers={profitDiffers} onProfitDiffers={setProfitDiffers}
-              priceCents={price} partners={partners.data ?? []} boundHere={boundHere} />
+              priceCents={price} partners={partners.data ?? []} boundHere={boundHere} capitalOnly={isInvestor} />
           )}
         </section>
 
-        {!consignment && <section className="space-y-3">
+        {!consignment && !isInvestor && <section className="space-y-3">
           <h3 className="font-cond font-semibold text-[18px]">Ödeme</h3>
           <Segment<"CASH" | "PLAN"> value={payMode} onChange={setPayMode}
             options={[{ value: "CASH", label: "Peşin" }, { value: "PLAN", label: "Vadeli (senet, çek, açık hesap, kart)" }]} />

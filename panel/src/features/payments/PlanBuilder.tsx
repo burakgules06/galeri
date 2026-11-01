@@ -24,7 +24,7 @@ const COUNT_LABEL: Partial<Record<PlanMode, string>> = {
 };
 
 export function PlanBuilder({
-  plan, baseCents, accounts, organizations, onOrgCreated = () => {}, modes, methods, nowLabel, downLabel,
+  plan, baseCents, accounts, organizations, onOrgCreated = () => {}, modes, methods, nowLabel, downLabel, hideAccounts = false,
 }: {
   plan: PlanState;
   baseCents: number;                 // plana dagitilacak tutar (bedel - odenmis taksitler)
@@ -35,6 +35,7 @@ export function PlanBuilder({
   methods: PaymentMethod[];          // satirlarda secilebilecek yontemler
   nowLabel: string;                  // "Şimdi alındı" / "Şimdi ödendi"
   downLabel: string;                 // "Peşinat (şimdi alınır)" / "Peşinat (şimdi ödenir)"
+  hideAccounts?: boolean;            // sermayedar: para her zaman galerinin kasasina (hesap secmez)
 }) {
   const { mode, config: cfg, rows } = plan;
   const defaultAccount = (accounts.find((a) => a.type === "CASH") ?? accounts[0])?.id ?? "";
@@ -60,11 +61,11 @@ export function PlanBuilder({
 
       {mode === "CASH" && (
         <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 grid gap-3 sm:grid-cols-2">
-          <Field label="Para nereye">
+          {hideAccounts ? <p className="self-end text-[14px] text-murekkep-2 pb-2">Para galerinin kasasına girer.</p> : <Field label="Para nereye">
             <select className={inputClass} value={cfg.accountId || defaultAccount} onChange={(e) => plan.update({ accountId: e.target.value })}>
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
-          </Field>
+          </Field>}
           <div className="self-end text-[14px] text-murekkep-2 pb-2">Tamamı <b className="sayi text-[17px] text-murekkep">{tl(baseCents)}</b> şimdi</div>
         </div>
       )}
@@ -73,12 +74,12 @@ export function PlanBuilder({
         <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
           <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
             <Field label={downLabel}><NumberInput value={cfg.downText} onValueChange={(downText) => plan.update({ downText })} placeholder="0" /></Field>
-            <Field label="Peşinat nereye">
+            {!hideAccounts && <Field label="Peşinat nereye">
               <select className={inputClass} value={cfg.accountId || defaultAccount} disabled={down <= 0}
                 onChange={(e) => plan.update({ accountId: e.target.value })}>
                 {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
-            </Field>
+            </Field>}
             <Field label={COUNT_LABEL[mode] ?? "Adet"}>
               <NumberInput kind="integer" value={cfg.count} onValueChange={(count) => plan.update({ count })} />
             </Field>
@@ -126,7 +127,7 @@ export function PlanBuilder({
           </div>
           {rows.map((r, k) => (
             <RowEditor key={r.key} r={r} problem={problems[k]} accounts={accounts} organizations={organizations} onOrgCreated={onOrgCreated}
-              methods={methods} nowLabel={nowLabel}
+              methods={methods} nowLabel={nowLabel} hideAccounts={hideAccounts}
               onChange={(patch) => plan.setRows(rows.map((x) => (x.key === r.key ? { ...x, ...patch } : x)))}
               onRemove={() => plan.setRows(rows.filter((x) => x.key !== r.key))} />
           ))}
@@ -156,10 +157,10 @@ export function PlanSummary({ planned, remaining, ready }: { planned: number; re
   );
 }
 
-function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods, nowLabel, onChange, onRemove }: {
+function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods, nowLabel, hideAccounts, onChange, onRemove }: {
   r: PlanRow; problem: string | null; accounts: AccountResponse[]; organizations: ContactResponse[];
   onOrgCreated: (c: ContactResponse) => void; methods: PaymentMethod[];
-  nowLabel: string; onChange: (patch: Partial<PlanRow>) => void; onRemove: () => void;
+  nowLabel: string; hideAccounts: boolean; onChange: (patch: Partial<PlanRow>) => void; onRemove: () => void;
 }) {
   const [text, setText] = useState(centsToInput(r.amountCents));
   const changeAmount = (t: string) => {
@@ -203,7 +204,7 @@ function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods,
             onChange={(e) => onChange({ paidNow: e.target.checked, accountId: e.target.checked ? (r.accountId || accounts.find((a) => a.type === "CASH")?.id || accounts[0]?.id || "") : "" })} />
           {nowLabel}
         </label>
-        {r.paidNow && (
+        {r.paidNow && !hideAccounts && (
           <select className={`${inputClass} h-9 md:w-36`} value={r.accountId} onChange={(e) => onChange({ accountId: e.target.value })} aria-label="Hesap">
             {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>

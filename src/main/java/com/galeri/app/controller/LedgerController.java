@@ -28,6 +28,7 @@ public class LedgerController {
 
     private final LedgerService ledgerService;
     private final com.galeri.app.service.NetWorthService netWorthService;
+    private final com.galeri.app.service.VehicleService vehicleService;
     private final GenericResponseService responseService;
 
     @GetMapping("/accounts")
@@ -67,7 +68,16 @@ public class LedgerController {
     }
 
     @PostMapping("/expenses")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")
     public GenericResponse<LedgerEntryResponse> addExpense(@Valid @RequestBody ExpenseRequest request) {
+        if (com.galeri.app.security.CurrentUser.isInvestor()) {
+            // Sermayedar: sadece kendi aracina masraf; para galerinin kasasindan (hesap secmez)
+            if (request.vehicleId() == null) throw new org.springframework.security.access.AccessDeniedException("Sadece arac masrafi");
+            vehicleService.requireAccess(request.vehicleId());
+            request = new ExpenseRequest(request.date(), ledgerService.cashAccountId(), request.amountCents(), request.vehicleId(),
+                    request.categoryId(), request.categoryName(), request.parentCategoryId(), request.description(), Boolean.TRUE, null);
+            // (konsinye aracinda masraf sahibine, yani kendisine yansir; ortakli aracta maliyete girer)
+        }
         return responseService.success(ledgerService.addExpense(request));
     }
 
@@ -92,7 +102,9 @@ public class LedgerController {
     }
 
     @GetMapping("/vehicles/{id}/cost")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")
     public GenericResponse<VehicleCost> vehicleCost(@PathVariable UUID id) {
+        vehicleService.requireAccess(id);
         return responseService.success(ledgerService.vehicleCost(id));
     }
 }

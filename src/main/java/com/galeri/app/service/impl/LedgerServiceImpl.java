@@ -293,6 +293,24 @@ public class LedgerServiceImpl implements LedgerService {
 
     @Override
     @Transactional
+    public LedgerEntry withdrawToUser(UUID userId, UUID tenantId, UUID moneyAccountId, long amountCents, LocalDate date, Vehicle vehicle,
+                                      String description) {
+        Account capital = userAccount(tenantId, userId, AccountType.CAPITAL);
+        if (capital == null) throw new InvalidAccountException();
+        LedgerEntry e = newEntry(tenantId, LedgerEntryType.CAPITAL, getMoneyAccount(moneyAccountId), capital, amountCents, date);
+        e.setVehicle(vehicle);
+        e.setDescription(description);
+        return entryRepository.save(e);
+    }
+
+    @Override
+    @Transactional
+    public UUID cashAccountId() {
+        return systemAccount(CurrentUser.tenantId(), AccountType.CASH).getId();
+    }
+
+    @Override
+    @Transactional
     public Endorsement writeEndorsement(Vehicle fromVehicle, Contact from, Vehicle toVehicle, Contact to, long amountCents,
                                         LocalDate date, String inDescription, String outDescription) {
         UUID tenantId = from.getTenantId();
