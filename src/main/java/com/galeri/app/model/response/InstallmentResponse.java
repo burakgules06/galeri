@@ -39,13 +39,14 @@ public record InstallmentResponse(
         ContactSummary holder,     // gecmis senet / cek sermayedarinsa (V18)
         String description,
         OffsetDateTime planCreatedAt,   // planin kuruldugu an (siralama)
+        String planCreatedBy,           // plani (senedi / ceki) kaydeden kullanici
         List<UUID> userIds              // parasi kimin: aracin sahipleri ya da evrak sahibi; bos degilse kisi seciminde
 ) {
     public InstallmentResponse(UUID id, UUID planId, PlanDirection direction, VehicleRef vehicle, int seq, int count, LocalDate dueDate,
                                long amountCents, PaymentMethod method, String noteNo, ContactSummary payer, ContactSummary counterparty,
                                InstallmentStatus status, long daysLate, UUID paidEntryId, OffsetDateTime paidAt) {
         this(id, planId, direction, vehicle, seq, count, dueDate, amountCents, method, noteNo, payer, counterparty, status, daysLate,
-                paidEntryId, paidAt, null, null, null, false, false, seq, count, null, null, null, List.of());
+                paidEntryId, paidAt, null, null, null, false, false, seq, count, null, null, null, null, List.of());
     }
 
     public InstallmentResponse(UUID id, UUID planId, PlanDirection direction, VehicleRef vehicle, int seq, int count, LocalDate dueDate,
@@ -54,6 +55,6 @@ public record InstallmentResponse(
                                String bankName, String drawerName, ContactSummary endorsedTo, boolean bounced,
                                boolean downPayment, int number, int installmentCount, ContactSummary holder) {
         this(id, planId, direction, vehicle, seq, count, dueDate, amountCents, method, noteNo, payer, counterparty, status, daysLate,
-                paidEntryId, paidAt, bankName, drawerName, endorsedTo, bounced, downPayment, number, installmentCount, holder, null, null, List.of());
+                paidEntryId, paidAt, bankName, drawerName, endorsedTo, bounced, downPayment, number, installmentCount, holder, null, null, null, List.of());
     }
 }
