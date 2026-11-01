@@ -34,7 +34,7 @@ export function OwnerReturns({ owners, saleCents, paidNowCents, purchaseCents, e
     <section className="space-y-3">
       <div>
         <p className="etiket">Ortaklar</p>
-        <p className="text-[13px] text-murekkep-2 mt-0.5">Her tahsilat kâr payı oranıyla bölünür. Şimdi alınan paradan ortağın payı sermayesine geçer; kalanı tahsil edildikçe.</p>
+        <p className="text-[13px] text-murekkep-2 mt-0.5">Kâr, kâr payı oranlarıyla bölünür; alacak = koyduğu para + kâr payı. Şimdi alınan paradan ortağın payı sermayesine geçer; kalanı tahsil edildikçe.</p>
       </div>
 
       {partners.map((o) => {

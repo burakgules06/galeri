@@ -339,9 +339,9 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
     /**
      * Satilmis aracin tahsilat dagitimini defterle esitler. Tahsilat geldikce dagitilir (pesin satista hemen):
      * <ul>
-     *   <li>Ortakli arac: satis gununde ortagin katkisi satisa gecer (INCOME -> CAPITAL); her tahsilat kar payi oranlariyla
-     *       bolunur, ortagin parcasi sermayesine yazilir (CAPITAL -> INCOME). Ortagin masraf payi (sahiplik oraniyla) ve
-     *       dukkan payi ilk tahsilatlardan duser. Dukkan sahibinin parcasi kasada kalir (havuz).</li>
+     *   <li>Ortakli arac: satis gununde ortagin katkisi satisa gecer (INCOME -> CAPITAL). Kar (satis - alis - masraflar) kar
+     *       payi oranlariyla bolunur; ortagin alacagi = katkisi + kar payi (dukkan payi dusulmus). Her tahsilattan alacagi
+     *       oraninda (alacak / satis) pay sermayesine yazilir (CAPITAL -> INCOME). Dukkan sahibinin parcasi kasada kalir.</li>
      *   <li>Konsinye: sahibine borc yazilmaz; her tahsilatin (satis - komisyon) / satis kadari sahibinin sermayesine,
      *       kalan (komisyon) galerinin karidir.</li>
      * </ul>
@@ -424,30 +424,26 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         }
         long sale = vehicle.getSalePriceCents();
         int pool = indexOfPool(owners.stream().map(VehicleShare::isPool).toList());
-        List<Integer> profitBps = owners.stream().map(VehicleShare::getProfitShareBp).toList();
-        List<Long> gross = CoOwnershipMath.split(sale, profitBps, pool);
-
-        // Ortagin dusulecek payi (sahiplik oraniyla): masraf payi + satista henuz odenmemis alis borcundan payi (kalan senetleri
-        // havuz satis parasindan oder); kar varsa dukkan payi (ortaklarin karindan, kar payi oranlariyla).
+        // Kar = satis - (gercek alis + masraflar); kar payi oranlariyla bolunur (kurus farki dukkan sahibine). Kar varsa dukkan
+        // payi ortaklarin payindan duser. Ortagin alacagi = koydugu para + kar payi (zararda katkisindan duser, 0'in altina inmez).
         long expenses = vehicleExpenses(vehicle.getId());
         long purchase = vehicle.getActualPurchaseCents() == null ? 0 : vehicle.getActualPurchaseCents();
-        List<Long> purchaseShares = CoOwnershipMath.split(purchase, owners.stream().map(VehicleShare::getShareBp).toList(), pool);
-        long[] deduct = new long[owners.size()];
+        long profit = sale - purchase - expenses;
+        List<Long> shares = new ArrayList<>(CoOwnershipMath.split(profit, owners.stream().map(VehicleShare::getProfitShareBp).toList(), pool));
         List<Integer> partners = new ArrayList<>();
         long partnersProfit = 0;
         for (int k = 0; k < owners.size(); k++) {
             if (owners.get(k).isPool()) continue;
             partners.add(k);
-            long contribution = contributions.getOrDefault(holderKey(owners.get(k)), 0L);
-            deduct[k] = Math.floorDiv(expenses * owners.get(k).getShareBp(), CoOwnershipMath.FULL_BP)
-                    + Math.max(0, purchaseShares.get(k) - contribution);
-            partnersProfit += gross.get(k) - deduct[k] - contribution;
+            partnersProfit += shares.get(k);
         }
         long cut = CoOwnershipMath.shopCut(partnersProfit, vehicle.getShopCutType(), vehicle.getShopCutRateBp(), vehicle.getShopCutCents());
         if (cut > 0) {
             List<Long> cuts = MoneyMath.splitByWeights(cut, partners.stream().map(k -> (long) owners.get(k).getProfitShareBp()).toList());
-            for (int j = 0; j < partners.size(); j++) deduct[partners.get(j)] += cuts.get(j);
+            for (int j = 0; j < partners.size(); j++) shares.set(partners.get(j), shares.get(partners.get(j)) - cuts.get(j));
         }
+        long[] entitled = new long[owners.size()];
+        for (int k : partners) entitled[k] = Math.max(0, contributions.getOrDefault(holderKey(owners.get(k)), 0L) + shares.get(k));
 
         Account income = entries ? systemAccount(vehicle.getTenantId(), AccountType.INCOME) : null;
         List<Wanted> wanted = new ArrayList<>();
@@ -463,9 +459,9 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         Map<UUID, Map<UUID, Long>> byEntry = new HashMap<>();
         for (Collection c : collections(vehicle)) {
             cum += c.amountCents();
-            List<Long> parts = CoOwnershipMath.split(cum, profitBps, pool);
+            // Her tahsilattan ortaga alacagi oraninda pay (alacak / satis bedeli); tamami tahsil edilince alacagin tamami
             for (int k : partners) {
-                long now = Math.max(0, parts.get(k) - deduct[k]);
+                long now = sale <= 0 ? 0 : Math.min(entitled[k], Math.floorDiv(cum * entitled[k], sale));
                 long delta = now - given[k];
                 given[k] = now;
                 if (delta != 0) byEntry.computeIfAbsent(c.entryId(), x -> new HashMap<>()).merge(owners.get(k).getUser().getId(), delta, Long::sum);
@@ -478,19 +474,16 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
 
         List<Settlement> list = new ArrayList<>();
         long partnersProfitAfter = 0;
-        for (int k : partners) {
-            partnersProfitAfter += Math.max(0, gross.get(k) - deduct[k]) - contributions.getOrDefault(holderKey(owners.get(k)), 0L);
-        }
+        for (int k : partners) partnersProfitAfter += entitled[k] - contributions.getOrDefault(holderKey(owners.get(k)), 0L);
         for (int k = 0; k < owners.size(); k++) {
             VehicleShare o = owners.get(k);
             long contribution = contributions.getOrDefault(holderKey(o), 0L);
             if (o.isPool()) {
                 // Dukkan sahibi havuzun kalani: arac kari - ortaklarin kari; alacagi = katkisi + kari (parasi zaten kasada)
-                long profit = sale - purchase - expenses - partnersProfitAfter;
-                list.add(new Settlement(o, contribution, profit, contribution + profit, null));
+                long poolProfit = profit - partnersProfitAfter;
+                list.add(new Settlement(o, contribution, poolProfit, contribution + poolProfit, null));
             } else {
-                long entitled = Math.max(0, gross.get(k) - deduct[k]);
-                list.add(new Settlement(o, contribution, entitled - contribution, entitled, given[k]));
+                list.add(new Settlement(o, contribution, entitled[k] - contribution, entitled[k], given[k]));
             }
         }
         return new Distribution(list, wanted, byEntry);
