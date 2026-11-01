@@ -86,6 +86,8 @@ export function LedgerPage() {
           <h1 className="font-cond font-bold text-[30px] md:text-[34px] leading-tight tracking-tight">Kasa ve banka</h1>
         </div>
         <div className="flex flex-wrap gap-2">
+          <a href="#/expenses" className="md:hidden basilir h-10 px-3 rounded-lg border border-cizgi-2 bg-yuzey font-semibold text-[14px] grid place-items-center">Masraflar</a>
+          <a href="#/shop" className="md:hidden basilir h-10 px-3 rounded-lg border border-cizgi-2 bg-yuzey font-semibold text-[14px] grid place-items-center">Dükkân</a>
           <Button variant="secondary" onClick={() => setTransferOpen(true)}>Hesaplar arası transfer</Button>
           <Button onClick={() => setExpenseOpen(true)}>Masraf ekle</Button>
         </div>

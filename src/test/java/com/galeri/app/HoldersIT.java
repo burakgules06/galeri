@@ -179,6 +179,22 @@ class HoldersIT {
         check("dagilim");
     }
 
+    @Test
+    void cepten_dukkanGideri_kasaDegismez_kimseninSermayesiDusmez_donemKarindanDuser() {
+        long cashBefore = cashBalance();
+        CapitalResponses.Holder ownerBefore = holder(furkan), burakBefore = holder(burak);
+        ledgerService.addExpense(new ExpenseRequest(today, null, 5 * K, null, null, "Yemek", null, null, null, true));
+        assertThat(cashBalance()).as("kasa").isEqualTo(cashBefore);
+        assertThat(holder(furkan).capitalCents()).as("dukkan sahibi").isEqualTo(ownerBefore.capitalCents());
+        assertThat(holder(burak).capitalCents()).as("sermayedar").isEqualTo(burakBefore.capitalCents());
+        assertThat(ledgerService.expenses(today, today)).anySatisfy(e -> {
+            assertThat(e.source().type()).isEqualTo(AccountType.CAPITAL);
+            assertThat(e.amountCents()).isEqualTo(5 * K);
+        });
+        assertThat(capitalService.periodProfit(today, today).generalExpenseCents()).isEqualTo(5 * K);
+        check("cepten gider");
+    }
+
     private void expectHolding(String step, UUID account, UUID user, long cents) {
         var holdings = netWorthService.holdings();
         assertThat(holdings).allSatisfy(h -> assertThat(h.parts().stream().mapToLong(p -> p.cents()).sum())

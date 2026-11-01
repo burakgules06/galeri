@@ -93,7 +93,7 @@ function Row({ e, direction, onChange, showVehicle }: { e: LedgerEntryResponse; 
             </a>
           )}
           <p className="text-[14px] text-murekkep-2 mt-0.5">
-            {e.source.name} → {e.target.name}
+            {e.source.type === "CAPITAL" && EXPENSE.includes(e.type) ? `Cepten (${e.source.name})` : e.source.name} → {e.target.name}
             {e.createdBy && <span className="text-murekkep-3"> · {e.createdBy}</span>}
           </p>
           {e.description && e.description !== title && e.description !== "Düzeltme" && <p className="text-[14px] text-murekkep-3 mt-0.5">{e.description}</p>}

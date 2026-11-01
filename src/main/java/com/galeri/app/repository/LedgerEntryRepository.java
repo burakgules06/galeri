@@ -60,6 +60,16 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> 
             select e from LedgerEntry e
             join fetch e.sourceAccount join fetch e.targetAccount join fetch e.createdBy
             left join fetch e.vehicle left join fetch e.category
+            where e.tenantId = :tenantId and e.type in :types and e.entryDate between :from and :to
+            order by e.entryDate desc, e.createdAt desc
+            """)
+    List<LedgerEntry> byTypes(@Param("tenantId") UUID tenantId, @Param("types") java.util.Collection<LedgerEntryType> types,
+                              @Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to);
+
+    @Query("""
+            select e from LedgerEntry e
+            join fetch e.sourceAccount join fetch e.targetAccount join fetch e.createdBy
+            left join fetch e.vehicle left join fetch e.category
             where e.tenantId = :tenantId and (e.sourceAccount.id = :accountId or e.targetAccount.id = :accountId)
             order by e.entryDate desc, e.createdAt desc
             """)

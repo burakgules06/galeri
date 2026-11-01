@@ -346,13 +346,14 @@ export interface VehicleCost {
 
 export interface ExpenseRequest {
   date: string;
-  sourceAccountId: string;
+  sourceAccountId: string | null;   // paidByOwner ise bos
   amountCents: number;
   vehicleId: string | null;
   categoryId: string | null;
   categoryName: string | null;
   description: string | null;
   chargeToOwner: boolean | null;   // konsinye aracta: masraf sahibinin carisine
+  paidByOwner?: boolean | null;    // dukkan gideri cepten (elden) odendi: kasa degismez, sermaye dusmez
 }
 
 export interface ContactPaymentRequest { accountId: string; date: string; amountCents: number; description: string | null }

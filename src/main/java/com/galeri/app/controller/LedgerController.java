@@ -49,6 +49,14 @@ public class LedgerController {
         return responseService.success(ledgerService.correct(id));
     }
 
+    @GetMapping("/expenses")
+    public GenericResponse<List<LedgerEntryResponse>> expenses(
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+        return responseService.success(ledgerService.expenses(from == null ? java.time.LocalDate.of(2000, 1, 1) : from,
+                to == null ? java.time.LocalDate.of(2100, 12, 31) : to));
+    }
+
     @PostMapping("/expenses")
     public GenericResponse<LedgerEntryResponse> addExpense(@Valid @RequestBody ExpenseRequest request) {
         return responseService.success(ledgerService.addExpense(request));

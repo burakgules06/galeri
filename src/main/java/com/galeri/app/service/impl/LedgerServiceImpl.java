@@ -174,7 +174,9 @@ public class LedgerServiceImpl implements LedgerService {
 
     private LedgerEntry writeExpense(ExpenseRequest r) {
         UUID tenantId = CurrentUser.tenantId();
-        Account source = getMoneyAccount(r.sourceAccountId());
+        boolean pocket = Boolean.TRUE.equals(r.paidByOwner()) && r.vehicleId() == null;
+        if (!pocket && r.sourceAccountId() == null) throw new InvalidAccountException();
+        Account source = pocket ? ownerCapitalAccount(tenantId) : getMoneyAccount(r.sourceAccountId());
 
         Vehicle vehicle = null;
         Account target;
@@ -341,6 +343,27 @@ public class LedgerServiceImpl implements LedgerService {
     }
 
     /** Kullanicinin carisi (konsinye sahibi; V22). Yoksa ilk ihtiyacta acilir. */
+    /** Cepten odenen dukkan gideri icin dukkan sahibinin sermaye hesabi: istegi yapan dukkan sahibiyse o, degilse havuzun sahibi. */
+    private Account ownerCapitalAccount(UUID tenantId) {
+        PanelUser me = panelUserRepository.findById(CurrentUser.principal().userId()).orElseThrow(RecordNotFoundException::new);
+        PanelUser owner = me.isOwner() ? me : panelUserRepository.findPoolOwner(tenantId).orElseThrow(InvalidAccountException::new);
+        Account found = userAccount(tenantId, owner.getId(), AccountType.CAPITAL);
+        if (found != null) return found;
+        Account a = new Account();
+        a.setTenantId(tenantId);
+        a.setType(AccountType.CAPITAL);
+        a.setUserId(owner.getId());
+        a.setName(owner.getFullName());
+        return accountRepository.save(a);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<LedgerEntryResponse> expenses(LocalDate from, LocalDate to) {
+        return toResponse(entryRepository.byTypes(CurrentUser.tenantId(),
+                List.of(LedgerEntryType.VEHICLE_EXPENSE, LedgerEntryType.GENERAL_EXPENSE), from, to));
+    }
+
     private Account userBalanceAccount(PanelUser user) {
         Account found = userAccount(user.getTenant().getId(), user.getId(), AccountType.BALANCE);
         if (found != null) return found;

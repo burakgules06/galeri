@@ -29,6 +29,9 @@ public interface LedgerService {
     /** accountId null ise galerinin tum hareketleri; yeniden eskiye. */
     List<LedgerEntryResponse> entries(UUID accountId);
 
+    /** Donemdeki masraflar (arac masrafi ve genel gider), duzeltmeleriyle; yeni once. */
+    List<LedgerEntryResponse> expenses(java.time.LocalDate from, java.time.LocalDate to);
+
     LedgerEntryResponse addExpense(ExpenseRequest request);
 
     /** Toplu masraf: hepsi tek transaction'da, sirayla; biri hataliysa hicbiri yazilmaz. */
