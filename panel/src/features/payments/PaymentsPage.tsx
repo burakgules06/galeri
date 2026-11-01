@@ -3,7 +3,7 @@
 // plan ozeti gorunur. Kisi secimi: parasi o kisinin olan planlar (aracin sahipleri ya da evrak sahibi). Siralama sagda.
 import { useMemo, useState } from "react";
 import { api } from "../../api/galeri";
-import { addDaysIso, formatDate, METHOD, tl, todayIso } from "../../shared/format";
+import { addDaysIso, formatDate, METHOD, shortDateTime, tl, todayIso } from "../../shared/format";
 import type { InstallmentResponse, PaymentMethod, PlanDirection } from "../../shared/types";
 import { useLoad } from "../../shared/useLoad";
 import { Button, Empty, ErrorBox, inputClass } from "../../shared/ui/Common";
@@ -38,6 +38,7 @@ interface Plan {
   counterparty: InstallmentResponse["counterparty"];
   vehicle: InstallmentResponse["vehicle"];
   createdAt: string;
+  createdBy: string | null;
   items: InstallmentResponse[];
   total: number;
   paid: number;
@@ -79,7 +80,7 @@ export function PaymentsPage() {
     for (const i of data ?? []) {
       let p = map.get(i.planId);
       if (!p) {
-        p = { id: i.planId, direction: i.direction, counterparty: i.counterparty, vehicle: i.vehicle, createdAt: i.planCreatedAt ?? "",
+        p = { id: i.planId, direction: i.direction, counterparty: i.counterparty, vehicle: i.vehicle, createdAt: i.planCreatedAt ?? "", createdBy: i.planCreatedBy ?? null,
           items: [], total: 0, paid: 0, overdue: 0, userIds: i.userIds ?? [] };
         map.set(i.planId, p);
       }
@@ -225,8 +226,16 @@ function PlanItem({ plan, open, onToggle, onChange, sub }: { plan: Plan; open: b
           <div className="mt-1 flex items-center gap-2 flex-wrap text-[13px] text-murekkep-2">
             {plan.vehicle && <><Plate plate={plan.vehicle.plate} size="sm" /><span className="hidden md:inline truncate">{plan.vehicle.make} {plan.vehicle.model}</span></>}
             {!plan.vehicle && <span>Geçmiş kayıt</span>}
-            {methods.map((m) => <span key={m} className="rounded bg-yuzey-2 border border-cizgi px-1.5 py-0.5 text-[12px] font-semibold">{METHOD[m]}</span>)}
+            {methods.map((m) => {
+              const n = plan.items.filter((i) => i.method === m && !i.downPayment).length;
+              return <span key={m} className="rounded bg-yuzey-2 border border-cizgi px-1.5 py-0.5 text-[12px] font-semibold">
+                {n > 1 ? `${n} ${METHOD[m].toLocaleLowerCase("tr-TR")}` : METHOD[m]}</span>;
+            })}
+            <span className="text-[12.5px]">{plan.items.length} taksit · {plan.items.filter((i) => i.status === "PAID").length} ödendi</span>
             {holder && <span className="text-[12px] font-semibold text-plaka-koyu bg-plaka-acik rounded px-1.5 py-0.5">{holder.name}</span>}
+          </div>
+          <div className="mt-0.5 text-[12px] text-murekkep-3">
+            Kaydeden {plan.createdBy ?? "—"}{plan.createdAt && ` · ${shortDateTime(plan.createdAt)}`}
           </div>
         </div>
 
