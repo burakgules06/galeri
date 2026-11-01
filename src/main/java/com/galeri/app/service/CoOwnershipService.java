@@ -46,6 +46,12 @@ public interface CoOwnershipService {
      */
     Map<UUID, List<UUID>> vehicleUsers(UUID tenantId, java.util.Collection<UUID> vehicleIds);
 
+    /**
+     * Kasa / banka hareketlerinin sermayedarlara dusen kismi (hareket id -> kullanici -> kurus, hesaba giren arti): ortakli
+     * aracin alis odemesinde ortagin katkisi (eksi), ortakli / konsinye satis tahsilatinda sahibine gecen pay (arti).
+     */
+    Map<UUID, Map<UUID, Long>> moneyEntryShares(UUID tenantId);
+
     /** Dukkan sahibi (havuz): galerinin ilk aktif yoneticisi; yoksa null. */
     UUID poolOwnerId(UUID tenantId);
 
