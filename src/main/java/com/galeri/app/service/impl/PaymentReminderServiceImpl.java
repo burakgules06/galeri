@@ -157,6 +157,7 @@ public class PaymentReminderServiceImpl implements PaymentReminderService {
             case CHEQUE -> "çek ";
             case CASH -> "";
             case OPEN_ACCOUNT -> "açık hesap ";
+            case CREDIT_CARD -> "kredi kartı ";
         };
     }
 

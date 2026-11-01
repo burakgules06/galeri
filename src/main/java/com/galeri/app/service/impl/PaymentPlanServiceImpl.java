@@ -9,7 +9,6 @@ import com.galeri.app.exception.runtime.InstallmentAlreadyPaidException;
 import com.galeri.app.exception.runtime.InstallmentNotPaidException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidPayerException;
-import com.galeri.app.exception.runtime.InvalidOpenAccountUsageException;
 import com.galeri.app.exception.runtime.PlanNotRemovableException;
 import com.galeri.app.exception.runtime.NotAPartnerException;
 import com.galeri.app.exception.runtime.PurchaseHasPaymentsException;
@@ -104,7 +103,6 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     @Override
     @Transactional
     public void recordSale(Vehicle vehicle, Contact buyer, VehicleSaleRequest r) {
-        ensureNoOpenAccount(r.installments());
         long total = r.installments().stream().mapToLong(InstallmentRequest::amountCents).sum();
         if (total != r.salePriceCents()) throw new SaleTotalMismatchException();
         UUID tenantId = vehicle.getTenantId();
@@ -150,6 +148,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             i.setNoteNo(blankToNull(row.noteNo()));
             i.setBankName(blankToNull(row.bankName()));
             i.setDrawerName(blankToNull(row.drawerName()));
+            if (row.method() == PaymentMethod.OPEN_ACCOUNT) i.setDescription(blankToNull(row.description()));
             i.setPayer(payers.get(k));
             if (row.paidNow()) {
                 LedgerEntry paid = settle(i, PlanDirection.SALE, vehicle, row.accountId(), r.saleDate(),
@@ -183,7 +182,6 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     @Override
     @Transactional
     public void recordBasketSale(List<Vehicle> vehicles, List<Long> prices, Contact buyer, BasketSaleRequest r) {
-        ensureNoOpenAccount(r.installments());
         long total = prices.stream().mapToLong(Long::longValue).sum();
         if (r.installments().stream().mapToLong(InstallmentRequest::amountCents).sum() != total) throw new SaleTotalMismatchException();
         UUID tenantId = buyer.getTenantId();
@@ -248,6 +246,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             i.setNoteNo(blankToNull(row.noteNo()));
             i.setBankName(blankToNull(row.bankName()));
             i.setDrawerName(blankToNull(row.drawerName()));
+            if (row.method() == PaymentMethod.OPEN_ACCOUNT) i.setDescription(blankToNull(row.description()));
             i.setPayer(payers.get(k));
             if (row.paidNow()) {
                 LedgerEntry paid = settle(i, PlanDirection.SALE, null, row.accountId(), r.saleDate(),
@@ -283,7 +282,6 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     @Override
     @Transactional
     public void syncPurchase(Vehicle vehicle, UUID purchaseAccountId, List<InstallmentRequest> rows) {
-        if (rows != null) ensureNoOpenAccount(rows);
         Optional<PaymentPlan> existing = planRepository.findByVehicleIdAndDirection(vehicle.getId(), PlanDirection.PURCHASE);
         List<Installment> current = existing.map(p -> installmentRepository.findByPlanIds(List.of(p.getId()))).orElse(List.of());
         List<Installment> paid = current.stream().filter(Installment::isPaid).toList();
@@ -365,6 +363,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             i.setNoteNo(blankToNull(row.noteNo()));
             i.setBankName(blankToNull(row.bankName()));
             i.setDrawerName(blankToNull(row.drawerName()));
+            if (row.method() == PaymentMethod.OPEN_ACCOUNT) i.setDescription(blankToNull(row.description()));
             i.setPayer(payees.get(k));
             if (row.paidNow()) {
                 LedgerEntry e = ledgerService.writeSettlement(PlanDirection.PURCHASE, vehicle, payees.get(k), row.accountId(),
@@ -820,12 +819,6 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
 
     // ------------------------------------------------------------------ yardimcilar
 
-    private static void ensureNoOpenAccount(List<InstallmentRequest> rows) {
-        if (rows.stream().anyMatch(row -> row.method() == PaymentMethod.OPEN_ACCOUNT)) {
-            throw new InvalidOpenAccountUsageException();
-        }
-    }
-
     private LedgerEntry settle(Installment i, PlanDirection direction, Vehicle vehicle, UUID accountId, LocalDate date, String description) {
         return ledgerService.writeSettlement(direction, vehicle, i.getPayer(), accountId, i.getAmountCents(), date, description);
     }
@@ -846,6 +839,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                 case PROMISSORY_NOTE -> "Senet ödemesi";
                 case OPEN_ACCOUNT -> "Açık hesap ödemesi";
                 case CHEQUE -> "Çek ödemesi";
+                case CREDIT_CARD -> "Kredi kartı ödemesi";
                 default -> "Ödeme";
             };
         }
@@ -854,6 +848,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             case OPEN_ACCOUNT -> "Açık hesap tahsilatı";
             case CHEQUE -> "Çek tahsilatı";
             case INSTITUTION -> "Kurum ödemesi";
+            case CREDIT_CARD -> "Kredi kartı tahsilatı";
             default -> "Tahsilat";
         };
     }
