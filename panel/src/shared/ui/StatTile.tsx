@@ -18,7 +18,7 @@ const DOT: Record<Tone, string> = {
 };
 
 export function StatTile({ label, value, sub, tone = "neutral", children }: {
-  label: string; value: string; sub?: ReactNode; tone?: Tone; children?: ReactNode;
+  label: string; value: ReactNode; sub?: ReactNode; tone?: Tone; children?: ReactNode;
 }) {
   return (
     <div className="kart p-4 md:p-5 flex flex-col min-w-0">
