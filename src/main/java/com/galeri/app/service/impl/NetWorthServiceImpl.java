@@ -93,6 +93,13 @@ public class NetWorthServiceImpl implements NetWorthService {
     @Override
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<CapitalResponses.Holder> holders() {
+        List<CapitalResponses.Holder> all = allHolders();
+        if (!CurrentUser.isInvestor()) return all;
+        UUID me = CurrentUser.principal().userId();
+        return all.stream().filter(h -> me.equals(h.userId())).toList();
+    }
+
+    private List<CapitalResponses.Holder> allHolders() {
         UUID tenant = CurrentUser.tenantId();
         NetWorthResponse w = summary();
         Optional<PanelUser> owner = users.findPoolOwner(tenant);
@@ -159,7 +166,7 @@ public class NetWorthServiceImpl implements NetWorthService {
         UUID tenant = CurrentUser.tenantId();
         List<Account> money = accounts.findByTenantIdAndTypeInOrderByCreatedAtAsc(tenant, List.of(AccountType.CASH, AccountType.BANK));
         if (money.isEmpty()) return List.of();
-        List<CapitalResponses.Holder> people = holders();
+        List<CapitalResponses.Holder> people = allHolders();
         Map<UUID, CapitalResponses.Holder> investors = new LinkedHashMap<>();
         CapitalResponses.Holder owner = null;
         for (CapitalResponses.Holder h : people) {
@@ -246,7 +253,14 @@ public class NetWorthServiceImpl implements NetWorthService {
                     bal - investorsHere));
             result.add(new AccountHoldings(a.getId(), a.getName(), a.getType(), bal, parts));
         }
-        return result;
+        if (!CurrentUser.isInvestor()) return result;
+        // Sermayedar hesaplarin bakiyesini ve baskalarinin parasini gormez: sadece kendi payi
+        UUID me = CurrentUser.principal().userId();
+        return result.stream().map(h -> {
+            List<AccountHoldings.Part> mine = h.parts().stream().filter(p -> me.equals(p.userId()) && !p.owner()).toList();
+            long cents = mine.stream().mapToLong(AccountHoldings.Part::cents).sum();
+            return new AccountHoldings(h.accountId(), h.name(), h.type(), cents, mine);
+        }).toList();
     }
 
     /** Stoktaki araclarda secilen sahiplerin odenmis katkisi, buyukten kucuge. */

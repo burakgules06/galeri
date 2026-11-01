@@ -7,7 +7,7 @@ export interface ApiEnvelope<T> {
   requestId: string | null;
 }
 
-export type Role = "SUPER_ADMIN" | "ADMIN" | "STAFF";
+export type Role = "SUPER_ADMIN" | "ADMIN" | "INVESTOR" | "STAFF";
 
 export interface LoginResponse {
   token: string;

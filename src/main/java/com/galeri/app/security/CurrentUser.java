@@ -26,6 +26,11 @@ public final class CurrentUser {
         return "ADMIN".equals(principal().role());
     }
 
+    /** Sermayedar mi? Sadece kendi parasini (kendi kayitlari, kendi araclari) gorur; islem yapamaz (MIMARI §0 Yetkiler). */
+    public static boolean isInvestor() {
+        return "INVESTOR".equals(principal().role());
+    }
+
     public static UUID tenantId() {
         UUID tenantId = principal().tenantId();
         if (tenantId == null) {

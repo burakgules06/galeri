@@ -31,6 +31,7 @@ public class InstallmentController {
     private final GenericResponseService responseService;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")   // sermayedar: sadece parasi kendisinin olan planlar
     public GenericResponse<List<InstallmentResponse>> list(
             @RequestParam(required = false) InstallmentStatus status,
             @RequestParam(required = false) PlanDirection direction,

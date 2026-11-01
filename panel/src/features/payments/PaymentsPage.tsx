@@ -6,6 +6,7 @@ import { api } from "../../api/galeri";
 import { addDaysIso, formatDate, METHOD, tl, todayIso } from "../../shared/format";
 import type { InstallmentResponse, PaymentMethod, PlanDirection } from "../../shared/types";
 import { useLoad } from "../../shared/useLoad";
+import { useAuth } from "../../auth/useAuth";
 import { Button, Empty, ErrorBox, inputClass } from "../../shared/ui/Common";
 import { Plate } from "../../shared/ui/Plate";
 import { StatTile } from "../../shared/ui/StatTile";
@@ -57,8 +58,9 @@ function readSort(): Sort {
 }
 
 export function PaymentsPage() {
+  const { isAdmin } = useAuth();   // sermayedar: sadece kendi planlari (backend suzer), islem yok
   const { data, error, reload } = useLoad(() => api.installments(), []);
-  const holders = useLoad(() => api.holders(), []);
+  const holders = useLoad(() => (isAdmin ? api.holders() : Promise.resolve([])), [isAdmin]);
   const [side, setSide] = useState<PlanDirection>("SALE");
   const [sub, setSub] = useState<Sub>("all");
   const [person, setPerson] = useState("");
@@ -137,13 +139,13 @@ export function PaymentsPage() {
           <p className="etiket">Tahsilat ve ödeme</p>
           <h1 className="font-cond font-bold text-[30px] md:text-[34px] leading-tight tracking-tight">Ödemeler</h1>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        {isAdmin && <div className="flex items-center gap-2 w-full sm:w-auto">
           <select className={`${inputClass} grow sm:w-[230px]`} value={person} onChange={(e) => setPerson(e.target.value)} aria-label="Kişi">
             <option value="">Herkes</option>
             {people.map((h) => <option key={h.userId!} value={h.userId!}>{h.name}{h.owner ? " (dükkân sahibi)" : ""}</option>)}
           </select>
           <Button variant="secondary" className="shrink-0" onClick={() => setImporting(true)}>Geçmiş borç ekle</Button>
-        </div>
+        </div>}
       </header>
       {importing && <OpenItemsForm onClose={() => setImporting(false)} onSaved={() => { setImporting(false); reload(); }} />}
 
@@ -195,7 +197,7 @@ export function PaymentsPage() {
         )}
         {list.length > 0 && (
           <ul className="divide-y divide-cizgi">
-            {list.map((p) => <PlanItem key={p.id} plan={p} open={open.has(p.id)} onToggle={() => toggle(p.id)} onChange={reload} sub={sub} />)}
+            {list.map((p) => <PlanItem key={p.id} plan={p} open={open.has(p.id)} onToggle={() => toggle(p.id)} onChange={reload} sub={sub} readOnly={!isAdmin} />)}
           </ul>
         )}
       </section>
@@ -203,7 +205,9 @@ export function PaymentsPage() {
   );
 }
 
-function PlanItem({ plan, open, onToggle, onChange, sub }: { plan: Plan; open: boolean; onToggle: () => void; onChange: () => void; sub: Sub }) {
+function PlanItem({ plan, open, onToggle, onChange, sub, readOnly }: {
+  plan: Plan; open: boolean; onToggle: () => void; onChange: () => void; sub: Sub; readOnly: boolean;
+}) {
   const openItems = plan.items.filter((i) => i.status !== "PAID");
   const next = openItems.find((i) => sub === "all" || sub === "overdue" || i.method === sub) ?? openItems[0];
   const methods = [...new Set(plan.items.filter((i) => !i.downPayment).map((i) => i.method))];
@@ -268,7 +272,8 @@ function PlanItem({ plan, open, onToggle, onChange, sub }: { plan: Plan; open: b
           </dl>
           <ul className="divide-y divide-cizgi">
             {plan.items.map((i) => (
-              <InstallmentRow key={i.id} i={i} onChange={onChange} showVehicle={false} showPayer={i.payer.id !== plan.counterparty.id} allowDeleteOpenItem />
+              <InstallmentRow key={i.id} i={i} onChange={onChange} showVehicle={false} showPayer={i.payer.id !== plan.counterparty.id}
+                allowDeleteOpenItem={!readOnly} readOnly={readOnly} />
             ))}
           </ul>
         </div>

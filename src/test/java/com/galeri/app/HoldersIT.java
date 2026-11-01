@@ -195,6 +195,24 @@ class HoldersIT {
         check("cepten gider");
     }
 
+    @Test
+    void sermayedar_sadeceKendiSermayesiniVeKasadakiPayiniGorur() {
+        TestSession.close();
+        TestSession.open(burak, tenant, "INVESTOR");
+        try {
+            assertThat(netWorthService.holders()).extracting(CapitalResponses.Holder::userId).containsExactly(burak);
+            var kasa = netWorthService.holdings().stream().filter(h -> h.accountId().equals(cash)).findFirst().orElseThrow();
+            assertThat(kasa.balanceCents()).as("kasada sadece kendi parasi").isEqualTo(6 * M);
+            assertThat(kasa.parts()).extracting(p -> p.userId()).containsExactly(burak);
+            assertThat(ledgerService.entries(null)).as("sadece kendi sermaye hareketleri")
+                    .allSatisfy(e -> assertThat(e.source().type() == AccountType.CAPITAL || e.target().type() == AccountType.CAPITAL).isTrue())
+                    .hasSize(1);
+        } finally {
+            TestSession.close();
+            TestSession.open(furkan, tenant, "ADMIN");
+        }
+    }
+
     private void expectHolding(String step, UUID account, UUID user, long cents) {
         var holdings = netWorthService.holdings();
         assertThat(holdings).allSatisfy(h -> assertThat(h.parts().stream().mapToLong(p -> p.cents()).sum())

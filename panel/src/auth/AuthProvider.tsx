@@ -15,6 +15,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthContextValue = {
     auth,
     isAdmin: auth?.role === "ADMIN" || auth?.role === "SUPER_ADMIN",
+    isInvestor: auth?.role === "INVESTOR",
     login: (data) => {
       saveAuth(data);
       setAuth(data);

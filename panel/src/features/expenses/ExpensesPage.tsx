@@ -5,6 +5,7 @@ import { api } from "../../api/galeri";
 import { tl, todayIso } from "../../shared/format";
 import type { LedgerEntryResponse } from "../../shared/types";
 import { useLoad } from "../../shared/useLoad";
+import { useAuth } from "../../auth/useAuth";
 import { Button, Empty, ErrorBox } from "../../shared/ui/Common";
 import { StatTile } from "../../shared/ui/StatTile";
 import { ExpenseForm } from "../ledger/ExpenseForm";
@@ -16,6 +17,7 @@ import { currentPeriod, isActiveEntry, periodRange, type Period } from "./period
 type Kind = "all" | "VEHICLE_EXPENSE" | "GENERAL_EXPENSE";
 
 export function ExpensesPage() {
+  const { isAdmin } = useAuth();   // sermayedar: sadece kendi araclarinin masraflari (backend suzer), islem yok
   const [period, setPeriod] = useState<Period>(() => currentPeriod(todayIso()));
   const [kind, setKind] = useState<Kind>("all");
   const [adding, setAdding] = useState(false);
@@ -38,7 +40,7 @@ export function ExpensesPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <PeriodPicker value={period} onChange={setPeriod} />
-          <Button onClick={() => setAdding(true)}>Masraf ekle</Button>
+          {isAdmin && <Button onClick={() => setAdding(true)}>Masraf ekle</Button>}
         </div>
       </header>
       <ErrorBox message={error} />
@@ -59,7 +61,7 @@ export function ExpensesPage() {
             ))}
           </div>
           {data && shownActive.length === 0 && <Empty title="Bu dönemde masraf yok" />}
-          {data && shown.length > 0 && <LedgerEntryList entries={shown} direction={() => -1} onChange={reload} />}
+          {data && shown.length > 0 && <LedgerEntryList entries={shown} direction={() => -1} onChange={reload} readOnly={!isAdmin} />}
         </section>
         <section className="kart p-4 md:p-5">
           <p className="etiket mb-3">Kategoriye göre</p>

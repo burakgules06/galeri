@@ -564,7 +564,9 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                 .stream().collect(Collectors.toMap(Vehicle::getId, PaymentPlanServiceImpl::ref));
         LocalDate today = today();
         Map<UUID, List<UUID>> usersOf = planUsers(tenantId, all.stream().map(Installment::getPlan).distinct().toList());
+        UUID investor = CurrentUser.isInvestor() ? CurrentUser.principal().userId() : null;
         return all.stream()
+                .filter(i -> investor == null || usersOf.getOrDefault(i.getPlan().getId(), List.of()).contains(investor))
                 .filter(i -> direction == null || i.getPlan().getDirection() == direction)
                 .filter(i -> from == null || !i.getDueDate().isBefore(from))
                 .filter(i -> to == null || !i.getDueDate().isAfter(to))

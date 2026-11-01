@@ -21,13 +21,13 @@ public class NetWorthController {
     }
 
     @GetMapping("/api/holdings")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")   // sermayedar: sadece kendi payi
     public GenericResponse<java.util.List<com.galeri.app.model.response.AccountHoldings>> holdings() {
         return responses.success(service.holdings());
     }
 
     @GetMapping("/api/holders")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")   // sermayedar: sadece kendi satiri
     public GenericResponse<java.util.List<com.galeri.app.model.response.CapitalResponses.Holder>> holders() {
         return responses.success(service.holders());
     }
