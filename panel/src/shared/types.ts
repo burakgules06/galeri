@@ -40,6 +40,7 @@ export interface ShareResponse {
   userId: string; name: string; owner: boolean;   // owner: dukkan sahibinin payi (parasi kasadan, kari donem karina)
   shareBp: number; profitShareBp: number; source: ContributionSource; pocketCents: number | null;
   contributionCents: number; profitCents: number | null; receivableCents: number | null;
+  collectedCents: number | null;   // satilmis aracta tahsil edildikce bu sahibe dagitilan (alacak - bu = bekleyen)
 }
 // Ortak arac satisinda ortagin alacagi: sermayede kalsin / nakit ode (tamami) / hibrit (amountCents kadari nakit)
 export type OwnerReturnMode = "KEEP" | "CASH" | "HYBRID";
@@ -328,8 +329,9 @@ export interface VehicleCost {
   salePriceCents: number | null;
   profitCents: number | null;
   commissionCents: number | null;
-  ownerPayoutCents: number | null;   // konsinye: sahibine borc (satis - komisyon)
+  ownerPayoutCents: number | null;   // konsinye: sahibinin alacagi (satis - komisyon)
   ownerChargedCents: number;         // konsinye: sahibine yansitilan masraf
+  ownerCollectedCents: number | null;   // konsinye: alacaginin tahsil edilip sermayesine gecen kismi
   shares: ShareResponse[];           // ortak arac: sahipler, katkilar, kar paylari
   entries: LedgerEntryResponse[];
 }

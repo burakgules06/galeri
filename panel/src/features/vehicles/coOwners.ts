@@ -52,46 +52,35 @@ export function contributions(priceCents: number, bps: number[], poolIndex: numb
   return parts;
 }
 
-/** Satış formundaki alacak önizlemesi backend CoOwnershipMath ile aynı kuruş kuralını kullanır. */
-export function ownerReceivables(
-  profitCents: number, owners: ShareResponse[], shopCutType: CommissionType | null,
-  shopCutRateBp: number | null, shopCutCents: number | null,
-): Record<string, number> {
-  const poolIndex = owners.findIndex((o) => o.owner);
-  const shares = owners.map((o) => o.owner ? 0 : Math.floor(profitCents * o.profitShareBp / 10000));
-  if (poolIndex >= 0) shares[poolIndex] = profitCents - shares.reduce((sum, part) => sum + part, 0);
-  else if (shares.length) {
-    // Eşit toplamda partner ağırlıklarıyla böl; son kuruş(lar) en yüksek paya gider.
-    const total = owners.reduce((sum, o) => sum + o.profitShareBp, 0);
-    let given = 0;
-    for (let i = 0; i < owners.length; i++) {
-      shares[i] = Math.floor(profitCents * owners[i].profitShareBp / total);
-      given += shares[i];
-    }
-    const largest = owners.reduce((best, o, i) => o.profitShareBp > owners[best].profitShareBp ? i : best, 0);
-    shares[largest] += profitCents - given;
-  }
-
-  const partners = owners.map((o, i) => o.owner ? -1 : i).filter((i) => i >= 0);
-  const partnersProfit = partners.reduce((sum, i) => sum + shares[i], 0);
+/**
+ * Ortakli arac satisinda sahip basina tahmin (kayitta kesin tutar hesaplanir; backend CoOwnershipServiceImpl ile ayni kural):
+ * kar (satis - alis - masraflar) kar payi oranlariyla bolunur, varsa dukkan payi ortaklarin karindan duser; ortagin alacagi =
+ * koydugu para + kar payi (0'in altina inmez). Her tahsilattan alacagi oraninda pay alir. entitled: toplam alacagi,
+ * now: simdi alinan kisimdan payi.
+ */
+export function ownerSaleShares(
+  saleCents: number, paidNowCents: number, purchaseCents: number, expenseCents: number, owners: ShareResponse[],
+  shopCutType: CommissionType | null, shopCutRateBp: number | null, shopCutCents: number | null,
+): Record<string, { entitled: number; now: number }> {
+  const profit = saleCents - purchaseCents - expenseCents;
+  const partners = owners.filter((o) => !o.owner);
+  const share = new Map(partners.map((o) => [o.userId, Math.floor((profit * o.profitShareBp) / 10000)]));
+  const partnersProfit = [...share.values()].reduce((t, v) => t + v, 0);
   const cut = partnersProfit <= 0 || shopCutType == null ? 0
     : shopCutType === "FIXED" ? Math.min(shopCutCents ?? 0, partnersProfit)
       : Math.floor((partnersProfit * (shopCutRateBp ?? 0) + 5000) / 10000);
   if (cut > 0 && partners.length) {
-    const total = partners.reduce((sum, i) => sum + owners[i].profitShareBp, 0);
+    const total = partners.reduce((t, o) => t + o.profitShareBp, 0);
     let given = 0;
-    const cuts = partners.map((i) => {
-      const part = Math.floor(cut * owners[i].profitShareBp / total);
-      given += part;
-      return part;
-    });
-    const largest = partners.reduce((best, i, j) => owners[i].profitShareBp > owners[partners[best]].profitShareBp ? j : best, 0);
-    cuts[largest] += cut - given;
-    partners.forEach((i, j) => { shares[i] -= cuts[j]; });
-    if (poolIndex >= 0) shares[poolIndex] += cut;
+    partners.forEach((o) => { const c = Math.floor((cut * o.profitShareBp) / total); given += c; share.set(o.userId, share.get(o.userId)! - c); });
+    const largest = partners.reduce((best, o) => (o.profitShareBp > best.profitShareBp ? o : best), partners[0]);
+    share.set(largest.userId, share.get(largest.userId)! - (cut - given));
   }
-
-  return Object.fromEntries(owners.flatMap((o, i) => o.owner ? [] : [[o.userId, o.contributionCents + shares[i]]]));
+  return Object.fromEntries(partners.map((o) => {
+    const entitled = Math.max(0, o.contributionCents + share.get(o.userId)!);
+    const now = saleCents > 0 ? Math.min(entitled, Math.floor((paidNowCents * entitled) / saleCents)) : 0;
+    return [o.userId, { entitled, now }];
+  }));
 }
 
 export const totalBp = (bps: (number | null)[]) => bps.reduce<number>((t, b) => t + (b != null && !Number.isNaN(b) ? b : 0), 0);

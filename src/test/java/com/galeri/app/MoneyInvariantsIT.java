@@ -53,6 +53,7 @@ class MoneyInvariantsIT {
     @Autowired private ContactService contactService;
     @Autowired private LedgerService ledgerService;
     @Autowired private CapitalService capitalService;
+    @Autowired private com.galeri.app.service.CoOwnershipService coOwnershipService;
     @Autowired private VehicleService vehicleService;
     @Autowired private PaymentPlanService paymentPlanService;
     @Autowired private com.galeri.app.service.NetWorthService netWorthService;
@@ -169,7 +170,7 @@ class MoneyInvariantsIT {
 
     /** Her adimdan sonra: adim adi hata mesajinda gorunur. */
     private void check(String step) {
-        new LedgerInvariants(jdbc, capitalService).check(tenant, step);
+        new LedgerInvariants(jdbc, capitalService, coOwnershipService).check(tenant, step);
         org.assertj.core.api.Assertions.assertThat(netWorthService.summary().differenceCents())
                 .as("%s: acilis ve duzeltmelerle varlik dengesi", step).isZero();
     }

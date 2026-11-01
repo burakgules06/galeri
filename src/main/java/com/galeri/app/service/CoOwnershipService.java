@@ -5,6 +5,7 @@ import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.request.OwnerReturnRequest;
 import com.galeri.app.model.request.ShareRequest;
 import com.galeri.app.model.response.ShareResponse;
+import com.galeri.app.model.response.VehicleRef;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -32,8 +33,25 @@ public interface CoOwnershipService {
     /** Satis geri alinirken: nakit donus yapilmissa 1043; kar paylari terslenir. */
     void onUndoSale(Vehicle vehicle);
 
-    /** Satilmis ortak aracin kari degistiyse (masraf, alis bedeli, sahipler) kar paylarini yeniden yazar. */
+    /**
+     * Satilmis ortakli / konsinye aracin tahsilat dagitimini defterle esitler: her tahsilat (pesin dahil) geldikce ortaklarin
+     * kar payi oranlariyla bolunur (konsinyede sahibinin alacagi oraninda) ve sermayelerine yazilir. Satis, tahsilat, geri alma,
+     * ciro, karsiliksiz ve masraf degisikliginden sonra cagrilir.
+     */
     void resyncProfitShares(Vehicle vehicle);
+
+    /** Satilmis araclardan sahiplerin henuz tahsil edilmemis alacagi (sermayedarin kartinda alacak). */
+    List<PendingShare> pendingSaleShares(UUID tenantId);
+
+    record PendingShare(UUID userId, VehicleRef vehicle, long cents) {}
+
+    /** Ortakli araçta ortaklarin (dukkan sahibi haric) toplam kari: alacak - katki. Donem karinda havuzdan ayrilir. */
+    long partnersProfit(Vehicle vehicle);
+
+    /** Satilmis konsinye araçta sahibinin alacagi ve tahsil edilip sermayesine gecen kismi; degilse null. */
+    ConsignmentShare consignmentShare(Vehicle vehicle);
+
+    record ConsignmentShare(long entitledCents, long collectedCents) {}
 
     /** Ortak (contactId) basina araclarda bagli sermaye: asOf gunu itibariyle stoktaki ortak araclardaki odenmis katkilar. */
     Map<UUID, Long> boundCapital(UUID tenantId, LocalDate asOf);

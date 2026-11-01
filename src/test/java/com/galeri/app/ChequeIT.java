@@ -65,6 +65,7 @@ class ChequeIT {
     @Autowired private ContactService contactService;
     @Autowired private LedgerService ledgerService;
     @Autowired private CapitalService capitalService;
+    @Autowired private com.galeri.app.service.CoOwnershipService coOwnershipService;
     @Autowired private VehicleService vehicleService;
     @Autowired private PaymentPlanService paymentPlanService;
 
@@ -298,7 +299,7 @@ class ChequeIT {
     }
 
     private void check(String step) {
-        new LedgerInvariants(jdbc, capitalService).check(tenant, step);
+        new LedgerInvariants(jdbc, capitalService, coOwnershipService).check(tenant, step);
         Long portfolio = jdbc.queryForObject("""
                 select coalesce(sum(case when e.target_account_id = a.id then e.amount_cents else -e.amount_cents end), 0)
                 from account a join ledger_entry e on e.target_account_id = a.id or e.source_account_id = a.id

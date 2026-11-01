@@ -65,6 +65,7 @@ class BasketSaleIT {
     @Autowired private ContactService contactService;
     @Autowired private LedgerService ledgerService;
     @Autowired private CapitalService capitalService;
+    @Autowired private com.galeri.app.service.CoOwnershipService coOwnershipService;
     @Autowired private VehicleService vehicleService;
     @Autowired private PaymentPlanService paymentPlanService;
 
@@ -215,7 +216,7 @@ class BasketSaleIT {
     }
 
     private void check(String step) {
-        new LedgerInvariants(jdbc, capitalService).check(tenant, step);
+        new LedgerInvariants(jdbc, capitalService, coOwnershipService).check(tenant, step);
     }
 
     private static void expectError(int code, ThrowableAssert.ThrowingCallable call) {

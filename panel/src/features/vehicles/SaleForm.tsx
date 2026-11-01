@@ -15,7 +15,7 @@ import { PlanBuilder, PlanSummary } from "../payments/PlanBuilder";
 import { NumberInput } from "../../shared/ui/NumberInput";
 import { OwnerReturns } from "./OwnerReturns";
 import { toOwnerReturns, type OwnerReturnDraft } from "./ownerReturnDraft";
-import { ownerReceivables } from "./coOwners";
+import { ownerSaleShares } from "./coOwners";
 
 interface Props { open: boolean; onClose: () => void; vehicle: VehicleDetailAdmin; onSaved: (d: VehicleDetailAdmin) => void }
 
@@ -51,6 +51,7 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
   const ownPrice = parsed != null && !Number.isNaN(parsed) ? parsed : 0;
   const centsOf = (t: string) => { const c = tlToCents(t); return c != null && !Number.isNaN(c) ? c : 0; };
   const price = ownPrice + basket.reduce((t, b) => t + centsOf(b.priceText), 0);
+  const paidNowCents = planRows.reduce((t, r) => t + (r.paidNow && r.amountCents > 0 ? r.amountCents : 0), 0);
   const planned = planRows.reduce((t, r) => t + (r.amountCents > 0 ? r.amountCents : 0), 0);
   const remaining = price - planned;
   const beforePurchase = !!vehicle.vehicle.purchaseDate && date < vehicle.vehicle.purchaseDate;
@@ -58,7 +59,7 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
 
   // Pesin planda toplam degisince tek satir da degissin (elle duzenlenen planlara dokunulmaz)
   const syncCash = (total: number) => {
-    if (mode === "CASH") setRows(cashPlan(total, date, rows[0]?.accountId || accounts.data?.[0]?.id || ""));
+    if (mode === "CASH") setRows(cashPlan(total, date, rows[0]?.accountId || (accounts.data?.find((a) => a.type === "CASH") ?? accounts.data?.[0])?.id || ""));
   };
   const changePrice = (text: string) => {
     setPriceText(text);
@@ -73,9 +74,9 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
     e.preventDefault();
     if (!buyer) return setError("Alıcıyı seç.");
     if (!canSave) return setError("Planı tamamla: kalan 0 olmalı ve her satır dolu olmalı.");
-    const profit = cost.data ? price - cost.data.totalCents : null;
-    const receivables = profit == null ? {} : ownerReceivables(profit, vehicle.shares,
+    const shares = ownerSaleShares(price, paidNowCents, vehicle.actualPurchaseCents ?? 0, cost.data?.expenseCents ?? 0, vehicle.shares,
       vehicle.shopCutType, vehicle.shopCutRateBp, vehicle.shopCutCents);
+    const receivables = Object.fromEntries(Object.entries(shares).map(([id, s]) => [id, s.now]));
     const ownerReturns = toOwnerReturns(returns, receivables);
     if (typeof ownerReturns === "string") return setError(ownerReturns);
     setSaving(true);
@@ -174,8 +175,16 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
             paidNowLabel="Şimdi alındı" downHint="Şimdi alınır" />
         </section>
 
+        {vehicle.vehicle.ownership === "CONSIGNMENT" && (
+          <p className="text-[13px] text-murekkep-2 border-l-[3px] border-konsinye pl-3 py-1">
+            Konsinye: sahibine borç yazılmaz. Tahsil edilen para seçilen hesaba girer (varsayılan Kasa); komisyon dışındaki kısmı
+            tahsil edildikçe <b className="text-murekkep">{vehicle.consignor?.name ?? "sahibinin"}</b> sermayesine geçer. Komisyon galerinin kârıdır.
+          </p>
+        )}
+
         {coOwned && basket.length === 0 && (
-          <OwnerReturns owners={vehicle.shares} profitCents={price > 0 && cost.data ? price - cost.data.totalCents : null}
+          <OwnerReturns owners={vehicle.shares} saleCents={price} paidNowCents={paidNowCents}
+            purchaseCents={vehicle.actualPurchaseCents ?? 0} expenseCents={cost.data?.expenseCents ?? 0}
             shopCutType={vehicle.shopCutType} shopCutRateBp={vehicle.shopCutRateBp} shopCutCents={vehicle.shopCutCents}
             accounts={accounts.data ?? []} value={returns} onChange={setReturns} />
         )}

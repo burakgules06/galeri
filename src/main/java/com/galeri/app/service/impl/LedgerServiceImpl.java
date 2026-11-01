@@ -405,8 +405,10 @@ public class LedgerServiceImpl implements LedgerService {
 
         // Ortak arac: sahipler, katkilari, satildiysa kar paylari (dukkan payi dusulmus) ve alacaklari
         List<ShareResponse> shares = coOwnershipService.owners(vehicle);
+        CoOwnershipService.ConsignmentShare share = consignment ? coOwnershipService.consignmentShare(vehicle) : null;
+        Long collected = share == null ? null : share.collectedCents();
         return new VehicleCost(vehicle.getId(), vehicle.getOwnership(), purchase, purchaseInLedger, expense, total, sale, profit,
-                commission, payout, consignment ? charged : 0, shares, toResponse(entries));
+                commission, payout, consignment ? charged : 0, collected, shares, toResponse(entries));
     }
 
     private static boolean touches(LedgerEntry e, AccountType type) {
@@ -423,35 +425,13 @@ public class LedgerServiceImpl implements LedgerService {
     @Override
     @Transactional
     public void syncConsignmentSettlement(Vehicle vehicle) {
-        List<LedgerEntry> active = activeVehicleEntries(vehicle.getId(), LedgerEntryType.CONSIGNMENT_SETTLEMENT);
-        Long sale = vehicle.getSalePriceCents();
-        boolean wanted = vehicle.getOwnership() == Ownership.CONSIGNMENT && vehicle.getStatus() != VehicleStatus.IN_STOCK
-                && sale != null && vehicle.getConsignor() != null;
-        long amount = 0;
-        if (wanted) {
-            Long commission = ConsignmentMath.commission(vehicle, sale);
-            if (commission == null || commission > sale) throw new CommissionExceedsSaleException();
-            amount = sale - commission;
+        // Konsinye satista sahibine borc yazilmaz: tahsil edildikce sahibinin sermayesine (CoOwnershipService)
+        if (vehicle.getOwnership() == Ownership.CONSIGNMENT && vehicle.getStatus() != VehicleStatus.IN_STOCK
+                && vehicle.getSalePriceCents() != null) {
+            Long commission = ConsignmentMath.commission(vehicle, vehicle.getSalePriceCents());
+            if (commission == null || commission > vehicle.getSalePriceCents()) throw new CommissionExceedsSaleException();
         }
-        wanted = wanted && amount > 0;   // komisyon satisin tamamiysa sahibine borc yok
-
-        if (wanted && active.size() == 1) {
-            LedgerEntry e = active.get(0);
-            if (e.getAmountCents() == amount && e.getEntryDate().equals(vehicle.getSaleDate())
-                    && vehicle.getConsignor().getId().equals(e.getSourceAccount().getUserId())) {
-                return;   // degisiklik yok
-            }
-        }
-        if (!wanted && active.isEmpty()) return;
-
-        active.forEach(this::writeReversal);
-        if (wanted) {
-            LedgerEntry e = newEntry(vehicle.getTenantId(), LedgerEntryType.CONSIGNMENT_SETTLEMENT, userBalanceAccount(vehicle.getConsignor()),
-                    systemAccount(vehicle.getTenantId(), AccountType.INCOME), amount, vehicle.getSaleDate());
-            e.setVehicle(vehicle);
-            e.setDescription("Konsinye satış: sahibine borç");
-            entryRepository.save(e);
-        }
+        coOwnershipService.resyncProfitShares(vehicle);
     }
 
     @Override

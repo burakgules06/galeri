@@ -220,10 +220,6 @@ public class CapitalServiceImpl implements CapitalService {
         for (Object[] s : entryRepository.vehicleExpenseTotals(tenantId, LedgerEntryType.VEHICLE_EXPENSE, AccountType.VEHICLE)) {
             expenses.put((UUID) s[0], ((Number) s[1]).longValue());
         }
-        Map<UUID, Long> partnerShares = new HashMap<>();
-        for (Object[] s : entryRepository.partnerProfitShareTotals(tenantId, LedgerEntryType.VEHICLE_PROFIT_SHARE, AccountType.CAPITAL)) {
-            partnerShares.put((UUID) s[0], ((Number) s[1]).longValue());
-        }
         List<SoldVehicle> vehicles = new ArrayList<>();
         long vehicleProfit = 0, commission = 0, coOwned = 0;
         for (Vehicle v : vehicleRepository.findByTenantIdAndSaleDateBetween(tenantId, from, to)) {
@@ -237,8 +233,8 @@ public class CapitalServiceImpl implements CapitalService {
             } else {
                 long cost = (v.getActualPurchaseCents() == null ? 0 : v.getActualPurchaseCents()) + expenses.getOrDefault(v.getId(), 0L);
                 long profit = v.getSalePriceCents() - cost;
-                // Ortak arac: ortaklarin payi satista sermayelerine gecti (defterde); kalan havuzun payi (dukkan payi dahil)
-                long partners = v.getOwnership() == Ownership.CO_OWNED ? partnerShares.getOrDefault(v.getId(), 0L) : 0;
+                // Ortak arac: ortaklarin payi (tahsil edildikce sermayelerine gecer); kalan havuzun payi (dukkan payi dahil)
+                long partners = v.getOwnership() == Ownership.CO_OWNED ? coOwnershipService.partnersProfit(v) : 0;
                 vehicleProfit += profit - partners;
                 coOwned += partners;
                 vehicles.add(new SoldVehicle(ref, v.getOwnership(), v.getSaleDate(), v.getSalePriceCents(), cost, profit, profit - partners));

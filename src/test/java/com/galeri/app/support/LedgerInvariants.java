@@ -2,6 +2,7 @@ package com.galeri.app.support;
 
 import com.galeri.app.model.response.CapitalResponses;
 import com.galeri.app.service.CapitalService;
+import com.galeri.app.service.CoOwnershipService;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
@@ -18,10 +19,12 @@ public final class LedgerInvariants {
 
     private final JdbcTemplate jdbc;
     private final CapitalService capitalService;
+    private final CoOwnershipService coOwnershipService;
 
-    public LedgerInvariants(JdbcTemplate jdbc, CapitalService capitalService) {
+    public LedgerInvariants(JdbcTemplate jdbc, CapitalService capitalService, CoOwnershipService coOwnershipService) {
         this.jdbc = jdbc;
         this.capitalService = capitalService;
+        this.coOwnershipService = coOwnershipService;
     }
 
     public void check(UUID tenant, String step) {
@@ -60,7 +63,10 @@ public final class LedgerInvariants {
         // ortaklarin payi satista sermayelerine gecti: dagitilmamis kara da rapor netine de girmez.
         CapitalResponses.PeriodProfit report = capitalService.periodProfit(LocalDate.of(2000, 1, 1), LocalDate.of(2100, 12, 31));
         long allocated = report.partners().stream().mapToLong(CapitalResponses.PartnerProfit::allocatedCents).sum();
-        assertThat(report.netCents() - allocated).as("%s: rapor kari - sermayeye eklenen = defter", step).isEqualTo(undistributed);
+        // Satilmis ortakli / konsinye araclarda sahiplerin tahsil edilmemis payi gelir hesabinda bekler (tahsil edildikce sermayeye)
+        long pending = coOwnershipService.pendingSaleShares(tenant).stream().mapToLong(CoOwnershipService.PendingShare::cents).sum();
+        assertThat(report.netCents() - allocated + pending).as("%s: rapor kari - sermayeye eklenen + bekleyen paylar = defter", step)
+                .isEqualTo(undistributed);
 
         // 3) Ortak sermayeleri defterle ayni; her ortakta sermaye = nakitteki + araclarda bagli, nakitteki eksi degil
         Map<UUID, Long> capitalByContact = new HashMap<>();

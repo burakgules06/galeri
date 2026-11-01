@@ -114,9 +114,8 @@ public interface LedgerService {
     // ------------------------------------------------------------------ konsinye
 
     /**
-     * Konsinye satisin sahibine borcunu aracin son haline esitler: satilmis konsinye aracta
-     * BALANCE(sahibi) -> INCOME (satis - komisyon), satis tarihinde. Arac stoktaysa, konsinye degilse ya da
-     * tutar/sahip/tarih degistiyse eski hareket terslenir. Satis, satisi geri alma ve arac guncellemesi cagirir.
+     * Konsinye satista sahibine borc yazilmaz: komisyonu dogrular (1034), tahsil edilen kisim sahibinin sermayesine
+     * CoOwnershipService.resyncProfitShares ile yazilir. Satis, satisi geri alma ve arac guncellemesi cagirir.
      */
     void syncConsignmentSettlement(Vehicle vehicle);
 
