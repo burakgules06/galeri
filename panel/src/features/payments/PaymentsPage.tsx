@@ -282,7 +282,7 @@ function PlanItem({ plan, open, onToggle, onChange, sub, readOnly }: {
           <ul className="divide-y divide-cizgi">
             {plan.items.map((i) => (
               <InstallmentRow key={i.id} i={i} onChange={onChange} showVehicle={false} showPayer={i.payer.id !== plan.counterparty.id}
-                allowDeleteOpenItem={!readOnly} readOnly={readOnly} />
+                allowDeleteOpenItem={!readOnly} readOnly={readOnly} investor={readOnly} />
             ))}
           </ul>
         </div>

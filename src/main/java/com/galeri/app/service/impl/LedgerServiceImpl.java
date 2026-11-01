@@ -163,12 +163,15 @@ public class LedgerServiceImpl implements LedgerService {
         return toResponse(afterExpense(writeReversal(changeableExpense(entryId))), false);
     }
 
-    /** Satilmis ortak araca masraf girildi / degisti: kar degisti, ortaklarin kar paylari yeniden yazilir. */
+    /**
+     * Ortak araca masraf girildi / degisti: ortaklarin payi (sahiplik oraniyla) katkilarina eklenir, nakit sermaye yetmezse 1042;
+     * satilmissa kar degisti, dagitim yeniden yazilir.
+     */
     private LedgerEntry afterExpense(LedgerEntry e) {
         Vehicle v = e.getVehicle();
-        if (v != null && v.getOwnership() == Ownership.CO_OWNED && v.getStatus() != VehicleStatus.IN_STOCK) {
+        if (v != null && v.getOwnership() == Ownership.CO_OWNED) {
             entryRepository.flush();
-            coOwnershipService.resyncProfitShares(v);
+            coOwnershipService.syncContributions(v);   // stokta: katki ve sermaye kontrolu; satilmissa dagitim da
         }
         return e;
     }
@@ -289,6 +292,24 @@ public class LedgerServiceImpl implements LedgerService {
                 amountCents, date);
         e.setDescription(description);
         return entryRepository.save(e);
+    }
+
+    @Override
+    @Transactional
+    public LedgerEntry withdrawToUser(UUID userId, UUID tenantId, UUID moneyAccountId, long amountCents, LocalDate date, Vehicle vehicle,
+                                      String description) {
+        Account capital = userAccount(tenantId, userId, AccountType.CAPITAL);
+        if (capital == null) throw new InvalidAccountException();
+        LedgerEntry e = newEntry(tenantId, LedgerEntryType.CAPITAL, getMoneyAccount(moneyAccountId), capital, amountCents, date);
+        e.setVehicle(vehicle);
+        e.setDescription(description);
+        return entryRepository.save(e);
+    }
+
+    @Override
+    @Transactional
+    public UUID cashAccountId() {
+        return systemAccount(CurrentUser.tenantId(), AccountType.CASH).getId();
     }
 
     @Override

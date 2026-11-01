@@ -12,6 +12,8 @@ import { PaymentPlanCard } from "./PaymentPlanCard";
 import { SaleForm } from "./SaleForm";
 import { VehicleForm } from "./VehicleForm";
 import { BulkExpenseForm } from "../ledger/BulkExpenseForm";
+import { ExpenseForm } from "../ledger/ExpenseForm";
+import { useAuth } from "../../auth/useAuth";
 import { LedgerEntryList } from "../ledger/LedgerEntryList";
 
 // Durum renkleri: stokta (onayli, mavi), satildi (olumlu, yesil), kapandi (gri)
@@ -24,6 +26,7 @@ const STATUS_PILL: Record<VehicleStatus, string> = {
 export function VehicleDetailPage({ id }: { id: string }) {
   const { data, setData, error, reload } = useLoad(() => api.vehicle(id), [id]);
   const [form, setForm] = useState<"edit" | "sell" | null>(null);
+  const { isInvestor } = useAuth();   // sermayedar kendi aracini fiyatlariyla gorur; sadece satar ve masraf ekler
   const [removeError, setRemoveError] = useState<string | null>(null);
 
   if (error) return <ErrorBox message={error} />;
@@ -66,8 +69,8 @@ export function VehicleDetailPage({ id }: { id: string }) {
         </div>
         {admin && (
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setForm("edit")}>Düzenle</Button>
-            {v.status === "IN_STOCK" && <Button variant="quiet" className="text-tehlike" onClick={remove}>Kaldır</Button>}
+            {!isInvestor && <Button variant="secondary" onClick={() => setForm("edit")}>Düzenle</Button>}
+            {!isInvestor && v.status === "IN_STOCK" && <Button variant="quiet" className="text-tehlike" onClick={remove}>Kaldır</Button>}
             {v.status === "IN_STOCK" && <Button onClick={() => setForm("sell")}>Satıldı olarak işaretle</Button>}
           </div>
         )}
@@ -145,13 +148,13 @@ export function VehicleDetailPage({ id }: { id: string }) {
             key={JSON.stringify(v.parts)}
             vehicleId={v.id}
             parts={v.parts}
-            editable={!!admin}
+            editable={!!admin && !isInvestor}
             onSaved={setData}
           />
         </Card>
       </div>
 
-      {admin && <VehicleForm open={form === "edit"} onClose={() => setForm(null)} existing={admin}
+      {admin && !isInvestor && <VehicleForm open={form === "edit"} onClose={() => setForm(null)} existing={admin}
         onSaved={(d) => { setData(d); setForm(null); }} />}
       {admin && <SaleForm open={form === "sell"} onClose={() => setForm(null)} vehicle={admin}
         onSaved={(d) => { setData(d); setForm(null); }} />}
@@ -165,6 +168,7 @@ export function VehicleDetailPage({ id }: { id: string }) {
 function CostCard({ vehicle, ownerName }: { vehicle: VehicleDetail; ownerName?: string }) {
   const { data, error, reload } = useLoad(() => api.vehicleCost(vehicle.id), [vehicle.id]);
   const [expenseOpen, setExpenseOpen] = useState(false);
+  const { isInvestor } = useAuth();
   const expenses = (data?.entries ?? []).filter((e) => e.type === "VEHICLE_EXPENSE");
   const consignment = data?.ownership === "CONSIGNMENT";
 
@@ -221,8 +225,10 @@ function CostCard({ vehicle, ownerName }: { vehicle: VehicleDetail; ownerName?: 
           </div>
         </>
       )}
-      {expenseOpen && <BulkExpenseForm vehicle={vehicle} onClose={() => setExpenseOpen(false)}
+      {expenseOpen && !isInvestor && <BulkExpenseForm vehicle={vehicle} onClose={() => setExpenseOpen(false)}
         onSaved={() => { setExpenseOpen(false); reload(); }} />}
+      <ExpenseForm open={expenseOpen && isInvestor} vehicle={vehicle} onClose={() => setExpenseOpen(false)}
+        onSaved={() => { setExpenseOpen(false); reload(); }} />
     </Card>
   );
 }

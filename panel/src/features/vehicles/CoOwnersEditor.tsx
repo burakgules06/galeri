@@ -12,10 +12,11 @@ interface Props {
   priceCents: number;
   partners: Partner[];   // dukkan sahibi ve sermayedarlar (V22: araç sahibi her zaman kullanici)
   boundHere: Record<string, number>;
+  capitalOnly?: boolean;   // sermayedar giriyor: katki her zaman sermayeden (kaynak secimi yok)
 }
 
 export function CoOwnersEditor({ rows, onRows, profitDiffers, onProfitDiffers, priceCents,
-  partners, boundHere }: Props) {
+  partners, boundHere, capitalOnly = false }: Props) {
   const bps = rows.map(r => percentToBp(r.percent));
   const total = totalBp(bps);
   const profitTotal = totalBp(rows.map(r => percentToBp(r.profitPercent)));
@@ -51,7 +52,7 @@ export function CoOwnersEditor({ rows, onRows, profitDiffers, onProfitDiffers, p
         {profitDiffers && <div className="flex items-center justify-between gap-3 text-sm">
           <span>Kâr payı</span><div className="w-24"><PercentInput value={r.profitPercent} label="Kâr payı oranı" onChange={profitPercent => update(r.key, { profitPercent })} /></div>
         </div>}
-        {!r.pool && <div className="flex flex-wrap items-start gap-2">
+        {!r.pool && !capitalOnly && <div className="flex flex-wrap items-start gap-2">
           <select className={`${inputClass} w-auto text-sm`} aria-label="Katkı kaynağı" value={r.source}
             onChange={e => update(r.key, { source: e.target.value as ContributionSource })}>
             {(Object.keys(CONTRIBUTION_SOURCE) as ContributionSource[]).map(s => <option key={s} value={s}>{CONTRIBUTION_SOURCE[s]}</option>)}

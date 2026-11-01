@@ -20,6 +20,11 @@ import com.galeri.app.model.enums.CommissionType;
 import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.PartCondition;
 import com.galeri.app.model.enums.VehicleStatus;
+import com.galeri.app.model.enums.ContributionSource;
+import com.galeri.app.exception.runtime.InvalidSharesException;
+import com.galeri.app.model.request.InstallmentRequest;
+import com.galeri.app.model.request.OwnerReturnRequest;
+import org.springframework.security.access.AccessDeniedException;
 import com.galeri.app.model.request.BasketSaleRequest;
 import com.galeri.app.model.request.VehiclePartsRequest;
 import com.galeri.app.model.request.VehicleRequest;
@@ -110,7 +115,56 @@ public class VehicleServiceImpl implements VehicleService {
     public Object detail(UUID id) {
         Vehicle vehicle = getVehicle(id);
         VehicleDetail detail = toDetail(vehicle);
-        return CurrentUser.isAdmin() ? toAdmin(vehicle, detail) : detail;
+        // Sermayedar kendi (ve ortak oldugu) aracini fiyatlariyla gorur; digerlerini calisan gibi
+        return CurrentUser.isAdmin() || investorOwns(vehicle) ? toAdmin(vehicle, detail) : detail;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void requireAccess(UUID vehicleId) {
+        if (CurrentUser.isAdmin()) return;
+        if (!investorOwns(getVehicle(vehicleId))) throw new AccessDeniedException("Bu arac sermayedara ait degil");
+    }
+
+    /** Oturumdaki sermayedar bu aracin sahiplerinden mi (ortakli aracta payi var ya da konsinye sahibi). */
+    private boolean investorOwns(Vehicle vehicle) {
+        if (!CurrentUser.isInvestor()) return false;
+        UUID me = CurrentUser.principal().userId();
+        return coOwnershipService.vehicleUsers(vehicle.getTenantId(), List.of(vehicle.getId()))
+                .getOrDefault(vehicle.getId(), List.of()).contains(me);
+    }
+
+    /**
+     * Sermayedarin alimi: arac her zaman ortakli (tek basina aldiysa %100 onun), payi kendi sermayesinden (katki kaynagi
+     * sermaye); para galerinin kasasindan cikar, kasa secmez. Senetli alis, konsinye ve dukkan payi yok.
+     */
+    private VehicleRequest investorPurchase(VehicleRequest r) {
+        UUID me = CurrentUser.principal().userId();
+        if (r.ownershipOrDefault() != Ownership.CO_OWNED || r.shares() == null
+                || r.shares().stream().noneMatch(s -> me.equals(s.userId()))
+                || r.shares().stream().anyMatch(s -> s.sourceOrDefault() != ContributionSource.CAPITAL)
+                || (r.purchasePlan() != null && !r.purchasePlan().isEmpty())) {
+            throw new InvalidSharesException();
+        }
+        return new VehicleRequest(r.plate(), r.make(), r.model(), r.modelYear(), r.fuel(), r.transmission(), r.mileageKm(), r.color(),
+                r.tramerCents(), r.notes(), r.purchaseDate(), r.sellerId(), me, r.actualPurchaseCents(), r.officialPurchaseCents(),
+                ledgerService.cashAccountId(), null, Ownership.CO_OWNED, null, null, null, null, r.shares(), r.addToCatalog(),
+                r.catalogModel(), null, null, null);
+    }
+
+    /**
+     * Sermayedarin satisi: kendi aracini satar, ayni odeme secenekleri; "simdi alindi" para galerinin kasasina girer.
+     * Ortaga donusten sadece kendisininki: "Nakit aldım" (payi cebine) ya da "Sermayeme ekle".
+     */
+    private VehicleSaleRequest investorSale(VehicleSaleRequest r) {
+        UUID me = CurrentUser.principal().userId();
+        UUID cash = ledgerService.cashAccountId();
+        List<InstallmentRequest> rows = r.installments().stream().map(i -> new InstallmentRequest(i.dueDate(), i.amountCents(), i.method(),
+                i.noteNo(), i.payerId(), i.paidNow(), i.paidNow() ? cash : null, i.bankName(), i.drawerName(), i.description())).toList();
+        List<OwnerReturnRequest> returns = r.ownerReturns() == null ? null : r.ownerReturns().stream()
+                .filter(o -> me.equals(o.userId()))
+                .map(o -> new OwnerReturnRequest(o.userId(), o.mode(), o.amountCents(), cash)).toList();
+        return new VehicleSaleRequest(r.saleDate(), r.buyerId(), r.soldById(), r.salePriceCents(), rows, returns);
     }
 
     // ------------------------------------------------------------------ yazma
@@ -119,6 +173,7 @@ public class VehicleServiceImpl implements VehicleService {
     @Transactional
     public VehicleDetailAdmin create(VehicleRequest request) {
         UUID tenantId = CurrentUser.tenantId();
+        if (CurrentUser.isInvestor()) request = investorPurchase(request);
         String plate = PlateUtil.normalize(request.plate());
         if (vehicleRepository.existsByTenantIdAndPlateAndStatus(tenantId, plate, VehicleStatus.IN_STOCK)) {
             throw new PlateAlreadyInStockException();
@@ -190,6 +245,10 @@ public class VehicleServiceImpl implements VehicleService {
     @Transactional
     public VehicleDetailAdmin sell(UUID id, VehicleSaleRequest request) {
         Vehicle vehicle = getVehicle(id);
+        if (CurrentUser.isInvestor()) {
+            if (!investorOwns(vehicle)) throw new AccessDeniedException("Bu arac sermayedara ait degil");
+            request = investorSale(request);
+        }
         if (vehicle.getStatus() != VehicleStatus.IN_STOCK) throw new VehicleAlreadySoldException();
         if (request.saleDate().isBefore(vehicle.getPurchaseDate())) throw new InvalidDateException();
 

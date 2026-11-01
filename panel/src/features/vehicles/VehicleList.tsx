@@ -15,7 +15,7 @@ import { VehicleForm } from "./VehicleForm";
 type Filter = "IN_STOCK" | "SOLD" | "ALL";
 
 export function VehicleList() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isInvestor } = useAuth();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("IN_STOCK");
   const [formOpen, setFormOpen] = useState(false);
@@ -33,7 +33,7 @@ export function VehicleList() {
             Araçlar {data && <span className="sayi font-semibold text-murekkep-3">{list.length}</span>}
           </h1>
         </div>
-        {isAdmin && <Button onClick={() => setFormOpen(true)}>Araç ekle</Button>}
+        {(isAdmin || isInvestor) && <Button onClick={() => setFormOpen(true)}>Araç ekle</Button>}
       </div>
 
       <div className="flex flex-col md:flex-row gap-2 md:items-center mb-4">
@@ -109,7 +109,7 @@ export function VehicleList() {
         </>
       )}
 
-      {isAdmin && (
+      {(isAdmin || isInvestor) && (
         <VehicleForm
           open={formOpen}
           onClose={() => setFormOpen(false)}

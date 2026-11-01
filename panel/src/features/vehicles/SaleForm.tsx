@@ -16,6 +16,7 @@ import { NumberInput } from "../../shared/ui/NumberInput";
 import { OwnerReturns } from "./OwnerReturns";
 import { toOwnerReturns, type OwnerReturnDraft } from "./ownerReturnDraft";
 import { ownerSaleShares } from "./coOwners";
+import { useAuth } from "../../auth/useAuth";
 
 interface Props { open: boolean; onClose: () => void; vehicle: VehicleDetailAdmin; onSaved: (d: VehicleDetailAdmin) => void }
 
@@ -26,6 +27,8 @@ export function SaleForm(props: Props) {
 const centsOf = (t: string) => { const c = tlToCents(t); return c != null && !Number.isNaN(c) ? c : 0; };
 
 function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
+  const { isInvestor } = useAuth();   // sermayedar: para galerinin kasasina; kendi payi icin "Sermayeme ekle / Nakit aldım"
+  const me = useLoad(() => (isInvestor ? api.me() : Promise.resolve(null)), [isInvestor]);
   const [date, setDate] = useState(todayIso());
   const [buyer, setBuyer] = useState<ContactSummary | null>(null);
   const [soldBy, setSoldBy] = useState("");
@@ -151,7 +154,7 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
                 </button>
               </div>
             ))}
-            {picking ? (
+            {isInvestor ? null : picking ? (
               <select className={inputClass} autoFocus defaultValue="" aria-label="Eklenecek araç" onChange={(e) => {
                 const v = (stock.data ?? []).find((x) => x.id === e.target.value);
                 if (v) setBasket([...basket, { v, priceText: "" }]);
@@ -172,14 +175,14 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
               organizations={allContacts.filter((c) => c.type === "ORGANIZATION")} onOrgCreated={(c) => setExtraContacts((l) => [c, ...l])}
               modes={["CASH", "PROMISSORY_NOTE", "CHEQUE", "OPEN_ACCOUNT", "INSTITUTION", "CREDIT_CARD", "MIXED"]}
               methods={["CASH", "TRANSFER", "CREDIT_CARD", "PROMISSORY_NOTE", "CHEQUE", "OPEN_ACCOUNT", "INSTITUTION"]}
-              nowLabel="Şimdi alındı" downLabel="Peşinat (şimdi alınır)" />
+              nowLabel="Şimdi alındı" downLabel="Peşinat (şimdi alınır)" hideAccounts={isInvestor} />
           </section>
 
           {coOwned && basket.length === 0 && (
             <OwnerReturns owners={vehicle.shares} saleCents={price} paidNowCents={paidNowCents}
               purchaseCents={vehicle.actualPurchaseCents ?? 0} expenseCents={cost.data?.expenseCents ?? 0}
               shopCutType={vehicle.shopCutType} shopCutRateBp={vehicle.shopCutRateBp} shopCutCents={vehicle.shopCutCents}
-              accounts={accounts.data ?? []} value={returns} onChange={setReturns} />
+              accounts={accounts.data ?? []} value={returns} onChange={setReturns} investorId={isInvestor ? me.data?.userId ?? "-" : undefined} />
           )}
         </div>
 

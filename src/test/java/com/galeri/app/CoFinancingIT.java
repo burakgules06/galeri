@@ -179,14 +179,17 @@ class CoFinancingIT {
     }
 
     @Test
-    void zararKatkiyiAsarsa_ortaginAlacagiSifir_sermayedenSadeceKatkisiDuser() {
-        // Arac 400.000 (katki 200.000), masraf 250.000, satis 150.000: Burak'a 75.000 - 125.000 masraf payi = 0 dagitilir
+    void masrafPayiHemenSermayedenAracaBaglanir_zarardaKatkisindanDuser() {
+        // Arac 400.000 (katki 200.000), masraf 250.000: Burak'in %50 payi 125.000 hemen araca baglanir (katki 325.000)
         UUID v = coOwned(400_000 * TL, half(burak, ContributionSource.CAPITAL, null));
         ledgerService.addExpense(new ExpenseRequest(today, cash, 250_000 * TL, v, null, "Motor", null, null, null));
+        expectPartner("masraf", burak, 1_000_000 * TL, 675_000 * TL, 325_000 * TL);
+        check("masraf");
+        // Satis 150.000: zarar 500.000, Burak'in payi 250.000; alacagi 325.000 - 250.000 = 75.000
         sell(v, 150_000 * TL);
-        assertThat(owner(v, burak).receivableCents()).isZero();
-        assertThat(owner(v, burak).profitCents()).isEqualTo(-200_000 * TL);
-        expectPartner("zarar", burak, 800_000 * TL, 800_000 * TL, 0);   // sermayeden sadece katkisi (200.000) duser
+        assertThat(owner(v, burak).receivableCents()).isEqualTo(75_000 * TL);
+        assertThat(owner(v, burak).profitCents()).isEqualTo(-250_000 * TL);
+        expectPartner("zarar", burak, 750_000 * TL, 750_000 * TL, 0);
         check("zarar");
     }
 

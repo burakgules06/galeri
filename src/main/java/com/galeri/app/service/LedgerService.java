@@ -76,6 +76,13 @@ public interface LedgerService {
      */
     LedgerEntry creditHolder(UUID holderUserId, UUID tenantId, long amountCents, LocalDate date, String description);
 
+    /** Sermayedarin nakit aldigi pay: kasa / banka -> CAPITAL(kullanici) (sermaye cekisi), araca bagli. */
+    LedgerEntry withdrawToUser(UUID userId, UUID tenantId, UUID moneyAccountId, long amountCents, LocalDate date, Vehicle vehicle,
+                               String description);
+
+    /** Galerinin kasasi (yoksa acilir): sermayedarin islemlerinde para buraya girer / buradan cikar. */
+    UUID cashAccountId();
+
     /** Ciro hareketleri: cekin / senedin alindigi kisiden portfoye (tahsilat), portfoyden verildigi kisiye (odeme). */
     record Endorsement(LedgerEntry in, LedgerEntry out) {}
 

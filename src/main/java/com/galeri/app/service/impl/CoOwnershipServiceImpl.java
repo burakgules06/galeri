@@ -208,13 +208,19 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
     }
 
     /**
-     * Katkiya sayilan odemeler: pesin alis (kasa / bankadan) ve odenmis alis taksitleri, tarih sirasiyla. Satilmis aracta
+     * Katkiya sayilan odemeler: pesin alis (kasa / bankadan), arac masraflari ve odenmis alis taksitleri, tarih sirasiyla. Satilmis aracta
      * satis gununden sonraki odemeler sayilmaz: kalan senetleri satis parasindan havuz oder.
      */
     private List<Payment> contributingPayments(Vehicle vehicle) {
         List<Payment> payments = new ArrayList<>();
         for (LedgerEntry e : active(entryRepository.findByVehicle_IdAndType(vehicle.getId(), LedgerEntryType.VEHICLE_PURCHASE))) {
             if (e.getSourceAccount().getType().isMoneyAccount()) {
+                payments.add(new Payment(e.getId(), e.getEntryDate(), e.getCreatedAt(), e.getAmountCents(), e.getSourceAccount()));
+            }
+        }
+        // Arac masrafi da sahiplik payina gore katkidir: ortagin payi hemen sermayesinden araca baglanir (nakitteki sermayesi duser)
+        for (LedgerEntry e : active(entryRepository.findByVehicle_IdAndType(vehicle.getId(), LedgerEntryType.VEHICLE_EXPENSE))) {
+            if (e.getTargetAccount().getType() == AccountType.VEHICLE && e.getSourceAccount().getType().isMoneyAccount()) {
                 payments.add(new Payment(e.getId(), e.getEntryDate(), e.getCreatedAt(), e.getAmountCents(), e.getSourceAccount()));
             }
         }

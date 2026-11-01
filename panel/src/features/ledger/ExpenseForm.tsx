@@ -10,6 +10,7 @@ import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../share
 import { CategoryPicker } from "./CategoryPicker";
 import { NumberInput } from "../../shared/ui/NumberInput";
 import { confirmOwnerCash } from "../../shared/ownerCash";
+import { useAuth } from "../../auth/useAuth";
 
 interface VehicleChoice { id: string; plate: string; make: string; model: string; ownership?: Ownership }
 
@@ -32,6 +33,7 @@ export function ExpenseForm(props: Props) {
 }
 
 function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing, shop = false }: Props) {
+  const { isInvestor } = useAuth();   // sermayedar: kendi aracina masraf; para galerinin kasasindan (hesap secmez)
   // Duzenlemede arac kaydin kendisinden; aracin maliyet hesabina gitmeyen arac masrafi konsinye aractadir
   const vehicle: VehicleChoice | undefined = existing?.vehicle
     ? { ...existing.vehicle, ownership: fixedVehicle?.ownership ?? (existing.target.type !== "VEHICLE" ? "CONSIGNMENT" : undefined) }
@@ -61,8 +63,8 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing,
     if (cents == null || Number.isNaN(cents) || cents <= 0) return setError("Tutarı 5.000 gibi yaz.");
     if (!category.trim()) return setError("Kategori yaz ya da seç.");
     if (root === "VEHICLE" && !vehicleId) return setError("Aracı seç.");
-    if (!selectedAccount) return setError("Ödemenin çıktığı hesabı seç.");
-    if (!existing && !pocket && !(await confirmOwnerCash(cents))) return;
+    if (!selectedAccount && !isInvestor) return setError("Ödemenin çıktığı hesabı seç.");
+    if (!existing && !pocket && !isInvestor && !(await confirmOwnerCash(cents))) return;
     setSaving(true);
     setError(null);
     try {
@@ -121,14 +123,14 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing,
           <CategoryPicker key={root} root={root} name={category} onChange={setCategory} />
         </Field>
 
-        <Field label="Nereden ödendi">
+        {isInvestor ? <p className="text-[13.5px] text-murekkep-2">Para galerinin kasasından çıkar; aracın maliyetine eklenir.</p> : <Field label="Nereden ödendi">
           {accounts.data && (
             <Segment<string> value={selectedAccount} onChange={setAccountId}
               options={[...accounts.data.map((a) => ({ value: a.id, label: `${a.name} · ${tl(a.balanceCents)}` })),
                 ...(root === "GENERAL" ? [{ value: POCKET, label: "Cepten (elden ödendi)" }] : [])]} />
           )}
           {pocket && <p className="text-[13px] text-murekkep-2 mt-1.5">Kasa ve banka değişmez, kimsenin sermayesinden düşmez; gider olarak kaydedilir.</p>}
-        </Field>
+        </Field>}
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Tarih"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>

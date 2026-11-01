@@ -70,7 +70,7 @@ class CapitalSecurityTest {
         assertThatCode(() -> netWorth.holdings()).doesNotThrowAnyException();
 
         assertThatThrownBy(() -> netWorth.summary()).isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(() -> capital.partners()).isInstanceOf(AccessDeniedException.class);
+        assertThatCode(() -> capital.partners()).doesNotThrowAnyException();   // ortak secmek icin isimler
         assertThatThrownBy(() -> capital.move(id, new CapitalRequests.Movement(CapitalRequests.Direction.IN, id, DAY, 1L, null)))
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> capital.periodProfit(DAY, DAY)).isInstanceOf(AccessDeniedException.class);
