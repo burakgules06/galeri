@@ -912,7 +912,8 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                 i.getAmountCents(), i.getMethod(), i.getNoteNo(), summary(i.getPayer()), summary(p.getContact()),
                 status, daysLate, i.getPaidEntryId(), i.getPaidAt(), i.getBankName(), i.getDrawerName(), summary(i.getEndorsedTo()),
                 i.getBouncedAt() != null && !i.isPaid(), down, down ? 0 : regular.indexOf(i.getId()) + 1, regular.size(),
-                userSummary(p.getHolder()), i.getDescription(), p.getCreatedAt(), users);
+                userSummary(p.getHolder()), i.getDescription(), p.getCreatedAt(),
+                p.getCreatedBy() == null ? null : p.getCreatedBy().getFullName(), users);
     }
 
     private Installment lockInstallment(UUID id) {
