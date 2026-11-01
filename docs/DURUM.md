@@ -20,11 +20,11 @@ Yeni bir oturuma başlarken önce bunu, sonra `docs/MIMARI.md`'yi oku. Her adım
 
 **Kasım 2026 gece paketi** (#59–#64, sırayla birbirinin üstünde; kurallar `MIMARI.md` §0 "Satış parasının dağıtımı"):
 - #59 Ortaklı / konsinye satışta para tahsil edildikçe dağıtılır. Ortaklı: satış gününde ortağın katkısı satışa geçer
-  (INCOME → CAPITAL), her tahsilat kâr payı oranlarıyla bölünür, ortağın parçası sermayesine (CAPITAL → INCOME). Ortağın masraf payı ve
-  satışta ödenmemiş alış borcundan payı (sahiplik oranıyla) ve dükkân payı ilk tahsilatlardan düşer; ortağın alacağı 0'ın altına inmez
-  (zarar tanımsız). Konsinye: sahibine borç yazılmaz; tahsilatın (satış − komisyon) / satış kadarı sahibinin sermayesine, yansıtılan
-  masraf önce bu paydan düşer. Tahsil edilmemiş pay sahibinin kartında alacak (`CoOwnershipService.pendingSaleShares`); karşılıksız çıkan
-  evrakta dağıtılan pay geri alınır. Dönem kârında ortakların payı hesaptan (`partnersProfit`).
+  (INCOME → CAPITAL); kâr kâr payı oranlarıyla bölünür, ortağın alacağı = katkı + kâr payı (dükkân payı düşülmüş, 0'ın altına inmez);
+  her tahsilattan alacak / satış oranında parça sermayesine (CAPITAL → INCOME). Konsinye: sahibine borç yazılmaz; tahsilatın
+  (satış − komisyon) / satış kadarı sahibinin sermayesine, yansıtılan masraf önce bu paydan düşer. Tahsil edilmemiş pay sahibinin kartında
+  alacak (`CoOwnershipService.pendingSaleShares`); karşılıksız çıkan evrakta dağıtılan pay geri alınır. Dönem kârında ortakların payı
+  hesaptan (`partnersProfit`).
 - #60 Satış ödeme şekilleri ayrı: Nakit, Senet, Çek, Açık hesap, Evim / kredi, Kredi kartı (`V23__credit_card_method.sql`), Karma.
   Peşinat / adet / ilk vade yazarken plan kurulur. Açık hesap artık satış ve alış planında da kullanılır. Satış ve araç formu iki sütunlu.
 - #61 Ödemeler: "Ödemeler" (alacak) / "Ödeyeceklerim" (borç); Tümü, Çek, Senet, Açık hesap, Kredi kartı, Geciken; plan bazında açılır
