@@ -23,5 +23,9 @@ public record VehicleDetailAdmin(
         List<ShareResponse> shares, // ortak arac: sahipler (Havuz dahil), paylari ve katkilari
         CommissionType shopCutType, // ortak arac: istege bagli dukkan payi
         Integer shopCutRateBp,
-        Long shopCutCents
+        Long shopCutCents,
+        ContactSummary sellerUser,   // araci panel kullanicisindan aldik (V25)
+        ContactSummary buyerUser,    // araci panel kullanicisina sattik
+        UUID transferFromVehicleId,  // "satmak icin al" ile gelen kayit: satilan eski kayit
+        UUID transferToVehicleId     // satilan kayit: alanin stogundaki yeni kayit
 ) {}

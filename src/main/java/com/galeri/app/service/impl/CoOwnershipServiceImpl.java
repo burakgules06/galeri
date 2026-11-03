@@ -385,7 +385,7 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
             planId = own.get().getId();
         } else {
             Optional<PaymentPlanVehicle> link = basketRepository.findByVehicleId(vehicle.getId());
-            if (link.isEmpty()) return List.of();
+            if (link.isEmpty()) return directSaleCollections(vehicle);
             planId = link.get().getPlanId();
             price = link.get().getSalePriceCents();
             total = planRepository.findById(planId).map(PaymentPlan::getTotalCents).orElse(0L);
@@ -413,6 +413,17 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
             prev = mine;
         }
         return result;
+    }
+
+    /**
+     * Plansiz satis (panel kullanicisina, V25): satis hareketi dogrudan kasa / bankaya yazilir, satis gununde tamami tahsil edilmis sayilir.
+     */
+    private List<Collection> directSaleCollections(Vehicle vehicle) {
+        if (vehicle.getBuyerUser() == null) return List.of();
+        return active(entryRepository.findByVehicle_IdAndType(vehicle.getId(), LedgerEntryType.VEHICLE_SALE)).stream()
+                .filter(e -> e.getTargetAccount().getType().isMoneyAccount())
+                .map(e -> new Collection(e.getEntryDate(), e.getAmountCents(), e.getId()))
+                .toList();
     }
 
     /** Ortakli aracin dagitimi: sahip basina durum ve defterde istenen hareketler. */

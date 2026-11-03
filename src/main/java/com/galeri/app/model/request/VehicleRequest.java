@@ -53,8 +53,25 @@ public record VehicleRequest(
         // Ortak aracta istege bagli dukkan payi: ortaklarin kar payindan havuza kalan oran (baz puan) ya da sabit kurus
         CommissionType shopCutType,
         @Min(0) @Max(10000) Integer shopCutRateBp,
-        @PositiveOrZero Long shopCutCents
+        @PositiveOrZero Long shopCutCents,
+        // Araci panel kullanicisindan aldik (sellerId yerine). Bedelin sellerCapitalCents kadari kasadan cikmaz, onun sermayesine eklenir.
+        UUID sellerUserId,
+        @PositiveOrZero Long sellerCapitalCents
 ) {
+    /** Kullanici saticisiz (eski cagrilar). */
+    public VehicleRequest(String plate, String make, String model, Short modelYear, Fuel fuel, Transmission transmission,
+                          Integer mileageKm, String color, Long tramerCents, String notes, LocalDate purchaseDate,
+                          UUID sellerId, UUID boughtById, Long actualPurchaseCents, Long officialPurchaseCents,
+                          UUID purchaseAccountId, List<InstallmentRequest> purchasePlan, Ownership ownership, UUID consignorId,
+                          CommissionType commissionType, Integer commissionRateBp, Long commissionCents,
+                          List<ShareRequest> shares, Boolean addToCatalog, String catalogModel,
+                          CommissionType shopCutType, Integer shopCutRateBp, Long shopCutCents) {
+        this(plate, make, model, modelYear, fuel, transmission, mileageKm, color, tramerCents, notes, purchaseDate, sellerId,
+                boughtById, actualPurchaseCents, officialPurchaseCents, purchaseAccountId, purchasePlan, ownership, consignorId,
+                commissionType, commissionRateBp, commissionCents, shares, addToCatalog, catalogModel,
+                shopCutType, shopCutRateBp, shopCutCents, null, null);
+    }
+
     /** Dukkan payi olmadan (ortak arac disindaki kayitlar ve eski cagrilar). */
     public VehicleRequest(String plate, String make, String model, Short modelYear, Fuel fuel, Transmission transmission,
                           Integer mileageKm, String color, Long tramerCents, String notes, LocalDate purchaseDate,

@@ -78,6 +78,7 @@ class VehicleServiceImplTest {
     @Mock private LedgerService ledgerService;
     @Mock private PaymentPlanService paymentPlanService;
     @Mock private CoOwnershipService coOwnershipService;
+    @Mock private com.galeri.app.service.CapitalService capitalService;
     @Mock private CatalogEntryRepository catalogEntryRepository;
     private CatalogServiceImpl catalog;
 
@@ -94,7 +95,7 @@ class VehicleServiceImplTest {
     void setUp() {
         catalog = new CatalogServiceImpl(catalogEntryRepository);   // gercek katalog (vehicles.json), eklemeler mock
         service = new VehicleServiceImpl(vehicleRepository, vehiclePartRepository, contactRepository, panelUserRepository,
-                ledgerService, paymentPlanService, catalog, coOwnershipService, clock);
+                ledgerService, paymentPlanService, catalog, coOwnershipService, capitalService, clock);
         buyer = new Contact();
         buyer.setId(UUID.randomUUID());
         buyer.setTenantId(tenantId);

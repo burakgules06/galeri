@@ -126,4 +126,25 @@ public class Vehicle extends BaseModel {
 
     @Column(name = "shop_cut_cents")
     private Long shopCutCents;
+
+    // Panel kullanicisi karsi taraf (V25): araci ondan aldik / ona sattik
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seller_user_id")
+    private PanelUser sellerUser;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "buyer_user_id")
+    private PanelUser buyerUser;
+
+    /** "Satmak icin al": bu kayit, alanin stoguna acildigi satilan aracin kaydi. */
+    @Column(name = "transfer_from_vehicle_id")
+    private UUID transferFromVehicleId;
+
+    /** Kullanicidan alista bedelin onun sermayesine eklenen kismi (CAPITAL -> kasa). */
+    @Column(name = "purchase_capital_entry_id")
+    private UUID purchaseCapitalEntryId;
+
+    /** Kullaniciya satista: devirde alanin nakit girisi (CAPITAL -> kasa), devirsiz satista sermayeden dusen kisim (kasa -> CAPITAL). */
+    @Column(name = "sale_capital_entry_id")
+    private UUID saleCapitalEntryId;
 }

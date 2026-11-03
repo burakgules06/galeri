@@ -259,6 +259,34 @@ public class LedgerServiceImpl implements LedgerService {
 
     @Override
     @Transactional
+    public LedgerEntry writeDirectSale(Vehicle vehicle, UUID accountId, long amountCents, LocalDate date, String description) {
+        Account income = systemAccount(vehicle.getTenantId(), AccountType.INCOME);
+        LedgerEntry e = newEntry(vehicle.getTenantId(), LedgerEntryType.VEHICLE_SALE, income, getMoneyAccount(accountId), amountCents, date);
+        e.setVehicle(vehicle);
+        e.setDescription(description);
+        return entryRepository.save(e);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Optional<CapitalEntryInfo> capitalEntryInfo(UUID entryId) {
+        return entryRepository.findById(entryId).map(e -> {
+            Account capital = e.getSourceAccount().getType() == AccountType.CAPITAL ? e.getSourceAccount() : e.getTargetAccount();
+            Account money = capital == e.getSourceAccount() ? e.getTargetAccount() : e.getSourceAccount();
+            return new CapitalEntryInfo(!entryRepository.existsByCorrectedEntryId(e.getId()), capital.getUserId(),
+                    e.getAmountCents(), e.getEntryDate(), money.getId());
+        });
+    }
+
+    @Override
+    @Transactional
+    public void reverseIfActive(UUID entryId) {
+        if (entryId == null || entryRepository.existsByCorrectedEntryId(entryId)) return;
+        reverse(entryId);
+    }
+
+    @Override
+    @Transactional
     public LedgerEntry writeSettlement(PlanDirection direction, Vehicle vehicle, Contact payer, UUID accountId,
                                        long amountCents, LocalDate date, String description) {
         Account money = getMoneyAccount(accountId);
