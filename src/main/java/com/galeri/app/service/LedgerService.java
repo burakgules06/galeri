@@ -64,6 +64,17 @@ public interface LedgerService {
     /** Satis: INCOME -> BALANCE(odeyen). Odeyenin carisi yoksa acilir. */
     LedgerEntry writeSale(Vehicle vehicle, Contact payer, long amountCents, LocalDate date);
 
+    /** Panel kullanicisina satis: bedel taksitsiz, dogrudan INCOME -> kasa / banka (tahsil edilmis sayilir). */
+    LedgerEntry writeDirectSale(Vehicle vehicle, UUID accountId, long amountCents, LocalDate date, String description);
+
+    /** Sermaye hareketinin ozeti: gecerli mi, kimin sermayesi, tutar, tarih, karsi kasa / banka. */
+    record CapitalEntryInfo(boolean active, UUID userId, long amountCents, LocalDate date, UUID moneyAccountId) {}
+
+    java.util.Optional<CapitalEntryInfo> capitalEntryInfo(UUID entryId);
+
+    /** Hareket hala gecerliyse (duzeltilmemis) tersini yazar; zaten duzeltildiyse bir sey yapmaz. */
+    void reverseIfActive(UUID entryId);
+
     /**
      * Gecmis senet / cek aktarimi: plan toplami cariye acilis hareketiyle (OPENING_BALANCE) yazilir.
      * SALE: OPENING -> BALANCE(kisi) (bize borclu), PURCHASE: BALANCE(kisi) -> OPENING (biz borcluyuz).

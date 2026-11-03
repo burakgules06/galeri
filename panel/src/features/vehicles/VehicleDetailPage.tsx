@@ -101,10 +101,14 @@ export function VehicleDetailPage({ id }: { id: string }) {
                   <Info label="Komisyon" numeric strong value={admin.commissionType === "RATE"
                     ? percent(admin.commissionRateBp ?? 0, 2) : tl(admin.commissionCents)} />
                 </> : <>
-                  <Info label="Kimden alındı" value={admin.seller?.name ?? "—"} />
+                  <Info label="Kimden alındı" value={admin.transferFromVehicleId ? "Devir (satmak için al)"
+                    : admin.sellerUser ? `${admin.sellerUser.name} (kullanıcı)` : admin.seller?.name ?? "—"} />
                   <Info label="Alan çalışan" value={admin.boughtBy?.name ?? "—"} />
                   <Info label="Gerçek alış bedeli" value={tl(admin.actualPurchaseCents)} numeric strong />
                   <Info label="Resmi alış bedeli" value={tl(admin.officialPurchaseCents)} numeric />
+                  {admin.sellerUser && (admin.sellerCapitalCents ?? 0) > 0 && (
+                    <Info label={`${admin.sellerUser.name} sermayesine`} value={tl(admin.sellerCapitalCents)} numeric />
+                  )}
                 </>}
                 {v.ownership === "CO_OWNED" && (
                   <div className="col-span-2">
@@ -119,10 +123,18 @@ export function VehicleDetailPage({ id }: { id: string }) {
                   </div>
                 )}
                 {v.status !== "IN_STOCK" && <>
-                  <Info label="Alıcı" value={admin.buyer?.name ?? "—"} />
+                  <Info label="Alıcı" value={admin.buyerUser ? `${admin.buyerUser.name} (kullanıcı)` : admin.buyer?.name ?? "—"} />
                   <Info label="Satan çalışan" value={admin.soldBy?.name ?? "—"} />
                   <Info label="Satış bedeli" value={tl(admin.salePriceCents)} numeric strong />
                 </>}
+                {(admin.transferFromVehicleId || admin.transferToVehicleId) && (
+                  <div className="col-span-2 text-[14px]">
+                    <a className="font-semibold text-plaka hover:underline"
+                      href={`#/vehicles/${admin.transferFromVehicleId ?? admin.transferToVehicleId}`}>
+                      {admin.transferFromVehicleId ? "Devredilen eski kaydı aç" : `${admin.buyerUser?.name ?? "Alan"} stoğundaki kaydı aç`}
+                    </a>
+                  </div>
+                )}
               </dl>
             </Card>
           )}

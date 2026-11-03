@@ -37,6 +37,9 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
 
     boolean existsByTenantIdAndPlateAndStatus(UUID tenantId, String plate, VehicleStatus status);
 
+    /** "Satmak icin al": satilan aracin alanin stogunda acilan kaydi. */
+    java.util.Optional<Vehicle> findByTransferFromVehicleId(UUID vehicleId);
+
     List<Vehicle> findByTenantIdAndStatus(UUID tenantId, VehicleStatus status);
 
     // Kaldirilan (yanlis girilen) araclar alis raporlarina girmez

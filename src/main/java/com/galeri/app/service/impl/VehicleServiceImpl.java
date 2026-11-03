@@ -1,6 +1,11 @@
 package com.galeri.app.service.impl;
 
 import com.galeri.app.exception.runtime.InvalidBasketException;
+import com.galeri.app.exception.runtime.InvalidUserCounterpartyException;
+import com.galeri.app.exception.runtime.TransferLockedException;
+import com.galeri.app.model.request.CapitalRequests;
+import com.galeri.app.model.request.ShareRequest;
+import com.galeri.app.service.CapitalService;
 import com.galeri.app.exception.runtime.CatalogUnknownException;
 import com.galeri.app.exception.runtime.ConsignmentDetailsRequiredException;
 import com.galeri.app.exception.runtime.InvalidDateException;
@@ -78,6 +83,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final PaymentPlanService paymentPlanService;
     private final CatalogService catalogService;
     private final CoOwnershipService coOwnershipService;
+    private final CapitalService capitalService;
     private final Clock clock;
 
     // ------------------------------------------------------------------ okuma
@@ -149,7 +155,7 @@ public class VehicleServiceImpl implements VehicleService {
         return new VehicleRequest(r.plate(), r.make(), r.model(), r.modelYear(), r.fuel(), r.transmission(), r.mileageKm(), r.color(),
                 r.tramerCents(), r.notes(), r.purchaseDate(), r.sellerId(), me, r.actualPurchaseCents(), r.officialPurchaseCents(),
                 ledgerService.cashAccountId(), null, Ownership.CO_OWNED, null, null, null, null, r.shares(), r.addToCatalog(),
-                r.catalogModel(), null, null, null);
+                r.catalogModel(), null, null, null, r.sellerUserId(), r.sellerCapitalCents());
     }
 
     /**
@@ -159,12 +165,14 @@ public class VehicleServiceImpl implements VehicleService {
     private VehicleSaleRequest investorSale(VehicleSaleRequest r) {
         UUID me = CurrentUser.principal().userId();
         UUID cash = ledgerService.cashAccountId();
-        List<InstallmentRequest> rows = r.installments().stream().map(i -> new InstallmentRequest(i.dueDate(), i.amountCents(), i.method(),
+        List<InstallmentRequest> rows = r.installments() == null ? List.of() : r.installments().stream().map(i -> new InstallmentRequest(i.dueDate(), i.amountCents(), i.method(),
                 i.noteNo(), i.payerId(), i.paidNow(), i.paidNow() ? cash : null, i.bankName(), i.drawerName(), i.description())).toList();
         List<OwnerReturnRequest> returns = r.ownerReturns() == null ? null : r.ownerReturns().stream()
                 .filter(o -> me.equals(o.userId()))
                 .map(o -> new OwnerReturnRequest(o.userId(), o.mode(), o.amountCents(), cash)).toList();
-        return new VehicleSaleRequest(r.saleDate(), r.buyerId(), r.soldById(), r.salePriceCents(), rows, returns);
+        List<InstallmentRequest> safeRows = r.installments() == null ? null : rows;
+        return new VehicleSaleRequest(r.saleDate(), r.buyerId(), r.soldById(), r.salePriceCents(), safeRows, returns,
+                r.buyerUserId(), r.transfer(), r.buyerCapitalCents(), r.buyerUserId() == null ? null : cash);
     }
 
     // ------------------------------------------------------------------ yazma
@@ -185,6 +193,7 @@ public class VehicleServiceImpl implements VehicleService {
         Vehicle saved = vehicleRepository.save(vehicle);
         coOwnershipService.syncOwners(saved, request.shares());
         syncPurchase(saved, request);
+        syncSellerCapital(saved, request);
         coOwnershipService.syncContributions(saved);   // ortak aracta cepten katki ve nakit sermaye kontrolu
         return toAdmin(saved, toDetail(saved));
     }
@@ -199,6 +208,9 @@ public class VehicleServiceImpl implements VehicleService {
                 && vehicleRepository.existsByTenantIdAndPlateAndStatus(vehicle.getTenantId(), plate, VehicleStatus.IN_STOCK)) {
             throw new PlateAlreadyInStockException();
         }
+        if (vehicle.getTransferFromVehicleId() != null && transferPurchaseChanged(vehicle, request)) {
+            throw new TransferLockedException("Bu araç devirle geldi; alış bedeli, tarihi ve sahipliği değiştirilemez. Önce eski kaydın satışını geri alın.");
+        }
         vehicle.setPlate(plate);
         apply(vehicle, request);
         if (vehicle.getSaleDate() != null && vehicle.getSaleDate().isBefore(vehicle.getPurchaseDate())) {
@@ -206,6 +218,7 @@ public class VehicleServiceImpl implements VehicleService {
         }
         coOwnershipService.syncOwners(vehicle, request.shares());
         syncPurchase(vehicle, request);
+        syncSellerCapital(vehicle, request);
         // Ortak aracta katkilar; satilmissa kar paylari da yeniden yazilir
         coOwnershipService.syncContributions(vehicle);
         // Satilmis aracta sahiplik ya da komisyon degistiyse sahibine borc yeniden yazilir
@@ -251,6 +264,10 @@ public class VehicleServiceImpl implements VehicleService {
         }
         if (vehicle.getStatus() != VehicleStatus.IN_STOCK) throw new VehicleAlreadySoldException();
         if (request.saleDate().isBefore(vehicle.getPurchaseDate())) throw new InvalidDateException();
+        if (request.buyerUserId() != null) return sellToUser(vehicle, request);
+        if (request.buyerId() == null || request.installments() == null || request.installments().isEmpty() || request.transferOrDefault()) {
+            throw new InvalidUserCounterpartyException("Alıcı ve ödeme planı seçin");
+        }
 
         Contact buyer = getContact(request.buyerId(), vehicle.getTenantId());
         vehicle.setStatus(VehicleStatus.SOLD);
@@ -271,8 +288,13 @@ public class VehicleServiceImpl implements VehicleService {
         if (vehicle.getStatus() != VehicleStatus.IN_STOCK) {
             throw new VehicleNotRemovableException("Satılmış araç kaldırılamaz. Önce satışı geri alın.");
         }
+        if (vehicle.getTransferFromVehicleId() != null) {
+            throw new VehicleNotRemovableException("Bu araç devirle geldi. Kaldırmak için eski kaydın satışını geri alın.");
+        }
         paymentPlanService.removePurchasePlan(vehicle);
         ledgerService.reverseVehicleEntries(vehicle.getId());   // alis, pesinat, masraflar, ortak katkilari: para geldigi yere doner
+        ledgerService.reverseIfActive(vehicle.getPurchaseCapitalEntryId());   // kullanicidan alista sermayesine eklenen kisim
+        vehicle.setPurchaseCapitalEntryId(null);
         vehicle.setStatus(VehicleStatus.REMOVED);
     }
 
@@ -285,17 +307,21 @@ public class VehicleServiceImpl implements VehicleService {
         List<Vehicle> all = basket.isEmpty() ? List.of(vehicle) : basket.stream().map(this::getVehicle).toList();
         for (Vehicle v : all) {
             if (v.getStatus() != VehicleStatus.SOLD) throw new VehicleNotSoldException();
-            // Ayni plakayla stokta baska arac varsa geri donus tekillik kisitini bozar
-            if (vehicleRepository.existsByTenantIdAndPlateAndStatus(v.getTenantId(), v.getPlate(), VehicleStatus.IN_STOCK)) {
+            // Ayni plakayla stokta baska arac varsa geri donus tekillik kisitini bozar (devirle acilan kopya geri alinca kalkar)
+            boolean transferCopyInStock = vehicleRepository.findByTransferFromVehicleId(v.getId())
+                    .filter(t -> t.getStatus() == VehicleStatus.IN_STOCK).isPresent();
+            if (!transferCopyInStock && vehicleRepository.existsByTenantIdAndPlateAndStatus(v.getTenantId(), v.getPlate(), VehicleStatus.IN_STOCK)) {
                 throw new PlateAlreadyInStockException();
             }
         }
         for (Vehicle v : all) coOwnershipService.onUndoSale(v);   // ortaga nakit donus yapildiysa 1043; kar paylari terslenir
+        if (vehicle.getBuyerUser() != null) undoUserSale(vehicle);
         paymentPlanService.undoSale(vehicle);
         for (Vehicle v : all) {
             v.setStatus(VehicleStatus.IN_STOCK);
             v.setSaleDate(null);
             v.setBuyer(null);
+            v.setBuyerUser(null);
             v.setSoldBy(null);
             v.setSalePriceCents(null);
             ledgerService.syncConsignmentSettlement(v);   // stoktaki araca sahibine borc kalmaz
@@ -363,6 +389,7 @@ public class VehicleServiceImpl implements VehicleService {
             vehicle.setCommissionRateBp(type == CommissionType.RATE ? r.commissionRateBp() : null);
             vehicle.setCommissionCents(type == CommissionType.FIXED ? r.commissionCents() : null);
             vehicle.setSeller(null);
+            vehicle.setSellerUser(null);
             vehicle.setActualPurchaseCents(null);
             vehicle.setOfficialPurchaseCents(null);
         } else {
@@ -370,7 +397,9 @@ public class VehicleServiceImpl implements VehicleService {
             vehicle.setCommissionType(null);
             vehicle.setCommissionRateBp(null);
             vehicle.setCommissionCents(null);
+            if (r.sellerId() != null && r.sellerUserId() != null) throw new InvalidUserCounterpartyException("Satıcı olarak ya kişi ya kullanıcı seçin");
             vehicle.setSeller(getContact(r.sellerId(), vehicle.getTenantId()));
+            vehicle.setSellerUser(r.sellerUserId() == null ? null : getUser(r.sellerUserId(), vehicle.getTenantId()));
             vehicle.setActualPurchaseCents(r.actualPurchaseCents());
             vehicle.setOfficialPurchaseCents(r.officialPurchaseCents());
         }
@@ -417,6 +446,166 @@ public class VehicleServiceImpl implements VehicleService {
         } else {
             paymentPlanService.syncPurchase(vehicle, r.purchaseAccountId(), r.purchasePlan());
         }
+    }
+
+    // ------------------------------------------------------------------ panel kullanicisiyla alis / satis (V25)
+
+    /**
+     * Kullanicidan alis: alis kasadan tam bedelle yazilir (katki ve maliyet her zamanki gibi), bedelin sellerCapitalCents kadari ayni
+     * hesaba onun sermaye girisi olarak geri yazilir. Net: kasadan nakit kismi cikar, kullanicinin sermayesi sermaye kismi kadar artar.
+     */
+    private void syncSellerCapital(Vehicle vehicle, VehicleRequest r) {
+        long capital = r.sellerCapitalCents() == null ? 0 : r.sellerCapitalCents();
+        PanelUser seller = vehicle.getSellerUser();
+        if (seller != null && r.purchasePlan() != null && !r.purchasePlan().isEmpty()) {
+            throw new InvalidUserCounterpartyException("Kullanıcıdan alışta ödeme planı kurulmaz; nakit ve sermaye kısmı girin");
+        }
+        if (capital > 0) {
+            if (seller == null || vehicle.getOwnership() == Ownership.CONSIGNMENT) {
+                throw new InvalidUserCounterpartyException("Sermayeye eklenecek kısım sadece kullanıcıdan alışta girilir");
+            }
+            if (seller.isOwner()) throw new InvalidUserCounterpartyException("Dükkân sahibinin parası havuzdadır; sermaye kısmı girilmez");
+            long price = vehicle.getActualPurchaseCents() == null ? 0 : vehicle.getActualPurchaseCents();
+            if (capital > price) throw new InvalidUserCounterpartyException("Sermaye kısmı alış bedelini aşamaz");
+        }
+        UUID account = r.purchaseAccountId() != null ? r.purchaseAccountId() : ledgerService.cashAccountId();
+        // Ayni kullanici, tutar, tarih ve hesap ise dokunma; degilse eskiyi tersle, yenisini yaz
+        UUID existing = vehicle.getPurchaseCapitalEntryId();
+        LedgerService.CapitalEntryInfo ref = existing == null ? null : ledgerService.capitalEntryInfo(existing).orElse(null);
+        boolean same = ref != null && capital > 0 && ref.active() && ref.userId().equals(seller.getId()) && ref.amountCents() == capital
+                && ref.date().equals(vehicle.getPurchaseDate()) && ref.moneyAccountId().equals(account);
+        if (same || (existing == null && capital == 0)) return;
+        ledgerService.reverseIfActive(existing);
+        vehicle.setPurchaseCapitalEntryId(capital == 0 ? null : capitalService.move(seller.getId(), new CapitalRequests.Movement(
+                CapitalRequests.Direction.IN, account, vehicle.getPurchaseDate(), capital,
+                vehicle.getPlate() + " alışı: bedel sermayeye")).id());
+    }
+
+    /**
+     * Panel kullanicisina satis. Bedel taksitsiz: satis hareketi INCOME -> kasa / banka (satis gununde tahsil edilmis; ortakli ve konsinye
+     * aracta paylar hemen dagitilir). Alan sermayedarsa:
+     * - "satmak icin al" (devir): nakit kismi onun sermaye girisi olarak kasaya yazilir, arac ayni bilgilerle onun stoguna yeni kayitla
+     *   girer (maliyeti satis bedeli, %100 onun, sermayesinden). Net: sermayesinden sermaye kismi kadar duser, arac varliklarina eklenir.
+     * - devirsiz: sermaye kismi kasadan onun sermayesine cekis olarak duser (nakit kismi kasada kalir).
+     * Alan dukkan sahibiyse sadece devir olur ve bedelin tamami havuzdan (sermaye kismi yok).
+     */
+    private VehicleDetailAdmin sellToUser(Vehicle vehicle, VehicleSaleRequest r) {
+        UUID tenantId = vehicle.getTenantId();
+        PanelUser buyer = getUser(r.buyerUserId(), tenantId);
+        boolean transfer = r.transferOrDefault();
+        long price = r.salePriceCents();
+        long capital = r.buyerCapitalCents() == null ? 0 : r.buyerCapitalCents();
+        if (r.buyerId() != null || (r.installments() != null && !r.installments().isEmpty())) {
+            throw new InvalidUserCounterpartyException("Kullanıcıya satışta ödeme planı kurulmaz; sermaye ve nakit kısmı girin");
+        }
+        if (!buyer.isOwner() && !buyer.isCapitalHolder()) throw new InvalidUserCounterpartyException("Çalışana satış yapılamaz");
+        if (capital > price) throw new InvalidUserCounterpartyException("Sermaye kısmı satış bedelini aşamaz");
+        if (buyer.isOwner() && (capital > 0 || !transfer)) {
+            throw new InvalidUserCounterpartyException("Dükkân sahibine satış sadece \"satmak için al\" ile olur; bedel havuzdan ödenir");
+        }
+        if (ownsAlone(vehicle, buyer)) throw new InvalidUserCounterpartyException("Araç zaten bu kullanıcının");
+        UUID cash = r.cashAccountId() != null ? r.cashAccountId() : ledgerService.cashAccountId();
+
+        vehicle.setStatus(VehicleStatus.SOLD);
+        vehicle.setSaleDate(r.saleDate());
+        vehicle.setBuyer(null);
+        vehicle.setBuyerUser(buyer);
+        vehicle.setSoldBy(getStaff(r.soldById(), tenantId));
+        vehicle.setSalePriceCents(price);
+        ledgerService.writeDirectSale(vehicle, cash, price, r.saleDate(),
+                (transfer ? "Devir: " : "Satış: ") + buyer.getFullName());
+        // Satan tarafin paylari once dagitilir (alan ayni aracin ortagiysa onun payi da sermayesine gecer)
+        ledgerService.syncConsignmentSettlement(vehicle);
+        coOwnershipService.onSale(vehicle, r.ownerReturns());
+        if (transfer) {
+            long cashPart = price - capital;
+            if (!buyer.isOwner() && cashPart > 0) {
+                vehicle.setSaleCapitalEntryId(capitalService.move(buyer.getId(), new CapitalRequests.Movement(CapitalRequests.Direction.IN,
+                        cash, r.saleDate(), cashPart, vehicle.getPlate() + " devri: nakit kısmı")).id());
+            }
+            openTransferVehicle(vehicle, buyer, price, r.saleDate(), cash);
+        } else if (capital > 0) {
+            vehicle.setSaleCapitalEntryId(capitalService.move(buyer.getId(), new CapitalRequests.Movement(CapitalRequests.Direction.OUT,
+                    cash, r.saleDate(), capital, vehicle.getPlate() + " alışı: sermayeden")).id());
+        }
+        return toAdmin(vehicle, toDetail(vehicle));
+    }
+
+    /** Arac zaten tek basina bu kullanicinin mi (galeri araci dukkan sahibinin, konsinye sahibinin, ortakli tek sahibin). */
+    private boolean ownsAlone(Vehicle v, PanelUser user) {
+        return switch (v.getOwnership()) {
+            case DEALER -> user.isOwner();
+            case CONSIGNMENT -> v.getConsignor() != null && v.getConsignor().getId().equals(user.getId());
+            case CO_OWNED -> {
+                var owners = coOwnershipService.owners(v);
+                yield owners.size() == 1 && user.getId().equals(owners.get(0).userId());
+            }
+        };
+    }
+
+    /** "Satmak icin al": alanin stoguna ayni bilgilerle yeni kayit; alis kasadan satis bedeliyle, sermayedarsa %100 onun (sermayeden). */
+    private void openTransferVehicle(Vehicle sold, PanelUser buyer, long price, LocalDate date, UUID cash) {
+        Vehicle t = new Vehicle();
+        t.setTenantId(sold.getTenantId());
+        t.setPlate(sold.getPlate());
+        t.setMake(sold.getMake());
+        t.setModel(sold.getModel());
+        t.setModelYear(sold.getModelYear());
+        t.setFuel(sold.getFuel());
+        t.setTransmission(sold.getTransmission());
+        t.setMileageKm(sold.getMileageKm());
+        t.setColor(sold.getColor());
+        t.setTramerCents(sold.getTramerCents());
+        t.setNotes(sold.getNotes());
+        t.setPurchaseDate(date);
+        t.setBoughtBy(sold.getSoldBy());
+        t.setActualPurchaseCents(price);
+        t.setOfficialPurchaseCents(price);
+        t.setTransferFromVehicleId(sold.getId());
+        t.setOwnership(buyer.isOwner() ? Ownership.DEALER : Ownership.CO_OWNED);
+        Vehicle saved = vehicleRepository.save(t);
+        for (VehiclePart p : vehiclePartRepository.findByVehicleId(sold.getId())) {
+            VehiclePart copy = new VehiclePart();
+            copy.setTenantId(saved.getTenantId());
+            copy.setVehicleId(saved.getId());
+            copy.setPart(p.getPart());
+            copy.setCondition(p.getCondition());
+            vehiclePartRepository.save(copy);
+        }
+        coOwnershipService.syncOwners(saved, buyer.isOwner() ? null : List.of(new ShareRequest(buyer.getId(), 10000)));
+        ledgerService.syncVehiclePurchase(saved, cash);
+        coOwnershipService.syncContributions(saved);   // sermayedarin nakitteki sermayesi bedeli karsilamali
+    }
+
+    /** Kullaniciya satisin geri alinmasi: devirle acilan kayit (stoktaysa) kaldirilir, sermaye hareketi terslenir. */
+    private void undoUserSale(Vehicle vehicle) {
+        vehicleRepository.findByTransferFromVehicleId(vehicle.getId()).ifPresent(t -> {
+            if (t.getStatus() != VehicleStatus.IN_STOCK) {
+                throw new TransferLockedException("Devirle alınan araç satılmış; önce onun satışını geri alın.");
+            }
+            paymentPlanService.removePurchasePlan(t);
+            ledgerService.reverseVehicleEntries(t.getId());
+            t.setStatus(VehicleStatus.REMOVED);
+            t.setTransferFromVehicleId(null);
+            vehicleRepository.saveAndFlush(t);
+        });
+        ledgerService.reverseIfActive(vehicle.getSaleCapitalEntryId());
+        vehicle.setSaleCapitalEntryId(null);
+    }
+
+    /** Devirle acilan kayitta alis bilgisi devirden gelir. */
+    private static boolean transferPurchaseChanged(Vehicle v, VehicleRequest r) {
+        return !java.util.Objects.equals(v.getActualPurchaseCents(), r.actualPurchaseCents())
+                || !v.getPurchaseDate().equals(r.purchaseDate())
+                || v.getOwnership() != r.ownershipOrDefault()
+                || r.sellerId() != null || r.sellerUserId() != null
+                || (r.purchasePlan() != null && !r.purchasePlan().isEmpty());
+    }
+
+    private PanelUser getUser(UUID id, UUID tenantId) {
+        PanelUser u = panelUserRepository.findById(id).orElseThrow(RecordNotFoundException::new);
+        if (u.getTenant() == null || !u.getTenant().getId().equals(tenantId)) throw new SourceNotBelongToTenantException();
+        return u;
     }
 
     private Vehicle getVehicle(UUID id) {
@@ -489,7 +678,12 @@ public class VehicleServiceImpl implements VehicleService {
                 contactSummary(v.getBuyer()), staffSummary(v.getSoldBy()), v.getSalePriceCents(),
                 ledgerService.purchaseAccountId(v.getId()),
                 userSummary(v.getConsignor()), v.getCommissionType(), v.getCommissionRateBp(), v.getCommissionCents(),
-                coOwnershipService.owners(v), v.getShopCutType(), v.getShopCutRateBp(), v.getShopCutCents());
+                coOwnershipService.owners(v), v.getShopCutType(), v.getShopCutRateBp(), v.getShopCutCents(),
+                userSummary(v.getSellerUser()),
+                v.getPurchaseCapitalEntryId() == null ? null : ledgerService.capitalEntryInfo(v.getPurchaseCapitalEntryId())
+                        .filter(LedgerService.CapitalEntryInfo::active).map(LedgerService.CapitalEntryInfo::amountCents).orElse(null),
+                userSummary(v.getBuyerUser()), v.getTransferFromVehicleId(),
+                vehicleRepository.findByTransferFromVehicleId(v.getId()).map(Vehicle::getId).orElse(null));
     }
 
     private static ContactSummary userSummary(PanelUser u) {

@@ -62,4 +62,6 @@ public class ErrorMessageConstant {
     public static final int INVALID_OPEN_ACCOUNT_USAGE = 1056;
     public static final int LOGIN_DETAILS_REQUIRED = 1057;
     public static final int ROLE_CHANGE_NOT_ALLOWED = 1058;
+    public static final int INVALID_USER_COUNTERPARTY = 1059;
+    public static final int TRANSFER_LOCKED = 1060;
 }
