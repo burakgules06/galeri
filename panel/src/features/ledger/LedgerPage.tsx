@@ -15,6 +15,7 @@ import { LedgerEntryList } from "./LedgerEntryList";
 import { PartnersPanel } from "./PartnersPanel";
 import { PeriodProfitPanel } from "./PeriodProfitPanel";
 import { NetWorthPanel } from "./NetWorthPanel";
+import { groupEntries } from "./entryGroups";
 import { TransferForm } from "./TreasuryForms";
 
 type Tab = "entries" | "partners" | "profit" | "assets";
@@ -74,9 +75,11 @@ export function LedgerPage() {
   const correctionCount = allEntries.filter(isCorrection).length;
   const hasFilters = !!(related || flow);
   const pageSize = 20;
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  // Son hareketlerde toplu islemler tek satir: sayfalama gruplar uzerinden
+  const items = listTab === "entries" ? groupEntries(filtered) : filtered.map((e) => [e]);
+  const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
   const page = Math.min(entryPage, pageCount);
-  const pageEntries = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const pageEntries = items.slice((page - 1) * pageSize, page * pageSize).flat();
   const changeAccount = (id: string | null) => { setSelected(id); setEntryPage(1); };
 
   return (
@@ -188,10 +191,10 @@ export function LedgerPage() {
         )}
         {entries.data && filtered.length > 0 && (
           <LedgerEntryList entries={pageEntries} direction={(e) => entryDirection(e, selected)} onChange={reload}
-            corrections={listTab === "corrections" ? "only" : "hide"} />
+            corrections={listTab === "corrections" ? "only" : "hide"} grouped={listTab === "entries"} />
         )}
-        {entries.data && filtered.length > pageSize && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-cizgi pt-3">
-          <span className="text-[13px] text-murekkep-2">{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)} / {filtered.length} hareket</span>
+        {entries.data && items.length > pageSize && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-cizgi pt-3">
+          <span className="text-[13px] text-murekkep-2">{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, items.length)} / {items.length} satır</span>
           <div className="flex items-center gap-2">
             <Button type="button" variant="secondary" className="h-9" disabled={page === 1} onClick={() => setEntryPage(Math.max(1, page - 1))}>Önceki</Button>
             <span className="min-w-16 text-center text-[13px] font-semibold">{page} / {pageCount}</span>
