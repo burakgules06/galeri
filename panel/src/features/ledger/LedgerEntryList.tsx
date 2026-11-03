@@ -9,12 +9,13 @@ import { errorMessage } from "../../shared/useLoad";
 import { Plate } from "../../shared/ui/Plate";
 import { Button, ErrorBox } from "../../shared/ui/Common";
 import { ExpenseForm } from "./ExpenseForm";
+import { groupEntries } from "./entryGroups";
 
 // Satis ve taksit hareketleri plana bagli: arac detayindan / odemeler ekranindan geri alinir, burada duzeltilmez.
 const LINKED: LedgerEntryType[] = ["VEHICLE_SALE", "COLLECTION", "PAYMENT", "CONSIGNMENT_SETTLEMENT", "PARTNER_SALE_SETTLEMENT"];
 const EXPENSE: LedgerEntryType[] = ["VEHICLE_EXPENSE", "GENERAL_EXPENSE"];
 
-export function LedgerEntryList({ entries, direction, onChange, showVehicle = true, corrections, readOnly = false }: {
+export function LedgerEntryList({ entries, direction, onChange, showVehicle = true, corrections, readOnly = false, grouped = false }: {
   entries: LedgerEntryResponse[];
   /** +1 giris (yesil), -1 cikis (kirmizi), 0 notr */
   direction: (e: LedgerEntryResponse) => number;
@@ -24,6 +25,8 @@ export function LedgerEntryList({ entries, direction, onChange, showVehicle = tr
   corrections?: "hide" | "only";
   /** Sermayedar: duzenle / sil / duzelt yok */
   readOnly?: boolean;
+  /** Ayni araca / kisiye ayni gun yapilan hareketler tek satirda toplam (entryGroups) */
+  grouped?: boolean;
 }) {
   const [showCorrections, setShowCorrections] = useState(false);
   const isCorrection = (e: LedgerEntryResponse) => e.corrected || e.correctedEntryId != null;
@@ -43,7 +46,9 @@ export function LedgerEntryList({ entries, direction, onChange, showVehicle = tr
         ? <p className="text-[14px] text-murekkep-3">Gösterilecek kayıt yok.</p>
         : (
           <ul className="divide-y divide-cizgi">
-            {visible.map((e) => <Row key={e.id} e={e} direction={direction(e)} onChange={onChange} showVehicle={showVehicle} readOnly={readOnly} />)}
+            {(grouped ? groupEntries(visible) : visible.map((e) => [e])).map((g) => g.length === 1
+              ? <Row key={g[0].id} e={g[0]} direction={direction(g[0])} onChange={onChange} showVehicle={showVehicle} readOnly={readOnly} />
+              : <GroupRow key={g[0].id} entries={g} direction={direction} onChange={onChange} showVehicle={showVehicle} readOnly={readOnly} />)}
           </ul>
         )}
     </div>
@@ -135,6 +140,54 @@ function Row({ e, direction, onChange, showVehicle, readOnly }: {
       )}
       {error && <div className="mt-2"><ErrorBox message={error} /></div>}
       <ExpenseForm open={editing} existing={e} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onChange(); }} />
+    </li>
+  );
+}
+
+function GroupRow({ entries, direction, onChange, showVehicle, readOnly }: {
+  entries: LedgerEntryResponse[]; direction: (e: LedgerEntryResponse) => number; onChange: () => void; showVehicle: boolean; readOnly: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const e = entries[0];
+  const total = entries.reduce((t, x) => t + x.amountCents, 0);
+  const dir = direction(e);
+  const amountColor = dir > 0 ? "text-basari" : dir < 0 ? "text-tehlike" : "text-murekkep";
+  const sign = dir > 0 ? "+" : dir < 0 ? "−" : "";
+  const person = e.vehicle ? null : (e.source.type === "BALANCE" || e.source.type === "CAPITAL" ? e.source : e.target).name;
+  const latest = entries.reduce((m, x) => ((x.createdAt ?? "") > (m.createdAt ?? "") ? x : m), e);
+
+  return (
+    <li className="py-3 first:pt-0 last:pb-0">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+        className="basilir w-full text-left flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-[16px]">{ENTRY_TYPE[e.type]}{person ? ` · ${person}` : ""}</span>
+            <Tag>{`${entries.length} işlem`}</Tag>
+          </div>
+          {showVehicle && e.vehicle && (
+            <span className="mt-1 flex items-center gap-2 text-[14px] text-murekkep-2">
+              <Plate plate={e.vehicle.plate} size="sm" />
+              <span className="truncate">{e.vehicle.make} {e.vehicle.model}</span>
+            </span>
+          )}
+          <p className="text-[14px] text-murekkep-2 mt-0.5">
+            {e.source.type === "CAPITAL" && EXPENSE.includes(e.type) ? `Cepten (${e.source.name})` : e.source.name} → {e.target.name}
+            <span className="text-plaka font-semibold"> · {open ? "Detayı gizle" : "Detayı gör"}</span>
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className={`font-cond font-semibold text-[19px] whitespace-nowrap ${amountColor}`}>{sign}{sign && " "}{tl(total)}</p>
+          <p className="text-[12.5px] text-murekkep-2 whitespace-nowrap">
+            {formatDate(e.date)}{latest.createdAt && <span className="text-murekkep-3"> · {timeOf(latest.createdAt)}</span>}
+          </p>
+        </div>
+      </button>
+      {open && (
+        <ul className="mt-3 ml-3 pl-3 border-l-2 border-cizgi divide-y divide-cizgi">
+          {entries.map((x) => <Row key={x.id} e={x} direction={direction(x)} onChange={onChange} showVehicle={false} readOnly={readOnly} />)}
+        </ul>
+      )}
     </li>
   );
 }
