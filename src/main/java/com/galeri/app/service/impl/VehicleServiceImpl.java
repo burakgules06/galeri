@@ -307,8 +307,10 @@ public class VehicleServiceImpl implements VehicleService {
         List<Vehicle> all = basket.isEmpty() ? List.of(vehicle) : basket.stream().map(this::getVehicle).toList();
         for (Vehicle v : all) {
             if (v.getStatus() != VehicleStatus.SOLD) throw new VehicleNotSoldException();
-            // Ayni plakayla stokta baska arac varsa geri donus tekillik kisitini bozar
-            if (vehicleRepository.existsByTenantIdAndPlateAndStatus(v.getTenantId(), v.getPlate(), VehicleStatus.IN_STOCK)) {
+            // Ayni plakayla stokta baska arac varsa geri donus tekillik kisitini bozar (devirle acilan kopya geri alinca kalkar)
+            boolean transferCopyInStock = vehicleRepository.findByTransferFromVehicleId(v.getId())
+                    .filter(t -> t.getStatus() == VehicleStatus.IN_STOCK).isPresent();
+            if (!transferCopyInStock && vehicleRepository.existsByTenantIdAndPlateAndStatus(v.getTenantId(), v.getPlate(), VehicleStatus.IN_STOCK)) {
                 throw new PlateAlreadyInStockException();
             }
         }
@@ -677,7 +679,10 @@ public class VehicleServiceImpl implements VehicleService {
                 ledgerService.purchaseAccountId(v.getId()),
                 userSummary(v.getConsignor()), v.getCommissionType(), v.getCommissionRateBp(), v.getCommissionCents(),
                 coOwnershipService.owners(v), v.getShopCutType(), v.getShopCutRateBp(), v.getShopCutCents(),
-                userSummary(v.getSellerUser()), userSummary(v.getBuyerUser()), v.getTransferFromVehicleId(),
+                userSummary(v.getSellerUser()),
+                v.getPurchaseCapitalEntryId() == null ? null : ledgerService.capitalEntryInfo(v.getPurchaseCapitalEntryId())
+                        .filter(LedgerService.CapitalEntryInfo::active).map(LedgerService.CapitalEntryInfo::amountCents).orElse(null),
+                userSummary(v.getBuyerUser()), v.getTransferFromVehicleId(),
                 vehicleRepository.findByTransferFromVehicleId(v.getId()).map(Vehicle::getId).orElse(null));
     }
 

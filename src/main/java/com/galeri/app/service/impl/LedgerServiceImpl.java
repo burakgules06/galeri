@@ -268,7 +268,7 @@ public class LedgerServiceImpl implements LedgerService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional   // readOnly degil: ayni islemde hareket kilitlenip terslenebilir
     public java.util.Optional<CapitalEntryInfo> capitalEntryInfo(UUID entryId) {
         return entryRepository.findById(entryId).map(e -> {
             Account capital = e.getSourceAccount().getType() == AccountType.CAPITAL ? e.getSourceAccount() : e.getTargetAccount();

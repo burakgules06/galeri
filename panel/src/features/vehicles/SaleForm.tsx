@@ -8,7 +8,7 @@ import { formatDate, percent, tl, tlToCents, todayIso } from "../../shared/forma
 import type { ContactResponse, ContactSummary, VehicleDetailAdmin, VehicleSummary } from "../../shared/types";
 import { Plate } from "../../shared/ui/Plate";
 import { errorMessage, useLoad } from "../../shared/useLoad";
-import { Button, ErrorBox, Field, inputClass, Modal } from "../../shared/ui/Common";
+import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
 import { ContactPicker } from "../contacts/ContactPicker";
 import { rowProblem, toRequest, usePlan } from "../payments/plan";
 import { PlanBuilder } from "../payments/PlanBuilder";
@@ -31,6 +31,13 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
   const me = useLoad(() => (isInvestor ? api.me() : Promise.resolve(null)), [isInvestor]);
   const [date, setDate] = useState(todayIso());
   const [buyer, setBuyer] = useState<ContactSummary | null>(null);
+  // Alici panel kullanicisi olabilir: taksit yok; sermayesinden ve / veya nakit. "Satmak için al": arac onun stoguna girer.
+  const [toUser, setToUser] = useState(false);
+  const [buyerUserId, setBuyerUserId] = useState("");
+  const [transfer, setTransfer] = useState(true);
+  const [capitalText, setCapitalText] = useState("");
+  const [cashAccountChoice, setCashAccountChoice] = useState("");
+  const partners = useLoad(() => api.partners(), []);
   const [soldBy, setSoldBy] = useState("");
   const [priceText, setPriceText] = useState("");
   const [returns, setReturns] = useState<Record<string, OwnerReturnDraft>>({});
@@ -59,10 +66,19 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
   const planned = rows.reduce((t, r) => t + (r.amountCents > 0 ? r.amountCents : 0), 0);
   const remaining = price - planned;
   const beforePurchase = !!vehicle.vehicle.purchaseDate && date < vehicle.vehicle.purchaseDate;
-  const canSave = !beforePurchase && !!buyer && ownPrice > 0 && basket.every((b) => centsOf(b.priceText) > 0) && price > 0
+  const buyerPartner = (partners.data ?? []).find((p) => p.userId === buyerUserId);
+  const buyerIsOwner = !!buyerPartner?.owner;
+  const capitalCents = toUser && !buyerIsOwner ? centsOf(capitalText) : 0;
+  const userBlocker = !buyerUserId ? "Alıcı kullanıcıyı seç" : ownPrice <= 0 ? "Bedeli yaz"
+    : capitalCents > ownPrice ? "Sermaye kısmı bedeli aşamaz"
+    : buyerPartner && !buyerIsOwner && capitalCents > buyerPartner.cashCents ? `${buyerPartner.name} nakitteki sermayesi yetmiyor` : null;
+  const userCanSave = !beforePurchase && userBlocker == null;
+  const canSaveContact = !beforePurchase && !!buyer && ownPrice > 0 && basket.every((b) => centsOf(b.priceText) > 0) && price > 0
     && rows.length > 0 && remaining === 0 && rows.every((r) => rowProblem(r) == null);
-  const blocker = !buyer ? "Alıcıyı seç" : price <= 0 ? "Bedeli yaz" : plan.mode == null ? "Ödeme şeklini seç"
+  const canSave = toUser ? userCanSave : canSaveContact;
+  const contactBlocker = !buyer ? "Alıcıyı seç" : price <= 0 ? "Bedeli yaz" : plan.mode == null ? "Ödeme şeklini seç"
     : plan.problem ?? (rows.some((r) => rowProblem(r)) ? "Plandaki satırları tamamla" : remaining !== 0 ? "Kalan 0 olmalı" : null);
+  const blocker = toUser ? userBlocker : contactBlocker;
 
   const shares = coOwned && basket.length === 0
     ? ownerSaleShares(price, paidNowCents, vehicle.actualPurchaseCents ?? 0, cost.data?.expenseCents ?? 0, vehicle.shares,
@@ -80,6 +96,14 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
     setSaving(true);
     setError(null);
     try {
+      if (toUser) {
+        onSaved(await api.sell(vehicle.vehicle.id, {
+          saleDate: date, buyerId: null, soldById: soldBy || null, salePriceCents: ownPrice, installments: null, ownerReturns: null,
+          buyerUserId, transfer: buyerIsOwner || transfer, buyerCapitalCents: capitalCents > 0 ? capitalCents : null,
+          cashAccountId: isInvestor ? null : cashAccountChoice || cashAccount || null,
+        }));
+        return;
+      }
       if (basket.length > 0) {
         onSaved(await api.sellBasket({
           saleDate: date, buyerId: buyer!.id, soldById: soldBy || null, installments: rows.map(toRequest),
@@ -119,8 +143,17 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
 
           <section className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
             <Field label="Alıcı">
-              <ContactPicker contacts={allContacts} selected={buyer} onSelect={setBuyer}
-                onCreated={(c) => setExtraContacts((l) => [c, ...l])} placeholder="İsim yaz ya da seç" />
+              <Segment<"contact" | "user"> value={toUser ? "user" : "contact"} onChange={(m) => { setToUser(m === "user"); setBasket([]); }}
+                options={[{ value: "contact", label: "Kişi" }, { value: "user", label: "Panel kullanıcısı" }]} />
+              <div className="mt-2">
+                {toUser
+                  ? <select className={inputClass} aria-label="Alıcı kullanıcı" value={buyerUserId} onChange={(e) => setBuyerUserId(e.target.value)}>
+                      <option value="">Kullanıcı seç</option>
+                      {(partners.data ?? []).map((p) => <option key={p.userId} value={p.userId}>{p.name}{p.owner ? " (dükkân sahibi)" : ""}</option>)}
+                    </select>
+                  : <ContactPicker contacts={allContacts} selected={buyer} onSelect={setBuyer}
+                      onCreated={(c) => setExtraContacts((l) => [c, ...l])} placeholder="İsim yaz ya da seç" />}
+              </div>
             </Field>
             <Field label={basket.length ? `${vehicle.vehicle.plate} bedeli` : "Satış bedeli"}>
               <NumberInput className={`${inputClass} sayi text-[19px] font-semibold`} value={priceText} onValueChange={setPriceText}
@@ -154,7 +187,7 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
                 </button>
               </div>
             ))}
-            {isInvestor ? null : picking ? (
+            {isInvestor || toUser ? null : picking ? (
               <select className={inputClass} autoFocus defaultValue="" aria-label="Eklenecek araç" onChange={(e) => {
                 const v = (stock.data ?? []).find((x) => x.id === e.target.value);
                 if (v) setBasket([...basket, { v, priceText: "" }]);
@@ -169,16 +202,48 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
             )}
           </section>
 
-          <section className="space-y-3">
+          {toUser && (
+            <section className="space-y-3">
+              <h3 className="font-cond font-semibold text-[18px]">Ödeme</h3>
+              <label className="flex items-start gap-2 text-[14px] cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 mt-0.5 accent-plaka" checked={buyerIsOwner || transfer} disabled={buyerIsOwner}
+                  onChange={(e) => setTransfer(e.target.checked)} />
+                <span>
+                  <span className="font-semibold">Satmak için al</span>
+                  <span className="block text-murekkep-2 text-[13px]">Araç {buyerPartner?.name ?? "alanın"} araçlarına eklenir (maliyeti satış bedeli), galeride satılmaya devam eder.</span>
+                </span>
+              </label>
+              {buyerIsOwner
+                ? <p className="text-[13.5px] text-murekkep-2">Bedel havuzdan ödenir; satanın payı ve kârı sermayesine geçer, kasa değişmez.</p>
+                : buyerPartner && <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+                    <Field label={`${buyerPartner.name} sermayesinden`}>
+                      <NumberInput value={capitalText} onValueChange={setCapitalText} placeholder="0" />
+                      <p className="text-[12.5px] text-murekkep-2 mt-1">Nakitteki sermayesi: <span className="sayi">{tl(buyerPartner.cashCents)}</span></p>
+                    </Field>
+                    <div>
+                      <p className="text-[13px] text-murekkep-2">Nakit getirdiği kısım</p>
+                      <p className="sayi font-semibold text-[19px] mt-1">{tl(Math.max(0, ownPrice - capitalCents))}</p>
+                      {!isInvestor && ownPrice - capitalCents > 0 && (
+                        <select className={`${inputClass} mt-1`} aria-label="Nakit nereye" value={cashAccountChoice || cashAccount}
+                          onChange={(e) => setCashAccountChoice(e.target.value)}>
+                          {(accounts.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  </div>}
+            </section>
+          )}
+
+          {!toUser && <section className="space-y-3">
             <h3 className="font-cond font-semibold text-[18px]">Ödeme şekli</h3>
             <PlanBuilder plan={plan} baseCents={price} accounts={accounts.data ?? []}
               organizations={allContacts.filter((c) => c.type === "ORGANIZATION")} onOrgCreated={(c) => setExtraContacts((l) => [c, ...l])}
               modes={["CASH", "PROMISSORY_NOTE", "CHEQUE", "OPEN_ACCOUNT", "INSTITUTION", "CREDIT_CARD", "MIXED"]}
               methods={["CASH", "TRANSFER", "CREDIT_CARD", "PROMISSORY_NOTE", "CHEQUE", "OPEN_ACCOUNT", "INSTITUTION"]}
               nowLabel="Şimdi alındı" downLabel="Peşinat (şimdi alınır)" hideAccounts={isInvestor} />
-          </section>
+          </section>}
 
-          {coOwned && basket.length === 0 && (
+          {coOwned && basket.length === 0 && !toUser && (
             <OwnerReturns owners={vehicle.shares} saleCents={price} paidNowCents={paidNowCents}
               purchaseCents={vehicle.actualPurchaseCents ?? 0} expenseCents={cost.data?.expenseCents ?? 0}
               shopCutType={vehicle.shopCutType} shopCutRateBp={vehicle.shopCutRateBp} shopCutCents={vehicle.shopCutCents}
@@ -193,12 +258,17 @@ function SaleFormContent({ onClose, vehicle, onSaved }: Props) {
             {basket.length > 0 && <p className="text-[13px] text-murekkep-2">{basket.length + 1} araç birlikte</p>}
           </div>
           <dl className="space-y-2 text-[14px]">
-            <SummaryLine label="Şimdi alınan" cents={paidNowCents} tone="text-basari" />
-            <SummaryLine label="Vadeli" cents={planned - paidNowCents} />
-            <div className="border-t border-cizgi pt-2">
-              <SummaryLine label="Kalan" cents={remaining} strong
-                tone={remaining === 0 && price > 0 ? "text-basari" : remaining < 0 ? "text-tehlike" : "text-uyari"} />
-            </div>
+            {toUser ? <>
+              <SummaryLine label="Sermayesinden" cents={capitalCents} />
+              <SummaryLine label="Nakit" cents={Math.max(0, ownPrice - capitalCents)} tone="text-basari" />
+            </> : <>
+              <SummaryLine label="Şimdi alınan" cents={paidNowCents} tone="text-basari" />
+              <SummaryLine label="Vadeli" cents={planned - paidNowCents} />
+              <div className="border-t border-cizgi pt-2">
+                <SummaryLine label="Kalan" cents={remaining} strong
+                  tone={remaining === 0 && price > 0 ? "text-basari" : remaining < 0 ? "text-tehlike" : "text-uyari"} />
+              </div>
+            </>}
           </dl>
 
           {consignment && (

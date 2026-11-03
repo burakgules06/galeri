@@ -120,6 +120,11 @@ export interface VehicleDetailAdmin {
   shopCutType: CommissionType | null;    // ortak arac: istege bagli dukkan payi
   shopCutRateBp: number | null;
   shopCutCents: number | null;
+  sellerUser: ContactSummary | null;       // araci panel kullanicisindan aldik
+  sellerCapitalCents: number | null;       // bedelin onun sermayesine eklenen kismi
+  buyerUser: ContactSummary | null;        // araci panel kullanicisina sattik
+  transferFromVehicleId: string | null;    // "satmak icin al" ile gelen kayit: eski kayit
+  transferToVehicleId: string | null;      // satilan kayit: alanin stogundaki yeni kayit
 }
 
 // Ana tur: musteri / alis yaptiklarim (arac aldigimiz kisi) / tedarikci. Bicim (type): bireysel / tuzel.
@@ -194,15 +199,23 @@ export interface VehicleRequest {
   shopCutType: CommissionType | null;   // ortak arac: dukkan payi (ortaklarin kar payindan havuza)
   shopCutRateBp: number | null;
   shopCutCents: number | null;
+  sellerUserId?: string | null;          // araci panel kullanicisindan aldik (sellerId yerine)
+  sellerCapitalCents?: number | null;    // bedelin kasadan cikmayip onun sermayesine eklenen kismi
 }
 
 export interface SaleRequest {
   saleDate: string;
-  buyerId: string;
+  buyerId: string | null;
   soldById: string | null;
   salePriceCents: number;
-  installments: InstallmentRequest[];   // toplami salePriceCents'e kurusu kurusuna esit
+  installments: InstallmentRequest[] | null;   // kisiye satista toplami salePriceCents'e kurusu kurusuna esit
   ownerReturns: OwnerReturnRequest[] | null;   // ortak arac: ortaga donus (bos = sermayede kalir)
+  // Panel kullanicisina satis: taksit yok; buyerCapitalCents sermayesinden, kalani cashAccountId'ye nakit.
+  // transfer = "satmak icin al": arac onun stoguna yeni kayitla girer.
+  buyerUserId?: string | null;
+  transfer?: boolean | null;
+  buyerCapitalCents?: number | null;
+  cashAccountId?: string | null;
 }
 
 // ---- Odeme plani ve taksitler (sadece ADMIN). Tutarlar kurus. ----

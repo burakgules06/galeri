@@ -25,6 +25,7 @@ public record VehicleDetailAdmin(
         Integer shopCutRateBp,
         Long shopCutCents,
         ContactSummary sellerUser,   // araci panel kullanicisindan aldik (V25)
+        Long sellerCapitalCents,     // kullanicidan alista bedelin onun sermayesine eklenen kismi
         ContactSummary buyerUser,    // araci panel kullanicisina sattik
         UUID transferFromVehicleId,  // "satmak icin al" ile gelen kayit: satilan eski kayit
         UUID transferToVehicleId     // satilan kayit: alanin stogundaki yeni kayit

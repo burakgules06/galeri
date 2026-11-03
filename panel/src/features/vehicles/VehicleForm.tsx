@@ -67,6 +67,10 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const [notes, setNotes] = useState(v?.notes ?? "");
   const [purchaseDate, setPurchaseDate] = useState(v?.purchaseDate ?? todayIso());
   const [seller, setSeller] = useState<ContactSummary | null>(existing?.seller ?? null);
+  // Kimden alindi: kisi ya da panel kullanicisi (kullanicidan alista bedelin bir kismi onun sermayesine eklenebilir)
+  const [fromUser, setFromUser] = useState(!!existing?.sellerUser);
+  const [sellerUserId, setSellerUserId] = useState(existing?.sellerUser?.id ?? "");
+  const [sellerCapital, setSellerCapital] = useState(centsToInput(existing?.sellerCapitalCents));
   const [boughtBy, setBoughtBy] = useState<string | null>(existing ? existing.boughtBy?.id ?? "" : null);
   const [actual, setActual] = useState(centsToInput(existing?.actualPurchaseCents));
   const [official, setOfficial] = useState(centsToInput(existing?.officialPurchaseCents));
@@ -127,6 +131,9 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const rows = plan.rows;
   const planned = lockedCents + rows.reduce((t, r) => t + (r.amountCents > 0 ? r.amountCents : 0), 0);
   const remaining = price - planned;
+  const sellerPartner = (partners.data ?? []).find((p) => p.userId === sellerUserId);
+  const userSale = fromUser && !consignment && !isInvestor;
+  const sellerCapitalCents = userSale && sellerPartner && !sellerPartner.owner ? tlToCents(sellerCapital) ?? 0 : 0;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -147,7 +154,11 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       const problem = ownersProblem(owners, profitDiffers, price, { enabled: false, type: "RATE", rate: "", fixed: "" });
       if (problem) return setError(problem);
     }
-    if (!consignment && !isInvestor && payMode === "PLAN") {
+    if (userSale) {
+      if (!sellerUserId) return setError("Aracı hangi kullanıcıdan aldığını seç.");
+      if (Number.isNaN(sellerCapitalCents) || sellerCapitalCents > price) return setError("Sermayeye eklenecek kısım alış bedelini aşamaz.");
+    }
+    if (!consignment && !isInvestor && payMode === "PLAN" && !userSale) {
       if (!seller) return setError("Senetli alışta kimden alındığını seç.");
       if (price <= 0 || remaining !== 0) return setError("Ödeme planının toplamı gerçek alış bedeline eşit olmalı.");
       if (rows.some((r) => rowProblem(r) != null)) return setError("Plan satırlarını tamamla.");
@@ -156,10 +167,11 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
     const request: VehicleRequest = {
       plate, make: makeModel.make, model: makeModel.model, modelYear: yearNumber, fuel, transmission, mileageKm: mileageNumber,
       color: color.trim() || null, tramerCents: amounts[0], notes: notes.trim() || null,
-      purchaseDate, sellerId: seller?.id ?? null, boughtById: boughtById || null,
+      purchaseDate, sellerId: userSale ? null : seller?.id ?? null, boughtById: boughtById || null,
+      sellerUserId: userSale ? sellerUserId : null, sellerCapitalCents: userSale && sellerCapitalCents > 0 ? sellerCapitalCents : null,
       actualPurchaseCents: amounts[1], officialPurchaseCents: amounts[2],
-      purchaseAccountId: !consignment && !isInvestor && payMode === "CASH" ? purchaseAccountId || null : null,
-      purchasePlan: !consignment && !isInvestor && payMode === "PLAN" ? rows.map(toRequest) : null,
+      purchaseAccountId: !consignment && !isInvestor && (payMode === "CASH" || userSale) ? purchaseAccountId || null : null,
+      purchasePlan: !consignment && !isInvestor && payMode === "PLAN" && !userSale ? rows.map(toRequest) : null,
       ownership,
       consignorId: consignment ? consignor?.id ?? null : null,
       commissionType: consignment ? commissionType : null,
@@ -234,8 +246,19 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
               Resmi bedel farklı
             </label>
             <Field label="Kimden alındı">
-              <ContactPicker contacts={allContacts} selected={seller} onSelect={setSeller} role="SELLER"
-                onCreated={c => setExtraContacts(l => [c, ...l])} placeholder="İsim yaz ya da seç" />
+              {!isInvestor && (
+                <Segment<"contact" | "user"> value={fromUser ? "user" : "contact"} onChange={(m) => { setFromUser(m === "user"); if (m === "user") setPayMode("CASH"); }}
+                  options={[{ value: "contact", label: "Kişi" }, { value: "user", label: "Panel kullanıcısı" }]} />
+              )}
+              <div className={isInvestor ? "" : "mt-2"}>
+                {fromUser && !isInvestor
+                  ? <select className={inputClass} aria-label="Kullanıcı" value={sellerUserId} onChange={(e) => setSellerUserId(e.target.value)}>
+                      <option value="">Kullanıcı seç</option>
+                      {(partners.data ?? []).map((p) => <option key={p.userId} value={p.userId}>{p.name}{p.owner ? " (dükkân sahibi)" : ""}</option>)}
+                    </select>
+                  : <ContactPicker contacts={allContacts} selected={seller} onSelect={setSeller} role="SELLER"
+                      onCreated={c => setExtraContacts(l => [c, ...l])} placeholder="İsim yaz ya da seç" />}
+              </div>
             </Field>
           </>}
         </section>
@@ -284,9 +307,21 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
 
         {!consignment && !isInvestor && <section className="space-y-3">
           <h3 className="font-cond font-semibold text-[18px]">Ödeme</h3>
-          <Segment<"CASH" | "PLAN"> value={payMode} onChange={setPayMode}
-            options={[{ value: "CASH", label: "Peşin" }, { value: "PLAN", label: "Vadeli (senet, çek, açık hesap, kart)" }]} />
-          {payMode === "CASH" && (
+          {existing?.transferFromVehicleId && (
+            <p className="text-[13.5px] text-murekkep-2">Bu araç devirle geldi ("satmak için al"); alış bedeli ve tarihi devirden gelir.</p>
+          )}
+          {!userSale && <Segment<"CASH" | "PLAN"> value={payMode} onChange={setPayMode}
+            options={[{ value: "CASH", label: "Peşin" }, { value: "PLAN", label: "Vadeli (senet, çek, açık hesap, kart)" }]} />}
+          {userSale && sellerPartner && !sellerPartner.owner && (
+            <Field label={`${sellerPartner.name} sermayesine eklenecek kısım`}>
+              <NumberInput value={sellerCapital} onValueChange={setSellerCapital} placeholder="0" />
+              <p className="text-[13px] text-murekkep-2 mt-1">
+                Kasadan çıkacak nakit: <span className="sayi">{tl(Math.max(0, price - (Number.isNaN(sellerCapitalCents) ? 0 : sellerCapitalCents)))}</span>.
+                Kalanı kasadan çıkmaz, {sellerPartner.name} adına sermayesine yazılır.
+              </p>
+            </Field>
+          )}
+          {(payMode === "CASH" || userSale) && (
             <Field label="Ödeme nereden">
               <select className={inputClass} value={purchaseAccountId} onChange={(e) => setPurchaseAccount(e.target.value)}>
                 {(accounts.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -294,7 +329,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
               </select>
             </Field>
           )}
-          {payMode === "PLAN" && (
+          {payMode === "PLAN" && !userSale && (
             <>
 
               {locked.length > 0 && (
