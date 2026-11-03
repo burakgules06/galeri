@@ -4,10 +4,11 @@ Oturum başında önce bunu oku (kısa tutulur). Bir özelliğe başlamadan önc
 Eski işlerin ayrıntısı `docs/GECMIS.md`'de; gerekmedikçe okuma, gerekirse `grep` ile ilgili bölümü bul.
 Her iş bitince bu dosyayı güncelle: "Şu an" ve "Sıradaki"yi değiştir, bitmiş işi tek satırla "Son işler"e ekle. 150 satırı geçmesin.
 
-## Şu an (1 Kasım 2026)
+## Şu an (4 Kasım 2026)
 
-- Prod canlı ve kullanılıyor. main'e merge = otomatik prod deploy. Son merge #73. Son migration `V24__contact_kind.sql` (yenisi V25).
-- Açık PR yok.
+- Prod canlı ve kullanılıyor. main'e merge = otomatik prod deploy. Son migration `V25__user_counterparty.sql` (#76; yenisi V26).
+- Açık PR: #75 (Kasa toplu hareketler), #76 (kullanıcıyla alış / satış, "satmak için al").
+- Alacak / verecek sıfırlama scripti (`alacak-verecek-onizleme.sql` + `alacak-verecek-sifirla.sql`) Burak'a verildi; sonucu bildirilmedi.
 - Prod veri sıfırlaması: `sifirla-pgadmin.sql` (pgAdmin Query Tool) Burak'a verildi. Test galerisi tamamen siliniyor; gerçek galeride
   araçlar, araç masrafları, çek / senet planları ve kullanıcılar dışındaki her şey (sermaye dahil) siliniyor. Sonucu henüz bildirilmedi;
   script sonunda kullanıcıyla aynı adlı kişi kalırsa listeler.
@@ -23,9 +24,16 @@ Her iş bitince bu dosyayı güncelle: "Şu an" ve "Sıradaki"yi değiştir, bit
 - Konsinye: alacak = satış − komisyon. Yansıtılan masraf önce bu paydan düşer.
 - Roller: ADMIN (dükkân sahibi), INVESTOR (sermayedar), STAFF (para alanı görmez).
 - Sermayedar sadece kendi araçlarını görür ve alıp satabilir. Alış hep CO_OWNED ve sermayeden. Tahsilatta "Sermayeme ekle" ya da "Nakit aldım".
+- Kullanıcıyla alış / satış (V25): araç kullanıcıdan alınabilir (bedelin bir kısmı onun sermayesine: kasadan tam alış + CAPITAL→kasa girişi,
+  `vehicle.purchase_capital_entry_id`). Kullanıcıya satış taksitsiz: INCOME→kasa (tahsil edilmiş sayılır, `directSaleCollections`).
+  "Satmak için al": alanın nakit kısmı sermaye girişi, araç yeni kayıtla onun stoğuna (%100 ortaklı, sermayeden; dükkân sahibine galeri aracı),
+  `transfer_from_vehicle_id`. Devirsiz: sermaye kısmı kasa→CAPITAL çekişi (`sale_capital_entry_id`). Geri alınca kopya kaldırılır.
 - Kişiler (`contact.kind`): CUSTOMER / SELLER / SUPPLIER. Tüzel / bireysel ayrımı var. Kullanıcılar (çalışan, sermayedar) kişi olarak görünmez.
 
 ## Son işler
+
+- #76 Kullanıcıyla alış / satış ve "satmak için al" (MIMARI §0 madde 5), `UserCounterpartyIT`.
+- #75 Kasa son hareketlerde aynı gün / araç / kişi / hesap toplu işlemleri tek satır (`features/ledger/entryGroups.ts`).
 
 - #59–#64 gece paketi: tahsilatla para dağıtımı, ödeme yöntemleri + kredi kartı (V23), Ödemeler yeni ekran, Kasa/Banka kişi bazında,
   Masraflar ve Dükkân sayfaları (cepten gider), sermayedar girişi (salt okunur).

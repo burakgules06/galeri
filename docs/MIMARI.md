@@ -79,7 +79,7 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
    kişi SELLER, diğerleri CUSTOMER. Etiketler saklanmaz, araçlardan hesaplanır ("Araç sattık" alıcı, "Araç aldık" satıcı).
 3. Yetkiler: sermayedar ve çalışan için backend kısıtları ve panel ekranları; Kullanıcılar ekranında alacak/verecek ve geçmiş.
 4. Sermayedarın alımı (sermayeden düşme) ve tahsilat seçenekleri (Sermayeme ekle / Nakit aldım).
-5. Sermayedarlar arası araç devri ("satmak için al").
+5. Sermayedarlar arası araç devri ("satmak için al"). **Yapıldı** (`V25__user_counterparty.sql`, #76): satış + alanın stoğunda yeni kayıt; kullanıcıdan alışta bedelin bir kısmı sermayeye.
 6. `can_trade` çalışanın peşin alım / satımı.
 
 ## 1. Uygulama ne işe yarar
