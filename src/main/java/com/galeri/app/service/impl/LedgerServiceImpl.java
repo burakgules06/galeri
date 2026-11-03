@@ -270,11 +270,11 @@ public class LedgerServiceImpl implements LedgerService {
     @Override
     @Transactional   // readOnly degil: ayni islemde hareket kilitlenip terslenebilir
     public java.util.Optional<CapitalEntryInfo> capitalEntryInfo(UUID entryId) {
-        return entryRepository.findById(entryId).map(e -> {
-            Account capital = e.getSourceAccount().getType() == AccountType.CAPITAL ? e.getSourceAccount() : e.getTargetAccount();
-            Account money = capital == e.getSourceAccount() ? e.getTargetAccount() : e.getSourceAccount();
-            return new CapitalEntryInfo(!entryRepository.existsByCorrectedEntryId(e.getId()), capital.getUserId(),
-                    e.getAmountCents(), e.getEntryDate(), money.getId());
+        return entryRepository.capitalEntryScalars(entryId).stream().findFirst().map(r -> {
+            boolean sourceIsCapital = r[2] == AccountType.CAPITAL;
+            return new CapitalEntryInfo(!entryRepository.existsByCorrectedEntryId(entryId),
+                    (UUID) (sourceIsCapital ? r[3] : r[6]), ((Number) r[0]).longValue(), (LocalDate) r[1],
+                    (UUID) (sourceIsCapital ? r[7] : r[4]));
         });
     }
 

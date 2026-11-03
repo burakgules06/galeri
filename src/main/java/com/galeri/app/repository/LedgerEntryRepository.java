@@ -18,6 +18,14 @@ import java.util.UUID;
 
 public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> {
 
+    /** Sermaye hareketi ozeti (varlik yuklemeden; ayni islemde hareket kilitlenip terslenebilsin):
+     *  tutar, tarih, kaynak tur / kullanici / id, hedef tur / kullanici / id. */
+    @Query("""
+            select e.amountCents, e.entryDate, s.type, s.userId, s.id, t.type, t.userId, t.id
+            from LedgerEntry e join e.sourceAccount s join e.targetAccount t where e.id = :id""")
+    List<Object[]> capitalEntryScalars(@Param("id") UUID id);
+
+
     // Hesap bazinda toplamlar: [accountId, totalCents]
     @Query("select e.targetAccount.id, sum(e.amountCents) from LedgerEntry e where e.tenantId = :tenantId group by e.targetAccount.id")
     List<Object[]> incomingTotals(@Param("tenantId") UUID tenantId);
