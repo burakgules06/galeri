@@ -218,12 +218,7 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
                 payments.add(new Payment(e.getId(), e.getEntryDate(), e.getCreatedAt(), e.getAmountCents(), e.getSourceAccount()));
             }
         }
-        // Arac masrafi da sahiplik payina gore katkidir: ortagin payi hemen sermayesinden araca baglanir (nakitteki sermayesi duser)
-        for (LedgerEntry e : active(entryRepository.findByVehicle_IdAndType(vehicle.getId(), LedgerEntryType.VEHICLE_EXPENSE))) {
-            if (e.getTargetAccount().getType() == AccountType.VEHICLE && e.getSourceAccount().getType().isMoneyAccount()) {
-                payments.add(new Payment(e.getId(), e.getEntryDate(), e.getCreatedAt(), e.getAmountCents(), e.getSourceAccount()));
-            }
-        }
+        // Arac masrafi katki degildir: ortagin sermayesinden hemen dusmez, havuz oder; satista kardan (kar payi oraniyla) duser
         planRepository.findByVehicleIdAndDirection(vehicle.getId(), PlanDirection.PURCHASE).ifPresent(plan -> {
             List<UUID> paid = installmentRepository.findByPlanIds(List.of(plan.getId())).stream()
                     .filter(Installment::isPaid).map(Installment::getPaidEntryId).toList();

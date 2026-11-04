@@ -179,17 +179,30 @@ class CoFinancingIT {
     }
 
     @Test
-    void masrafPayiHemenSermayedenAracaBaglanir_zarardaKatkisindanDuser() {
-        // Arac 400.000 (katki 200.000), masraf 250.000: Burak'in %50 payi 125.000 hemen araca baglanir (katki 325.000)
+    void masraf_sermayedenHemenDusmez_satistaKardanKarPayiOraniylaDuser() {
+        // Arac 400.000 (Burak'in katkisi 200.000), masraf 100.000: Burak'in sermayesi degismez, masrafi havuz oder
+        UUID v = coOwned(400_000 * TL, half(burak, ContributionSource.CAPITAL, null));
+        ledgerService.addExpense(new ExpenseRequest(today, cash, 100_000 * TL, v, null, "Motor", null, null, null));
+        expectPartner("masraf", burak, 1_000_000 * TL, 800_000 * TL, 200_000 * TL);
+        check("masraf");
+        // Satis 700.000: kar 700 - 400 - 100 = 200.000, Burak'in payi 100.000; alacagi 200.000 + 100.000
+        sell(v, 700_000 * TL);
+        assertThat(owner(v, burak).profitCents()).isEqualTo(100_000 * TL);
+        assertThat(owner(v, burak).receivableCents()).isEqualTo(300_000 * TL);
+        expectPartner("satis", burak, 1_100_000 * TL, 1_100_000 * TL, 0);
+        check("satis");
+    }
+
+    @Test
+    void masrafliZarardaSatis_ortakKoydugundanFazlasiniKaybetmez() {
+        // Arac 400.000 (katki 200.000), masraf 250.000, satis 150.000: zarar 500.000; Burak en fazla koydugunu (200.000) kaybeder
         UUID v = coOwned(400_000 * TL, half(burak, ContributionSource.CAPITAL, null));
         ledgerService.addExpense(new ExpenseRequest(today, cash, 250_000 * TL, v, null, "Motor", null, null, null));
-        expectPartner("masraf", burak, 1_000_000 * TL, 675_000 * TL, 325_000 * TL);
-        check("masraf");
-        // Satis 150.000: zarar 500.000, Burak'in payi 250.000; alacagi 325.000 - 250.000 = 75.000
+        expectPartner("masraf", burak, 1_000_000 * TL, 800_000 * TL, 200_000 * TL);
         sell(v, 150_000 * TL);
-        assertThat(owner(v, burak).receivableCents()).isEqualTo(75_000 * TL);
-        assertThat(owner(v, burak).profitCents()).isEqualTo(-250_000 * TL);
-        expectPartner("zarar", burak, 750_000 * TL, 750_000 * TL, 0);
+        assertThat(owner(v, burak).profitCents()).isEqualTo(-200_000 * TL);
+        assertThat(owner(v, burak).receivableCents()).isZero();
+        expectPartner("zarar", burak, 800_000 * TL, 800_000 * TL, 0);
         check("zarar");
     }
 
