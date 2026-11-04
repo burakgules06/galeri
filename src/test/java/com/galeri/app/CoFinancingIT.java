@@ -194,6 +194,21 @@ class CoFinancingIT {
     }
 
     @Test
+    void masraf_sahiplikOraniylaKardanDuser_karPayiOraniFarkliOlsaBile() {
+        // Sahiplik %50 / %50, kar payi Furkan %40 / Burak %60. Alis 2.000.000, masraf 100.000, satis 2.400.000.
+        // Masrafsiz kar 400.000: Burak 240.000, Furkan 160.000. Masraf sahiplikle: 50.000 / 50.000.
+        UUID v = coOwned(2_000_000 * TL, List.of(new ShareRequest(owner, 5000, 4000, null, null),
+                new ShareRequest(burak, 5000, 6000, null, null)));
+        ledgerService.addExpense(new ExpenseRequest(today, cash, 100_000 * TL, v, null, "Motor", null, null, null));
+        sell(v, 2_400_000 * TL);
+        assertThat(owner(v, burak).profitCents()).isEqualTo(190_000 * TL);
+        assertThat(owner(v, burak).receivableCents()).isEqualTo(1_190_000 * TL);
+        assertThat(owner(v, owner).profitCents()).isEqualTo(110_000 * TL);
+        expectPartner("sahiplikle masraf", burak, 1_190_000 * TL, 1_190_000 * TL, 0);
+        check("sahiplikle masraf");
+    }
+
+    @Test
     void masrafliZarardaSatis_ortakKoydugundanFazlasiniKaybetmez() {
         // Arac 400.000 (katki 200.000), masraf 250.000, satis 150.000: zarar 500.000; Burak en fazla koydugunu (200.000) kaybeder
         UUID v = coOwned(400_000 * TL, half(burak, ContributionSource.CAPITAL, null));

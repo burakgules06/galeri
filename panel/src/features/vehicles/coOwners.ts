@@ -62,9 +62,12 @@ export function ownerSaleShares(
   saleCents: number, paidNowCents: number, purchaseCents: number, expenseCents: number, owners: ShareResponse[],
   shopCutType: CommissionType | null, shopCutRateBp: number | null, shopCutCents: number | null,
 ): Record<string, { entitled: number; now: number }> {
-  const profit = saleCents - purchaseCents - expenseCents;
+  // Satis onizlemesi (backend CoOwnershipServiceImpl.distribution ile ayni kural): masrafsiz kar kar payi oraniyla,
+  // masraf sahiplik oraniyla bolunur
+  const gross = saleCents - purchaseCents;
   const partners = owners.filter((o) => !o.owner);
-  const share = new Map(partners.map((o) => [o.userId, Math.floor((profit * o.profitShareBp) / 10000)]));
+  const share = new Map(partners.map((o) => [o.userId,
+    Math.floor((gross * o.profitShareBp) / 10000) - Math.floor((expenseCents * o.shareBp) / 10000)]));
   const partnersProfit = [...share.values()].reduce((t, v) => t + v, 0);
   const cut = partnersProfit <= 0 || shopCutType == null ? 0
     : shopCutType === "FIXED" ? Math.min(shopCutCents ?? 0, partnersProfit)
