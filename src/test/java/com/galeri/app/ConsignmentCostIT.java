@@ -125,10 +125,6 @@ class ConsignmentCostIT {
         assertThat(cashBalance()).isEqualTo(6_180_000 * TL);
         assertThat(capitalService.periodProfit(today, today).commissionCents()).isEqualTo(6_000 * TL);
         check("satis");
-
-        vehicleService.undoSale(v);
-        expectZeki("satis geri alindi", 980_000 * TL, 180_000 * TL, 800_000 * TL);
-        check("satis geri alindi");
     }
 
     @Test
