@@ -53,7 +53,7 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
         direction, date: todayIso(), holderId: direction === "SALE" && holder ? holder : null,
         installments: filled.map((r) => ({
           dueDate: r.dueDate, amountCents: cents(r), method: r.method, noteNo: r.noteNo.trim() || null, payerId: null,
-          description: r.method === "OPEN_ACCOUNT" ? r.description.trim() || null : null,
+          description: r.description.trim() || null,
           paidNow: false, accountId: null,
           bankName: r.method === "CHEQUE" ? r.bankName.trim() || null : null,
           drawerName: r.method === "CHEQUE" ? r.drawerName.trim() || null : null,
@@ -103,11 +103,11 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
                 {METHODS.map((m) => <option key={m} value={m}>{METHOD[m]}</option>)}
               </select>
               <div className="col-span-2 md:col-span-1 grid grid-cols-3 gap-2">
-                {r.method !== "OPEN_ACCOUNT" && <input className={`${inputClass} ${r.method === "CHEQUE" ? "" : "col-span-3"}`} value={r.noteNo} aria-label="Numara"
+                {r.method !== "OPEN_ACCOUNT" && <input className={`${inputClass} ${r.method === "CHEQUE" ? "" : "col-span-3"}`} value={r.noteNo} aria-label="Numara" maxLength={40}
                   placeholder={r.method === "CHEQUE" ? "Çek no" : "Senet no"} onChange={(e) => update(r.key, { noteNo: e.target.value })} />}
                 {r.method === "CHEQUE" && <>
-                  <input className={inputClass} value={r.bankName} aria-label="Banka" placeholder="Banka" onChange={(e) => update(r.key, { bankName: e.target.value })} />
-                  <input className={inputClass} value={r.drawerName} aria-label="Keşideci" placeholder="Keşideci" onChange={(e) => update(r.key, { drawerName: e.target.value })} />
+                  <input className={inputClass} value={r.bankName} aria-label="Banka" maxLength={60} placeholder="Banka" onChange={(e) => update(r.key, { bankName: e.target.value })} />
+                  <input className={inputClass} value={r.drawerName} aria-label="Keşideci" maxLength={120} placeholder="Keşideci" onChange={(e) => update(r.key, { drawerName: e.target.value })} />
                 </>}
                 {r.method === "OPEN_ACCOUNT" && <input className="col-span-3" value={r.description} aria-label="Açıklama"
                   maxLength={500} placeholder="Açıklama (isteğe bağlı)" onChange={(e) => update(r.key, { description: e.target.value })} />}
@@ -116,6 +116,8 @@ export function OpenItemsForm({ contact: fixedContact, onClose, onSaved }: {
                 className="basilir w-9 h-9 rounded-lg hover:bg-yuzey-2 grid place-items-center text-murekkep-3 justify-self-end">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </button>
+              {r.method !== "OPEN_ACCOUNT" && <input className={`${inputClass} col-span-2 md:col-span-4`} value={r.description} aria-label="Açıklama"
+                maxLength={500} placeholder="Açıklama (isteğe bağlı, örn. kiminle ortak)" onChange={(e) => update(r.key, { description: e.target.value })} />}
             </div>
           ))}
           <Button type="button" variant="quiet" className="text-plaka" onClick={addRow}>+ Satır ekle</Button>
