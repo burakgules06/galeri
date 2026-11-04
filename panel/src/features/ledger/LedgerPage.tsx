@@ -37,9 +37,10 @@ export function LedgerPage() {
   const [sort, setSort] = useState<Sort>("new");
   const [entryPage, setEntryPage] = useState(1);
   const accounts = useLoad(() => api.accounts(), []);
-  // Kisinin kasa ve bankalardaki toplam parasi backend'den (holders.cashCents); hangi hesapta durdugu tutulmaz, tahmin edilmez
+  // Kisinin toplam parasi (holders.cashCents) ve hesap basina parasi (holdings) backend'den, hareketlerden; panelde hesap yok
   const holders = useLoad(() => api.holders(), [revision]);
   const partners = holders;
+  const holdings = useLoad(() => api.holdings(), [revision]);
   const summary = useLoad(() => api.dashboard(), []);
   const entries = useLoad(() => api.ledgerEntries(selected), [selected]);
 
@@ -50,8 +51,11 @@ export function LedgerPage() {
   // Kisiler: dukkan sahibi once, sonra sermayedarlar
   const peopleList = (partners.data ?? []).filter((p): p is typeof p & { userId: string } => p.userId != null);
   const person = peopleList.find((p) => p.userId === owner);
-  const shown = colored.map((a) => ({ ...a, amount: a.balanceCents }));
+  const partsOf = (accountId: string) => (holdings.data?.accounts ?? []).find((h) => h.accountId === accountId)?.parts ?? [];
+  const isMine = (p: { userId: string | null; owner: boolean }) => (person?.owner ? p.owner : !p.owner && p.userId === person?.userId);
+  const shown = colored.map((a) => ({ ...a, amount: person ? partsOf(a.id).find(isMine)?.cents ?? 0 : a.balanceCents }));
   const shownTotal = person ? person.cashCents : total;
+  const unassigned = person ? (holdings.data?.unassigned ?? []).find(isMine)?.cents ?? 0 : 0;
 
   const allEntries = entries.data ?? [];
   const isCorrection = (e: LedgerEntryResponse) => e.corrected || e.correctedEntryId != null;
@@ -102,11 +106,10 @@ export function LedgerPage() {
           <div>
             <p className="etiket">{person ? `${person.name} · kasa ve bankalardaki parası` : "Toplam nakit"}</p>
             <p className={`sayi font-bold text-[34px] md:text-[40px] leading-none tracking-tight mt-1.5 ${shownTotal < 0 ? "text-tehlike" : ""}`}>
-              {accounts.data && (!owner || partners.data) ? tl(shownTotal) : "…"}
+              {accounts.data && (!owner || (partners.data && holdings.data)) ? tl(shownTotal) : "…"}
             </p>
-            {person && <p className="text-[13px] text-murekkep-2 mt-1">
-              {person.owner ? "Kasa ve bankalardan sermayedarların parası çıkınca kalan" : <>Araçlarda bağlı: <span className="sayi">{tl(person.vehicleCents)}</span></>}
-              {" · "}Hesap kartları hesapların toplam bakiyesidir.
+            {person && !person.owner && <p className="text-[13px] text-murekkep-2 mt-1">
+              Araçlarda bağlı: <span className="sayi">{tl(person.vehicleCents)}</span>
             </p>}
           </div>
           {bankOpen
@@ -114,15 +117,22 @@ export function LedgerPage() {
             : <Button variant="secondary" onClick={() => setBankOpen(true)}>+ Banka hesabı</Button>}
         </div>
         <div className="mt-4"><SplitBar height={10} parts={shown.map((a) => ({ key: a.id, value: Math.max(0, a.amount), color: a.color }))} /></div>
-        {/* Hesap kartlari her zaman hesabin toplam bakiyesi; kisinin parasi hangi hesapta tutulmaz */}
+        {/* Tumu: hesabin bakiyesi ve altinda kimin ne kadari. Kisi secili: o kisinin o hesaptaki parasi. Hepsi backend'den. */}
         <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-          <AccountButton name="Tüm hesaplar" balance={total} share={null} color={null} selected={selected === null} onClick={() => changeAccount(null)} />
+          <AccountButton name="Tüm hesaplar" balance={shownTotal} share={null} color={null} selected={selected === null} onClick={() => changeAccount(null)} />
           {shown.map((a) => (
             <AccountButton key={a.id} name={a.name} balance={a.amount} color={a.color}
-              share={total > 0 && a.amount > 0 ? Math.round((a.amount * 10000) / total) : null}
-              selected={selected === a.id} onClick={() => changeAccount(a.id)} />
+              share={!person && total > 0 && a.amount > 0 ? Math.round((a.amount * 10000) / total) : null}
+              selected={selected === a.id} onClick={() => changeAccount(a.id)}
+              parts={person ? undefined : partsOf(a.id).filter((p) => p.cents !== 0)} />
           ))}
         </div>
+        {unassigned !== 0 && (
+          <p className="mt-2 text-[13px] text-murekkep-2">
+            Hesabı belli olmayan: <span className={`sayi ${unassigned < 0 ? "text-tehlike" : ""}`}>{tl(unassigned)}</span>
+            {" "}(kasa ya da bankaya dokunmayan sermaye hareketi, örneğin sermaye devri)
+          </p>
+        )}
       </section>
 
       <Segment<Tab> value={tab} onChange={setTab} options={[
@@ -216,8 +226,9 @@ function PersonChip({ label, sub, on, onClick }: { label: string; sub?: string; 
   );
 }
 
-function AccountButton({ name, balance, share, color, selected, onClick }: {
+function AccountButton({ name, balance, share, color, selected, onClick, parts }: {
   name: string; balance: number; share: number | null; color: string | null; selected: boolean; onClick: () => void;
+  parts?: { userId: string | null; name: string; cents: number }[];   // Tumu seciliyken hesaptaki paranin kisilere dagilimi (backend)
 }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={selected}
@@ -228,6 +239,16 @@ function AccountButton({ name, balance, share, color, selected, onClick }: {
         {share != null && <span className="ml-auto text-murekkep-3 font-medium">{percent(share, 0)}</span>}
       </span>
       <span className={`block sayi font-bold text-[20px] leading-tight mt-0.5 ${balance < 0 ? "text-tehlike" : selected ? "text-plaka-koyu" : "text-murekkep"}`}>{tl(balance)}</span>
+      {parts && parts.length > 0 && (
+        <span className="mt-1.5 block space-y-0.5">
+          {parts.map((p) => (
+            <span key={p.userId ?? "owner"} className="flex items-baseline justify-between gap-2 text-[12px] text-murekkep-2">
+              <span className="truncate">{p.name}</span>
+              <span className={`sayi whitespace-nowrap ${p.cents < 0 ? "text-tehlike" : ""}`}>{tl(p.cents)}</span>
+            </span>
+          ))}
+        </span>
+      )}
     </button>
   );
 }

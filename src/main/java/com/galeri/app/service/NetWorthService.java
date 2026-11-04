@@ -11,5 +11,5 @@ public interface NetWorthService {
     List<CapitalResponses.Holder> holders();
 
     /** Kasa ve bankalardaki paranin kisilere dagilimi (dukkan sahibi kalan). */
-    List<com.galeri.app.model.response.AccountHoldings> holdings();
+    com.galeri.app.model.response.AccountHoldings.Response holdings();
 }

@@ -157,7 +157,7 @@ class HoldersIT {
     }
 
     @Test
-    void kasaVeBanka_kisilereDagilir_transferOranindaTasinir_ortakAracKatkisiHesaptanDuser() {
+    void kasaVeBanka_kisilereDagilir_transferDukkanSahibininParasiniTasir_ortakAracKatkisiHesaptanDuser() {
         UUID bank = ledgerService.addBank(new com.galeri.app.model.request.AccountRequest("Ziraat")).id();
         capitalService.move(selin, new CapitalRequests.Movement(CapitalRequests.Direction.IN, bank, today, 4 * M, null));
         // Kasa: Furkan 50 + Burak 6; Banka: Selin 4
@@ -165,17 +165,18 @@ class HoldersIT {
         expectHolding("giris", bank, selin, 4 * M);
         expectHolding("giris", cash, null, 50 * M);
 
-        // Kasadan bankaya 28 milyon (kasanin yarisi): herkesin kasadaki parasinin yarisi tasinir
+        // Kasadan bankaya 28 milyon: dukkan sahibinin parasi tasinir, Burak'in 6 milyonu kasada kalir
         ledgerService.transfer(new CapitalRequests.Transfer(cash, bank, today, 28 * M, null));
-        expectHolding("transfer", cash, burak, 3 * M);
-        expectHolding("transfer", bank, burak, 3 * M);
+        expectHolding("transfer", cash, burak, 6 * M);
+        expectHolding("transfer", bank, burak, 0);
         expectHolding("transfer", bank, selin, 4 * M);
-        expectHolding("transfer", cash, null, 25 * M);
+        expectHolding("transfer", cash, null, 22 * M);
+        expectHolding("transfer", bank, null, 28 * M);
 
         // Ortakli arac kasadan 4 milyon, Burak %50: Burak'in kasadaki parasindan 2 milyon araca
         vehicle(4 * M, List.of(new ShareRequest(furkan, 5000), new ShareRequest(burak, 5000, null, ContributionSource.CAPITAL, null)));
-        expectHolding("ortak arac", cash, burak, 1 * M);
-        expectHolding("ortak arac", cash, null, 23 * M);
+        expectHolding("ortak arac", cash, burak, 4 * M);
+        expectHolding("ortak arac", cash, null, 20 * M);
         check("dagilim");
     }
 
@@ -201,7 +202,7 @@ class HoldersIT {
         TestSession.open(burak, tenant, "INVESTOR");
         try {
             assertThat(netWorthService.holders()).extracting(CapitalResponses.Holder::userId).containsExactly(burak);
-            var kasa = netWorthService.holdings().stream().filter(h -> h.accountId().equals(cash)).findFirst().orElseThrow();
+            var kasa = netWorthService.holdings().accounts().stream().filter(h -> h.accountId().equals(cash)).findFirst().orElseThrow();
             assertThat(kasa.balanceCents()).as("kasada sadece kendi parasi").isEqualTo(6 * M);
             assertThat(kasa.parts()).extracting(p -> p.userId()).containsExactly(burak);
             assertThat(ledgerService.entries(null)).as("sadece kendi sermaye hareketleri")
@@ -230,11 +231,12 @@ class HoldersIT {
         expectHolding("aktarim", bank, null, 10 * M);
         expectHolding("aktarim", bank, selin, 20 * M);
 
-        // Eksik kapandiktan sonraki fazlasi yine oranla: bankadan 6 milyon daha (Furkan 10 / Selin 20 -> 2 / 4)
+        // Bankadan 6 milyon daha: yine dukkan sahibinin parasi, Selin'in 20 milyonu bankada kalir
         ledgerService.transfer(new CapitalRequests.Transfer(bank, cash, today, 6 * M, null));
-        expectHolding("ikinci aktarim", cash, null, 2 * M);
-        expectHolding("ikinci aktarim", cash, selin, 4 * M);
-        expectHolding("ikinci aktarim", bank, selin, 16 * M);
+        expectHolding("ikinci aktarim", cash, null, 6 * M);
+        expectHolding("ikinci aktarim", cash, selin, 0);
+        expectHolding("ikinci aktarim", bank, selin, 20 * M);
+        expectHolding("ikinci aktarim", bank, null, 4 * M);
         check("aktarim");
     }
 
@@ -256,7 +258,7 @@ class HoldersIT {
     }
 
     private void expectHolding(String step, UUID account, UUID user, long cents) {
-        var holdings = netWorthService.holdings();
+        var holdings = netWorthService.holdings().accounts();
         assertThat(holdings).allSatisfy(h -> assertThat(h.parts().stream().mapToLong(p -> p.cents()).sum())
                 .as("%s: %s parcalar toplami", step, h.name()).isEqualTo(h.balanceCents()));
         var acc = holdings.stream().filter(h -> h.accountId().equals(account)).findFirst().orElseThrow();

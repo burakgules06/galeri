@@ -322,6 +322,7 @@ export interface AccountSummary { id: string; type: AccountType; name: string }
 export interface AccountResponse extends AccountSummary { balanceCents: number }
 
 // Kasa / banka hesabindaki paranin kisilere dagilimi (dukkan sahibi kalan). parts toplami = balanceCents.
+export interface HoldingsResponse { accounts: AccountHoldings[]; unassigned: AccountHoldings["parts"] }
 export interface AccountHoldings {
   accountId: string; name: string; type: AccountType; balanceCents: number;
   parts: { userId: string | null; name: string; owner: boolean; cents: number }[];
