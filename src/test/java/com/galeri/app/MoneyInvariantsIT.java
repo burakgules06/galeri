@@ -142,11 +142,11 @@ class MoneyInvariantsIT {
         vehicleService.undoSale(clio);
         check("satisi geri alma");
 
-        // Konsinye: komisyon %5, sahibine masraf yansitilir, sahibine kismi odeme
+        // Konsinye: komisyon %5, masraflar sahibinin sermayesinden (nakdi yetmiyor: onayla eksiye), sahibine kismi odeme
         UUID egea = vehicleService.create(vehicle("34 INV 103", "Fiat", "Egea 1.3 Multijet", day(-15), null,
                 null, null, null, Ownership.CONSIGNMENT, consignor)).vehicle().id();
         ledgerService.addExpense(new ExpenseRequest(day(-14), cash, 2_000 * TL, egea, null, "Yikama", null, null, true));
-        ledgerService.addExpense(new ExpenseRequest(day(-14), cash, 1_000 * TL, egea, null, "Ilan", null, null, false));
+        ledgerService.addExpense(new ExpenseRequest(day(-14), cash, 1_000 * TL, egea, null, "Ilan", null, null, true));
         check("konsinye arac ve masraflari");
         vehicleService.sell(egea, new VehicleSaleRequest(day(-10), buyer, null, 300_000_33L, List.of(
                 installment(day(-10), 300_000_33L, PaymentMethod.TRANSFER, true, bank))));

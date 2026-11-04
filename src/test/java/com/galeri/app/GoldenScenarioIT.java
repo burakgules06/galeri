@@ -198,8 +198,9 @@ class GoldenScenarioIT {
 
         // ---------------------------------------------------------------- TC6 konsinye, nakit satis
         UUID v6 = consignment("34 TC 006", mehmet, CommissionType.RATE, 300, null);
-        expense(v6, tl(10_000), "Yıkama", false);
-        expense(v6, tl(5_000), "Bakım", true);
+        // Kasim 2026 oncesi kayitlar: eski kuralla (galeri ustlenir / sahibine yansitilir) satista netlesir
+        legacyConsignmentExpense(v6, mehmet, tl(10_000), false);
+        legacyConsignmentExpense(v6, mehmet, tl(5_000), true);
         expectMoney("TC6", tl(40_575_000), tl(9_560_000));
         expectCari("TC6", mehmet, tl(5_000));
         assertThat(dashboard().consignmentCount()).as("TC6 +1 konsinye arac").isEqualTo(1);
@@ -259,7 +260,7 @@ class GoldenScenarioIT {
         expectShare("TC9 cekis", burak, 164);
         expectMoney("TC9 cekis", tl(39_552_000), tl(9_560_000));
         UUID v9 = consignment("34 TC 009", burak, CommissionType.FIXED, null, 0L);
-        expense(v9, tl(30_000), "Bakım", true);
+        legacyConsignmentExpense(v9, burak, tl(30_000), true);   // eski kayit
         sell(v9, veli, tl(1_400_000), paidNow(tl(1_400_000), cash));
         // Satis parasi dogrudan sermayesine: 1.400.000 - yansitilan 30.000 masraf
         expectCari("TC9 sermayeye", burak, 0);
@@ -389,8 +390,29 @@ class GoldenScenarioIT {
                 today, seller, null, actual, actual, account, plan, ownership, consignor, type, rateBp, fixedCents, shares, null, null);
     }
 
-    private void expense(UUID vehicle, long cents, String category, Boolean chargeToOwner) {
-        ledgerService.addExpense(new ExpenseRequest(today, cash, cents, vehicle, null, category, null, null, chargeToOwner));
+    /**
+     * Kasim 2026 oncesi konsinye masrafi (eski kayit, prod'da duran veri): sahibine yansitilan carisine (BALANCE), digeri galerinin
+     * genel giderine. Yeni masraf girisi bunlari artik yazmaz; satista eski kuralla netlesmeleri boyle test edilir.
+     */
+    private void legacyConsignmentExpense(UUID vehicle, UUID owner, long cents, boolean chargeToOwner) {
+        UUID target = chargeToOwner ? accountId("BALANCE", owner) : accountId("EXPENSE", null);
+        jdbc.update("insert into ledger_entry (tenant_id, entry_date, type, source_account_id, target_account_id, amount_cents, vehicle_id, "
+                        + "created_by_id, description) values (?, ?, 'VEHICLE_EXPENSE', ?, ?, ?, ?, ?, 'Eski kayit')",
+                tenant, today, cash, target, cents, vehicle, user);
+    }
+
+    private UUID accountId(String type, UUID userId) {
+        List<UUID> found = userId == null
+                ? jdbc.queryForList("select id from account where tenant_id = ? and type = ? and user_id is null", UUID.class, tenant, type)
+                : jdbc.queryForList("select id from account where tenant_id = ? and type = ? and user_id = ?", UUID.class, tenant, type, userId);
+        if (!found.isEmpty()) return found.get(0);
+        UUID id = UUID.randomUUID();
+        jdbc.update("insert into account (id, tenant_id, type, name, user_id) values (?, ?, ?, ?, ?)", id, tenant, type, type, userId);
+        return id;
+    }
+
+    private void expense(UUID vehicle, long cents, String category, Boolean confirmNegative) {
+        ledgerService.addExpense(new ExpenseRequest(today, cash, cents, vehicle, null, category, null, null, confirmNegative));
     }
 
     private void sell(UUID vehicle, UUID buyer, long price, InstallmentRequest... rows) {

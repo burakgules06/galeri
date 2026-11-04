@@ -45,7 +45,22 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
   evrak karşılıksız çıkarsa riski payı oranında onda. Konsinyede sahibine borç yazılmaz, tahsil edildikçe (satış − komisyon) oranında
   sermayesine; komisyon galerinin kârı, para fiziksel olarak seçilen hesaba (varsayılan Kasa) girer.
 - **Tek sahipli sermayedar aracı = konsinye:** mevcut konsinye ekranı ve komisyonu aynen kalır; sadece sahibi kişi değil kullanıcıdır.
-- **Masraf:** ortaklı araca masraf sahiplik paylarına göre bölünür; herkesin payı kendi sermayesinden düşer (dükkân sahibininki kasadan).
+- **Masraf:** ortaklı araçta masrafı o an seçilen kasa / banka (dükkân sahibi) öder; ortağın sermayesinden hemen düşmez. Satışta masraf
+  sahiplik payı oranında bölünür ve ortağın payı onun kârından düşer.
+- **Konsinye (Kasım 2026, uygulandı):**
+  1. Formda isteğe bağlı "Sahibi kaça aldı" (maliyet = `actual_purchase_cents`) ve alım türü: sermayeden / hibrit / cepten. Maliyet
+     doluysa kasadan araca `VEHICLE_PURCHASE` (kasa → VEHICLE, planlı alış yok) ve araç sahibinin araçlarına bağlanır (bağlı sermaye).
+     Cepten kısım `sellerCapitalCents` ile V25'teki gibi CAPITAL(sahibi) → kasa yazılır (`purchase_capital_entry_id`): sermayesi artar,
+     kasaya net etkisi yok. Sonuç: kasa ve sahibinin nakitteki parası sermayeden kısım kadar düşer; dükkân sahibinin parası değişmez.
+     Sermayeden kısım nakitteki parasını aşarsa 1042. Maliyet boşsa araç eskisi gibi deftere girmez.
+  2. Masraf: `VEHICLE_EXPENSE` seçilen kasa / banka → CAPITAL(sahibi). Toplam ve nakitteki sermayesi hemen düşer, satışta bir daha
+     düşülmez. Nakitteki parası yetmezse 1061; panel sorar, onaylanırsa (`confirmNegative`) eksiye düşer. "Galeri üstlenir" yok.
+     Cepten masraf `vehicle_pocket_expense` tablosunda (V26): deftere yazılmaz, hiçbir hesaba / kâra / sermayeye etkisi yok.
+  3. Komisyon kârdan: kâr = satış − maliyet (masraflar hariç); oran kârın yüzdesi, sabit tutar en fazla kâr kadar; zararda 0
+     (`ConsignmentMath.commission`). Satış günü bağlı maliyet satışa geçer (INCOME → CAPITAL, `CONSIGNMENT_SETTLEMENT`), tahsil
+     edildikçe (satış − komisyon) sermayesine döner. Örnek: maliyet 800.000, satış 1.000.000, %3 → galeri 6.000, sahibi 194.000 kâr.
+  4. Eski kayıtlar: sahibine yansıtılan (BALANCE) ve galerinin üstlendiği (EXPENSE) masraflar satışta eski kuralla netleşir.
+  Maliyeti girilen konsinye aracın alış bedeli stok maliyetine ve toplam mala girer (stok sayısına girmez).
 - **Zarar:** şimdilik tanımsız, sonra konuşulacak.
 - **Sermayedarlar arası araç devri:** alan kullanıcı satışta "satmak için al" işaretler. Satanın sermayesine satış bedeli (maliyet + kâr)
   eklenir, araç onun araçlarından düşer; alanın sermayesinden bedel düşer, araç onun araçlarına eklenir. Kasa değişmez.
@@ -185,6 +200,7 @@ sol arka kapı, sol arka çamurluk, sağ ön çamurluk, sağ ön kapı, sağ ark
 ### Sahiplik
 - `DEALER` (galeri): varsayılan. Maliyeti VEHICLE hesabında birikir, kârı galerinin kârıdır.
 - `CONSIGNMENT` (konsinye): sahibi bir kişidir, komisyon oranı ya da sabit tutarı tutulur. VEHICLE hesabına maliyet yazılmaz.
+  **Kasım 2026'dan beri** maliyet ve masraf kuralları §0 "Konsinye" maddesindedir (o geçerli).
 - `CO_OWNED` (ortak): Havuz (kişi hesabı olmayan galeri payı) ve/veya kişiler `vehicle_share` satırlarında sahip olur. Sahiplik payları
   toplamı 100%; ortakların katkısı ve kâr payı oranı ayrı tutulur. Havuz payı dönem kârına, ortak payı satışta ortağın sermayesine yazılır.
 
@@ -455,6 +471,7 @@ Her yerde aynı terim kullanılır:
 | kasa / banka | `CASH` / `BANK` |
 | gider / gelir (hesap türü) | `EXPENSE` / `INCOME` |
 | masraf / masraf kategorisi (kök, üst) | `expense` / `expense_category` (`root`: `VEHICLE`, `GENERAL`; `parent_id`) |
+| cepten masraf (konsinye, sadece takip) | `pocket expense` / `vehicle_pocket_expense` (`/api/pocket-expenses`) |
 | hareket türü: araç alışı, araç masrafı, genel gider, sermaye, araç satışı, tahsilat, ödeme, ortak araç kâr/zararı | `VEHICLE_PURCHASE`, `VEHICLE_EXPENSE`, `GENERAL_EXPENSE`, `CAPITAL`, `VEHICLE_SALE`, `COLLECTION`, `PAYMENT`, `VEHICLE_PROFIT_SHARE` |
 | alacak / verecek | `receivable` / `payable` |
 | dükkân sahibi | `owner` (`contact.is_owner`) |

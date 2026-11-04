@@ -347,7 +347,7 @@ export interface LedgerEntryResponse {
 
 export interface CategoryResponse { id: string; name: string; root: ExpenseRoot; parentId: string | null; usage: number }
 
-// CONSIGNMENT: purchase 0, expenseCents = galerinin ustlendigi masraf, kar = komisyon - expenseCents.
+// CONSIGNMENT: purchase = sahibinin alis bedeli (girildiyse), expenseCents = galerinin ustlendigi (eski) masraf, kar = komisyon - expenseCents.
 export interface VehicleCost {
   vehicleId: string;
   ownership: Ownership;
@@ -359,7 +359,7 @@ export interface VehicleCost {
   profitCents: number | null;
   commissionCents: number | null;
   ownerPayoutCents: number | null;   // konsinye: sahibinin alacagi (satis - komisyon)
-  ownerChargedCents: number;         // konsinye: sahibine yansitilan masraf
+  ownerChargedCents: number;         // konsinye: sahibine ait masraf (sermayesinden dusen; eski kayitta carisine yansitilan)
   ownerCollectedCents: number | null;   // konsinye: alacaginin tahsil edilip sermayesine gecen kismi
   shares: ShareResponse[];           // ortak arac: sahipler, katkilar, kar paylari
   entries: LedgerEntryResponse[];
@@ -373,8 +373,19 @@ export interface ExpenseRequest {
   categoryId: string | null;
   categoryName: string | null;
   description: string | null;
-  chargeToOwner: boolean | null;   // konsinye aracta: masraf sahibinin carisine
+  confirmNegative?: boolean | null; // konsinye aracta: sahibinin nakdi yetmiyorsa "eksiye dusecek, devam?" onayi (1061)
   paidByOwner?: boolean | null;    // dukkan gideri cepten (elden) odendi: kasa degismez, sermaye dusmez
+}
+
+// Konsinye araca cepten masraf: sadece takip, para hareketi yok
+export interface PocketExpenseResponse {
+  id: string;
+  vehicleId: string;
+  date: string;
+  amountCents: number;
+  categoryId: string | null;
+  categoryName: string | null;
+  description: string | null;
 }
 
 export interface ContactPaymentRequest { accountId: string; date: string; amountCents: number; description: string | null }

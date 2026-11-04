@@ -1,6 +1,7 @@
 package com.galeri.app.service;
 
 import com.galeri.app.model.entity.LedgerEntry;
+import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.Vehicle;
 import com.galeri.app.model.request.OwnerReturnRequest;
 import com.galeri.app.model.request.ShareRequest;
@@ -26,6 +27,15 @@ public interface CoOwnershipService {
      * ortaklarin nakitteki sermayesi eksiye dusuyorsa 1042. Satilmis aracta kar paylari da yeniden hesaplanir.
      */
     void syncContributions(Vehicle vehicle);
+
+    /**
+     * Maliyeti girilmis stoktaki konsinye arac (Kasim 2026): sahibinin nakitteki sermayesi (sermaye - araclarda bagli) eksiye
+     * dusuyorsa 1042. Konsinye degilse ya da maliyet yoksa bir sey yapmaz.
+     */
+    void checkConsignorCash(Vehicle vehicle);
+
+    /** Kullanicinin nakitteki sermayesi: sermaye bakiyesi - bugun itibariyle araclarda bagli kismi. */
+    long cashCapital(PanelUser user);
 
     /** Satista: kar paylari (VEHICLE_PROFIT_SHARE) ve ortaga donus (nakit kisim icin sermaye cekisi). */
     void onSale(Vehicle vehicle, List<OwnerReturnRequest> returns);

@@ -75,8 +75,8 @@ public class LedgerController {
             if (request.vehicleId() == null) throw new org.springframework.security.access.AccessDeniedException("Sadece arac masrafi");
             vehicleService.requireAccess(request.vehicleId());
             request = new ExpenseRequest(request.date(), ledgerService.cashAccountId(), request.amountCents(), request.vehicleId(),
-                    request.categoryId(), request.categoryName(), request.parentCategoryId(), request.description(), Boolean.TRUE, null);
-            // (konsinye aracinda masraf sahibine, yani kendisine yansir; ortakli aracta maliyete girer)
+                    request.categoryId(), request.categoryName(), request.parentCategoryId(), request.description(), request.confirmNegative(), null);
+            // (konsinye aracinda masraf kendi sermayesinden duser; ortakli aracta maliyete girer)
         }
         return responseService.success(ledgerService.addExpense(request));
     }
@@ -94,6 +94,28 @@ public class LedgerController {
     @DeleteMapping("/expenses/{id}")
     public GenericResponse<LedgerEntryResponse> deleteExpense(@PathVariable UUID id) {
         return responseService.success(ledgerService.deleteExpense(id));
+    }
+
+    // Konsinye araca cepten masraf (sadece takip): sahibi sermayedar kendi aracina da girebilir.
+    @GetMapping("/vehicles/{id}/pocket-expenses")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")
+    public GenericResponse<List<com.galeri.app.model.response.PocketExpenseResponse>> pocketExpenses(@PathVariable UUID id) {
+        vehicleService.requireAccess(id);
+        return responseService.success(ledgerService.pocketExpenses(id));
+    }
+
+    @PostMapping("/pocket-expenses")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")
+    public GenericResponse<com.galeri.app.model.response.PocketExpenseResponse> addPocketExpense(@Valid @RequestBody ExpenseRequest request) {
+        if (request.vehicleId() != null) vehicleService.requireAccess(request.vehicleId());
+        return responseService.success(ledgerService.addPocketExpense(request));
+    }
+
+    @DeleteMapping("/pocket-expenses/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")
+    public GenericResponse<UUID> deletePocketExpense(@PathVariable UUID id) {
+        vehicleService.requireAccess(ledgerService.pocketExpenseVehicleId(id));
+        return responseService.success(ledgerService.deletePocketExpense(id));
     }
 
     @GetMapping("/expense-categories")

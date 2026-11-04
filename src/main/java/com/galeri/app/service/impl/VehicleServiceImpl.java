@@ -195,6 +195,7 @@ public class VehicleServiceImpl implements VehicleService {
         syncPurchase(saved, request);
         syncSellerCapital(saved, request);
         coOwnershipService.syncContributions(saved);   // ortak aracta cepten katki ve nakit sermaye kontrolu
+        if (saved.getActualPurchaseCents() != null) coOwnershipService.checkConsignorCash(saved);   // konsinye: sermayeden kisim yetmeli
         return toAdmin(saved, toDetail(saved));
     }
 
@@ -211,6 +212,8 @@ public class VehicleServiceImpl implements VehicleService {
         if (vehicle.getTransferFromVehicleId() != null && transferPurchaseChanged(vehicle, request)) {
             throw new TransferLockedException("Bu araç devirle geldi; alış bedeli, tarihi ve sahipliği değiştirilemez. Önce eski kaydın satışını geri alın.");
         }
+        // Konsinye maliyeti / sahibi / cepten kismi degistiyse sahibinin nakitteki parasi yeniden kontrol edilir
+        List<Object> consignmentBefore = consignmentFunding(vehicle, vehicle.getPurchaseCapitalEntryId());
         vehicle.setPlate(plate);
         apply(vehicle, request);
         if (vehicle.getSaleDate() != null && vehicle.getSaleDate().isBefore(vehicle.getPurchaseDate())) {
@@ -219,6 +222,10 @@ public class VehicleServiceImpl implements VehicleService {
         coOwnershipService.syncOwners(vehicle, request.shares());
         syncPurchase(vehicle, request);
         syncSellerCapital(vehicle, request);
+        if (vehicle.getActualPurchaseCents() != null
+                && !consignmentBefore.equals(consignmentFunding(vehicle, vehicle.getPurchaseCapitalEntryId()))) {
+            coOwnershipService.checkConsignorCash(vehicle);
+        }
         // Ortak aracta katkilar; satilmissa kar paylari da yeniden yazilir
         coOwnershipService.syncContributions(vehicle);
         // Satilmis aracta sahiplik ya da komisyon degistiyse sahibine borc yeniden yazilir
@@ -383,14 +390,15 @@ public class VehicleServiceImpl implements VehicleService {
                     || (type == CommissionType.FIXED && r.commissionCents() == null)) {
                 throw new ConsignmentDetailsRequiredException();
             }
-            // Arac galerinin mali degil: alis bedeli ve saticisi yok, sahibi var
+            // Saticisi yok, sahibi (sermayedar) var. Istege bagli maliyet: sahibinin araci kaca aldigi (Kasim 2026); doluysa
+            // kasadan araca yazilir ve sahibinin araclarina baglanir, bos ise arac eskisi gibi deftere girmez.
             vehicle.setConsignor(getConsignor(r.consignorId(), vehicle.getTenantId()));
             vehicle.setCommissionType(type);
             vehicle.setCommissionRateBp(type == CommissionType.RATE ? r.commissionRateBp() : null);
             vehicle.setCommissionCents(type == CommissionType.FIXED ? r.commissionCents() : null);
             vehicle.setSeller(null);
             vehicle.setSellerUser(null);
-            vehicle.setActualPurchaseCents(null);
+            vehicle.setActualPurchaseCents(r.actualPurchaseCents() == null || r.actualPurchaseCents() == 0 ? null : r.actualPurchaseCents());
             vehicle.setOfficialPurchaseCents(null);
         } else {
             vehicle.setConsignor(null);
@@ -439,13 +447,25 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setModel(resolved.model());
     }
 
-    /** Konsinye aracin alisi deftere yazilmaz: varsa onceki alis hareketi / plani kaldirilir. */
+    /**
+     * Konsinye arac: maliyet girildiyse kasadan (ya da secilen hesaptan) araca pesin alis olarak yazilir (planli alis yok);
+     * maliyet bossa alis deftere yazilmaz, varsa onceki alis hareketi / plani kaldirilir.
+     */
     private void syncPurchase(Vehicle vehicle, VehicleRequest r) {
         if (vehicle.getOwnership() == Ownership.CONSIGNMENT) {
-            paymentPlanService.syncPurchase(vehicle, null, null);
+            if (r.purchasePlan() != null && !r.purchasePlan().isEmpty()) throw new ConsignmentDetailsRequiredException();
+            UUID account = vehicle.getActualPurchaseCents() == null ? null
+                    : r.purchaseAccountId() != null ? r.purchaseAccountId() : ledgerService.cashAccountId();
+            paymentPlanService.syncPurchase(vehicle, account, null);
         } else {
             paymentPlanService.syncPurchase(vehicle, r.purchaseAccountId(), r.purchasePlan());
         }
+    }
+
+    /** Konsinye aracin sahibinin parasini etkileyen alanlar (sahiplik, sahibi, maliyet, tarih, cepten kismin hareketi). */
+    private static List<Object> consignmentFunding(Vehicle v, UUID capitalEntryId) {
+        return java.util.Arrays.asList(v.getOwnership(), v.getConsignor() == null ? null : v.getConsignor().getId(),
+                v.getActualPurchaseCents(), v.getPurchaseDate(), capitalEntryId);
     }
 
     // ------------------------------------------------------------------ panel kullanicisiyla alis / satis (V25)
@@ -456,14 +476,14 @@ public class VehicleServiceImpl implements VehicleService {
      */
     private void syncSellerCapital(Vehicle vehicle, VehicleRequest r) {
         long capital = r.sellerCapitalCents() == null ? 0 : r.sellerCapitalCents();
-        PanelUser seller = vehicle.getSellerUser();
-        if (seller != null && r.purchasePlan() != null && !r.purchasePlan().isEmpty()) {
+        // Konsinye aracta "cepten" kisim: sahibi aracin bu kismini kendi cebinden almis; ayni yolla onun sermayesine eklenir.
+        boolean consignment = vehicle.getOwnership() == Ownership.CONSIGNMENT;
+        PanelUser seller = consignment ? vehicle.getConsignor() : vehicle.getSellerUser();
+        if (!consignment && seller != null && r.purchasePlan() != null && !r.purchasePlan().isEmpty()) {
             throw new InvalidUserCounterpartyException("Kullanıcıdan alışta ödeme planı kurulmaz; nakit ve sermaye kısmı girin");
         }
         if (capital > 0) {
-            if (seller == null || vehicle.getOwnership() == Ownership.CONSIGNMENT) {
-                throw new InvalidUserCounterpartyException("Sermayeye eklenecek kısım sadece kullanıcıdan alışta girilir");
-            }
+            if (seller == null) throw new InvalidUserCounterpartyException("Sermayeye eklenecek kısım sadece kullanıcıdan alışta girilir");
             if (seller.isOwner()) throw new InvalidUserCounterpartyException("Dükkân sahibinin parası havuzdadır; sermaye kısmı girilmez");
             long price = vehicle.getActualPurchaseCents() == null ? 0 : vehicle.getActualPurchaseCents();
             if (capital > price) throw new InvalidUserCounterpartyException("Sermaye kısmı alış bedelini aşamaz");

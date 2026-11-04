@@ -1,7 +1,6 @@
 package com.galeri.app.service.impl;
 
 import com.galeri.app.exception.runtime.CategoryDepthLimitException;
-import com.galeri.app.exception.runtime.CommissionExceedsSaleException;
 import com.galeri.app.exception.runtime.CorrectionNotCorrectableException;
 import com.galeri.app.exception.runtime.EntryAlreadyCorrectedException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
@@ -78,6 +77,7 @@ class LedgerServiceImplTest {
     @Mock private CoOwnershipService coOwnershipService;
     @Mock private ContactRepository contactRepository;
     @Mock private PaymentPlanRepository planRepository;
+    @Mock private com.galeri.app.repository.VehiclePocketExpenseRepository pocketExpenseRepository;
 
     private static final LocalDate DAY = LocalDate.of(2026, 7, 1);
 
@@ -91,7 +91,7 @@ class LedgerServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new LedgerServiceImpl(accountRepository, entryRepository, categoryRepository, vehicleRepository, panelUserRepository,
-                installmentRepository, contactRepository, coOwnershipService, planRepository);
+                installmentRepository, contactRepository, coOwnershipService, planRepository, pocketExpenseRepository);
         TestSession.open(userId, tenantId, "ADMIN");
 
         cash = account(AccountType.CASH, tenantId);
@@ -515,40 +515,85 @@ class LedgerServiceImplTest {
     }
 
     @Test
-    void sabitKomisyonSatistanBuyukse_reddedilir() {
+    void sabitKomisyonKardanBuyukse_karKadarAlinir_reddedilmez() {
         PanelUser owner = consignor("Burak Gules");
         Vehicle v = soldConsignment(owner, 1000000L);
         v.setCommissionType(CommissionType.FIXED);
         v.setCommissionRateBp(null);
         v.setCommissionCents(2000000L);
 
-        assertThatThrownBy(() -> service.syncConsignmentSettlement(v)).isInstanceOf(CommissionExceedsSaleException.class);
+        service.syncConsignmentSettlement(v);
+
+        verify(coOwnershipService).resyncProfitShares(v);
     }
 
     @Test
-    void konsinyeMasrafi_sahibineYansitilirsa_sahibininCarisine_yoksaGenelGidereYazilir() {
+    void konsinyeMasrafi_secilenKasadan_sahibininSermayesindenDuser() {
         PanelUser owner = consignor("Burak Gules");
-        Account ownerBalance = userBalance(owner);
+        Account ownerCapital = userCapital(owner);
         Vehicle v = soldConsignment(owner, 130000000L);
         v.setStatus(VehicleStatus.IN_STOCK);
         when(vehicleRepository.findById(v.getId())).thenReturn(Optional.of(v));
+        when(coOwnershipService.cashCapital(owner)).thenReturn(1000000L);
         ExpenseCategory paint = category(ExpenseRoot.VEHICLE, "Boya", null);
         when(categoryRepository.findFirstByTenantIdAndRootAndParentIdIsNullAndNameIgnoreCase(tenantId, ExpenseRoot.VEHICLE, "Boya"))
                 .thenReturn(Optional.of(paint));
 
-        service.addExpense(new ExpenseRequest(DAY, cash.getId(), 500000L, v.getId(), null, "Boya", null, null, true));
-        service.addExpense(new ExpenseRequest(DAY, cash.getId(), 300000L, v.getId(), null, "Boya", null, null, false));
+        service.addExpense(new ExpenseRequest(DAY, cash.getId(), 500000L, v.getId(), null, "Boya", null, null, null));
 
         ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
-        verify(entryRepository, times(2)).save(saved.capture());
-        LedgerEntry charged = saved.getAllValues().get(0);
-        LedgerEntry absorbed = saved.getAllValues().get(1);
-        assertThat(charged.getSourceAccount()).isSameAs(cash);
-        assertThat(charged.getTargetAccount()).isSameAs(ownerBalance);   // sahibi galeriye borclanir
-        assertThat(charged.getVehicle()).isSameAs(v);
-        assertThat(absorbed.getTargetAccount()).isSameAs(expense);       // galerinin genel gideri
-        assertThat(absorbed.getVehicle()).isSameAs(v);
-        verify(accountRepository, never()).findByVehicleId(v.getId());   // konsinye araca maliyet hesabi acilmaz
+        verify(entryRepository).save(saved.capture());
+        LedgerEntry e = saved.getValue();
+        assertThat(e.getType()).isEqualTo(LedgerEntryType.VEHICLE_EXPENSE);
+        assertThat(e.getSourceAccount()).isSameAs(cash);
+        assertThat(e.getTargetAccount()).isSameAs(ownerCapital);   // sahibinin sermayesi hemen duser
+        assertThat(e.getVehicle()).isSameAs(v);
+        verify(accountRepository, never()).findByVehicleId(v.getId());   // aracin maliyetine girmez
+    }
+
+    @Test
+    void konsinyeMasrafi_nakitYetmezseOnaySorulur_onaylanirsaEksiyeDuser() {
+        PanelUser owner = consignor("Zeki Yilmaz");
+        Account ownerCapital = userCapital(owner);
+        Vehicle v = soldConsignment(owner, 130000000L);
+        v.setStatus(VehicleStatus.IN_STOCK);
+        when(vehicleRepository.findById(v.getId())).thenReturn(Optional.of(v));
+        when(coOwnershipService.cashCapital(owner)).thenReturn(100000L);
+        ExpenseCategory paint = category(ExpenseRoot.VEHICLE, "Boya", null);
+        when(categoryRepository.findFirstByTenantIdAndRootAndParentIdIsNullAndNameIgnoreCase(tenantId, ExpenseRoot.VEHICLE, "Boya"))
+                .thenReturn(Optional.of(paint));
+
+        assertThatThrownBy(() -> service.addExpense(new ExpenseRequest(DAY, cash.getId(), 500000L, v.getId(), null, "Boya", null, null, null)))
+                .isInstanceOf(com.galeri.app.exception.runtime.ConsignorCashNegativeException.class);
+        verify(entryRepository, never()).save(any());
+
+        service.addExpense(new ExpenseRequest(DAY, cash.getId(), 500000L, v.getId(), null, "Boya", null, null, true));
+
+        ArgumentCaptor<LedgerEntry> saved = ArgumentCaptor.forClass(LedgerEntry.class);
+        verify(entryRepository).save(saved.capture());
+        assertThat(saved.getValue().getTargetAccount()).isSameAs(ownerCapital);
+    }
+
+    @Test
+    void ceptenMasraf_sadeceKonsinyeAraca_defterYazilmaz() {
+        PanelUser owner = consignor("Zeki Yilmaz");
+        Vehicle consigned = soldConsignment(owner, 130000000L);
+        consigned.setStatus(VehicleStatus.IN_STOCK);
+        Vehicle dealer = vehicle();
+        when(vehicleRepository.findById(consigned.getId())).thenReturn(Optional.of(consigned));
+        when(vehicleRepository.findById(dealer.getId())).thenReturn(Optional.of(dealer));
+        ExpenseCategory paint = category(ExpenseRoot.VEHICLE, "Boya", null);
+        when(categoryRepository.findFirstByTenantIdAndRootAndParentIdIsNullAndNameIgnoreCase(tenantId, ExpenseRoot.VEHICLE, "Boya"))
+                .thenReturn(Optional.of(paint));
+        when(pocketExpenseRepository.save(any(com.galeri.app.model.entity.VehiclePocketExpense.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var added = service.addPocketExpense(new ExpenseRequest(DAY, null, 250000L, consigned.getId(), null, "Boya", null, null, null));
+
+        assertThat(added.amountCents()).isEqualTo(250000L);
+        assertThat(added.categoryName()).isEqualTo("Boya");
+        verify(entryRepository, never()).save(any());   // para hareketi yok
+        assertThatThrownBy(() -> service.addPocketExpense(new ExpenseRequest(DAY, null, 250000L, dealer.getId(), null, "Boya", null, null, null)))
+                .isInstanceOf(com.galeri.app.exception.runtime.PocketExpenseNotAllowedException.class);
     }
 
     @Test
@@ -806,6 +851,13 @@ class LedgerServiceImplTest {
         u.setFullName(name);
         u.setRole("INVESTOR");
         return u;
+    }
+
+    private Account userCapital(PanelUser u) {
+        Account a = account(AccountType.CAPITAL, tenantId);
+        a.setUserId(u.getId());
+        when(accountRepository.findFirstByTenantIdAndTypeAndUserId(tenantId, AccountType.CAPITAL, u.getId())).thenReturn(Optional.of(a));
+        return a;
     }
 
     private Account userBalance(PanelUser u) {

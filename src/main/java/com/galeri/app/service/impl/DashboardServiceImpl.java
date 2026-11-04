@@ -118,11 +118,14 @@ public class DashboardServiceImpl implements DashboardService {
         for (Object[] s : entryRepository.vehicleExpenseTotals(tenantId, LedgerEntryType.VEHICLE_EXPENSE, AccountType.VEHICLE)) {
             expenses.put((UUID) s[0], ((Number) s[1]).longValue());
         }
-        // Konsinye araclar galerinin mali degil: stok sayisina ve maliyetine girmez, ayri sayilir
+        // Konsinye araclar stok sayisina girmez, ayri sayilir. Maliyeti girilmis konsinye aracin alis bedeli (kasadan cikti,
+        // sahibinin sermayesine bagli) stok maliyetine girer; masraflari girmez (sahibinin sermayesinden dustu).
         List<Vehicle> allInStock = vehicleRepository.findByTenantIdAndStatus(tenantId, VehicleStatus.IN_STOCK);
         List<Vehicle> inStock = allInStock.stream().filter(v -> v.getOwnership() != Ownership.CONSIGNMENT).toList();
         int consignmentCount = allInStock.size() - inStock.size();
-        long stockCost = inStock.stream().mapToLong(v -> cost(v, expenses)).sum();
+        long stockCost = inStock.stream().mapToLong(v -> cost(v, expenses)).sum()
+                + allInStock.stream().filter(v -> v.getOwnership() == Ownership.CONSIGNMENT && v.getActualPurchaseCents() != null)
+                        .mapToLong(Vehicle::getActualPurchaseCents).sum();
         long averageDays = inStock.isEmpty() ? 0
                 : Math.round(inStock.stream().mapToLong(v -> VehicleServiceImpl.daysInStock(v, today)).average().orElse(0));
 

@@ -54,12 +54,16 @@ public class NetWorthServiceImpl implements NetWorthService {
                 .forEach(i -> debts.merge(i.getPlan().getVehicleId(), i.getAmountCents(), Long::sum));
         List<NetWorthResponse.StockVehicle> stock = new ArrayList<>();
         for (var v : vehicles.findByTenantIdAndStatus(tenant, VehicleStatus.IN_STOCK)) {
-            if (v.getOwnership() == Ownership.CONSIGNMENT) continue;
             long cost = vehicleCosts.getOrDefault(v.getId(), 0L);
             long debt = debts.getOrDefault(v.getId(), 0L);
+            // Konsinye arac: sadece maliyeti girilmisse (kasadan odendi) varliktir; tamami sahibinin
+            if (v.getOwnership() == Ownership.CONSIGNMENT && (cost == 0 || v.getConsignor() == null)) continue;
             List<ShareResponse> owners = coOwnership.owners(v);
             List<NetWorthResponse.Owner> shares = new ArrayList<>();
-            if (owners.isEmpty()) {
+            if (v.getOwnership() == Ownership.CONSIGNMENT) {
+                PanelUser c = v.getConsignor();
+                shares.add(new NetWorthResponse.Owner(c.getId(), c.getFullName(), false, 10000, cost, debt, cost - debt, cost));
+            } else if (owners.isEmpty()) {
                 shares.add(new NetWorthResponse.Owner(null, "Dükkân", true, 10000, cost, debt, cost - debt, cost - debt));
             } else {
                 int pool = -1;

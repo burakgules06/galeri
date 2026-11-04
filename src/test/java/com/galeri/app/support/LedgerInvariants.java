@@ -7,8 +7,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -73,10 +75,15 @@ public final class LedgerInvariants {
         jdbc.queryForList("select id, user_id from account where tenant_id = ? and type = 'CAPITAL'", tenant)
                 .forEach(r -> capitalByContact.put((UUID) r.get("user_id"), -balance.getOrDefault((UUID) r.get("id"), 0L)));
         List<CapitalResponses.Partner> partners = capitalService.partners();
+        // Konsinye araca masraf (Kasim 2026): sahibinin nakdi yetmezse onayla eksiye dusebilir; sadece bu kullanicilarda serbest
+        Set<UUID> mayGoNegative = new HashSet<>(jdbc.queryForList("""
+                select distinct a.user_id from ledger_entry e join account a on a.id = e.target_account_id
+                where e.tenant_id = ? and e.type = 'VEHICLE_EXPENSE' and a.type = 'CAPITAL'
+                """, UUID.class, tenant));
         for (CapitalResponses.Partner p : partners) {
             assertThat(p.capitalCents()).as("%s: %s sermayesi", step, p.name()).isEqualTo(capitalByContact.getOrDefault(p.userId(), 0L));
             assertThat(p.cashCents() + p.boundCents()).as("%s: %s sermaye = nakitteki + bagli", step, p.name()).isEqualTo(p.capitalCents());
-            assertThat(p.cashCents()).as("%s: %s nakitteki sermaye", step, p.name()).isNotNegative();
+            if (!mayGoNegative.contains(p.userId())) assertThat(p.cashCents()).as("%s: %s nakitteki sermaye", step, p.name()).isNotNegative();
             assertThat(p.boundCents()).as("%s: %s bagli sermaye", step, p.name()).isNotNegative();
         }
         assertThat(partners.stream().mapToLong(CapitalResponses.Partner::capitalCents).sum()).as("%s: toplam sermaye", step).isEqualTo(capital);

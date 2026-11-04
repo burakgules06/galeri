@@ -15,7 +15,7 @@ public record DashboardResponse(
         List<ContactBalance> receivables,
         List<ContactBalance> payables,
         int inStockCount,               // galerinin ve ortakli stoktaki araclar (konsinye haric)
-        int consignmentCount,           // stoktaki konsinye araclar; stok maliyetine girmez
+        int consignmentCount,           // stoktaki konsinye araclar; sadece maliyeti girilenlerin alis bedeli stok maliyetine girer
         long stockCostCents,
         long averageDaysInStock,
         List<MonthStat> months,

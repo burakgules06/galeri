@@ -6,8 +6,8 @@ Her iş bitince bu dosyayı güncelle: "Şu an" ve "Sıradaki"yi değiştir, bit
 
 ## Şu an (4 Kasım 2026)
 
-- Prod canlı ve kullanılıyor. main'e merge = otomatik prod deploy. Son migration `V25__user_counterparty.sql` (#76; yenisi V26).
-- Açık PR: #75 (Kasa toplu hareketler), #76 (kullanıcıyla alış / satış, "satmak için al").
+- Prod canlı ve kullanılıyor. main'e merge = otomatik prod deploy. Son migration `V26__vehicle_pocket_expense.sql` (#86; yenisi V27).
+- Açık PR: #86 (konsinye yeniden tasarımı).
 - Alacak / verecek sıfırlama scripti (`alacak-verecek-onizleme.sql` + `alacak-verecek-sifirla.sql`) Burak'a verildi; sonucu bildirilmedi.
 - Prod veri sıfırlaması: `sifirla-pgadmin.sql` (pgAdmin Query Tool) Burak'a verildi. Test galerisi tamamen siliniyor; gerçek galeride
   araçlar, araç masrafları, çek / senet planları ve kullanıcılar dışındaki her şey (sermaye dahil) siliniyor. Sonucu henüz bildirilmedi;
@@ -20,8 +20,11 @@ Her iş bitince bu dosyayı güncelle: "Şu an" ve "Sıradaki"yi değiştir, bit
 - Ortaklı satış: kâr = satış − alış − araç masrafları; sadece kâr kâr payı oranıyla bölünür. Ortağın alacağı = katkı + kâr payı − dükkân payı (≥ 0).
   Tahsil edildikçe orantılı dağıtılır (`CoOwnershipServiceImpl.distribution`, BigInteger `mulDiv`).
   Örnek: alış 2M, satış 2.3M, %60 → 180k / 120k.
-- Ortaklı araçta masraf payı hemen ortağın sermayesinden araca bağlanır.
-- Konsinye: alacak = satış − komisyon. Yansıtılan masraf önce bu paydan düşer.
+- Ortaklı araçta masrafı o an seçilen kasa / banka (dükkân sahibi) öder; satışta sahiplik payı oranında ortağın kârından düşer.
+- Konsinye (#86, MIMARI §0 "Konsinye"): isteğe bağlı maliyet (sermayeden / hibrit / cepten) kasadan araca, sahibinin araçlarına bağlı.
+  Masraf seçilen kasadan sahibinin sermayesinden hemen düşer (yetmezse 1061 onayı, eksiye düşebilir); cepten masraf sadece takip (V26).
+  Komisyon kârın yüzdesi (kâr = satış − maliyet), sabit tutar en fazla kâr; zararda 0. Alacak = satış − komisyon.
+  Eski kayıtlarda yansıtılan (BALANCE) masraf önce bu paydan düşer.
 - Roller: ADMIN (dükkân sahibi), INVESTOR (sermayedar), STAFF (para alanı görmez).
 - Sermayedar sadece kendi araçlarını görür ve alıp satabilir. Alış hep CO_OWNED ve sermayeden. Tahsilatta "Sermayeme ekle" ya da "Nakit aldım".
 - Kullanıcıyla alış / satış (V25): araç kullanıcıdan alınabilir (bedelin bir kısmı onun sermayesine: kasadan tam alış + CAPITAL→kasa girişi,
@@ -32,6 +35,7 @@ Her iş bitince bu dosyayı güncelle: "Şu an" ve "Sıradaki"yi değiştir, bit
 
 ## Son işler
 
+- #86 Konsinye yeniden tasarımı (kural 1-4), `ConsignmentCostIT`; ortaklı masraf yorumu sahiplik oranıyla düzeltildi.
 - #76 Kullanıcıyla alış / satış ve "satmak için al" (MIMARI §0 madde 5), `UserCounterpartyIT`.
 - #75 Kasa son hareketlerde aynı gün / araç / kişi / hesap toplu işlemleri tek satır (`features/ledger/entryGroups.ts`).
 
@@ -42,22 +46,9 @@ Her iş bitince bu dosyayı güncelle: "Şu an" ve "Sıradaki"yi değiştir, bit
 - #67 Kişiler sekmeleri: Tedarikçiler / Müşteriler / Alış yaptıklarım + tüzel/bireysel (V24); Kasa son hareketlerde saat.
 - #68–#71 gece paketinin dalları (ödemeler, kasa, masraf/dükkân, sermayedar) main'e alındı.
 - #72 Ana sayfada kasa, banka ve stok maliyeti kuruşuna kadar.
-- #73 Sermayedar araç alıp satabiliyor; ortaklı araç masraf payı sermayeden hemen düşüyor.
+- #73 Sermayedar araç alıp satabiliyor. (Ortaklı masraf kuralı sonra netleşti: masrafı kasa öder, satışta kârdan düşer.)
 
 ## Sıradaki / Burak'ın kararını bekleyenler
-
-- **Konsinye yeniden tasarımı (4 Kasım 2026, Burak onayladı, henüz kodlanmadı).** Kurallar:
-  1. Konsinye formuna "Sahibi aracı kaça aldı" (maliyet) + alım türü (sermayeden / hibrit / cepten) eklenir. Araç girilince
-     maliyet sermayedarın malvarlığına (araçlarına) yazılır; nakitteki parası alım türüne göre düşer (sermayeden: tamamı,
-     hibrit: girilen sermaye kısmı, cepten: düşmez; cepten kısım sermayesine eklenir). Dükkân sahibinin parasına dokunulmaz.
-  2. Konsinye araca masraf: girildiği anda seçilen kasa / bankadan, sermayedarın parasından düşer; toplam sermayesi de hemen
-     düşer (örn. 1.000.000 → 980.000). Satışta bir daha düşülmez. Dükkân sahibinin parasına dokunulmaz.
-     "Masrafı galeri üstlenir" seçeneği kalkar. Sermayedarın nakitteki parası yetmezse uyarı ("eksiye düşecek, devam?"),
-     onaylanırsa eksiye düşer. Cepten masraf sadece takip içindir, paraya etkisi yok (nasıl saklanacağı açık).
-  3. Satışta kâr = satış − maliyet (masraflar hariç). Galeri komisyonu **kârın yüzdesi** (ya da sabit tutar); zararda 0.
-     Galerinin kârı komisyon; kalan kâr sermayedarın. Maliyet boşsa kâr = satış bedeli (bugünkü sonuçla aynı).
-     Örnek: maliyet 800.000, satış 1.000.000, kâr 200.000, %3 → galeri 6.000, Zeki 194.000 kâr.
-  4. Eski kayıtlar: "sahibine yansıtılan" (BALANCE) masraflar eski kuralla satışta netleşir; yeni masraflar yeni kuralla.
 
 - Dükkân sahibinin komisyon kuralı (gece paketi soru 2, "şimdilik geç" dendi).
 - Konsinye para dağıtımının zamanlaması (soru 4, "sonra soracağım" dendi).
