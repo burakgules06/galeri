@@ -84,6 +84,8 @@ body {
 /* Katmanli olmali: katmansiz kural Tailwind yardimci siniflarini (text-white vb.) ezer */
 @layer base {
   button, input, select, textarea { font: inherit; color: inherit; }
+  /* Izgara hucreleri icerigine gore genislemesin (telefonda yatay kayma): uzun plaka / model / tutar satirlari hucrede kisalir */
+  .grid > * { min-width: 0; }
 }
 
 /* Sadece dokunmaya cevap veren kisa hareket */
