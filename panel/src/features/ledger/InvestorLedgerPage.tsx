@@ -9,10 +9,10 @@ import { PartnerCapitalCard } from "../home/PartnerCapitalCard";
 import { LedgerEntryList } from "./LedgerEntryList";
 
 export function InvestorLedgerPage() {
-  const me = useLoad(() => api.me(), []);
-  const partners = useLoad(() => api.partners(), []);
+  // Sermayedara /api/holders sadece kendi satirini doner: kasa ve bankalardaki parasi backend'den
+  const partners = useLoad(() => api.holders(), []);
   const entries = useLoad(() => api.ledgerEntries(null), []);
-  const mine = (partners.data ?? []).find((p) => p.userId === me.data?.userId);
+  const mine = (partners.data ?? []).find((p) => !p.owner);
   const total = mine?.cashCents ?? 0;
 
   return (
@@ -21,7 +21,7 @@ export function InvestorLedgerPage() {
         <p className="etiket">Benim param</p>
         <h1 className="font-cond font-bold text-[30px] md:text-[34px] leading-tight tracking-tight">Kasa ve banka</h1>
       </header>
-      <ErrorBox message={partners.error ?? me.error ?? entries.error} />
+      <ErrorBox message={partners.error ?? entries.error} />
 
       <section className="kart p-4 md:p-5">
         <p className="etiket">Kasa ve bankalardaki param</p>

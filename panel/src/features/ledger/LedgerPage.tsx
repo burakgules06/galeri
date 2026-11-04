@@ -37,9 +37,9 @@ export function LedgerPage() {
   const [sort, setSort] = useState<Sort>("new");
   const [entryPage, setEntryPage] = useState(1);
   const accounts = useLoad(() => api.accounts(), []);
-  // Kisinin kasa ve bankalardaki toplam parasi defterden kesin (sermaye hesabi); hangi hesapta durdugu tutulmaz, tahmin edilmez
-  const partners = useLoad(() => api.partners(), [revision]);
+  // Kisinin kasa ve bankalardaki toplam parasi backend'den (holders.cashCents); hangi hesapta durdugu tutulmaz, tahmin edilmez
   const holders = useLoad(() => api.holders(), [revision]);
+  const partners = holders;
   const summary = useLoad(() => api.dashboard(), []);
   const entries = useLoad(() => api.ledgerEntries(selected), [selected]);
 
@@ -48,12 +48,10 @@ export function LedgerPage() {
   const total = list.reduce((t, a) => t + a.balanceCents, 0);
   const colored = list.map((a, i) => ({ ...a, color: SERIES[i % SERIES.length] }));
   // Kisiler: dukkan sahibi once, sonra sermayedarlar
-  const peopleList = [...(partners.data ?? [])].sort((x, y) => Number(y.owner) - Number(x.owner) || x.name.localeCompare(y.name, "tr"));
+  const peopleList = (partners.data ?? []).filter((p): p is typeof p & { userId: string } => p.userId != null);
   const person = peopleList.find((p) => p.userId === owner);
   const shown = colored.map((a) => ({ ...a, amount: a.balanceCents }));
-  // Dukkan sahibinin parasi havuzun kalani: kasa + bankalar - sermayedarlarin nakitteki parasi (ikisi de defterden kesin)
-  const investorsCash = peopleList.filter((p) => !p.owner).reduce((t, p) => t + p.cashCents, 0);
-  const shownTotal = !person ? total : person.owner ? total - investorsCash : person.cashCents;
+  const shownTotal = person ? person.cashCents : total;
 
   const allEntries = entries.data ?? [];
   const isCorrection = (e: LedgerEntryResponse) => e.corrected || e.correctedEntryId != null;
@@ -107,7 +105,7 @@ export function LedgerPage() {
               {accounts.data && (!owner || partners.data) ? tl(shownTotal) : "…"}
             </p>
             {person && <p className="text-[13px] text-murekkep-2 mt-1">
-              {person.owner ? "Kasa ve bankalardan sermayedarların parası çıkınca kalan" : <>Araçlarda bağlı: <span className="sayi">{tl(person.boundCents)}</span></>}
+              {person.owner ? "Kasa ve bankalardan sermayedarların parası çıkınca kalan" : <>Araçlarda bağlı: <span className="sayi">{tl(person.vehicleCents)}</span></>}
               {" · "}Hesap kartları hesapların toplam bakiyesidir.
             </p>}
           </div>
