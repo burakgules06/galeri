@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { api, isAdminDetail } from "../../api/galeri";
 import { formatDate, formatNumber, FUEL, percent, STATUS, tl, TRANSMISSION } from "../../shared/format";
-import type { BodyPart, ContactSummary, ShareResponse, PartCondition, VehicleDetail, VehicleDetailAdmin, VehicleStatus } from "../../shared/types";
+import type { BodyPart, ContactSummary, PocketExpenseResponse, ShareResponse, PartCondition, VehicleDetail, VehicleDetailAdmin, VehicleStatus } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Plate } from "../../shared/ui/Plate";
 import { Button, ErrorBox } from "../../shared/ui/Common";
@@ -175,7 +175,8 @@ export function VehicleDetailPage({ id }: { id: string }) {
 }
 
 // Maliyet = gercek alis + araca bagli masraflar (defterden). Kar sadece satilmis aracta.
-// Konsinye: alis yok; kar = komisyon - galerinin ustlendigi masraflar, sahibine borc ve yansitilan masraf ayri.
+// Konsinye: istege bagli sahibinin alisi; masraflar sahibinin sermayesinden (eski kayitta galeri ustlenir / carisine yansitilir);
+// kar = komisyon (kardan) - galerinin ustlendigi eski masraflar. Cepten masraflar sadece listelenir, paraya etkisi yok.
 // Ortakli: kar, ortaklarin payina gore bolunur (sadece gosterim).
 function CostCard({ vehicle, ownerName }: { vehicle: VehicleDetail; ownerName?: string }) {
   const { data, error, reload } = useLoad(() => api.vehicleCost(vehicle.id), [vehicle.id]);
@@ -183,6 +184,9 @@ function CostCard({ vehicle, ownerName }: { vehicle: VehicleDetail; ownerName?: 
   const { isInvestor } = useAuth();
   const expenses = (data?.entries ?? []).filter((e) => e.type === "VEHICLE_EXPENSE");
   const consignment = data?.ownership === "CONSIGNMENT";
+  const pockets = useLoad(() => (consignment ? api.pocketExpenses(vehicle.id) : Promise.resolve([])), [vehicle.id, consignment]);
+  const pocketTotal = (pockets.data ?? []).reduce((t, p) => t + p.amountCents, 0);
+  const reloadAll = () => { reload(); pockets.reload(); };
 
   return (
     <Card title={consignment ? "Komisyon ve masraflar" : "Maliyet"}>
@@ -192,8 +196,10 @@ function CostCard({ vehicle, ownerName }: { vehicle: VehicleDetail; ownerName?: 
           <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
             <Info label="Komisyon" value={data.commissionCents == null ? "Satışta belli olur" : tl(data.commissionCents)}
               numeric={data.commissionCents != null} strong />
-            <Info label="Galerinin masrafı" value={tl(data.expenseCents)} numeric />
-            <Info label="Sahibine yansıtılan" value={tl(data.ownerChargedCents)} numeric />
+            {data.purchaseCents > 0 && <Info label="Sahibinin alışı" value={tl(data.purchaseCents)} numeric />}
+            <Info label="Sahibinin masrafı" value={tl(data.ownerChargedCents)} numeric />
+            {pocketTotal > 0 && <Info label="Cepten masraf" value={tl(pocketTotal)} numeric />}
+            {data.expenseCents !== 0 && <Info label="Galerinin masrafı" value={tl(data.expenseCents)} numeric />}
             {data.profitCents != null && <>
               <Info label="Satış bedeli" value={tl(data.salePriceCents)} numeric />
               <ProfitInfo cents={data.profitCents} label="Galerinin kârı" />
@@ -231,16 +237,19 @@ function CostCard({ vehicle, ownerName }: { vehicle: VehicleDetail; ownerName?: 
               <h3 className="font-semibold text-[15px] text-murekkep-2">Masraf dökümü</h3>
               <Button variant="secondary" className="h-9" onClick={() => setExpenseOpen(true)}>Masraf ekle</Button>
             </div>
-            {expenses.length === 0
+            {expenses.length === 0 && (pockets.data ?? []).length === 0
               ? <p className="text-[14px] text-murekkep-3">Bu araca henüz masraf girilmedi.</p>
-              : <LedgerEntryList entries={expenses} direction={() => 0} onChange={reload} showVehicle={false} />}
+              : expenses.length > 0 && <LedgerEntryList entries={expenses} direction={() => 0} onChange={reload} showVehicle={false} />}
+            {(pockets.data ?? []).length > 0 && (
+              <PocketExpenseList items={pockets.data ?? []} onChange={pockets.reload} />
+            )}
           </div>
         </>
       )}
       {expenseOpen && !isInvestor && <BulkExpenseForm vehicle={vehicle} onClose={() => setExpenseOpen(false)}
-        onSaved={() => { setExpenseOpen(false); reload(); }} />}
+        onSaved={() => { setExpenseOpen(false); reloadAll(); }} />}
       <ExpenseForm open={expenseOpen && isInvestor} vehicle={vehicle} onClose={() => setExpenseOpen(false)}
-        onSaved={() => { setExpenseOpen(false); reload(); }} />
+        onSaved={() => { setExpenseOpen(false); reloadAll(); }} />
     </Card>
   );
 }
@@ -387,6 +396,41 @@ function Info({ label, value, numeric = false, strong = false }: { label: string
     <div className="min-w-0">
       <dt className="etiket">{label}</dt>
       <dd className={`mt-1 truncate ${numeric ? "sayi text-[21px] leading-tight" : "text-[16px] text-murekkep"} ${strong ? "font-bold" : numeric ? "font-medium" : "font-semibold"}`}>{value}</dd>
+    </div>
+  );
+}
+
+// Konsinye araca cepten yapilan masraflar: sadece takip (para hareketi yok), silinebilir.
+function PocketExpenseList({ items, onChange }: { items: PocketExpenseResponse[]; onChange: () => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const remove = async (id: string) => {
+    if (!window.confirm("Cepten masraf silinsin mi?")) return;
+    setBusy(id);
+    setError(null);
+    try {
+      await api.deletePocketExpense(id);
+      onChange();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <div className="mt-3">
+      <ErrorBox message={error} />
+      <h4 className="etiket mb-1">Cepten</h4>
+      <ul className="divide-y divide-cizgi">
+        {items.map((p) => (
+          <li key={p.id} className="flex items-center gap-3 py-2 text-[14px]">
+            <span className="text-murekkep-2 w-[88px] shrink-0">{formatDate(p.date)}</span>
+            <span className="min-w-0 flex-1 truncate">{p.categoryName ?? "—"}{p.description ? ` · ${p.description}` : ""}</span>
+            <span className="sayi">{tl(p.amountCents)}</span>
+            <Button variant="secondary" className="h-8 px-2" disabled={busy === p.id} onClick={() => remove(p.id)}>Sil</Button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

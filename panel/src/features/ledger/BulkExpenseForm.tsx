@@ -1,6 +1,7 @@
 // Toplu masraf: tarih ve odeme hesabi ustte bir kez secilir, her satirda arac (bossa genel gider), kategori, tutar ve aciklama.
 // Satir eklenir / silinir, hepsi tek istekte kaydedilir (POST /api/expenses/bulk; biri hataliysa hicbiri yazilmaz).
-// Arac detayindan acilinca arac sabittir (arac sutunu yok); konsinye aracta masrafi kimin ustlendigi bir kez secilir.
+// Arac detayindan acilinca arac sabittir (arac sutunu yok). Konsinye aracta masraf sahibinin sermayesinden duser (nakdi yetmezse
+// onay sorulur); konsinye aracta "Cepten" secilirse para hareketi olmaz, masraflar sadece aracta gorunur.
 import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { api } from "../../api/galeri";
 import { tl, tlToCents, todayIso } from "../../shared/format";
@@ -9,11 +10,13 @@ import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
 import { NumberInput } from "../../shared/ui/NumberInput";
 import { confirmOwnerCash } from "../../shared/ownerCash";
+import { withNegativeConfirm } from "../../shared/consignorCash";
 
 interface Row { key: number; vehicleId: string; category: string; amount: string; description: string }
 
 let nextKey = 1;
 const emptyRow = (vehicleId = ""): Row => ({ key: nextKey++, vehicleId, category: "", amount: "", description: "" });
+const POCKET = "POCKET";   // konsinye araca cepten: sadece takip
 
 interface FixedVehicle { id: string; plate: string; ownership?: Ownership }
 
@@ -24,7 +27,6 @@ export function BulkExpenseForm({ onClose, onSaved, vehicle }: {
   const consignment = vehicle?.ownership === "CONSIGNMENT";
   const [date, setDate] = useState(todayIso());
   const [accountId, setAccountId] = useState("");
-  const [chargeToOwner, setChargeToOwner] = useState(false);
   const [rows, setRows] = useState<Row[]>([emptyRow(fixed), emptyRow(fixed), emptyRow(fixed)]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -35,6 +37,7 @@ export function BulkExpenseForm({ onClose, onSaved, vehicle }: {
   const general = useLoad(() => api.categories("GENERAL"), []);
   const vehicleCats = useLoad(() => api.categories("VEHICLE"), []);
   const selectedAccount = accountId || accounts.data?.[0]?.id || "";
+  const pocket = consignment && selectedAccount === POCKET;
   const cols = fixed ? "md:grid-cols-[1.2fr_150px_1.2fr_36px]" : "md:grid-cols-[1.2fr_1fr_130px_1fr_36px]";
 
   const filled = rows.filter((r) => r.amount.trim() || r.category.trim());
@@ -66,14 +69,21 @@ export function BulkExpenseForm({ onClose, onSaved, vehicle }: {
       items.push({
         date, sourceAccountId: selectedAccount, amountCents: cents, vehicleId: fixed || r.vehicleId || null,
         categoryId: null, categoryName: r.category.trim(), description: r.description.trim() || null,
-        chargeToOwner: consignment ? chargeToOwner : null,
       });
     }
-    if (!(await confirmOwnerCash(items.reduce((t, x) => t + x.amountCents, 0)))) return;
+    // Konsinye araclarin masrafi sahibinin parasindan duser: dukkan sahibinin kasa payi sadece digerleri icin sorulur
+    const isConsignment = (id: string | null) => consignment || stock.data?.find((v) => v.id === id)?.ownership === "CONSIGNMENT";
+    const shopCents = items.filter((x) => !isConsignment(x.vehicleId)).reduce((t, x) => t + x.amountCents, 0);
+    if (!pocket && shopCents > 0 && !(await confirmOwnerCash(shopCents))) return;
     setSaving(true);
     setError(null);
     try {
-      await api.addExpenses(items);
+      if (pocket) {
+        for (const item of items) await api.addPocketExpense({ ...item, sourceAccountId: null });
+      } else {
+        const saved = await withNegativeConfirm((confirmNegative) => api.addExpenses(items.map((x) => ({ ...x, confirmNegative }))));
+        if (saved == null) return;
+      }
       onSaved(items.length);
     } catch (err) {
       setError(errorMessage(err));
@@ -99,17 +109,11 @@ export function BulkExpenseForm({ onClose, onSaved, vehicle }: {
           <Field label="Nereden ödendi">
             {accounts.data && (
               <Segment<string> value={selectedAccount} onChange={setAccountId}
-                options={accounts.data.map((a) => ({ value: a.id, label: a.name }))} />
+                options={[...accounts.data.map((a) => ({ value: a.id, label: a.name })),
+                  ...(consignment ? [{ value: POCKET, label: "Cepten" }] : [])]} />
             )}
           </Field>
         </div>
-
-        {consignment && (
-          <Field label="Masrafı kim üstleniyor">
-            <Segment<"dealer" | "owner"> value={chargeToOwner ? "owner" : "dealer"} onChange={(v) => setChargeToOwner(v === "owner")}
-              options={[{ value: "dealer", label: "Galeri üstlenir" }, { value: "owner", label: "Sahibine yansıt" }]} />
-          </Field>
-        )}
 
         <datalist id="expense-cats-general">{(general.data ?? []).map((c) => <option key={c.id} value={c.name} />)}</datalist>
         <datalist id="expense-cats-vehicle">{(vehicleCats.data ?? []).map((c) => <option key={c.id} value={c.name} />)}</datalist>

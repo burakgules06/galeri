@@ -3,7 +3,7 @@ import type {
   HoldingsResponse,
   NetWorthResponse, AccountResponse, BodyPart, CategoryResponse, ContactRequest, ContactResponse, DashboardResponse, ExpenseRequest, ExpenseRoot,
   YearlyTrades, PaymentPlanResponse, OpenItemsRequest, BasketSaleRequest, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
-  LedgerEntryResponse, MonthlyTrades, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
+  LedgerEntryResponse, MonthlyTrades, PocketExpenseResponse, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
   VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary, UserResponse, UserRole, ContactPaymentRequest,
   CapitalMovementRequest, CapitalBase, CapitalTransferRequest, Holder, OpeningBalanceRequest, Partner, PeriodProfit, ProfitAllocationRequest, TransferRequest, CatalogItem,
 } from "../shared/types";
@@ -92,6 +92,10 @@ export const api = {
   updateExpense: (id: string, request: ExpenseRequest) => apiFetch<LedgerEntryResponse>(`/api/expenses/${id}`, json(request, "PUT")),
   deleteExpense: (id: string) => apiFetch<LedgerEntryResponse>(`/api/expenses/${id}`, { method: "DELETE" }),
   categories: (root: ExpenseRoot) => apiFetch<CategoryResponse[]>(`/api/expense-categories?root=${root}`),
+  // Konsinye araca cepten masraf (sadece takip; para hareketi yok)
+  pocketExpenses: (vehicleId: string) => apiFetch<PocketExpenseResponse[]>(`/api/vehicles/${vehicleId}/pocket-expenses`),
+  addPocketExpense: (request: ExpenseRequest) => apiFetch<PocketExpenseResponse>("/api/pocket-expenses", json(request)),
+  deletePocketExpense: (id: string) => apiFetch<string>(`/api/pocket-expenses/${id}`, { method: "DELETE" }),
   vehicleCost: (vehicleId: string) => apiFetch<VehicleCost>(`/api/vehicles/${vehicleId}/cost`),
   // Kullanicilar (sadece ADMIN) ve herkesin kendi sifresi
   users: () => apiFetch<UserResponse[]>("/api/users"),

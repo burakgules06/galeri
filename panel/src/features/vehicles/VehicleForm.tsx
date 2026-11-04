@@ -1,5 +1,6 @@
 // Arac ekleme / duzenleme. Sadece ADMIN acar. Tutarlar TL girilir, kurus gonderilir.
-// Sahiplik: galeri (varsayilan), konsinye (sahibi + komisyon; alis bedeli ve odemesi yok), ortak (Havuz ve/veya ortaklar,
+// Sahiplik: galeri (varsayilan), konsinye (sahibi + komisyon; istege bagli sahibinin alis bedeli ve parayi sermayesinden /
+// cebinden verdigi; para kasadan, sahibinin parasindan), ortak (Havuz ve/veya ortaklar,
 // katki kaynagi ve kar payi orani: CoOwnersEditor).
 import { useState, type FormEvent } from "react";
 import { CoOwnersEditor } from "./CoOwnersEditor";
@@ -84,6 +85,9 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const [commissionType, setCommissionType] = useState<CommissionType>(existing?.commissionType ?? "RATE");
   const [commissionRate, setCommissionRate] = useState(bpToInput(existing?.commissionRateBp));
   const [commissionFixed, setCommissionFixed] = useState(centsToInput(existing?.commissionCents));
+  // Konsinye: sahibinin araci kaca aldigi (maliyet) ve parayi nereden verdigi. Cepten kisim sahibinin sermayesine eklenir.
+  const [consignFunding, setConsignFunding] = useState<ConsignFunding>(() => initialFunding(existing));
+  const [consignCapital, setConsignCapital] = useState(() => centsToInput(initialFundingCapital(existing)));
   const [owners, setOwners] = useState<OwnerRow[]>(() => initialOwners(existing));
   const [profitDiffers, setProfitDiffers] = useState(() => (existing?.shares ?? []).some((s) => s.profitShareBp !== s.shareBp));
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +138,10 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const sellerPartner = (partners.data ?? []).find((p) => p.userId === sellerUserId);
   const userSale = fromUser && !consignment && !isInvestor;
   const sellerCapitalCents = userSale && sellerPartner && !sellerPartner.owner ? tlToCents(sellerCapital) ?? 0 : 0;
+  const consignCapitalCents = consignFunding === "MIXED" ? tlToCents(consignCapital) ?? 0 : 0;
+  // Konsinyede sahibinin sermayesine eklenecek cepten kisim (sermayeden: 0, cepten: tamami, hibrit: kalan)
+  const consignPocketCents = !consignment || price <= 0 ? 0
+    : consignFunding === "POCKET" ? price : consignFunding === "MIXED" ? price - consignCapitalCents : 0;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -149,6 +157,9 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       const rate = percentToBp(commissionRate), fixed = tlToCents(commissionFixed);
       if (commissionType === "RATE" && (rate == null || Number.isNaN(rate))) return setError("Komisyon oranını 3 ya da 2,5 gibi yaz.");
       if (commissionType === "FIXED" && (fixed == null || Number.isNaN(fixed))) return setError("Sabit komisyonu 25.000 gibi yaz.");
+      if (price > 0 && consignFunding === "MIXED" && (Number.isNaN(consignCapitalCents) || consignCapitalCents <= 0 || consignCapitalCents >= price)) {
+        return setError("Sermayeden kısım alış bedelinden küçük olmalı.");
+      }
     }
     if (coOwned) {
       const problem = ownersProblem(owners, profitDiffers, price, { enabled: false, type: "RATE", rate: "", fixed: "" });
@@ -168,8 +179,10 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       plate, make: makeModel.make, model: makeModel.model, modelYear: yearNumber, fuel, transmission, mileageKm: mileageNumber,
       color: color.trim() || null, tramerCents: amounts[0], notes: notes.trim() || null,
       purchaseDate, sellerId: userSale ? null : seller?.id ?? null, boughtById: boughtById || null,
-      sellerUserId: userSale ? sellerUserId : null, sellerCapitalCents: userSale && sellerCapitalCents > 0 ? sellerCapitalCents : null,
-      actualPurchaseCents: amounts[1], officialPurchaseCents: amounts[2],
+      sellerUserId: userSale ? sellerUserId : null,
+      sellerCapitalCents: consignment ? (consignPocketCents > 0 ? consignPocketCents : null)
+        : userSale && sellerCapitalCents > 0 ? sellerCapitalCents : null,
+      actualPurchaseCents: amounts[1], officialPurchaseCents: consignment ? null : amounts[2],
       purchaseAccountId: !consignment && !isInvestor && (payMode === "CASH" || userSale) ? purchaseAccountId || null : null,
       purchasePlan: !consignment && !isInvestor && payMode === "PLAN" && !userSale ? rows.map(toRequest) : null,
       ownership,
@@ -235,8 +248,15 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
           <h3 className="font-cond font-semibold text-[18px]">Alış</h3>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Alış tarihi"><input type="date" className={inputClass} value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} required /></Field>
-            {!consignment && <Field label="Alış bedeli"><NumberInput className={`${inputClass} sayi text-[18px] font-semibold`} value={actual} onValueChange={setActual} placeholder="1.250.000" /></Field>}
+            <Field label={consignment ? "Sahibi kaça aldı" : "Alış bedeli"}><NumberInput className={`${inputClass} sayi text-[18px] font-semibold`} value={actual} onValueChange={setActual} placeholder="1.250.000" /></Field>
           </div>
+          {consignment && price > 0 && <>
+            <Segment<ConsignFunding> value={consignFunding} onChange={setConsignFunding}
+              options={[{ value: "CAPITAL", label: "Sermayeden" }, { value: "MIXED", label: "Hibrit" }, { value: "POCKET", label: "Cepten" }]} />
+            {consignFunding === "MIXED" && (
+              <Field label="Sermayeden kısım"><NumberInput value={consignCapital} onValueChange={setConsignCapital} placeholder="0" /></Field>
+            )}
+          </>}
           {!consignment && <>
             <label className="flex items-center gap-2 text-sm min-h-8 cursor-pointer">
               <input type="checkbox" className="w-4 h-4 accent-plaka" checked={officialDiffers} onChange={e => {
@@ -368,4 +388,18 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       </form>
     </Modal>
   );
+}
+
+type ConsignFunding = "CAPITAL" | "MIXED" | "POCKET";
+
+// Duzenlemede alim turu kayittan cikar: cepten kisim (sahibinin sermayesine eklenen) yoksa sermayeden, tamamiysa cepten.
+function initialFunding(existing?: VehicleDetailAdmin): ConsignFunding {
+  const cost = existing?.actualPurchaseCents ?? 0, pocket = existing?.sellerCapitalCents ?? 0;
+  if (existing?.vehicle.ownership !== "CONSIGNMENT" || pocket <= 0 || cost <= 0) return "CAPITAL";
+  return pocket >= cost ? "POCKET" : "MIXED";
+}
+
+function initialFundingCapital(existing?: VehicleDetailAdmin): number | null {
+  if (initialFunding(existing) !== "MIXED") return null;
+  return (existing?.actualPurchaseCents ?? 0) - (existing?.sellerCapitalCents ?? 0);
 }
