@@ -436,12 +436,16 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         }
         long sale = vehicle.getSalePriceCents();
         int pool = indexOfPool(owners.stream().map(VehicleShare::isPool).toList());
-        // Kar = satis - (gercek alis + masraflar); kar payi oranlariyla bolunur (kurus farki dukkan sahibine). Kar varsa dukkan
-        // payi ortaklarin payindan duser. Ortagin alacagi = koydugu para + kar payi (zararda katkisindan duser, 0'in altina inmez).
+        // Kar = satis - (gercek alis + masraflar). Masrafsiz kar (satis - alis) kar payi oranlariyla, masraflar sahiplik oranlariyla
+        // bolunur; ortagin kari = kar payi - masraf payi (kurus farki dukkan sahibine). Kar varsa dukkan payi ortaklarin payindan
+        // duser. Ortagin alacagi = koydugu para + kari (zararda katkisindan duser, 0'in altina inmez).
         long expenses = vehicleExpenses(vehicle.getId());
         long purchase = vehicle.getActualPurchaseCents() == null ? 0 : vehicle.getActualPurchaseCents();
         long profit = sale - purchase - expenses;
-        List<Long> shares = new ArrayList<>(CoOwnershipMath.split(profit, owners.stream().map(VehicleShare::getProfitShareBp).toList(), pool));
+        List<Long> gross = CoOwnershipMath.split(sale - purchase, owners.stream().map(VehicleShare::getProfitShareBp).toList(), pool);
+        List<Long> expenseParts = CoOwnershipMath.split(expenses, owners.stream().map(VehicleShare::getShareBp).toList(), pool);
+        List<Long> shares = new ArrayList<>();
+        for (int k = 0; k < owners.size(); k++) shares.add(gross.get(k) - expenseParts.get(k));
         List<Integer> partners = new ArrayList<>();
         long partnersProfit = 0;
         for (int k = 0; k < owners.size(); k++) {
