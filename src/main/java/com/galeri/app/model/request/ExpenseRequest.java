@@ -18,15 +18,15 @@ public record ExpenseRequest(
         @Size(max = 60) String categoryName,
         UUID parentCategoryId,
         @Size(max = 500) String description,
-        // Sadece konsinye aracta: true ise masraf sahibinin carisine yazilir (sahibi galeriye borclanir),
-        // degilse galerinin genel gideridir. Diger araclarda yok sayilir.
-        Boolean chargeToOwner,
+        // Sadece konsinye aracta (Kasim 2026): masraf her zaman sahibinin sermayesinden duser. Nakitteki parasi yetmiyorsa
+        // istek 1061 ile reddedilir; kullanici "eksiye dusecek, devam?" sorusunu onaylarsa true gelir ve eksiye duser.
+        Boolean confirmNegative,
         // Dukkan gideri cepten (elden) odendi: kasa / banka degismez, kimsenin sermayesi dusmez. Defterde dukkan sahibinin
         // sermaye hesabindan gidere yazilir (sermayesi o kadar artar, gider kadar azalir). Sadece genel giderde.
         Boolean paidByOwner
 ) {
     public ExpenseRequest(LocalDate date, UUID sourceAccountId, Long amountCents, UUID vehicleId, UUID categoryId, String categoryName,
-                          UUID parentCategoryId, String description, Boolean chargeToOwner) {
-        this(date, sourceAccountId, amountCents, vehicleId, categoryId, categoryName, parentCategoryId, description, chargeToOwner, null);
+                          UUID parentCategoryId, String description, Boolean confirmNegative) {
+        this(date, sourceAccountId, amountCents, vehicleId, categoryId, categoryName, parentCategoryId, description, confirmNegative, null);
     }
 }

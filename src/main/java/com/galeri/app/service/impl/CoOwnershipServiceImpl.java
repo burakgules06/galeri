@@ -264,7 +264,42 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
                 if (id != null) bound.merge(id, c, Long::sum);   // Havuzun katkisi kimsenin sermayesine bagli degil
             });
         }
+        // Maliyeti girilmis konsinye arac: kasadan odenen alis tamamen sahibinin sermayesine bagli (Kasim 2026)
+        for (Vehicle v : vehicleRepository.findByTenantIdAndOwnership(tenantId, Ownership.CONSIGNMENT)) {
+            if (v.getConsignor() == null || v.getPurchaseDate().isAfter(asOf)) continue;
+            boolean soldByThen = v.getStatus() != VehicleStatus.IN_STOCK && v.getSaleDate() != null && !v.getSaleDate().isAfter(asOf);
+            if (soldByThen) continue;
+            long paid = consignmentContribution(v, asOf);
+            if (paid != 0) bound.merge(v.getConsignor().getId(), paid, Long::sum);
+        }
         return bound;
+    }
+
+    /** Konsinye aracin kasadan odenmis alisi (sahibinin araca bagli parasi); upTo doluysa o gune kadar. */
+    private long consignmentContribution(Vehicle vehicle, LocalDate upTo) {
+        return contributingPayments(vehicle).stream()
+                .filter(p -> upTo == null || !p.date().isAfter(upTo))
+                .mapToLong(Payment::amountCents).sum();
+    }
+
+    @Override
+    @Transactional
+    public void checkConsignorCash(Vehicle vehicle) {
+        if (vehicle.getOwnership() != Ownership.CONSIGNMENT || vehicle.getConsignor() == null
+                || vehicle.getActualPurchaseCents() == null || vehicle.getStatus() != VehicleStatus.IN_STOCK) return;
+        entryRepository.flush();
+        if (cashCapital(vehicle.getConsignor()) < 0) throw new InsufficientCapitalException(vehicle.getConsignor().getFullName());
+    }
+
+    @Override
+    @Transactional
+    public long cashCapital(PanelUser user) {
+        UUID tenantId = user.getTenant().getId();
+        Account account = accountRepository.findFirstByTenantIdAndTypeAndUserId(tenantId, AccountType.CAPITAL, user.getId()).orElse(null);
+        long capital = account == null ? 0
+                : CapitalServiceImpl.capitalByAccount(entryRepository.touchingType(tenantId, AccountType.CAPITAL), null)
+                        .getOrDefault(account.getId(), 0L);
+        return capital - boundCapital(tenantId, today()).getOrDefault(user.getId(), 0L);
     }
 
     /** Ortaklarin nakitteki sermayesi (sermaye - araclarda bagli) eksiye dusmemeli. */
@@ -513,12 +548,18 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         Long commission = ConsignmentMath.commission(vehicle, sale);
         if (commission == null || commission > sale) throw new CommissionExceedsSaleException();
         long entitled = sale - commission;
-        // Sahibine yansitilan masraflar (carisinde borc) once onun payindan duser; kalani sermayesine
+        // Eski kayit: sahibine yansitilan masraflar (carisinde borc) once onun payindan duser; kalani sermayesine
         long charged = chargedToOwner(vehicle);
         Account income = entries ? systemAccount(vehicle.getTenantId(), AccountType.INCOME) : null;
         Account capital = entries ? capitalAccount(vehicle.getConsignor()) : null;
         Account balance = entries && charged > 0 ? balanceAccount(vehicle.getConsignor()) : null;
         List<Wanted> wanted = new ArrayList<>();
+        // Maliyeti girilmis arac (Kasim 2026): satis gununde sahibinin araca bagli parasi satisa gecer (INCOME -> CAPITAL),
+        // tahsilat geldikce (satis - komisyon) sermayesine doner. Ortakli aractaki katki akisiyla ayni.
+        long contribution = consignmentContribution(vehicle, null);
+        if (entries && contribution > 0) {
+            wanted.add(new Wanted(income, capital, contribution, vehicle.getSaleDate(), "Konsinye: maliyet satışa geçti"));
+        }
         long cum = 0, given = 0, netted = 0;
         Map<UUID, Long> capitalByEntry = new HashMap<>();
         for (Collection c : collections(vehicle)) {
@@ -608,8 +649,13 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
             }
         }
         for (Vehicle v : vehicleRepository.findByTenantIdAndOwnership(tenantId, Ownership.CONSIGNMENT)) {
-            if (v.getStatus() == VehicleStatus.IN_STOCK || v.getSalePriceCents() == null || v.getConsignor() == null) continue;
+            if (v.getConsignor() == null) continue;
             UUID user = v.getConsignor().getId();
+            // Maliyeti girilmis arac: kasadan odenen alis sahibinin parasindan cikti
+            for (Payment p : contributingPayments(v)) {
+                result.computeIfAbsent(p.entryId(), x -> new HashMap<>()).merge(user, -p.amountCents(), Long::sum);
+            }
+            if (v.getStatus() == VehicleStatus.IN_STOCK || v.getSalePriceCents() == null) continue;
             consignmentDistribution(v, false).capitalByEntry().forEach((entry, cents) ->
                     result.computeIfAbsent(entry, x -> new HashMap<>()).merge(user, cents, Long::sum));
         }

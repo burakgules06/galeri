@@ -2,6 +2,7 @@ package com.galeri.app.service.impl;
 
 import com.galeri.app.exception.runtime.CategoryDepthLimitException;
 import com.galeri.app.exception.runtime.CommissionExceedsSaleException;
+import com.galeri.app.exception.runtime.ConsignorCashNegativeException;
 import com.galeri.app.exception.runtime.CorrectionNotCorrectableException;
 import com.galeri.app.exception.runtime.EntryAlreadyCorrectedException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
@@ -9,15 +10,17 @@ import com.galeri.app.exception.runtime.InvalidCategoryException;
 import com.galeri.app.exception.runtime.LinkedEntryException;
 import com.galeri.app.exception.runtime.NotAnExpenseException;
 import com.galeri.app.exception.runtime.OpeningBalanceExistsException;
+import com.galeri.app.exception.runtime.PocketExpenseNotAllowedException;
 import com.galeri.app.exception.runtime.RecordNotFoundException;
 import com.galeri.app.exception.runtime.SameAccountException;
 import com.galeri.app.exception.runtime.SourceNotBelongToTenantException;
 import com.galeri.app.model.entity.Account;
 import com.galeri.app.model.entity.Contact;
-import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.ExpenseCategory;
 import com.galeri.app.model.entity.LedgerEntry;
+import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.entity.Vehicle;
+import com.galeri.app.model.entity.VehiclePocketExpense;
 import com.galeri.app.model.enums.AccountType;
 import com.galeri.app.model.enums.ExpenseRoot;
 import com.galeri.app.model.enums.LedgerEntryType;
@@ -32,6 +35,7 @@ import com.galeri.app.model.response.AccountResponse;
 import com.galeri.app.model.response.AccountSummary;
 import com.galeri.app.model.response.CategoryResponse;
 import com.galeri.app.model.response.LedgerEntryResponse;
+import com.galeri.app.model.response.PocketExpenseResponse;
 import com.galeri.app.model.response.ShareResponse;
 import com.galeri.app.model.response.VehicleCost;
 import com.galeri.app.model.response.VehicleRef;
@@ -42,6 +46,7 @@ import com.galeri.app.repository.InstallmentRepository;
 import com.galeri.app.repository.LedgerEntryRepository;
 import com.galeri.app.repository.PanelUserRepository;
 import com.galeri.app.repository.PaymentPlanRepository;
+import com.galeri.app.repository.VehiclePocketExpenseRepository;
 import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.security.CurrentUser;
 import com.galeri.app.service.CoOwnershipService;
@@ -60,6 +65,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -80,6 +86,7 @@ public class LedgerServiceImpl implements LedgerService {
     private final ContactRepository contactRepository;
     private final CoOwnershipService coOwnershipService;
     private final PaymentPlanRepository planRepository;
+    private final VehiclePocketExpenseRepository pocketExpenseRepository;
 
     // ------------------------------------------------------------------ hesaplar
 
@@ -199,12 +206,16 @@ public class LedgerServiceImpl implements LedgerService {
             vehicle = getVehicle(r.vehicleId());
             root = ExpenseRoot.VEHICLE;
             type = LedgerEntryType.VEHICLE_EXPENSE;
-            // Konsinye aracin maliyet hesabi yok: masraf ya sahibine yansitilir (sahibi galeriye borclanir)
-            // ya da galerinin genel gideridir. Arac bagi her iki durumda da kalir (arac karinda gorunur).
+            // Konsinye arac (Kasim 2026): masraf girildigi anda secilen kasa / bankadan, sahibinin sermayesinden duser
+            // (kasa / banka -> CAPITAL(sahibi)); satista bir daha dusulmez, dukkan sahibinin parasina dokunulmaz. Nakitteki
+            // parasi yetmiyorsa onay ister (1061); onaylanirsa eksiye duser. Arac bagi kalir.
             if (vehicle.getOwnership() == Ownership.CONSIGNMENT) {
-                target = Boolean.TRUE.equals(r.chargeToOwner())
-                        ? userBalanceAccount(vehicle.getConsignor())
-                        : systemAccount(tenantId, AccountType.EXPENSE);
+                PanelUser consignor = vehicle.getConsignor();
+                if (consignor == null) throw new InvalidAccountException();
+                if (!Boolean.TRUE.equals(r.confirmNegative()) && coOwnershipService.cashCapital(consignor) < r.amountCents()) {
+                    throw new ConsignorCashNegativeException(consignor.getFullName());
+                }
+                target = userCapitalAccount(consignor);
             } else {
                 target = vehicleAccount(vehicle);
             }
@@ -431,6 +442,18 @@ public class LedgerServiceImpl implements LedgerService {
         return toResponse(list);
     }
 
+    /** Kullanicinin sermaye hesabi; yoksa acilir (sermayesi 0 ile). */
+    private Account userCapitalAccount(PanelUser user) {
+        Account found = userAccount(user.getTenant().getId(), user.getId(), AccountType.CAPITAL);
+        if (found != null) return found;
+        Account a = new Account();
+        a.setTenantId(user.getTenant().getId());
+        a.setType(AccountType.CAPITAL);
+        a.setUserId(user.getId());
+        a.setName(user.getFullName());
+        return accountRepository.save(a);
+    }
+
     private Account userBalanceAccount(PanelUser user) {
         Account found = userAccount(user.getTenant().getId(), user.getId(), AccountType.BALANCE);
         if (found != null) return found;
@@ -471,22 +494,25 @@ public class LedgerServiceImpl implements LedgerService {
         Vehicle vehicle = getVehicle(vehicleId);
         List<LedgerEntry> entries = entryRepository.vehicleEntries(vehicle.getId());
 
-        // Araca bagli masraflar gittikleri hesaba gore: aracin maliyeti (VEHICLE), galerinin genel gideri (EXPENSE,
-        // konsinye) ya da sahibine yansitilan (BALANCE, konsinye). Duzeltmeler ters yonde oldugu icin kendiliginden duser.
+        // Araca bagli masraflar gittikleri hesaba gore: aracin maliyeti (VEHICLE), galerinin genel gideri (EXPENSE, eski
+        // konsinye kaydi) ya da sahibine ait (konsinye: eski kayitta carisine BALANCE, Kasim 2026'dan beri sermayesinden CAPITAL).
+        // Duzeltmeler ters yonde oldugu icin kendiliginden duser.
         long vehicleExpense = 0, absorbed = 0, charged = 0;
         for (LedgerEntry e : entries) {
             if (e.getType() != LedgerEntryType.VEHICLE_EXPENSE) continue;
             if (touches(e, AccountType.VEHICLE)) vehicleExpense += signed(e, AccountType.VEHICLE);
             else if (touches(e, AccountType.EXPENSE)) absorbed += signed(e, AccountType.EXPENSE);
             else if (touches(e, AccountType.BALANCE)) charged += signed(e, AccountType.BALANCE);
+            else if (touches(e, AccountType.CAPITAL)) charged += signed(e, AccountType.CAPITAL);
         }
         boolean purchaseInLedger = activePurchase(vehicle.getId()) != null;
         boolean consignment = vehicle.getOwnership() == Ownership.CONSIGNMENT;
         boolean sold = vehicle.getStatus() != VehicleStatus.IN_STOCK && vehicle.getSalePriceCents() != null;
         Long sale = vehicle.getSalePriceCents();
 
-        // Alis her zaman aracin gercek alis bedelinden: alis deftere yazilmamis olsa da maliyet dogru kalir.
-        long purchase = consignment || vehicle.getActualPurchaseCents() == null ? 0 : vehicle.getActualPurchaseCents();
+        // Alis her zaman aracin gercek alis bedelinden: alis deftere yazilmamis olsa da maliyet dogru kalir. Konsinyede sahibinin
+        // alis bedeli (girildiyse); konsinye kari = komisyon - galerinin ustlendigi (eski) masraf.
+        long purchase = vehicle.getActualPurchaseCents() == null ? 0 : vehicle.getActualPurchaseCents();
         long expense = consignment ? absorbed : vehicleExpense;
         long total = purchase + expense;
         Long commission = consignment ? ConsignmentMath.commission(vehicle, sale) : null;
@@ -499,6 +525,65 @@ public class LedgerServiceImpl implements LedgerService {
         Long collected = share == null ? null : share.collectedCents();
         return new VehicleCost(vehicle.getId(), vehicle.getOwnership(), purchase, purchaseInLedger, expense, total, sale, profit,
                 commission, payout, consignment ? charged : 0, collected, shares, toResponse(entries));
+    }
+
+    // ------------------------------------------------------------------ cepten masraf (konsinye, V26)
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PocketExpenseResponse> pocketExpenses(UUID vehicleId) {
+        Vehicle vehicle = getVehicle(vehicleId);
+        List<VehiclePocketExpense> list =
+                pocketExpenseRepository.findByVehicleIdOrderByExpenseDateDescCreatedAtDesc(vehicle.getId());
+        Map<UUID, String> names = new HashMap<>();
+        categoryRepository.findAllById(list.stream().map(VehiclePocketExpense::getCategoryId)
+                .filter(Objects::nonNull).distinct().toList()).forEach(c -> names.put(c.getId(), c.getName()));
+        return list.stream().map(p -> toPocketResponse(p, names.get(p.getCategoryId()))).toList();
+    }
+
+    @Override
+    @Transactional
+    public PocketExpenseResponse addPocketExpense(ExpenseRequest r) {
+        if (r.vehicleId() == null) throw new PocketExpenseNotAllowedException();
+        Vehicle vehicle = getVehicle(r.vehicleId());
+        if (vehicle.getOwnership() != Ownership.CONSIGNMENT) throw new PocketExpenseNotAllowedException();
+        ExpenseCategory category = findOrCreateCategory(vehicle.getTenantId(), ExpenseRoot.VEHICLE, r.categoryId(), r.categoryName(),
+                r.parentCategoryId());
+        VehiclePocketExpense p = new VehiclePocketExpense();
+        p.setTenantId(vehicle.getTenantId());
+        p.setVehicleId(vehicle.getId());
+        p.setExpenseDate(r.date());
+        p.setAmountCents(r.amountCents());
+        p.setCategoryId(category.getId());
+        p.setDescription(blankToNull(r.description()));
+        p.setCreatedById(CurrentUser.principal().userId());
+        return toPocketResponse(pocketExpenseRepository.save(p), category.getName());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UUID pocketExpenseVehicleId(UUID id) {
+        return getPocketExpense(id).getVehicleId();
+    }
+
+    @Override
+    @Transactional
+    public UUID deletePocketExpense(UUID id) {
+        VehiclePocketExpense p = getPocketExpense(id);
+        pocketExpenseRepository.delete(p);
+        return p.getVehicleId();
+    }
+
+    private VehiclePocketExpense getPocketExpense(UUID id) {
+        VehiclePocketExpense p = pocketExpenseRepository.findById(id).orElseThrow(RecordNotFoundException::new);
+        if (!p.getTenantId().equals(CurrentUser.tenantId())) throw new SourceNotBelongToTenantException();
+        return p;
+    }
+
+    private static PocketExpenseResponse toPocketResponse(VehiclePocketExpense p,
+                                                                                     String categoryName) {
+        return new PocketExpenseResponse(p.getId(), p.getVehicleId(), p.getExpenseDate(),
+                p.getAmountCents(), p.getCategoryId(), categoryName, p.getDescription());
     }
 
     private static boolean touches(LedgerEntry e, AccountType type) {

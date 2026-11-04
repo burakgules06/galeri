@@ -12,6 +12,7 @@ import com.galeri.app.model.request.ExpenseRequest;
 import com.galeri.app.model.response.AccountResponse;
 import com.galeri.app.model.response.CategoryResponse;
 import com.galeri.app.model.response.LedgerEntryResponse;
+import com.galeri.app.model.response.PocketExpenseResponse;
 import com.galeri.app.model.response.VehicleCost;
 
 import java.time.LocalDate;
@@ -49,6 +50,18 @@ public interface LedgerService {
     List<CategoryResponse> categories(ExpenseRoot root);
 
     VehicleCost vehicleCost(UUID vehicleId);
+
+    /** Konsinye araca cepten yapilan masraflar (V26; sadece takip, deftere yazilmaz). */
+    List<PocketExpenseResponse> pocketExpenses(UUID vehicleId);
+
+    /** Cepten masraf ekler: sadece konsinye arac (1062); hicbir hesaba, kara ya da sermayeye etkisi yok. */
+    PocketExpenseResponse addPocketExpense(ExpenseRequest request);
+
+    /** Cepten masrafin araci (yetki kontrolu icin); bu galerinin degilse 404. */
+    UUID pocketExpenseVehicleId(UUID id);
+
+    /** Cepten masrafi siler (defter kaydi olmadigi icin dogrudan). Silinen kaydin aracini doner. */
+    UUID deletePocketExpense(UUID id);
 
     /**
      * Aracin pesin alis hareketini aracin alis bilgisine esitler (VehicleService cagirir, ayni transaction).

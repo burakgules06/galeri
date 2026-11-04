@@ -436,7 +436,7 @@ class VehicleServiceImplTest {
     }
 
     @Test
-    void konsinyeArac_alisBedeliVeSaticisiTutulmaz_alisDeftereYazilmaz() {
+    void konsinyeArac_saticisiTutulmaz_maliyetGirildiyseKasadanAlisYazilir() {
         PanelUser owner = investor("Burak Gules");   // konsinye sahibi sermayedar kullanici (V22)
         savesWithId();
 
@@ -449,11 +449,12 @@ class VehicleServiceImplTest {
         assertThat(v.getConsignor()).isSameAs(owner);
         assertThat(v.getCommissionRateBp()).isEqualTo(300);
         assertThat(v.getCommissionCents()).isNull();          // oran tipinde sabit tutar tutulmaz
-        assertThat(v.getActualPurchaseCents()).isNull();
+        assertThat(v.getActualPurchaseCents()).isEqualTo(72000000L);   // sahibinin alis bedeli (maliyet, Kasim 2026)
         assertThat(v.getOfficialPurchaseCents()).isNull();
         assertThat(v.getSeller()).isNull();
         assertThat(result.consignor().name()).isEqualTo("Burak Gules");
-        verify(paymentPlanService).syncPurchase(v, null, null);   // kasa secilmis olsa da alis yazilmaz
+        verify(paymentPlanService).syncPurchase(v, cashId, null);   // maliyet kasadan araca, planli alis yok
+        verify(coOwnershipService).checkConsignorCash(v);           // sermayeden kisim sahibinin nakdine yetmeli
     }
 
     @Test

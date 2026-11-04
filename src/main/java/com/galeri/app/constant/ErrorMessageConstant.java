@@ -64,4 +64,6 @@ public class ErrorMessageConstant {
     public static final int ROLE_CHANGE_NOT_ALLOWED = 1058;
     public static final int INVALID_USER_COUNTERPARTY = 1059;
     public static final int TRANSFER_LOCKED = 1060;
+    public static final int CONSIGNOR_CASH_NEGATIVE = 1061;
+    public static final int POCKET_EXPENSE_NOT_ALLOWED = 1062;
 }
