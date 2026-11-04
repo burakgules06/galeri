@@ -164,14 +164,14 @@ public class LedgerServiceImpl implements LedgerService {
     }
 
     /**
-     * Ortak araca masraf girildi / degisti: ortaklarin payi (sahiplik oraniyla) katkilarina eklenir, nakit sermaye yetmezse 1042;
-     * satilmissa kar degisti, dagitim yeniden yazilir.
+     * Satilmis ortak araca masraf girildi / degisti: kar degisti, ortaklarin kar paylari yeniden yazilir.
+     * Stoktaki aracta masraf ortagin sermayesinden dusmez; satista kardan duser.
      */
     private LedgerEntry afterExpense(LedgerEntry e) {
         Vehicle v = e.getVehicle();
-        if (v != null && v.getOwnership() == Ownership.CO_OWNED) {
+        if (v != null && v.getOwnership() == Ownership.CO_OWNED && v.getStatus() != VehicleStatus.IN_STOCK) {
             entryRepository.flush();
-            coOwnershipService.syncContributions(v);   // stokta: katki ve sermaye kontrolu; satilmissa dagitim da
+            coOwnershipService.resyncProfitShares(v);
         }
         return e;
     }
