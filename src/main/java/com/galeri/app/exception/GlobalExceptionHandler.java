@@ -39,7 +39,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<GenericResponse<Object>> handleMethodArgumentNotValidException(MethodArgumentNotValidException ex) {
         String errorMessage = ex.getBindingResult().getAllErrors().stream()
-                .map(error -> error.getObjectName() + ": " + error.getDefaultMessage())
+                // Alan adi (installments[0].noteNo gibi): hangi alanin hatali oldugu belli olsun
+                .map(error -> (error instanceof org.springframework.validation.FieldError f ? f.getField() : error.getObjectName())
+                        + ": " + error.getDefaultMessage())
                 .collect(Collectors.joining(", "));
         log.warn("Validasyon hatasi: {}", errorMessage);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
