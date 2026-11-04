@@ -37,7 +37,8 @@ export function LedgerPage() {
   const [sort, setSort] = useState<Sort>("new");
   const [entryPage, setEntryPage] = useState(1);
   const accounts = useLoad(() => api.accounts(), []);
-  const holdings = useLoad(() => api.holdings(), [revision]);
+  // Kisinin kasa ve bankalardaki toplam parasi defterden kesin (sermaye hesabi); hangi hesapta durdugu tutulmaz, tahmin edilmez
+  const partners = useLoad(() => api.partners(), [revision]);
   const holders = useLoad(() => api.holders(), [revision]);
   const summary = useLoad(() => api.dashboard(), []);
   const entries = useLoad(() => api.ledgerEntries(selected), [selected]);
@@ -46,20 +47,13 @@ export function LedgerPage() {
   const list = accounts.data ?? [];
   const total = list.reduce((t, a) => t + a.balanceCents, 0);
   const colored = list.map((a, i) => ({ ...a, color: SERIES[i % SERIES.length] }));
-  // Kisiler: hesaplarda parasi olanlar (dukkan sahibi once)
-  const people = new Map<string, { key: string; name: string; owner: boolean }>();
-  for (const h of holdings.data ?? []) for (const p of h.parts) {
-    const key = p.userId ?? "owner";
-    if (!people.has(key)) people.set(key, { key, name: p.name, owner: p.owner });
-  }
-  const peopleList = [...people.values()].sort((x, y) => Number(y.owner) - Number(x.owner) || x.name.localeCompare(y.name, "tr"));
-  const amountOf = (accountId: string) => {
-    const h = (holdings.data ?? []).find((x) => x.accountId === accountId);
-    if (!owner) return h?.balanceCents ?? list.find((a) => a.id === accountId)?.balanceCents ?? 0;
-    return (h?.parts ?? []).filter((p) => (p.userId ?? "owner") === owner).reduce((t, p) => t + p.cents, 0);
-  };
-  const shown = colored.map((a) => ({ ...a, amount: amountOf(a.id) }));
-  const shownTotal = owner ? shown.reduce((t, a) => t + a.amount, 0) : total;
+  // Kisiler: dukkan sahibi once, sonra sermayedarlar
+  const peopleList = [...(partners.data ?? [])].sort((x, y) => Number(y.owner) - Number(x.owner) || x.name.localeCompare(y.name, "tr"));
+  const person = peopleList.find((p) => p.userId === owner);
+  const shown = colored.map((a) => ({ ...a, amount: a.balanceCents }));
+  // Dukkan sahibinin parasi havuzun kalani: kasa + bankalar - sermayedarlarin nakitteki parasi (ikisi de defterden kesin)
+  const investorsCash = peopleList.filter((p) => !p.owner).reduce((t, p) => t + p.cashCents, 0);
+  const shownTotal = !person ? total : person.owner ? total - investorsCash : person.cashCents;
 
   const allEntries = entries.data ?? [];
   const isCorrection = (e: LedgerEntryResponse) => e.corrected || e.correctedEntryId != null;
@@ -97,33 +91,38 @@ export function LedgerPage() {
         </div>
       </header>
 
-      <ErrorBox message={accounts.error ?? summary.error ?? holdings.error} />
+      <ErrorBox message={accounts.error ?? summary.error ?? partners.error} />
 
       {/* Kimin parasi: Tumu ya da bir kisi; hesap kartlari secili kisinin o hesaptaki parasini gosterir. Karta dokununca hareketler suzulur. */}
       <section className="kart p-4 md:p-5">
         <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Kimin parası">
-          <PersonChip label="Tümü" on={!owner} onClick={() => setOwner("")} />
-          {peopleList.map((p) => <PersonChip key={p.key} label={p.name} sub={p.owner ? "dükkân sahibi" : undefined} on={owner === p.key} onClick={() => setOwner(p.key)} />)}
+          <PersonChip label="Tümü" on={!owner} onClick={() => { setOwner(""); setRelated(""); setEntryPage(1); }} />
+          {peopleList.map((p) => <PersonChip key={p.userId} label={p.name} sub={p.owner ? "dükkân sahibi" : undefined} on={owner === p.userId}
+            onClick={() => { setOwner(p.userId); setRelated(p.userId); setEntryPage(1); }} />)}
         </div>
         <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="etiket">{owner ? `${people.get(owner)?.name ?? ""} · kasa ve bankalarda` : "Toplam nakit"}</p>
+            <p className="etiket">{person ? `${person.name} · kasa ve bankalardaki parası` : "Toplam nakit"}</p>
             <p className={`sayi font-bold text-[34px] md:text-[40px] leading-none tracking-tight mt-1.5 ${shownTotal < 0 ? "text-tehlike" : ""}`}>
-              {accounts.data ? tl(shownTotal) : "…"}
+              {accounts.data && (!owner || partners.data) ? tl(shownTotal) : "…"}
             </p>
+            {person && <p className="text-[13px] text-murekkep-2 mt-1">
+              {person.owner ? "Kasa ve bankalardan sermayedarların parası çıkınca kalan" : <>Araçlarda bağlı: <span className="sayi">{tl(person.boundCents)}</span></>}
+              {" · "}Hesap kartları hesapların toplam bakiyesidir.
+            </p>}
           </div>
           {bankOpen
             ? <BankForm onClose={() => setBankOpen(false)} onAdded={() => { setBankOpen(false); reload(); }} />
             : <Button variant="secondary" onClick={() => setBankOpen(true)}>+ Banka hesabı</Button>}
         </div>
         <div className="mt-4"><SplitBar height={10} parts={shown.map((a) => ({ key: a.id, value: Math.max(0, a.amount), color: a.color }))} /></div>
+        {/* Hesap kartlari her zaman hesabin toplam bakiyesi; kisinin parasi hangi hesapta tutulmaz */}
         <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-          <AccountButton name="Tüm hesaplar" balance={shownTotal} share={null} color={null} selected={selected === null} onClick={() => changeAccount(null)} />
+          <AccountButton name="Tüm hesaplar" balance={total} share={null} color={null} selected={selected === null} onClick={() => changeAccount(null)} />
           {shown.map((a) => (
             <AccountButton key={a.id} name={a.name} balance={a.amount} color={a.color}
-              share={shownTotal > 0 && a.amount > 0 ? Math.round((a.amount * 10000) / shownTotal) : null}
-              selected={selected === a.id} onClick={() => changeAccount(a.id)}
-              parts={owner ? undefined : (holdings.data ?? []).find((h) => h.accountId === a.id)?.parts.filter((p) => p.cents !== 0)} />
+              share={total > 0 && a.amount > 0 ? Math.round((a.amount * 10000) / total) : null}
+              selected={selected === a.id} onClick={() => changeAccount(a.id)} />
           ))}
         </div>
       </section>
@@ -219,9 +218,8 @@ function PersonChip({ label, sub, on, onClick }: { label: string; sub?: string; 
   );
 }
 
-function AccountButton({ name, balance, share, color, selected, onClick, parts }: {
+function AccountButton({ name, balance, share, color, selected, onClick }: {
   name: string; balance: number; share: number | null; color: string | null; selected: boolean; onClick: () => void;
-  parts?: { userId: string | null; name: string; cents: number }[];   // Tumu seciliyken hesaptaki paranin kisilere dagilimi
 }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={selected}
@@ -232,16 +230,6 @@ function AccountButton({ name, balance, share, color, selected, onClick, parts }
         {share != null && <span className="ml-auto text-murekkep-3 font-medium">{percent(share, 0)}</span>}
       </span>
       <span className={`block sayi font-bold text-[20px] leading-tight mt-0.5 ${balance < 0 ? "text-tehlike" : selected ? "text-plaka-koyu" : "text-murekkep"}`}>{tl(balance)}</span>
-      {parts && parts.length > 0 && (
-        <span className="mt-1.5 block space-y-0.5">
-          {parts.map((p) => (
-            <span key={p.userId ?? "owner"} className="flex items-baseline justify-between gap-2 text-[12px] text-murekkep-2">
-              <span className="truncate">{p.name}</span>
-              <span className={`sayi whitespace-nowrap ${p.cents < 0 ? "text-tehlike" : ""}`}>{tl(p.cents)}</span>
-            </span>
-          ))}
-        </span>
-      )}
     </button>
   );
 }
