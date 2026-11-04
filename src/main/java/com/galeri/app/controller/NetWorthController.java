@@ -22,7 +22,7 @@ public class NetWorthController {
 
     @GetMapping("/api/holdings")
     @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")   // sermayedar: sadece kendi payi
-    public GenericResponse<java.util.List<com.galeri.app.model.response.AccountHoldings>> holdings() {
+    public GenericResponse<com.galeri.app.model.response.AccountHoldings.Response> holdings() {
         return responses.success(service.holdings());
     }
 

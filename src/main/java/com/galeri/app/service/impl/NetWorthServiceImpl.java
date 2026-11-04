@@ -162,10 +162,10 @@ public class NetWorthServiceImpl implements NetWorthService {
 
     @Override
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public List<AccountHoldings> holdings() {
+    public AccountHoldings.Response holdings() {
         UUID tenant = CurrentUser.tenantId();
         List<Account> money = accounts.findByTenantIdAndTypeInOrderByCreatedAtAsc(tenant, List.of(AccountType.CASH, AccountType.BANK));
-        if (money.isEmpty()) return List.of();
+        if (money.isEmpty()) return new AccountHoldings.Response(List.of(), List.of());
         List<CapitalResponses.Holder> people = allHolders();
         Map<UUID, CapitalResponses.Holder> investors = new LinkedHashMap<>();
         CapitalResponses.Holder owner = null;
@@ -200,36 +200,8 @@ public class NetWorthServiceImpl implements NetWorthService {
             boolean srcMoney = held.containsKey(src.getId()), tgtMoney = held.containsKey(tgt.getId());
             long amount = e.getAmountCents();
             if (srcMoney && tgtMoney) {
-                // Hesaplar arasi transfer: once hedefte eksiye dusmus olanin eksigi kaynaktaki kendi parasindan kapanir
-                // (ornek: kasadan parasi yetmeden arac alan dukkan sahibi bankadan kasaya aktarir; baskasinin parasi tasinmaz),
-                // kalan tutar kaynaktaki herkesin parasi oraninda tasinir.
-                Map<UUID, Long> from = held.get(src.getId()), to = held.get(tgt.getId());
-                long before = balance.getOrDefault(src.getId(), 0L);
-                long left = amount;
-                // Dukkan sahibi her hesapta kalandir: eksigini kapatan kisim haritaya yazilmaz, kalan hesabinda kendiliginden tasinir
-                long ownerFrom = before - from.values().stream().mapToLong(Long::longValue).sum();
-                long ownerTo = balance.getOrDefault(tgt.getId(), 0L) - to.values().stream().mapToLong(Long::longValue).sum();
-                long ownerCover = Math.min(left, Math.min(Math.max(0, -ownerTo), Math.max(0, ownerFrom)));
-                left -= ownerCover;
-                long coveredFromSource = ownerCover;
-                for (Map.Entry<UUID, Long> p : from.entrySet()) {
-                    if (left == 0) break;
-                    long cover = Math.min(left, Math.min(Math.max(0, -to.getOrDefault(p.getKey(), 0L)), Math.max(0, p.getValue())));
-                    if (cover == 0) continue;
-                    p.setValue(p.getValue() - cover);
-                    to.merge(p.getKey(), cover, Long::sum);
-                    left -= cover;
-                    coveredFromSource += cover;
-                }
-                long base = before - coveredFromSource;
-                if (left > 0 && base > 0) {
-                    double f = Math.min(1.0, (double) left / base);
-                    for (Map.Entry<UUID, Long> p : from.entrySet()) {
-                        long moved = Math.round(p.getValue() * f);
-                        p.setValue(p.getValue() - moved);
-                        to.merge(p.getKey(), moved, Long::sum);
-                    }
-                }
+                // Hesaplar arasi transfer: dukkan sahibinin parasi tasinir (transferi o yapar, fiziksel kasa / bankayi o yonetir).
+                // Sermayedarin parasi girdigi hesapta kalir. Dukkan sahibi her hesapta kalan oldugu icin haritaya bir sey yazilmaz.
                 balance.merge(src.getId(), -amount, Long::sum);
                 balance.merge(tgt.getId(), amount, Long::sum);
                 continue;
@@ -246,16 +218,20 @@ public class NetWorthServiceImpl implements NetWorthService {
             if (parts != null) parts.forEach((user, cents) -> { if (investors.containsKey(user)) here.merge(user, cents, Long::sum); });
         }
 
-        // Izlenemeyen kisim (sermayeye eklenen kar payi, sermaye devri ...): hesaplara bakiyeleri oraninda
-        List<Long> weights = money.stream().map(a -> Math.max(0, balance.getOrDefault(a.getId(), 0L))).toList();
-        boolean anyPositive = weights.stream().anyMatch(w -> w > 0);
+        // Kasa / bankaya dokunmadan sermayesi degisen kisim (sermaye devri, sermayeye eklenen kar payi ...): hicbir hesaba
+        // dagitilmaz, "hesabi belli olmayan" olarak ayri doner. Dukkan sahibinin kalaninda da ayni tutar ters isaretle durur.
+        List<AccountHoldings.Part> unassigned = new ArrayList<>();
+        long unassignedTotal = 0;
         for (CapitalResponses.Holder h : investors.values()) {
             long tracked = held.values().stream().mapToLong(m -> m.getOrDefault(h.userId(), 0L)).sum();
             long rest = h.cashCents() - tracked;
             if (rest == 0) continue;
-            List<Long> split = anyPositive ? MoneyMath.splitByWeights(rest, weights)
-                    : java.util.stream.IntStream.range(0, money.size()).mapToObj(k -> k == 0 ? rest : 0L).toList();
-            for (int k = 0; k < money.size(); k++) held.get(money.get(k).getId()).merge(h.userId(), split.get(k), Long::sum);
+            unassigned.add(new AccountHoldings.Part(h.userId(), h.name(), false, rest));
+            unassignedTotal += rest;
+        }
+        if (unassignedTotal != 0) {
+            unassigned.addFirst(new AccountHoldings.Part(owner == null ? null : owner.userId(),
+                    owner == null ? "Dükkân sahibi" : owner.name(), true, -unassignedTotal));
         }
 
         List<AccountHoldings> result = new ArrayList<>();
@@ -273,14 +249,14 @@ public class NetWorthServiceImpl implements NetWorthService {
                     bal - investorsHere));
             result.add(new AccountHoldings(a.getId(), a.getName(), a.getType(), bal, parts));
         }
-        if (!CurrentUser.isInvestor()) return result;
+        if (!CurrentUser.isInvestor()) return new AccountHoldings.Response(result, unassigned);
         // Sermayedar hesaplarin bakiyesini ve baskalarinin parasini gormez: sadece kendi payi
         UUID me = CurrentUser.principal().userId();
-        return result.stream().map(h -> {
+        return new AccountHoldings.Response(result.stream().map(h -> {
             List<AccountHoldings.Part> mine = h.parts().stream().filter(p -> me.equals(p.userId()) && !p.owner()).toList();
             long cents = mine.stream().mapToLong(AccountHoldings.Part::cents).sum();
             return new AccountHoldings(h.accountId(), h.name(), h.type(), cents, mine);
-        }).toList();
+        }).toList(), unassigned.stream().filter(p -> me.equals(p.userId()) && !p.owner()).toList());
     }
 
     /** Stoktaki araclarda secilen sahiplerin odenmis katkisi, buyukten kucuge. */
