@@ -36,7 +36,7 @@ public class LedgerController {
     public GenericResponse<List<AccountResponse>> moneyAccounts() {
         if (com.galeri.app.security.CurrentUser.isInvestor()) {
             // Sermayedar: hesaplarda sadece kendi parasi (bakiye ve baskalarinin parasi donmez)
-            return responseService.success(netWorthService.holdings().stream()
+            return responseService.success(netWorthService.holdings().accounts().stream()
                     .map(h -> new AccountResponse(h.accountId(), h.type(), h.name(), h.balanceCents())).toList());
         }
         return responseService.success(ledgerService.moneyAccounts());
