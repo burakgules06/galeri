@@ -200,14 +200,34 @@ public class NetWorthServiceImpl implements NetWorthService {
             boolean srcMoney = held.containsKey(src.getId()), tgtMoney = held.containsKey(tgt.getId());
             long amount = e.getAmountCents();
             if (srcMoney && tgtMoney) {
-                // Hesaplar arasi transfer: kaynaktaki herkesin parasi oraninda tasinir
+                // Hesaplar arasi transfer: once hedefte eksiye dusmus olanin eksigi kaynaktaki kendi parasindan kapanir
+                // (ornek: kasadan parasi yetmeden arac alan dukkan sahibi bankadan kasaya aktarir; baskasinin parasi tasinmaz),
+                // kalan tutar kaynaktaki herkesin parasi oraninda tasinir.
+                Map<UUID, Long> from = held.get(src.getId()), to = held.get(tgt.getId());
                 long before = balance.getOrDefault(src.getId(), 0L);
-                if (before > 0) {
-                    double f = Math.min(1.0, (double) amount / before);
-                    for (Map.Entry<UUID, Long> p : held.get(src.getId()).entrySet()) {
+                long left = amount;
+                // Dukkan sahibi her hesapta kalandir: eksigini kapatan kisim haritaya yazilmaz, kalan hesabinda kendiliginden tasinir
+                long ownerFrom = before - from.values().stream().mapToLong(Long::longValue).sum();
+                long ownerTo = balance.getOrDefault(tgt.getId(), 0L) - to.values().stream().mapToLong(Long::longValue).sum();
+                long ownerCover = Math.min(left, Math.min(Math.max(0, -ownerTo), Math.max(0, ownerFrom)));
+                left -= ownerCover;
+                long coveredFromSource = ownerCover;
+                for (Map.Entry<UUID, Long> p : from.entrySet()) {
+                    if (left == 0) break;
+                    long cover = Math.min(left, Math.min(Math.max(0, -to.getOrDefault(p.getKey(), 0L)), Math.max(0, p.getValue())));
+                    if (cover == 0) continue;
+                    p.setValue(p.getValue() - cover);
+                    to.merge(p.getKey(), cover, Long::sum);
+                    left -= cover;
+                    coveredFromSource += cover;
+                }
+                long base = before - coveredFromSource;
+                if (left > 0 && base > 0) {
+                    double f = Math.min(1.0, (double) left / base);
+                    for (Map.Entry<UUID, Long> p : from.entrySet()) {
                         long moved = Math.round(p.getValue() * f);
                         p.setValue(p.getValue() - moved);
-                        held.get(tgt.getId()).merge(p.getKey(), moved, Long::sum);
+                        to.merge(p.getKey(), moved, Long::sum);
                     }
                 }
                 balance.merge(src.getId(), -amount, Long::sum);

@@ -214,6 +214,31 @@ class HoldersIT {
     }
 
     @Test
+    void kasasiEksiyeDusenDukkanSahibi_bankadanAktarinca_kendiParasiyla_kapanir_sermayedarinParasiYerindeKalir() {
+        UUID bank = ledgerService.addBank(new com.galeri.app.model.request.AccountRequest("Vakıfbank")).id();
+        capitalService.move(furkan, new CapitalRequests.Movement(CapitalRequests.Direction.IN, bank, today, 20 * M, null));
+        capitalService.move(selin, new CapitalRequests.Movement(CapitalRequests.Direction.IN, bank, today, 20 * M, null));
+        // Kasada 56 milyon (Furkan 50 + Burak 6); galeri araci 60 milyon kasadan: kasa -4, Furkan'in kasadaki payi -10
+        vehicle(60 * M, null);
+        expectHolding("arac", cash, null, -10 * M);
+        expectHolding("arac", cash, burak, 6 * M);
+
+        ledgerService.transfer(new CapitalRequests.Transfer(bank, cash, today, 10 * M, null));
+        expectHolding("aktarim", cash, null, 0);
+        expectHolding("aktarim", cash, burak, 6 * M);
+        expectHolding("aktarim", cash, selin, 0);
+        expectHolding("aktarim", bank, null, 10 * M);
+        expectHolding("aktarim", bank, selin, 20 * M);
+
+        // Eksik kapandiktan sonraki fazlasi yine oranla: bankadan 6 milyon daha (Furkan 10 / Selin 20 -> 2 / 4)
+        ledgerService.transfer(new CapitalRequests.Transfer(bank, cash, today, 6 * M, null));
+        expectHolding("ikinci aktarim", cash, null, 2 * M);
+        expectHolding("ikinci aktarim", cash, selin, 4 * M);
+        expectHolding("ikinci aktarim", bank, selin, 16 * M);
+        check("aktarim");
+    }
+
+    @Test
     void kasaHareketleri_ilgiliKisiyleGelir_galeriAraciDukkanSahibinin() {
         UUID shared = vehicle(4 * M, List.of(new ShareRequest(furkan, 5000), new ShareRequest(burak, 5000, null, ContributionSource.CAPITAL, null)));
         UUID dealer = vehicle(1 * M, null);
