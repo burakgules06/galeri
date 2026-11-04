@@ -46,6 +46,19 @@ Her iş bitince bu dosyayı güncelle: "Şu an" ve "Sıradaki"yi değiştir, bit
 
 ## Sıradaki / Burak'ın kararını bekleyenler
 
+- **Konsinye yeniden tasarımı (4 Kasım 2026, Burak onayladı, henüz kodlanmadı).** Kurallar:
+  1. Konsinye formuna "Sahibi aracı kaça aldı" (maliyet) + alım türü (sermayeden / hibrit / cepten) eklenir. Araç girilince
+     maliyet sermayedarın malvarlığına (araçlarına) yazılır; nakitteki parası alım türüne göre düşer (sermayeden: tamamı,
+     hibrit: girilen sermaye kısmı, cepten: düşmez; cepten kısım sermayesine eklenir). Dükkân sahibinin parasına dokunulmaz.
+  2. Konsinye araca masraf: girildiği anda seçilen kasa / bankadan, sermayedarın parasından düşer; toplam sermayesi de hemen
+     düşer (örn. 1.000.000 → 980.000). Satışta bir daha düşülmez. Dükkân sahibinin parasına dokunulmaz.
+     "Masrafı galeri üstlenir" seçeneği kalkar. Sermayedarın nakitteki parası yetmezse uyarı ("eksiye düşecek, devam?"),
+     onaylanırsa eksiye düşer. Cepten masraf sadece takip içindir, paraya etkisi yok (nasıl saklanacağı açık).
+  3. Satışta kâr = satış − maliyet (masraflar hariç). Galeri komisyonu **kârın yüzdesi** (ya da sabit tutar); zararda 0.
+     Galerinin kârı komisyon; kalan kâr sermayedarın. Maliyet boşsa kâr = satış bedeli (bugünkü sonuçla aynı).
+     Örnek: maliyet 800.000, satış 1.000.000, kâr 200.000, %3 → galeri 6.000, Zeki 194.000 kâr.
+  4. Eski kayıtlar: "sahibine yansıtılan" (BALANCE) masraflar eski kuralla satışta netleşir; yeni masraflar yeni kuralla.
+
 - Dükkân sahibinin komisyon kuralı (gece paketi soru 2, "şimdilik geç" dendi).
 - Konsinye para dağıtımının zamanlaması (soru 4, "sonra soracağım" dendi).
 - Token 24 saat sabit ve yenilenmiyor: kullanıcı gün içinde atılabilir. Akıllı Randevum'da kayan yenileme yapıldı (appointment #13);
