@@ -44,8 +44,8 @@ export function PlanBuilder({
   const down = centsOrZero(cfg.downText);
 
   return (
-    <div className="space-y-4">
-      <div role="radiogroup" aria-label="Ödeme şekli" className="grid grid-cols-2 min-[420px]:grid-cols-3 md:grid-cols-4 gap-2">
+    <div className="@container min-w-0 space-y-4">
+      <div role="radiogroup" aria-label="Ödeme şekli" className="grid grid-cols-2 @sm:grid-cols-3 @xl:grid-cols-4 gap-2">
         {modes.map((m) => {
           const on = mode === m;
           return (
@@ -60,7 +60,7 @@ export function PlanBuilder({
       </div>
 
       {mode === "CASH" && (
-        <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 grid gap-3 @sm:grid-cols-2">
           {hideAccounts ? <p className="self-end text-[14px] text-murekkep-2 pb-2">Para galerinin kasasına girer.</p> : <Field label="Para nereye">
             <select className={inputClass} value={cfg.accountId || defaultAccount} onChange={(e) => plan.update({ accountId: e.target.value })}>
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -72,7 +72,7 @@ export function PlanBuilder({
 
       {generated && (
         <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+          <div className="grid gap-3 grid-cols-2 @xl:grid-cols-4">
             <Field label={downLabel}><NumberInput value={cfg.downText} onValueChange={(downText) => plan.update({ downText })} placeholder="0" /></Field>
             {!hideAccounts && <Field label="Peşinat nereye">
               <select className={inputClass} value={cfg.accountId || defaultAccount} disabled={down <= 0}
@@ -122,7 +122,7 @@ export function PlanBuilder({
               </span>
             )}
           </div>
-          <div className="hidden md:grid grid-cols-[140px_150px_140px_1fr_40px] gap-2 px-1 etiket">
+          <div className="hidden @3xl:grid grid-cols-[140px_150px_140px_1fr_40px] gap-2 px-1 etiket">
             <span>Vade</span><span>Tutar</span><span>Yöntem</span><span>Ayrıntı</span><span />
           </div>
           {rows.map((r, k) => (
@@ -171,7 +171,7 @@ function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods,
   const options = methods.includes(r.method) ? methods : [r.method, ...methods];
 
   return (
-    <div className={`rounded-[12px] border p-2.5 md:p-2 grid gap-2 grid-cols-2 md:grid-cols-[140px_150px_140px_1fr_40px] md:items-center ${
+    <div className={`rounded-[12px] border p-2.5 @3xl:p-2 grid gap-2 grid-cols-2 @3xl:grid-cols-[140px_150px_140px_1fr_40px] @3xl:items-center ${
       problem ? "border-uyari bg-uyari-zemin/40" : r.paidNow ? "border-basari/30 bg-basari-zemin/50" : "border-cizgi bg-yuzey"}`}>
       <input type="date" className={`${inputClass} h-9`} value={r.dueDate} onChange={(e) => onChange({ dueDate: e.target.value })} aria-label="Vade" />
       <NumberInput className={`${inputClass} h-9 sayi text-[16px]`} value={text} onValueChange={changeAmount} aria-label="Tutar" preview={false} />
@@ -179,18 +179,18 @@ function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods,
         onChange={(e) => onChange({ method: e.target.value as PaymentMethod, payer: null })}>
         {options.map((m) => <option key={m} value={m}>{METHOD[m]}</option>)}
       </select>
-      <div className="col-span-2 md:col-span-1 flex flex-wrap items-center gap-2 min-w-0">
+      <div className="col-span-2 @3xl:col-span-1 order-last @3xl:order-none flex flex-wrap items-center gap-2 min-w-0">
         {r.method === "INSTITUTION" && (
-          <div className="w-full md:w-48">
+          <div className="w-full @3xl:w-48">
             <ContactPicker kind="ORGANIZATION" className={`${inputClass} h-9`} contacts={organizations} selected={r.payer}
               onSelect={(c) => onChange({ payer: c })} onCreated={onOrgCreated} placeholder="Kurum seç" />
           </div>
         )}
         {r.method === "PROMISSORY_NOTE" && (
-          <input className={`${inputClass} h-9 md:w-32`} value={r.noteNo} onChange={(e) => onChange({ noteNo: e.target.value })} placeholder="Senet no" aria-label="Senet no" />
+          <input className={`${inputClass} h-9 @3xl:w-32`} value={r.noteNo} onChange={(e) => onChange({ noteNo: e.target.value })} placeholder="Senet no" aria-label="Senet no" />
         )}
         {r.method === "OPEN_ACCOUNT" && (
-          <input className={`${inputClass} h-9 md:w-48`} value={r.description} onChange={(e) => onChange({ description: e.target.value })} placeholder="Açıklama" aria-label="Açıklama" />
+          <input className={`${inputClass} h-9 @3xl:w-48`} value={r.description} onChange={(e) => onChange({ description: e.target.value })} placeholder="Açıklama" aria-label="Açıklama" />
         )}
         {r.method === "CHEQUE" && (
           <div className="w-full grid grid-cols-3 gap-2">
@@ -205,7 +205,7 @@ function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods,
           {nowLabel}
         </label>
         {r.paidNow && !hideAccounts && (
-          <select className={`${inputClass} h-9 md:w-36`} value={r.accountId} onChange={(e) => onChange({ accountId: e.target.value })} aria-label="Hesap">
+          <select className={`${inputClass} h-9 @3xl:w-36`} value={r.accountId} onChange={(e) => onChange({ accountId: e.target.value })} aria-label="Hesap">
             {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         )}

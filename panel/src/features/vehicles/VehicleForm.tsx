@@ -219,7 +219,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
         <Button type="submit" form="vehicle-form" disabled={saving || (!existing && !me.data)}>{saving ? "Kaydediliyor…" : "Kaydet"}</Button>
       </>}
     >
-      <form id="vehicle-form" onSubmit={submit} className="grid gap-x-8 gap-y-6 md:grid-cols-2 md:items-start">
+      <form id="vehicle-form" onSubmit={submit} className="grid gap-x-8 gap-y-6 md:grid-cols-2 md:items-start [&>*]:min-w-0">
         <div className="md:col-span-2 empty:hidden"><ErrorBox message={error ?? me.error} /></div>
 
         <div className="space-y-6 min-w-0">
