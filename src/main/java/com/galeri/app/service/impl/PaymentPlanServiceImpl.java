@@ -148,7 +148,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             i.setNoteNo(blankToNull(row.noteNo()));
             i.setBankName(blankToNull(row.bankName()));
             i.setDrawerName(blankToNull(row.drawerName()));
-            if (row.method() == PaymentMethod.OPEN_ACCOUNT) i.setDescription(blankToNull(row.description()));
+            i.setDescription(blankToNull(row.description()));
             i.setPayer(payers.get(k));
             if (row.paidNow()) {
                 LedgerEntry paid = settle(i, PlanDirection.SALE, vehicle, row.accountId(), r.saleDate(),
@@ -246,7 +246,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             i.setNoteNo(blankToNull(row.noteNo()));
             i.setBankName(blankToNull(row.bankName()));
             i.setDrawerName(blankToNull(row.drawerName()));
-            if (row.method() == PaymentMethod.OPEN_ACCOUNT) i.setDescription(blankToNull(row.description()));
+            i.setDescription(blankToNull(row.description()));
             i.setPayer(payers.get(k));
             if (row.paidNow()) {
                 LedgerEntry paid = settle(i, PlanDirection.SALE, null, row.accountId(), r.saleDate(),
@@ -334,7 +334,12 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
 
         // ---- plan ve odenmemis taksitler: ayniysa dokunma, degilse odenmemisleri yeniden yaz
         List<Installment> unpaid = current.stream().filter(i -> !i.isPaid()).toList();
-        if (existing.isPresent() && sameRows(unpaid, sorted, payees)) return;
+        if (existing.isPresent() && sameRows(unpaid, sorted, payees)) {
+            // Para ve evrak ayni; sadece aciklama degistiyse taksitler yeniden yazilmaz, yerinde guncellenir.
+            List<Installment> ordered = orderedUnpaid(unpaid);
+            for (int k = 0; k < sorted.size(); k++) ordered.get(k).setDescription(blankToNull(sorted.get(k).description()));
+            return;
+        }
 
         PaymentPlan plan = existing.orElseGet(() -> {
             PaymentPlan p = new PaymentPlan();
@@ -363,7 +368,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             i.setNoteNo(blankToNull(row.noteNo()));
             i.setBankName(blankToNull(row.bankName()));
             i.setDrawerName(blankToNull(row.drawerName()));
-            if (row.method() == PaymentMethod.OPEN_ACCOUNT) i.setDescription(blankToNull(row.description()));
+            i.setDescription(blankToNull(row.description()));
             i.setPayer(payees.get(k));
             if (row.paidNow()) {
                 LedgerEntry e = ledgerService.writeSettlement(PlanDirection.PURCHASE, vehicle, payees.get(k), row.accountId(),
@@ -388,10 +393,14 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     }
 
     /** Odenmemis taksitler istenen satirlarla ayni mi (siraya gore vade, tutar, yontem, senet no, odenecek kisi). */
+    private static List<Installment> orderedUnpaid(List<Installment> unpaid) {
+        return unpaid.stream().sorted(Comparator.comparing(Installment::getDueDate).thenComparing(Installment::getSeq)).toList();
+    }
+
+    // Aciklama karsilastirilmaz: para ve evraktan bagimsizdir, degisirse yerinde guncellenir (syncPurchase).
     private static boolean sameRows(List<Installment> unpaid, List<InstallmentRequest> rows, List<Contact> payees) {
         if (unpaid.size() != rows.size() || rows.stream().anyMatch(InstallmentRequest::paidNow)) return false;
-        List<Installment> ordered = unpaid.stream()
-                .sorted(Comparator.comparing(Installment::getDueDate).thenComparing(Installment::getSeq)).toList();
+        List<Installment> ordered = orderedUnpaid(unpaid);
         for (int k = 0; k < rows.size(); k++) {
             Installment i = ordered.get(k);
             InstallmentRequest r = rows.get(k);
@@ -676,16 +685,13 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     @Transactional
     public InstallmentResponse update(UUID installmentId, InstallmentUpdateRequest r) {
         Installment i = getInstallment(installmentId);
-        if (i.isPaid()) {
-            if (i.getMethod() != PaymentMethod.OPEN_ACCOUNT) throw new InstallmentAlreadyPaidException();
-            i.setDescription(blankToNull(r.description()));
-            return single(i, null);
-        }
+        // Aciklama paraya dokunmaz: odenmis (tahsil edilmis, ciro edilmis) taksitte de duzenlenir; diger alanlar degismez.
+        i.setDescription(blankToNull(r.description()));
+        if (i.isPaid()) return single(i, null);
         i.setDueDate(r.dueDate());
         i.setNoteNo(blankToNull(r.noteNo()));
         if (r.bankName() != null) i.setBankName(blankToNull(r.bankName()));
         if (r.drawerName() != null) i.setDrawerName(blankToNull(r.drawerName()));
-        if (i.getMethod() == PaymentMethod.OPEN_ACCOUNT) i.setDescription(blankToNull(r.description()));
         return single(i, null);
     }
 

@@ -235,6 +235,36 @@ class PaymentPlanServiceImplTest {
     }
 
     @Test
+    void satistaCekVeSenetAciklamasi_taksitteSaklanir() {
+        VehicleSaleRequest r = sale(300000L,
+                new InstallmentRequest(TODAY, 100000L, PaymentMethod.CHEQUE, "C-1", null, false, null, "Ziraat", null, "Ali'nin cirosu"),
+                new InstallmentRequest(TODAY, 200000L, PaymentMethod.PROMISSORY_NOTE, "S-1", null, false, null, null, null, "Kefil: Veli"));
+
+        service.recordSale(vehicle, buyer, r);
+
+        ArgumentCaptor<Installment> saved = ArgumentCaptor.forClass(Installment.class);
+        verify(installmentRepository, times(2)).save(saved.capture());
+        assertThat(saved.getAllValues()).extracting(Installment::getDescription).containsExactly("Ali'nin cirosu", "Kefil: Veli");
+    }
+
+    @Test
+    void odenmisCekAciklamasi_duzenlenirDigerAlanlarDegismez() {
+        PaymentPlan plan = plan();
+        Installment target = installment(plan, TODAY, 100000L, true);
+        target.setMethod(PaymentMethod.CHEQUE);
+        target.setNoteNo("C-1");
+        when(installmentRepository.findById(target.getId())).thenReturn(Optional.of(target));
+        when(installmentRepository.findByPlanIds(List.of(plan.getId()))).thenReturn(List.of(target));
+
+        service.update(target.getId(), new InstallmentUpdateRequest(TODAY.plusDays(3), "C-9", "Banka", "Kesideci", "Ciro edildi"));
+
+        assertThat(target.getDescription()).isEqualTo("Ciro edildi");
+        assertThat(target.getDueDate()).isEqualTo(TODAY);
+        assertThat(target.getNoteNo()).isEqualTo("C-1");
+        assertThat(target.getBankName()).isNull();
+    }
+
+    @Test
     void kurumTaksitinde_kurumSecilmezse_reddedilir() {
         VehicleSaleRequest noPayer = sale(100L, row(100L, PaymentMethod.INSTITUTION, null, false));
         VehicleSaleRequest personPayer = sale(100L, row(100L, PaymentMethod.INSTITUTION, buyer.getId(), false));
@@ -449,6 +479,28 @@ class PaymentPlanServiceImplTest {
         verify(ledgerService, never()).writePlannedPurchase(any(), any(), anyLong(), any());
         verify(installmentRepository, never()).save(any());
         verify(installmentRepository, never()).deleteAll(any());
+    }
+
+    @Test
+    void aracDuzenlenirkenSadeceAciklamaDegisirse_taksitlerYerindeGuncellenir() {
+        Contact seller = purchasable(1600000L);
+        PaymentPlan p = purchasePlan(seller, 1600000L);
+        Installment second = purchaseInstallment(p, seller, 2, LocalDate.of(2026, 7, 10), 500000L, false);
+        Installment third = purchaseInstallment(p, seller, 3, LocalDate.of(2026, 8, 10), 500000L, false);
+        third.setDescription("Eski");
+        when(installmentRepository.findByPlanIds(anyCollection())).thenReturn(List.of(
+                purchaseInstallment(p, seller, 1, BOUGHT, 600000L, true), second, third));
+        when(ledgerService.activeVehiclePurchases(vehicle.getId())).thenReturn(List.of(plannedPurchaseEntry(seller, 1600000L)));
+
+        service.syncPurchase(vehicle, null, List.of(
+                new InstallmentRequest(LocalDate.of(2026, 7, 10), 500000L, PaymentMethod.PROMISSORY_NOTE, null, null, false, null, null, null, "Senet elden"),
+                new InstallmentRequest(LocalDate.of(2026, 8, 10), 500000L, PaymentMethod.PROMISSORY_NOTE, null, null, false, null, null, null, "  ")));
+
+        assertThat(second.getDescription()).isEqualTo("Senet elden");
+        assertThat(third.getDescription()).isNull();
+        verify(installmentRepository, never()).deleteAll(any());
+        verify(installmentRepository, never()).save(any());
+        verify(ledgerService, never()).reverseVehiclePurchases(any());
     }
 
     @Test

@@ -30,7 +30,7 @@ export interface PlanConfig {
   bankName: string;      // cek
   drawerName: string;    // cek: keside eden
   institution: ContactSummary | null;   // Evim / kredi
-  description: string;   // acik hesap
+  description: string;   // istege bagli aciklama (her yontem)
 }
 
 let nextKey = 1;
@@ -165,6 +165,6 @@ export function toRequest(r: PlanRow): InstallmentRequest {
     accountId: r.paidNow ? r.accountId : null,
     bankName: r.method === "CHEQUE" ? r.bankName.trim() || null : null,
     drawerName: r.method === "CHEQUE" ? r.drawerName.trim() || null : null,
-    description: r.method === "OPEN_ACCOUNT" ? r.description.trim() || null : null,
+    description: r.description.trim() || null,
   };
 }
