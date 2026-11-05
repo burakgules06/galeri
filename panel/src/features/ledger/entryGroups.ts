@@ -28,3 +28,15 @@ export function groupEntries(entries: LedgerEntryResponse[]): LedgerEntryRespons
   }
   return groups;
 }
+
+/**
+ * Grubun ekranda gosterilen toplami: giris (+) ve cikislar (-) yonune gore netlesir
+ * (5.000 giris, 3.015 ve 145.000 cikis -> -143.015). Hepsi notr ise duz toplam.
+ */
+export function groupTotal(entries: LedgerEntryResponse[], direction: (e: LedgerEntryResponse) => number): { cents: number; dir: number; mixed: boolean } {
+  const dirs = entries.map(direction);
+  if (dirs.every((d) => d === 0)) return { cents: entries.reduce((t, x) => t + x.amountCents, 0), dir: 0, mixed: false };
+  const net = entries.reduce((t, x, k) => t + Math.sign(dirs[k]) * x.amountCents, 0);
+  const signs = new Set(dirs.filter((d) => d !== 0).map(Math.sign));
+  return { cents: Math.abs(net), dir: Math.sign(net), mixed: signs.size > 1 };
+}
