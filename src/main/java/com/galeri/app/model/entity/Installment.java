@@ -10,7 +10,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 // Odeme planinin bir taksiti. Odeninde paidEntryId tahsilat / odeme hareketine baglanir.
-// Tutar ve odeyen sonradan degismez (defter tutmaz); sadece vade ve senet no duzenlenir.
+// Tutar ve odeyen sonradan degismez (defter tutmaz); vade, evrak bilgisi ve aciklama duzenlenir (aciklama odendikten sonra da).
 @Entity
 @Table(name = "installment")
 @Getter

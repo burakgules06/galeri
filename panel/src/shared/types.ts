@@ -234,7 +234,7 @@ export interface InstallmentRequest {
   accountId: string | null;
   bankName?: string | null;     // cek
   drawerName?: string | null;   // cek: keside eden
-  description?: string | null; // acik hesap aciklamasi
+  description?: string | null; // istege bagli aciklama (her yontem)
 }
 
 export interface InstallmentResponse {
@@ -262,7 +262,7 @@ export interface InstallmentResponse {
   number: number;                       // pesinat haric taksit no (pesinatta 0)
   installmentCount: number;             // pesinat haric taksit sayisi
   holder: ContactSummary | null;        // gecmis senet / cek sermayedarinsa: tahsil edildikce onun sermayesine
-  description: string | null;           // acik hesap aciklamasi
+  description: string | null;           // istege bagli aciklama (her yontem)
   planCreatedAt: string | null;         // planin kuruldugu an (siralama)
   planCreatedBy: string | null;         // plani (senedi / ceki) kaydeden kullanici
   userIds: string[];                    // parasi kimin: aracin sahipleri ya da evrak sahibi (kisi secimi)

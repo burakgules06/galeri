@@ -24,7 +24,7 @@ const COUNT_LABEL: Partial<Record<PlanMode, string>> = {
 };
 
 export function PlanBuilder({
-  plan, baseCents, accounts, organizations, onOrgCreated = () => {}, modes, methods, nowLabel, downLabel, hideAccounts = false,
+  plan, baseCents, accounts, organizations, onOrgCreated = () => {}, modes, methods, nowLabel, downLabel, downAccountLabel = "Peşinat nereye", hideAccounts = false,
 }: {
   plan: PlanState;
   baseCents: number;                 // plana dagitilacak tutar (bedel - odenmis taksitler)
@@ -35,6 +35,7 @@ export function PlanBuilder({
   methods: PaymentMethod[];          // satirlarda secilebilecek yontemler
   nowLabel: string;                  // "Şimdi alındı" / "Şimdi ödendi"
   downLabel: string;                 // "Peşinat (şimdi alınır)" / "Peşinat (şimdi ödenir)"
+  downAccountLabel?: string;         // satista "Peşinat nereye" (kasaya girer), alista "Peşinat nereden" (kasadan cikar)
   hideAccounts?: boolean;            // sermayedar: para her zaman galerinin kasasina (hesap secmez)
 }) {
   const { mode, config: cfg, rows } = plan;
@@ -74,7 +75,7 @@ export function PlanBuilder({
         <div className="rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
           <div className="grid gap-3 grid-cols-2 @xl:grid-cols-4">
             <Field label={downLabel}><NumberInput value={cfg.downText} onValueChange={(downText) => plan.update({ downText })} placeholder="0" /></Field>
-            {!hideAccounts && <Field label="Peşinat nereye">
+            {!hideAccounts && <Field label={downAccountLabel}>
               <select className={inputClass} value={cfg.accountId || defaultAccount} disabled={down <= 0}
                 onChange={(e) => plan.update({ accountId: e.target.value })}>
                 {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -189,9 +190,6 @@ function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods,
         {r.method === "PROMISSORY_NOTE" && (
           <input className={`${inputClass} h-9 @3xl:w-32`} value={r.noteNo} onChange={(e) => onChange({ noteNo: e.target.value })} placeholder="Senet no" aria-label="Senet no" />
         )}
-        {r.method === "OPEN_ACCOUNT" && (
-          <input className={`${inputClass} h-9 @3xl:w-48`} value={r.description} onChange={(e) => onChange({ description: e.target.value })} placeholder="Açıklama" aria-label="Açıklama" />
-        )}
         {r.method === "CHEQUE" && (
           <div className="w-full grid grid-cols-3 gap-2">
             <input className={`${inputClass} h-9`} value={r.noteNo} onChange={(e) => onChange({ noteNo: e.target.value })} placeholder="Çek no" aria-label="Çek no" />
@@ -199,6 +197,8 @@ function RowEditor({ r, problem, accounts, organizations, onOrgCreated, methods,
             <input className={`${inputClass} h-9`} value={r.drawerName} onChange={(e) => onChange({ drawerName: e.target.value })} placeholder="Keşideci" aria-label="Keşideci" />
           </div>
         )}
+        <input className={`${inputClass} h-9 w-full`} value={r.description} maxLength={500}
+          onChange={(e) => onChange({ description: e.target.value })} placeholder="Açıklama (isteğe bağlı)" aria-label="Açıklama" />
         <label className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold whitespace-nowrap">
           <input type="checkbox" checked={r.paidNow} className="w-4 h-4 accent-[var(--color-basari)]"
             onChange={(e) => onChange({ paidNow: e.target.checked, accountId: e.target.checked ? (r.accountId || accounts.find((a) => a.type === "CASH")?.id || accounts[0]?.id || "") : "" })} />
