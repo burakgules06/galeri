@@ -9,7 +9,7 @@ import { errorMessage } from "../../shared/useLoad";
 import { Plate } from "../../shared/ui/Plate";
 import { Button, ErrorBox } from "../../shared/ui/Common";
 import { ExpenseForm } from "./ExpenseForm";
-import { groupEntries } from "./entryGroups";
+import { groupEntries, groupTotal } from "./entryGroups";
 
 // Satis ve taksit hareketleri plana bagli: arac detayindan / odemeler ekranindan geri alinir, burada duzeltilmez.
 const LINKED: LedgerEntryType[] = ["VEHICLE_SALE", "COLLECTION", "PAYMENT", "CONSIGNMENT_SETTLEMENT", "PARTNER_SALE_SETTLEMENT"];
@@ -149,8 +149,7 @@ function GroupRow({ entries, direction, onChange, showVehicle, readOnly }: {
 }) {
   const [open, setOpen] = useState(false);
   const e = entries[0];
-  const total = entries.reduce((t, x) => t + x.amountCents, 0);
-  const dir = direction(e);
+  const { cents: total, dir, mixed } = groupTotal(entries, direction);
   const amountColor = dir > 0 ? "text-basari" : dir < 0 ? "text-tehlike" : "text-murekkep";
   const sign = dir > 0 ? "+" : dir < 0 ? "−" : "";
   const person = e.vehicle ? null : (e.source.type === "BALANCE" || e.source.type === "CAPITAL" ? e.source : e.target).name;
@@ -172,7 +171,7 @@ function GroupRow({ entries, direction, onChange, showVehicle, readOnly }: {
             </span>
           )}
           <p className="text-[14px] text-murekkep-2 mt-0.5">
-            {e.source.type === "CAPITAL" && EXPENSE.includes(e.type) ? `Cepten (${e.source.name})` : e.source.name} → {e.target.name}
+            {e.source.type === "CAPITAL" && EXPENSE.includes(e.type) ? `Cepten (${e.source.name})` : e.source.name} {mixed ? "↔" : "→"} {e.target.name}
             <span className="text-plaka font-semibold"> · {open ? "Detayı gizle" : "Detayı gör"}</span>
           </p>
         </div>
