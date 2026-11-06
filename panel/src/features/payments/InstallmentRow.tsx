@@ -115,7 +115,7 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
       {deleteError && <div className="px-4 pb-2"><ErrorBox message={deleteError} /></div>}
       {panel === "collect" && <CollectPanel i={i} label={actionLabel} investor={investor} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
       {panel === "undo" && <UndoPanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
-      {panel === "edit" && <EditPanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
+      {panel === "edit" && <EditPanel i={i} amountEditable={canDeleteOpenItem} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
       {panel === "endorse" && <EndorsePanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
       {panel === "instrumentPay" && <PayWithInstrumentPanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
       {panel === "bounce" && <BouncePanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
@@ -217,8 +217,12 @@ function UndoPanel({ i, onClose, onDone }: { i: InstallmentResponse; onClose: ()
   );
 }
 
-function EditPanel({ i, onClose, onDone }: { i: InstallmentResponse; onClose: () => void; onDone: () => void }) {
+function EditPanel({ i, amountEditable, onClose, onDone }: {
+  i: InstallmentResponse; amountEditable: boolean; onClose: () => void; onDone: () => void;
+}) {
   const [dueDate, setDueDate] = useState(i.dueDate);
+  // Gecmis cari kaydinda (arac disi) odenmemis satirin tutari duzeltilebilir; alacak / borc toplami da degisir
+  const [amount, setAmount] = useState(centsToInput(i.amountCents));
   const [noteNo, setNoteNo] = useState(i.noteNo ?? "");
   const [bankName, setBankName] = useState(i.bankName ?? "");
   const [drawerName, setDrawerName] = useState(i.drawerName ?? "");
@@ -228,9 +232,14 @@ function EditPanel({ i, onClose, onDone }: { i: InstallmentResponse; onClose: ()
   const openAccount = i.method === "OPEN_ACCOUNT";
   // Aciklama paraya dokunmaz: odenmis / ciro edilmis taksitte de duzenlenir, diger alanlar kilitli.
   const descriptionOnly = i.status === "PAID";
+  const parsed = tlToCents(amount);
+  const newCents = parsed != null && !Number.isNaN(parsed) ? parsed : 0;
+  const amountChanged = amountEditable && !descriptionOnly && newCents !== i.amountCents;
   const submit = async () => {
     setError(null);
+    if (amountChanged && newCents <= 0) return setError("Tutarı 100.000 gibi yaz.");
     try {
+      if (amountChanged) await api.resizeOpenItemInstallment(i.planId, i.id, newCents);
       await api.updateInstallment(i.id, dueDate, noteNo.trim() || null, cheque ? bankName.trim() : null,
         cheque ? drawerName.trim() : null, description.trim() || null);
       onDone();
@@ -242,6 +251,19 @@ function EditPanel({ i, onClose, onDone }: { i: InstallmentResponse; onClose: ()
     <div className="mx-1 mb-3 rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
       <ErrorBox message={error} />
       <div className="grid grid-cols-2 gap-3">
+        {amountEditable && !descriptionOnly && (
+          <div className="col-span-2">
+            <Field label="Tutar">
+              <NumberInput value={amount} onValueChange={setAmount} />
+            </Field>
+            {amountChanged && newCents > 0 && (
+              <p className="m-0 mt-1 text-[13px] text-murekkep-2">
+                {i.direction === "SALE" ? `${i.payer.name} adlı kişiden alacağın` : `${i.payer.name} adlı kişiye borcun`}{" "}
+                {tl(Math.abs(newCents - i.amountCents))} {newCents < i.amountCents ? "azalır" : "artar"}.
+              </p>
+            )}
+          </div>
+        )}
         {!descriptionOnly && <Field label="Vade"><input type="date" className={inputClass} value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>}
         {!descriptionOnly && !openAccount && <Field label={cheque ? "Çek no" : "Senet no"}><input className={inputClass} value={noteNo} onChange={(e) => setNoteNo(e.target.value)} /></Field>}
         {cheque && !descriptionOnly && <>
