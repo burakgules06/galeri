@@ -1,6 +1,8 @@
 package com.galeri.app.controller;
 
+import com.galeri.app.model.response.InstallmentResponse;
 import com.galeri.app.model.GenericResponse;
+import com.galeri.app.model.request.OpenItemAmountRequest;
 import com.galeri.app.model.request.ContactRequest;
 import com.galeri.app.model.request.OpenItemsRequest;
 import com.galeri.app.model.response.PaymentPlanResponse;
@@ -15,6 +17,7 @@ import com.galeri.app.service.impl.GenericResponseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -64,6 +67,13 @@ public class ContactController {
     public GenericResponse<Void> removeOpenItemInstallment(@PathVariable UUID planId, @PathVariable UUID installmentId) {
         paymentPlanService.removeOpenItemInstallment(planId, installmentId);
         return responseService.success(null);
+    }
+
+    // Gecmis cari kaydinda odenmemis satirin tutari (alacak / borc toplami da degisir)
+    @PatchMapping("/open-items/{planId}/installments/{installmentId}/amount")
+    public GenericResponse<InstallmentResponse> resizeOpenItemInstallment(@PathVariable UUID planId, @PathVariable UUID installmentId,
+                                                                         @Valid @RequestBody OpenItemAmountRequest request) {
+        return responseService.success(paymentPlanService.resizeOpenItemInstallment(planId, installmentId, request.amountCents()));
     }
 
     @PostMapping

@@ -83,6 +83,12 @@ public interface PaymentPlanService {
     /** Aracsiz gecmis plandaki odenmemis tek satiri kaldirir; cari acilisini kalan tutara esitler. */
     void removeOpenItemInstallment(UUID planId, UUID installmentId);
 
+    /**
+     * Gecmis cari kaydinda odenmemis satirin tutarini duzeltir: alacak / borc toplami da degisir
+     * (acilis hareketi terslenir, yeni toplamla yeniden yazilir; defter silinmez).
+     */
+    InstallmentResponse resizeOpenItemInstallment(UUID planId, UUID installmentId, long amountCents);
+
     /** Arac kaldirilirken alis plani silinir; pesinat disinda odenmis taksit varsa kaldirilamaz (1054). */
     void removePurchasePlan(Vehicle vehicle);
 

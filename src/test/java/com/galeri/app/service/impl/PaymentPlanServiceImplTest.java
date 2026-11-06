@@ -1,5 +1,6 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.PlanNotRemovableException;
 import com.galeri.app.exception.runtime.InstallmentAlreadyPaidException;
 import com.galeri.app.exception.runtime.InvalidPayerException;
 import com.galeri.app.exception.runtime.PurchaseHasPaymentsException;
@@ -146,6 +147,47 @@ class PaymentPlanServiceImplTest {
         verify(installmentRepository).delete(target);
         verify(planRepository).delete(plan);
         verify(entryRepository, never()).findById(openingId);
+    }
+
+    @Test
+    void gecmisSatirTutariDuzeltilince_acilisTerslenipYeniToplamlaYazilir() {
+        PaymentPlan plan = plan();
+        plan.setVehicleId(null);
+        UUID openingId = UUID.randomUUID();
+        plan.setOpeningEntryId(openingId);
+        Installment target = installment(plan, TODAY, 14000000L, false);
+        Installment other = installment(plan, TODAY.plusDays(30), 5000000L, true);
+        when(planRepository.lockById(plan.getId())).thenReturn(Optional.of(plan));
+        when(installmentRepository.lockByPlanId(plan.getId())).thenReturn(List.of(target, other));
+        LedgerEntry reversal = entry();
+        reversal.setEntryDate(LocalDate.of(2026, 10, 1));
+        when(ledgerService.reverseAndGet(openingId)).thenReturn(reversal);
+        LedgerEntry revised = entry();
+        when(ledgerService.writeOpenItems(plan.getContact(), plan.getDirection(), 15000000L, LocalDate.of(2026, 10, 1))).thenReturn(revised);
+        when(installmentRepository.resize(target.getId(), 10000000L)).thenReturn(1);
+
+        InstallmentResponse r = service.resizeOpenItemInstallment(plan.getId(), target.getId(), 10000000L);
+
+        assertThat(r.amountCents()).isEqualTo(10000000L);
+        verify(planRepository).replaceOpenItemsAmountAndOpeningEntry(plan.getId(), 15000000L, revised.getId());
+    }
+
+    @Test
+    void gecmisSatirTutari_odenmisseVeyaAracPlaniysa_duzeltilemez() {
+        PaymentPlan plan = plan();
+        plan.setVehicleId(null);
+        plan.setOpeningEntryId(UUID.randomUUID());
+        Installment paid = installment(plan, TODAY, 14000000L, true);
+        when(planRepository.lockById(plan.getId())).thenReturn(Optional.of(plan));
+        when(installmentRepository.lockByPlanId(plan.getId())).thenReturn(List.of(paid));
+        assertThatThrownBy(() -> service.resizeOpenItemInstallment(plan.getId(), paid.getId(), 10000000L))
+                .isInstanceOf(InstallmentAlreadyPaidException.class);
+
+        PaymentPlan vehiclePlan = plan();
+        when(planRepository.lockById(vehiclePlan.getId())).thenReturn(Optional.of(vehiclePlan));
+        assertThatThrownBy(() -> service.resizeOpenItemInstallment(vehiclePlan.getId(), UUID.randomUUID(), 10000000L))
+                .isInstanceOf(PlanNotRemovableException.class);
+        verify(ledgerService, never()).reverseAndGet(any());
     }
 
     @Test

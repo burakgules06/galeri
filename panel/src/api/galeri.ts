@@ -45,6 +45,10 @@ export const api = {
   removeOpenItems: (planId: string) => apiFetch<void>(`/api/contacts/open-items/${planId}`, { method: "DELETE" }),
   removeOpenItemInstallment: (planId: string, installmentId: string) =>
     apiFetch<void>(`/api/contacts/open-items/${planId}/installments/${installmentId}`, { method: "DELETE" }),
+  // Gecmis cari satiri tutari: alacak / borc toplami da degisir
+  resizeOpenItemInstallment: (planId: string, installmentId: string, amountCents: number) =>
+    apiFetch<InstallmentResponse>(`/api/contacts/open-items/${planId}/installments/${installmentId}/amount`,
+      { method: "PATCH", body: JSON.stringify({ amountCents }) }),
   endorse: (id: string, toContactId: string, targetInstallmentId: string | null, date: string) =>
     apiFetch<InstallmentResponse>(`/api/installments/${id}/endorse`, json({ toContactId, targetInstallmentId, date })),
   bounce: (id: string) => apiFetch<InstallmentResponse>(`/api/installments/${id}/bounce`, { method: "POST" }),

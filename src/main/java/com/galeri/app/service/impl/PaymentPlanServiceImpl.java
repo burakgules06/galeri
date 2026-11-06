@@ -576,6 +576,31 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
 
     @Override
     @Transactional
+    public InstallmentResponse resizeOpenItemInstallment(UUID planId, UUID installmentId, long amountCents) {
+        if (amountCents <= 0) throw new InvalidPartialAmountException();
+        PaymentPlan plan = planRepository.lockById(planId).orElseThrow(RecordNotFoundException::new);
+        if (!plan.getTenantId().equals(CurrentUser.tenantId())) throw new SourceNotBelongToTenantException();
+        if (plan.getOpeningEntryId() == null) throw new PlanNotRemovableException();   // sadece gecmis cari kaydi
+        List<Installment> rows = installmentRepository.lockByPlanId(planId);
+        Installment target = rows.stream().filter(i -> i.getId().equals(installmentId)).findFirst()
+                .orElseThrow(RecordNotFoundException::new);
+        if (target.isPaid()) throw new InstallmentAlreadyPaidException();
+        if (target.getAmountCents() == amountCents) return single(target, null);
+
+        long newTotal = rows.stream().mapToLong(i -> i.getId().equals(installmentId) ? amountCents : i.getAmountCents()).sum();
+        // Acilis hareketi silinmez: terslenir ve yeni toplamla ayni tarihte yeniden yazilir (bakiye farki kadar degisir)
+        LedgerEntry reversal = ledgerService.reverseAndGet(plan.getOpeningEntryId());
+        LedgerEntry revisedOpening = ledgerService.writeOpenItems(plan.getContact(), plan.getDirection(), newTotal, reversal.getEntryDate());
+        if (installmentRepository.resize(installmentId, amountCents) == 0) throw new InstallmentAlreadyPaidException();
+        target.setAmountCents(amountCents);
+        entryRepository.flush();
+        installmentRepository.flush();
+        planRepository.replaceOpenItemsAmountAndOpeningEntry(planId, newTotal, revisedOpening.getId());
+        return single(target, null);
+    }
+
+    @Override
+    @Transactional
     public void removePurchasePlan(Vehicle vehicle) {
         planRepository.findByVehicleIdAndDirection(vehicle.getId(), PlanDirection.PURCHASE).ifPresent(plan -> {
             List<Installment> rows = installmentRepository.findByPlanIds(List.of(plan.getId()));
