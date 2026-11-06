@@ -46,7 +46,7 @@ export function PaymentPlanCard({ vehicleId, direction = "SALE", onChanged, onUn
   return (
     <section className="kart p-4 md:p-5">
       <div className="flex items-center justify-between gap-3 pb-3 mb-4 border-b border-cizgi">
-        <h2 className="font-cond font-bold text-[21px] tracking-tight">{sale ? "Ödeme planı" : "Alış ödeme planı"}</h2>
+        <h2 className="font-cond font-bold text-[21px] tracking-tight">{sale ? "Satış ödeme planı" : "Alış ödeme planı"}</h2>
         {plan && <span className="text-[13px] text-murekkep-2">{sale ? "" : "Satıcı: "}{plan.counterparty.name}</span>}
       </div>
       <ErrorBox message={error} />
