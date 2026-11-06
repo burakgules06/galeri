@@ -109,3 +109,73 @@ export function BouncePanel({ i, onClose, onDone }: PanelProps) {
     </div>
   );
 }
+
+/**
+ * Borcu elimdeki cek / senetle ode: acik alis taksiti icin portfoydeki (alinmis, odenmemis) evraklardan biri secilir ve
+ * bu borca ciro edilir. Evrakin sahibinin borcu kapanir, bu kisiye olan borc o kadar duser; kasa degismez.
+ * Evrak borctan kucukse borc bolunur, kalani ayni vadeyle acik kalir (sonra baska evrak ya da nakitle odenir).
+ */
+export function PayWithInstrumentPanel({ i, onClose, onDone }: PanelProps) {
+  const portfolio = useLoad(() => api.installments({ direction: "SALE" }), []);
+  const [picked, setPicked] = useState("");
+  const [date, setDate] = useState(todayIso());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Ayni tutardakiler once, sonra buyukten kucuge; borcu asan ve borcun sahibinden alinmis evrak listelenmez
+  const options = (portfolio.data ?? [])
+    .filter((p) => p.status !== "PAID" && (p.method === "CHEQUE" || p.method === "PROMISSORY_NOTE")
+      && p.amountCents <= i.amountCents && p.payer.id !== i.payer.id)
+    .sort((a, b) => Number(b.amountCents === i.amountCents) - Number(a.amountCents === i.amountCents) || b.amountCents - a.amountCents);
+  const chosen = options.find((p) => p.id === picked);
+
+  const submit = async () => {
+    if (!chosen) return setError("Verilen çek ya da senedi seç.");
+    setBusy(true);
+    setError(null);
+    try {
+      await api.endorse(chosen.id, i.payer.id, i.id, date);
+      onDone();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mx-1 mb-3 rounded-[12px] bg-yuzey-2 border border-cizgi p-3 space-y-3">
+      <ErrorBox message={error} />
+      <Field label={`${i.payer.name} adına ciro edilecek çek / senet`}>
+        {portfolio.data && options.length === 0 ? (
+          <p className="m-0 text-[14px] text-murekkep-3">Elde bu borca verilebilecek çek ya da senet yok (tutarı {tl(i.amountCents)} veya altında olmalı).</p>
+        ) : (
+          <div className="space-y-1.5 max-h-72 overflow-y-auto">
+            {options.map((p) => (
+              <label key={p.id} className={`flex items-start gap-2 rounded-[10px] border px-2.5 py-2 text-[14px] cursor-pointer ${picked === p.id ? "border-plaka bg-yuzey" : "border-cizgi"}`}>
+                <input type="radio" name={`instrument-${i.id}`} className="accent-plaka mt-1" checked={picked === p.id} onChange={() => setPicked(p.id)} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+                    <span className="font-semibold">{METHOD[p.method]}{p.noteNo ? ` · ${p.noteNo}` : ""}</span>
+                    <b className="sayi">{tl(p.amountCents)}</b>
+                  </span>
+                  <span className="block text-[13px] text-murekkep-3">
+                    {p.payer.name} · vade {formatDate(p.dueDate)}{p.bankName ? ` · ${p.bankName}` : ""}{p.vehicle?.plate ? ` · ${p.vehicle.plate}` : ""}
+                  </span>
+                  {p.amountCents < i.amountCents && <span className="block text-[13px] text-murekkep-3">kalan {tl(i.amountCents - p.amountCents)} açık kalır</span>}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+      </Field>
+      <div className="grid gap-3 sm:grid-cols-[170px_1fr] sm:items-end">
+        <Field label="Tarih"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+        <div className="flex justify-end gap-2">
+          <Button variant="quiet" onClick={onClose}>Vazgeç</Button>
+          <Button onClick={submit} disabled={busy || !chosen}>{busy ? "Kaydediliyor…" : chosen ? `${tl(chosen.amountCents)} ile öde` : "Öde"}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}

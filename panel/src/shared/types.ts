@@ -235,6 +235,7 @@ export interface InstallmentRequest {
   bankName?: string | null;     // cek
   drawerName?: string | null;   // cek: keside eden
   description?: string | null; // istege bagli aciklama (her yontem)
+  endorseInstallmentId?: string | null;   // sadece alis: portfoydeki bu cek / senet bu satirla ciro edilir
 }
 
 export interface InstallmentResponse {

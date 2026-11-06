@@ -13,6 +13,8 @@ import java.util.UUID;
 // paidNow: pesinat gibi o an alinan kisim, accountId (kasa / banka) ile ayni islemde tahsil edilir.
 // Cekte noteNo cek numarasi, bankName bankasi, drawerName keside eden (bos olabilir).
 // description: her yontemde istege bagli aciklama.
+// endorseInstallmentId (sadece alis plani): portfoydeki alinmis cek / senet bu satirla odenir. Kayitta alis taksiti
+// acilir ve evrak hemen ona ciro edilir (satici carisine odeme, evrakin sahibinin borcu kapanir). Tutar evrakla ayni olmali.
 public record InstallmentRequest(
         @NotNull LocalDate dueDate,
         @NotNull @Positive Long amountCents,
@@ -23,15 +25,21 @@ public record InstallmentRequest(
         UUID accountId,
         @Size(max = 60) String bankName,
         @Size(max = 120) String drawerName,
-        @Size(max = 500) String description
+        @Size(max = 500) String description,
+        UUID endorseInstallmentId
 ) {
     public InstallmentRequest(LocalDate dueDate, Long amountCents, PaymentMethod method, String noteNo, UUID payerId,
+                              boolean paidNow, UUID accountId, String bankName, String drawerName, String description) {
+        this(dueDate, amountCents, method, noteNo, payerId, paidNow, accountId, bankName, drawerName, description, null);
+    }
+
+    public InstallmentRequest(LocalDate dueDate, Long amountCents, PaymentMethod method, String noteNo, UUID payerId,
                               boolean paidNow, UUID accountId) {
-        this(dueDate, amountCents, method, noteNo, payerId, paidNow, accountId, null, null, null);
+        this(dueDate, amountCents, method, noteNo, payerId, paidNow, accountId, null, null, null, null);
     }
 
     public InstallmentRequest(LocalDate dueDate, Long amountCents, PaymentMethod method, String noteNo, UUID payerId,
                               boolean paidNow, UUID accountId, String bankName, String drawerName) {
-        this(dueDate, amountCents, method, noteNo, payerId, paidNow, accountId, bankName, drawerName, null);
+        this(dueDate, amountCents, method, noteNo, payerId, paidNow, accountId, bankName, drawerName, null, null);
     }
 }

@@ -22,6 +22,8 @@ import { ContactPicker } from "../contacts/ContactPicker";
 import { row, rowProblem, toRequest, usePlan, type PlanRow } from "../payments/plan";
 import { useAuth } from "../../auth/useAuth";
 import { PlanBuilder, PlanSummary } from "../payments/PlanBuilder";
+import { EndorsedInstruments } from "../payments/EndorsedInstruments";
+import { endorsedRequest, endorsedTotal, type EndorsedRow } from "../payments/endorsedRows";
 
 interface Props {
   open: boolean;
@@ -129,11 +131,14 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
 
   const actualCents = tlToCents(actual);
   const price = actualCents != null && !Number.isNaN(actualCents) ? actualCents : 0;
-  const plan = usePlan({ priceCents: Math.max(0, price - lockedCents), date: purchaseDate,
+  // Elden verilen (portfoydeki) cek / senetler: tutarlari dusulur, plan / pesin odeme kalan icin
+  const [endorsed, setEndorsed] = useState<EndorsedRow[]>([]);
+  const endorsedCents = endorsedTotal(endorsed);
+  const plan = usePlan({ priceCents: Math.max(0, price - lockedCents - endorsedCents), date: purchaseDate,
     defaultAccount: (accounts.data?.find((a) => a.type === "CASH") ?? accounts.data?.[0])?.id ?? "",
     initialMode: purchasePlan ? "MIXED" : null, initialRows });
   const rows = plan.rows;
-  const planned = lockedCents + rows.reduce((t, r) => t + (r.amountCents > 0 ? r.amountCents : 0), 0);
+  const planned = lockedCents + endorsedCents + rows.reduce((t, r) => t + (r.amountCents > 0 ? r.amountCents : 0), 0);
   const remaining = price - planned;
   const sellerPartner = (partners.data ?? []).find((p) => p.userId === sellerUserId);
   const userSale = fromUser && !consignment && !isInvestor;
@@ -169,10 +174,28 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       if (!sellerUserId) return setError("Aracı hangi kullanıcıdan aldığını seç.");
       if (Number.isNaN(sellerCapitalCents) || sellerCapitalCents > price) return setError("Sermayeye eklenecek kısım alış bedelini aşamaz.");
     }
+    const canEndorse = !consignment && !isInvestor && !userSale;
+    if (canEndorse && endorsed.length > 0) {
+      if (!seller) return setError("Çek / senet verilen kişiyi (kimden alındı) seç.");
+      if (endorsedCents > price) return setError("Elden verilen çek / senetlerin toplamı alış bedelini aşamaz.");
+      if (payMode === "CASH" && price > endorsedCents && !purchaseAccountId) return setError("Kalan tutarın hangi hesaptan ödendiğini seç.");
+    }
     if (!consignment && !isInvestor && payMode === "PLAN" && !userSale) {
       if (!seller) return setError("Senetli alışta kimden alındığını seç.");
       if (price <= 0 || remaining !== 0) return setError("Ödeme planının toplamı gerçek alış bedeline eşit olmalı.");
       if (rows.some((r) => rowProblem(r) != null)) return setError("Plan satırlarını tamamla.");
+    }
+
+    // Alis plani: elden verilen evraklar + (vadeli) plan satirlari ya da (pesin) kalanin simdi odendigi satir
+    function purchasePlanRequest() {
+      if (consignment || isInvestor || userSale) return null;
+      const instruments = endorsed.map((r) => endorsedRequest(r, purchaseDate));
+      if (payMode === "PLAN") return [...instruments, ...rows.map(toRequest)];
+      if (instruments.length === 0) return null;
+      const rest = price - endorsedCents;
+      return rest > 0
+        ? [...instruments, toRequest(row({ dueDate: purchaseDate, amountCents: rest, paidNow: true, accountId: purchaseAccountId }))]
+        : instruments;
     }
 
     const request: VehicleRequest = {
@@ -183,8 +206,8 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       sellerCapitalCents: consignment ? (consignPocketCents > 0 ? consignPocketCents : null)
         : userSale && sellerCapitalCents > 0 ? sellerCapitalCents : null,
       actualPurchaseCents: amounts[1], officialPurchaseCents: consignment ? null : amounts[2],
-      purchaseAccountId: !consignment && !isInvestor && (payMode === "CASH" || userSale) ? purchaseAccountId || null : null,
-      purchasePlan: !consignment && !isInvestor && payMode === "PLAN" && !userSale ? rows.map(toRequest) : null,
+      purchaseAccountId: !consignment && !isInvestor && ((payMode === "CASH" && endorsed.length === 0) || userSale) ? purchaseAccountId || null : null,
+      purchasePlan: purchasePlanRequest(),
       ownership,
       consignorId: consignment ? consignor?.id ?? null : null,
       commissionType: consignment ? commissionType : null,
@@ -341,8 +364,11 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
               </p>
             </Field>
           )}
+          {!userSale && (
+            <EndorsedInstruments rows={endorsed} onChange={setEndorsed} sellerId={seller?.id ?? null} sellerName={seller?.name ?? null} />
+          )}
           {(payMode === "CASH" || userSale) && (
-            <Field label="Ödeme nereden">
+            <Field label={!userSale && endorsedCents > 0 ? `Kalan ${tl(Math.max(0, price - endorsedCents))} nereden` : "Ödeme nereden"}>
               <select className={inputClass} value={purchaseAccountId} onChange={(e) => setPurchaseAccount(e.target.value)}>
                 {(accounts.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                 <option value="">Kasaya işleme</option>
@@ -360,7 +386,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
                   </ul>
                 </div>
               )}
-              <PlanBuilder plan={plan} baseCents={Math.max(0, price - lockedCents)} accounts={accounts.data ?? []} organizations={[]}
+              <PlanBuilder plan={plan} baseCents={Math.max(0, price - lockedCents - endorsedCents)} accounts={accounts.data ?? []} organizations={[]}
                 modes={["PROMISSORY_NOTE", "CHEQUE", "OPEN_ACCOUNT", "CREDIT_CARD", "MIXED"]}
                 methods={["CASH", "TRANSFER", "CREDIT_CARD", "PROMISSORY_NOTE", "CHEQUE", "OPEN_ACCOUNT"]}
                 nowLabel="Şimdi ödendi" downLabel="Peşinat (şimdi ödenir)" downAccountLabel="Peşinat nereden" />
