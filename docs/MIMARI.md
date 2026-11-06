@@ -315,6 +315,12 @@ Durum (saklanmaz, bugüne göre hesaplanır): `PAID`
 - Araçsız geçmiş cari kayıtları senet/çek veya `OPEN_ACCOUNT` (sözlü borç) olabilir.
 - Her taksitte (çek, senet, açık hesap, peşinat; alışta ve satışta) isteğe bağlı açıklama tutulur (`installment.description`, 500 karakter).
   Açıklama ödeme hareketinden bağımsızdır: tahsil / ödeme / ciro edilmiş satırda da düzenlenebilir; vade, tutar ve defter hareketleri değişmez.
+- **Elden çek / senetle ödeme (ciro):** portföydeki alınmış, ödenmemiş çek / senet bir alış borcuna verilebilir.
+  - Araç alışında: plan satırı `endorseInstallmentId` taşır; tutar evrakla **birebir aynı** olmalı (`ENDORSE_AMOUNT_MISMATCH`). Kayıtta
+    alış taksiti açılır (evrak türü / no / banka kopyalanır) ve evrak hemen ona ciro edilir. Bir araca birden fazla evrak verilebilir;
+    kalan kısım peşin (hesaptan) ya da vadeli plan olur. Satış planında kullanılamaz.
+  - Ödemeler'de: açık alış taksitinde "Çek / senetle öde"; mevcut ciro akışı (evrak taksitten küçükse taksit bölünür, kalanı açık kalır).
+  - Defter: evrakın sahibinin carisi kapanır, satıcıya olan borç düşer, kasa değişmez. Geri al / karşılıksız normal ciro gibi.
   Araç düzenlenirken sadece açıklama değiştiyse taksitler yeniden yazılmaz, yerinde güncellenir.
   Ödenmemiş geçmiş satır tek tek silinirse eski açılış
   hareketi terslenir ve kalan satırların toplamıyla aynı tarihle yeniden cariye yazılır. Ödenmiş satır önce geri alınmalıdır; araçlı planlardaki

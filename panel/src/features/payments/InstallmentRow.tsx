@@ -1,6 +1,6 @@
 // Taksit satiri: odeyen, (istenirse) arac, vade + durum, tutar, yontem. Islemler satirin altinda acilir:
 // tahsil et (hesap + tarih, senet / taksitte kismi tutar), geri al (onayla), vade / evrak no duzenle;
-// alinmis cek / senette ciro et ve karsiliksiz. Durum renkleri: odendi yesil, bekliyor turuncu, gecikti kirmizi.
+// alinmis cek / senette ciro et ve karsiliksiz; alis borcunda "cek / senetle ode" (elimdeki evraki bu borca ciro et). Durum renkleri: odendi yesil, bekliyor turuncu, gecikti kirmizi.
 import { useState } from "react";
 import { api } from "../../api/galeri";
 import { centsToInput, dueLabel, formatDate, formatPhone, METHOD, tl, tlToCents, todayIso } from "../../shared/format";
@@ -9,7 +9,7 @@ import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Segment } from "../../shared/ui/Common";
 import { NumberInput } from "../../shared/ui/NumberInput";
 import { Plate } from "../../shared/ui/Plate";
-import { BouncePanel, EndorsePanel } from "./InstrumentPanels";
+import { BouncePanel, EndorsePanel, PayWithInstrumentPanel } from "./InstrumentPanels";
 
 const PILL: Record<InstallmentStatus, string> = {
   PAID: "bg-basari-zemin text-basari",
@@ -23,7 +23,7 @@ const STRIPE: Record<InstallmentStatus, string> = {
   OVERDUE: "bg-tehlike-canli",
 };
 
-type Panel = "collect" | "undo" | "edit" | "endorse" | "bounce" | null;
+type Panel = "collect" | "undo" | "edit" | "endorse" | "bounce" | "instrumentPay" | null;
 
 export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = true, allowDeleteOpenItem = false, readOnly = false,
   investor = false }: {
@@ -99,6 +99,7 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
               {canDeleteOpenItem && <Button variant="quiet" className="h-9 px-2.5 text-tehlike" onClick={removeOpenItem}>Sil</Button>}
               <Button variant="quiet" className="h-9 px-2.5" onClick={() => setPanel("edit")} aria-label="Taksiti düzenle">Düzenle</Button>
               {instrument && <Button variant="secondary" className="h-9" onClick={() => setPanel("endorse")}>Ciro et</Button>}
+              {i.direction === "PURCHASE" && <Button variant="secondary" className="h-9" onClick={() => setPanel("instrumentPay")}>Çek / senetle öde</Button>}
               <Button className="h-9" onClick={() => setPanel("collect")}>{actionLabel}</Button>
             </div>
           )}
@@ -116,6 +117,7 @@ export function InstallmentRow({ i, onChange, showVehicle = true, showPayer = tr
       {panel === "undo" && <UndoPanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
       {panel === "edit" && <EditPanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
       {panel === "endorse" && <EndorsePanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
+      {panel === "instrumentPay" && <PayWithInstrumentPanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
       {panel === "bounce" && <BouncePanel i={i} onClose={() => setPanel(null)} onDone={() => { setPanel(null); onChange(); }} />}
     </li>
   );

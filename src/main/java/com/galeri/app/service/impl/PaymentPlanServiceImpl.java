@@ -2,6 +2,7 @@ package com.galeri.app.service.impl;
 
 import com.galeri.app.exception.runtime.BounceNotAllowedException;
 import com.galeri.app.exception.runtime.CapitalExceededException;
+import com.galeri.app.exception.runtime.EndorseAmountMismatchException;
 import com.galeri.app.exception.runtime.EndorseNotAllowedException;
 import com.galeri.app.exception.runtime.InvalidEndorseTargetException;
 import com.galeri.app.exception.runtime.InvalidPartialAmountException;
@@ -122,6 +123,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         List<Contact> payers = new ArrayList<>();
         for (InstallmentRequest row : rows) {
             payers.add(payer(row, buyer, tenantId));
+            if (row.endorseInstallmentId() != null) throw new InvalidEndorseTargetException();   // elden evrak sadece alista
             if (row.paidNow() && row.accountId() == null) {
                 throw new InvalidAccountException();
             }
@@ -207,6 +209,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         List<Contact> payers = new ArrayList<>();
         for (InstallmentRequest row : rows) {
             payers.add(payer(row, buyer, tenantId));
+            if (row.endorseInstallmentId() != null) throw new InvalidEndorseTargetException();   // elden evrak sadece alista
             if (row.paidNow() && row.accountId() == null) {
                 throw new InvalidAccountException();
             }
@@ -311,9 +314,14 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         List<InstallmentRequest> sorted = new ArrayList<>(rows);
         sorted.sort(Comparator.comparing(InstallmentRequest::dueDate));
         List<Contact> payees = new ArrayList<>();
+        Map<UUID, Installment> instruments = new LinkedHashMap<>();
         for (InstallmentRequest row : sorted) {
             payees.add(payer(row, seller, vehicle.getTenantId()));
             if (row.paidNow() && row.accountId() == null) throw new InvalidAccountException();
+            if (row.endorseInstallmentId() != null) instruments.put(row.endorseInstallmentId(), endorsableInstrument(row));
+        }
+        if (instruments.size() != sorted.stream().filter(r -> r.endorseInstallmentId() != null).count()) {
+            throw new InvalidEndorseTargetException();   // ayni evrak iki satirda
         }
 
         // ---- defter: odenecek kisi basina toplam, alis tarihinde. Ayniysa dokunma.
@@ -334,7 +342,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
 
         // ---- plan ve odenmemis taksitler: ayniysa dokunma, degilse odenmemisleri yeniden yaz
         List<Installment> unpaid = current.stream().filter(i -> !i.isPaid()).toList();
-        if (existing.isPresent() && sameRows(unpaid, sorted, payees)) {
+        if (existing.isPresent() && instruments.isEmpty() && sameRows(unpaid, sorted, payees)) {
             // Para ve evrak ayni; sadece aciklama degistiyse taksitler yeniden yazilmaz, yerinde guncellenir.
             List<Installment> ordered = orderedUnpaid(unpaid);
             for (int k = 0; k < sorted.size(); k++) ordered.get(k).setDescription(blankToNull(sorted.get(k).description()));
@@ -370,6 +378,14 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             i.setDrawerName(blankToNull(row.drawerName()));
             i.setDescription(blankToNull(row.description()));
             i.setPayer(payees.get(k));
+            Installment instrument = row.endorseInstallmentId() == null ? null : instruments.get(row.endorseInstallmentId());
+            if (instrument != null) {
+                // Evrak bilgisi alis taksitine de yazilir (hangi cek / senetle odendigi gorunsun)
+                i.setMethod(instrument.getMethod());
+                i.setNoteNo(instrument.getNoteNo());
+                i.setBankName(instrument.getBankName());
+                i.setDrawerName(instrument.getDrawerName());
+            }
             if (row.paidNow()) {
                 LedgerEntry e = ledgerService.writeSettlement(PlanDirection.PURCHASE, vehicle, payees.get(k), row.accountId(),
                         row.amountCents(), vehicle.getPurchaseDate(), sorted.size() == 1 && paid.isEmpty() ? "Peşin ödeme" : "Peşinat");
@@ -378,7 +394,27 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                 i.setDownPayment(true);
             }
             installmentRepository.save(i);
+            if (instrument != null) {
+                // Alis taksiti acildi; evrak hemen ona ciro edilir (normal ciro akisi: defter, sermayedar, katki hesabi)
+                installmentRepository.flush();
+                endorse(instrument.getId(), new EndorseRequest(payees.get(k).getId(), i.getId(), vehicle.getPurchaseDate()));
+            }
         }
+    }
+
+    /**
+     * Alis planinda elden verilecek evrak: portfoyde (alinmis, odenmemis, ciro edilmemis) cek / senet,
+     * plan satiriyla ayni tutar; satir aninda odenmis (pesinat) olamaz.
+     */
+    private Installment endorsableInstrument(InstallmentRequest row) {
+        Installment instrument = installmentRepository.findById(row.endorseInstallmentId()).orElseThrow(EndorseNotAllowedException::new);
+        if (!instrument.getTenantId().equals(CurrentUser.tenantId())) throw new SourceNotBelongToTenantException();
+        if (instrument.isPaid() || instrument.getPlan().getDirection() != PlanDirection.SALE || !instrument.getMethod().isInstrument()) {
+            throw new EndorseNotAllowedException();
+        }
+        if (row.paidNow()) throw new InvalidEndorseTargetException();
+        if (!instrument.getAmountCents().equals(row.amountCents())) throw new EndorseAmountMismatchException();
+        return instrument;
     }
 
     /** Gecerli alis hareketleri istenenle ayni mi: hepsi saticinin carisinden, alis tarihinde, kisi basina ayni tutar. */

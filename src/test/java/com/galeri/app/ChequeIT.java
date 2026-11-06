@@ -43,6 +43,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 // Cek / senet takibi gercek Postgres'te: cekle satis, ciro (alis senedine ya da cariye), karsiliksiz, kismi tahsilat.
@@ -243,6 +244,69 @@ class ChequeIT {
     }
 
     // ------------------------------------------------------------------ yardimcilar
+
+    @Test
+    void aracAlirkenElimdekiCekVeSenet_alisTaksitiAcilipHemenCiroEdilir_kalaniVadeliKalir() {
+        UUID sold1 = cashVehicle(300_000 * TL);
+        sell(sold1, ali, List.of(cheque(today.plusDays(30), 400_000 * TL, "C-1")));
+        UUID sold2 = cashVehicle(200_000 * TL);
+        sell(sold2, veli, List.of(new InstallmentRequest(today.plusDays(60), 250_000 * TL, PaymentMethod.PROMISSORY_NOTE, "S-9", null, false, null)));
+        UUID chequeId = open(sold1).getFirst().id();
+        UUID noteId = open(sold2).getFirst().id();
+        long cashBefore = cashBalance();
+
+        // Mehmet'ten 1.000.000'a arac: Ali'nin cekiyle 400.000, Veli'nin senediyle 250.000, kalan 350.000 vadeli senet
+        UUID bought = vehicleService.create(request(1_000_000 * TL, null, mehmet, List.of(
+                endorseRow(today, 400_000 * TL, chequeId, "Ali'nin ceki"),
+                endorseRow(today, 250_000 * TL, noteId, null),
+                new InstallmentRequest(today.plusDays(90), 350_000 * TL, PaymentMethod.PROMISSORY_NOTE, "A-7", null, false, null)))).vehicle().id();
+
+        assertThat(balance(ali)).as("Ali'nin borcu cekle kapandi").isZero();
+        assertThat(balance(veli)).as("Veli'nin borcu senetle kapandi").isZero();
+        assertThat(balance(mehmet)).as("Mehmet'e sadece vadeli kisim kaldi").isEqualTo(-350_000 * TL);
+        assertThat(cashBalance()).as("kasaya para girmedi, cikmadi").isEqualTo(cashBefore);
+        assertThat(installments(sold1).getFirst().endorsedTo().id()).isEqualTo(mehmet);
+        assertThat(installments(sold2).getFirst().endorsedTo().id()).isEqualTo(mehmet);
+
+        List<InstallmentResponse> purchase = installments(bought);
+        assertThat(purchase).filteredOn(i -> i.status() == InstallmentStatus.PAID)
+                .extracting(InstallmentResponse::method, InstallmentResponse::noteNo, InstallmentResponse::amountCents)
+                .containsExactlyInAnyOrder(tuple(PaymentMethod.CHEQUE, "C-1", 400_000 * TL), tuple(PaymentMethod.PROMISSORY_NOTE, "S-9", 250_000 * TL));
+        assertThat(open(bought)).extracting(InstallmentResponse::amountCents).containsExactly(350_000 * TL);
+        check("alista ciro");
+
+        // Alis tarafindan geri al: evrak portfoye doner, Ali yine borclu, Mehmet'e borc acilir
+        UUID paidByCheque = purchase.stream().filter(i -> "C-1".equals(i.noteNo())).findFirst().orElseThrow().id();
+        paymentPlanService.undo(paidByCheque);
+        assertThat(balance(ali)).isEqualTo(400_000 * TL);
+        assertThat(balance(mehmet)).isEqualTo(-750_000 * TL);
+        assertThat(installments(sold1).getFirst().endorsedTo()).isNull();
+        check("alista ciro geri");
+    }
+
+    @Test
+    void aracAlirkenElimdekiEvrak_tutarFarkliysa_odenmisse_ayniEvrakIkiSatirdaysa_satistaKullanilirsa_reddedilir() {
+        UUID sold = cashVehicle(300_000 * TL);
+        sell(sold, ali, List.of(cheque(today.plusDays(30), 400_000 * TL, "C-2")));
+        UUID chequeId = open(sold).getFirst().id();
+
+        expectError(1063, () -> vehicleService.create(request(500_000 * TL, null, mehmet, List.of(
+                endorseRow(today, 450_000 * TL, chequeId, null),
+                new InstallmentRequest(today.plusDays(30), 50_000 * TL, PaymentMethod.PROMISSORY_NOTE, null, null, false, null)))));
+        expectError(1049, () -> vehicleService.create(request(800_000 * TL, null, mehmet, List.of(
+                endorseRow(today, 400_000 * TL, chequeId, null), endorseRow(today, 400_000 * TL, chequeId, null)))));
+        expectError(1049, () -> sell(cashVehicle(100_000 * TL), veli, List.of(endorseRow(today, 400_000 * TL, chequeId, null))));
+        assertThat(balance(ali)).as("hicbiri yarim kayit birakmadi").isEqualTo(400_000 * TL);
+
+        paymentPlanService.collect(chequeId, new CollectRequest(cash, today));
+        expectError(1048, () -> vehicleService.create(request(400_000 * TL, null, mehmet, List.of(
+                endorseRow(today, 400_000 * TL, chequeId, null)))));
+        check("alista ciro kurallari");
+    }
+
+    private InstallmentRequest endorseRow(LocalDate due, long cents, UUID instrumentId, String description) {
+        return new InstallmentRequest(due, cents, PaymentMethod.CHEQUE, null, null, false, null, null, null, description, instrumentId);
+    }
 
     private UUID person(String name) {
         return contactService.create(new ContactRequest(name, null, ContactType.PERSON, null)).id();
