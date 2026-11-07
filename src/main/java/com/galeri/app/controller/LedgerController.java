@@ -32,10 +32,10 @@ public class LedgerController {
     private final GenericResponseService responseService;
 
     @GetMapping("/accounts")
-    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR') or @staffTrade.allowed()")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR') or @staffTrade.allowed() or @staffTrade.expenseAllowed()")
     public GenericResponse<List<AccountResponse>> moneyAccounts() {
         if (com.galeri.app.security.CurrentUser.isStaff()) {
-            // Yetkili calisan: pesin alim / satimda hesap secer; sadece ad ve tur, bakiye asla donmez (0)
+            // Yetkili calisan: pesin alim / satimda ve masrafta hesap secer; sadece ad ve tur, bakiye asla donmez (0)
             return responseService.success(ledgerService.moneyAccounts().stream()
                     .map(a -> new AccountResponse(a.id(), a.type(), a.name(), 0)).toList());
         }
@@ -73,8 +73,13 @@ public class LedgerController {
     }
 
     @PostMapping("/expenses")
-    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR') or @staffTrade.expenseAllowed()")
     public GenericResponse<LedgerEntryResponse> addExpense(@Valid @RequestBody ExpenseRequest request) {
+        if (com.galeri.app.security.CurrentUser.isStaff()) {
+            // Yetkili calisan: sadece arac masrafi, secilen kasa / bankadan; cevapta tutar donmez
+            ledgerService.addExpense(staffExpense(request));
+            return responseService.success(null);
+        }
         if (com.galeri.app.security.CurrentUser.isInvestor()) {
             // Sermayedar: sadece kendi aracina masraf; para galerinin kasasindan (hesap secmez)
             if (request.vehicleId() == null) throw new org.springframework.security.access.AccessDeniedException("Sadece arac masrafi");
@@ -84,6 +89,15 @@ public class LedgerController {
             // (konsinye aracinda masraf kendi sermayesinden duser; ortakli aracta maliyete girer)
         }
         return responseService.success(ledgerService.addExpense(request));
+    }
+
+    /** Calisan masrafi: arac zorunlu, kasa / banka zorunlu; cepten ve "eksiye dussun" onayi yok (yonetici girer). */
+    private ExpenseRequest staffExpense(ExpenseRequest r) {
+        if (r.vehicleId() == null) throw new org.springframework.security.access.AccessDeniedException("Calisan sadece arac masrafi girer");
+        // Arac ve hesap tenant'a gore servis icinde dogrulanir (getVehicle / getMoneyAccount: sadece kasa / banka)
+        if (r.sourceAccountId() == null) throw new org.springframework.security.access.AccessDeniedException("Calisan masrafi kasa / bankadan girer");
+        return new ExpenseRequest(r.date(), r.sourceAccountId(), r.amountCents(), r.vehicleId(), r.categoryId(), r.categoryName(),
+                r.parentCategoryId(), r.description(), false, null);
     }
 
     @PostMapping("/expenses/bulk")
@@ -124,6 +138,7 @@ public class LedgerController {
     }
 
     @GetMapping("/expense-categories")
+    @PreAuthorize("hasRole('ADMIN') or @staffTrade.expenseAllowed()")
     public GenericResponse<List<CategoryResponse>> categories(@RequestParam ExpenseRoot root) {
         return responseService.success(ledgerService.categories(root));
     }

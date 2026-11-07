@@ -27,6 +27,10 @@ class StaffTradeGuardTest {
     }
 
     private void user(boolean active, boolean canTrade, UUID tenant) {
+        user(active, canTrade, false, tenant);
+    }
+
+    private void user(boolean active, boolean canTrade, boolean canAddExpense, UUID tenant) {
         Tenant t = new Tenant();
         t.setId(tenant);
         PanelUser u = new PanelUser();
@@ -35,6 +39,7 @@ class StaffTradeGuardTest {
         u.setRole("STAFF");
         u.setActive(active);
         u.setCanTrade(canTrade);
+        u.setCanAddExpense(canAddExpense);
         when(repo.findById(userId)).thenReturn(Optional.of(u));
     }
 
@@ -66,5 +71,17 @@ class StaffTradeGuardTest {
     @Test
     void oturumYoksa_reddedilir() {
         assertThat(guard.allowed()).isFalse();
+    }
+
+    @Test
+    void masrafYetkisi_alimSatimYetkisindenBagimsizdir() {
+        TestSession.open(userId, tenantId, "STAFF");
+        user(true, false, true, tenantId);
+        assertThat(guard.expenseAllowed()).isTrue();
+        assertThat(guard.allowed()).isFalse();
+        user(true, true, false, tenantId);
+        assertThat(guard.expenseAllowed()).isFalse();
+        user(false, false, true, tenantId);
+        assertThat(guard.expenseAllowed()).as("pasif").isFalse();
     }
 }

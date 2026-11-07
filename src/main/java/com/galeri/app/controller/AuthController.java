@@ -65,7 +65,8 @@ public class AuthController {
                 user.getFullName() != null ? user.getFullName() : "",
                 user.getRole(),
                 tenant != null ? tenant.getDisplayName() : "",
-                "STAFF".equals(user.getRole()) && user.isCanTrade())));
+                "STAFF".equals(user.getRole()) && user.isCanTrade(),
+                "STAFF".equals(user.getRole()) && user.isCanAddExpense())));
     }
 
     /** Herkes kendi sifresini degistirir; mevcut sifre zorunlu. */
@@ -89,6 +90,7 @@ public class AuthController {
                 user.getId(), user.getFullName(), user.getRole(),
                 tenant != null ? tenant.getId() : null,
                 tenant != null ? tenant.getDisplayName() : null,
-                "STAFF".equals(user.getRole()) && user.isCanTrade())));
+                "STAFF".equals(user.getRole()) && user.isCanTrade(),
+                "STAFF".equals(user.getRole()) && user.isCanAddExpense())));
     }
 }

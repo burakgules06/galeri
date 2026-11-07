@@ -14,7 +14,7 @@ export const api = {
   reminderSettings: () => apiFetch<{ time: string }>("/api/settings/reminder"),
   updateReminderSettings: (time: string) => apiFetch<{ time: string }>("/api/settings/reminder", json({ time }, "PUT")),
   testPush: () => apiFetch<void>("/api/push/test", json({})),
-  me: () => apiFetch<{ userId: string; role: string; canTrade: boolean }>("/api/auth/me"),
+  me: () => apiFetch<{ userId: string; role: string; canTrade: boolean; canAddExpense: boolean }>("/api/auth/me"),
   netWorth: () => apiFetch<NetWorthResponse>("/api/net-worth"),
   vehicles: (q: string, status: VehicleStatus | null) => {
     const p = new URLSearchParams();
@@ -104,9 +104,9 @@ export const api = {
   vehicleCost: (vehicleId: string) => apiFetch<VehicleCost>(`/api/vehicles/${vehicleId}/cost`),
   // Kullanicilar (sadece ADMIN) ve herkesin kendi sifresi
   users: () => apiFetch<UserResponse[]>("/api/users"),
-  addUser: (request: { fullName: string; phone: string | null; role: UserRole; password: string | null; canLogin: boolean; canTrade: boolean }) =>
+  addUser: (request: { fullName: string; phone: string | null; role: UserRole; password: string | null; canLogin: boolean; canTrade: boolean; canAddExpense: boolean }) =>
     apiFetch<UserResponse>("/api/users", json(request)),
-  updateUser: (id: string, request: { fullName: string; role: UserRole; active: boolean; canLogin?: boolean; canTrade?: boolean; phone?: string | null }) =>
+  updateUser: (id: string, request: { fullName: string; role: UserRole; active: boolean; canLogin?: boolean; canTrade?: boolean; canAddExpense?: boolean; phone?: string | null }) =>
     apiFetch<UserResponse>(`/api/users/${id}`, json(request, "PATCH")),
   resetUserPassword: (id: string, password: string) => apiFetch<void>(`/api/users/${id}/reset-password`, json({ password })),
   changePassword: (currentPassword: string, newPassword: string) =>

@@ -1,6 +1,7 @@
 // Masraf girisi: araca bagliysa aracin maliyetine eklenir, degilse genel gider. Odeme kasadan ya da bankadan.
 // Konsinye aracta masraf secilen kasa / bankadan sahibinin sermayesinden duser (nakdi yetmezse onay sorulur, eksiye dusebilir);
 // "Cepten" secilirse para hareketi olmaz, masraf sadece aracta gorunur.
+// Yetkili calisan (canAddExpense): sadece arac masrafi, kasa / banka secer (bakiyesiz); cepten ve duzenleme yok.
 // existing verilirse duzenleme: form mevcut degerlerle acilir, kaydedince eski kayit terslenir, yenisi yazilir (PUT /api/expenses/{id}).
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
@@ -11,7 +12,8 @@ import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../share
 import { CategoryPicker } from "./CategoryPicker";
 import { NumberInput } from "../../shared/ui/NumberInput";
 import { confirmOwnerCash } from "../../shared/ownerCash";
-import { withNegativeConfirm } from "../../shared/consignorCash";
+import { CONSIGNOR_CASH_NEGATIVE, withNegativeConfirm } from "../../shared/consignorCash";
+import { ApiError } from "../../shared/errors/ApiError";
 import { useAuth } from "../../auth/useAuth";
 
 interface VehicleChoice { id: string; plate: string; make: string; model: string; ownership?: Ownership }
@@ -36,7 +38,7 @@ export function ExpenseForm(props: Props) {
 }
 
 function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing, shop = false }: Props) {
-  const { isInvestor } = useAuth();   // sermayedar: kendi aracina masraf; para galerinin kasasindan (hesap secmez)
+  const { isInvestor, canAddExpense: staff } = useAuth();   // sermayedar: kendi aracina masraf; para galerinin kasasindan (hesap secmez)
   // Duzenlemede arac kaydin kendisinden; aracin maliyet hesabina gitmeyen arac masrafi konsinye aractadir
   const vehicle: VehicleChoice | undefined = existing?.vehicle
     ? { ...existing.vehicle, ownership: fixedVehicle?.ownership ?? (existing.target.type !== "VEHICLE" ? "CONSIGNMENT" : undefined) }
@@ -57,7 +59,7 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing,
   const ownership = vehicle?.ownership ?? stock.data?.find((v) => v.id === vehicleId)?.ownership;
   const consignment = root === "VEHICLE" && ownership === "CONSIGNMENT";
   const selectedAccount = accountId || (isInvestor ? HOUSE_CASH : (accounts.data?.find((a) => a.type === "CASH") ?? accounts.data?.[0])?.id || "");
-  const pocket = (root === "GENERAL" || (consignment && !locked)) && selectedAccount === POCKET;
+  const pocket = !staff && (root === "GENERAL" || (consignment && !locked)) && selectedAccount === POCKET;
   const pocketVehicle = pocket && consignment;   // konsinye araca cepten: sadece takip, para hareketi yok
 
   const submit = async (e: FormEvent) => {
@@ -68,7 +70,7 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing,
     if (root === "VEHICLE" && !vehicleId) return setError("Aracı seç.");
     if (!selectedAccount && !isInvestor) return setError("Ödemenin çıktığı hesabı seç.");
     // Konsinye masraf sahibinin parasindan duser: dukkan sahibinin kasa payi sorulmaz
-    if (!existing && !pocket && !consignment && !isInvestor && !(await confirmOwnerCash(cents))) return;
+    if (!existing && !pocket && !consignment && !isInvestor && !staff && !(await confirmOwnerCash(cents))) return;
     setSaving(true);
     setError(null);
     try {
@@ -77,7 +79,9 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing,
         vehicleId: root === "VEHICLE" ? vehicleId : null, categoryId: null, categoryName: category.trim(),
         description: description.trim() || null,
       };
-      if (pocketVehicle) {
+      if (staff) {
+        await api.addExpense({ ...request, confirmNegative: false });
+      } else if (pocketVehicle) {
         await api.addPocketExpense(request);
       } else {
         const saved = await withNegativeConfirm((confirmNegative) => existing
@@ -87,7 +91,9 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing,
       }
       onSaved();
     } catch (err) {
-      setError(errorMessage(err));
+      // Calisan: konsinye sahibinin parasi yetmiyor; eksiye dusurme karari yoneticinin
+      setError(staff && err instanceof ApiError && err.code === CONSIGNOR_CASH_NEGATIVE
+        ? "Bu masraf araç sahibinin parasını aşıyor. Yöneticiye girdirin." : errorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -133,8 +139,8 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing,
                 options={[{ value: HOUSE_CASH, label: "Kasadan" }, { value: POCKET, label: "Cepten" }]} />
             : accounts.data && (
               <Segment<string> value={selectedAccount} onChange={setAccountId}
-                options={[...accounts.data.map((a) => ({ value: a.id, label: `${a.name} · ${tl(a.balanceCents)}` })),
-                  ...(root === "GENERAL" || (consignment && !locked) ? [{ value: POCKET, label: root === "GENERAL" ? "Cepten (elden ödendi)" : "Cepten" }] : [])]} />
+                options={[...accounts.data.map((a) => ({ value: a.id, label: staff ? a.name : `${a.name} · ${tl(a.balanceCents)}` })),
+                  ...(!staff && (root === "GENERAL" || (consignment && !locked)) ? [{ value: POCKET, label: root === "GENERAL" ? "Cepten (elden ödendi)" : "Cepten" }] : [])]} />
             )}
           {pocket && !pocketVehicle && <p className="text-[13px] text-murekkep-2 mt-1.5">Kasa ve banka değişmez, kimsenin sermayesinden düşmez; gider olarak kaydedilir.</p>}
         </Field>}

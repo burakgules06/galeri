@@ -10,6 +10,8 @@ export interface AuthContextValue {
   isInvestor: boolean;
   /** Calisan "araç alıp satabilir": sadece pesin alim / satim girer, tutarlari sonra goremez. */
   canTrade: boolean;
+  /** Calisan araca masraf girebilir mi (girdigi tutari sonra goremez) */
+  canAddExpense: boolean;
   login: (data: LoginResponse) => void;
   logout: () => void;
 }
