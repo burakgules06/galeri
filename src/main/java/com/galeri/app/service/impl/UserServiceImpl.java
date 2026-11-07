@@ -73,6 +73,7 @@ public class UserServiceImpl implements UserService {
         user.setRole(request.role());
         user.setCanLogin(canLogin);
         user.setCanTrade("STAFF".equals(request.role()) && Boolean.TRUE.equals(request.canTrade()));
+        user.setCanAddExpense("STAFF".equals(request.role()) && Boolean.TRUE.equals(request.canAddExpense()));
         if (blankToNull(request.password()) != null) user.setPasswordHash(passwordEncoder.encode(request.password()));
         panelUserRepository.save(user);
         log.info("Kullanici eklendi: userId={}, rol={}", user.getId(), user.getRole());
@@ -113,6 +114,8 @@ public class UserServiceImpl implements UserService {
         user.setCanLogin(canLogin);
         boolean canTrade = request.canTrade() == null ? user.isCanTrade() : request.canTrade();
         user.setCanTrade("STAFF".equals(request.role()) && canTrade);
+        boolean canAddExpense = request.canAddExpense() == null ? user.isCanAddExpense() : request.canAddExpense();
+        user.setCanAddExpense("STAFF".equals(request.role()) && canAddExpense);
         log.info("Kullanici guncellendi: userId={}, rol={}, aktif={}", id, user.getRole(), user.isActive());
         return toResponse(user, me);
     }
@@ -156,6 +159,6 @@ public class UserServiceImpl implements UserService {
 
     private static UserResponse toResponse(PanelUser u, UUID me) {
         return new UserResponse(u.getId(), u.getFullName(), u.getPhone(), u.getRole(), u.isActive(), me.equals(u.getId()),
-                u.isCanLogin(), u.isCanTrade());
+                u.isCanLogin(), u.isCanTrade(), u.isCanAddExpense());
     }
 }

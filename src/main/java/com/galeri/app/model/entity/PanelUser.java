@@ -46,6 +46,10 @@ public class PanelUser extends BaseModel {
     @Column(name = "can_trade", nullable = false)
     private boolean canTrade = false;
 
+    // Calisan arac masrafi girebilir mi (V28); girdigi tutari sonra goremez
+    @Column(name = "can_add_expense", nullable = false)
+    private boolean canAddExpense = false;
+
     // Sermayedarin havuzdaki yuzdesi (sadece bilgi) neye gore gosterilir (V16, V22'de kisiden tasindi)
     @Enumerated(EnumType.STRING)
     @Column(name = "capital_base", nullable = false, length = 8)

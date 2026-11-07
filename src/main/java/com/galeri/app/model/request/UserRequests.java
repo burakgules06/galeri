@@ -12,7 +12,8 @@ public final class UserRequests {
 
     /**
      * role: ADMIN (dukkan sahibi), INVESTOR (sermayedar), STAFF (calisan). canLogin false ise telefon ve sifre bos olabilir
-     * (or. telefonu olmayan sermayedar). canTrade sadece calisanda anlamli (arac alim / satimi girebilir).
+     * (or. telefonu olmayan sermayedar). canTrade ve canAddExpense sadece calisanda anlamli (arac alim / satimi,
+     * arac masrafi girebilir).
      */
     public record Create(
             @NotBlank @Size(max = 120) String fullName,
@@ -20,10 +21,11 @@ public final class UserRequests {
             @NotNull @Pattern(regexp = "ADMIN|INVESTOR|STAFF") String role,
             @Size(min = 8, max = 72) String password,
             Boolean canLogin,
-            Boolean canTrade
+            Boolean canTrade,
+            Boolean canAddExpense
     ) {
         public Create(String fullName, String phone, String role, String password) {
-            this(fullName, phone, role, password, true, false);
+            this(fullName, phone, role, password, true, false, false);
         }
     }
 
@@ -33,11 +35,12 @@ public final class UserRequests {
             @NotNull Boolean active,
             Boolean canLogin,   // bos: degismez
             Boolean canTrade,   // bos: degismez
+            Boolean canAddExpense,   // bos: degismez
             @Size(max = 20) String phone,   // bos: degismez
             @Size(min = 8, max = 72) String password   // giris acilirken sifresi yoksa; bos: degismez
     ) {
         public Update(String fullName, String role, Boolean active) {
-            this(fullName, role, active, null, null, null, null);
+            this(fullName, role, active, null, null, null, null, null);
         }
     }
 

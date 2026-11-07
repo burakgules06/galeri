@@ -15,6 +15,7 @@ export interface LoginResponse {
   role: Role;
   /** Calisan pesin arac alim / satimi girebilir mi (yonetici "araç alıp satabilir" isaretlediyse) */
   canTrade?: boolean;
+  canAddExpense?: boolean;
   tenantName: string;
 }
 
@@ -100,7 +101,7 @@ export interface CatalogItem { name: string; custom: boolean }
 export type UserRole = "ADMIN" | "INVESTOR" | "STAFF";
 export interface UserResponse {
   id: string; fullName: string | null; phone: string | null; role: UserRole; active: boolean; self: boolean;
-  canLogin: boolean; canTrade: boolean;
+  canLogin: boolean; canTrade: boolean; canAddExpense: boolean;
 }
 
 // Sadece ADMIN'e gelir. STAFF'a dogrudan VehicleDetail gelir.
