@@ -345,6 +345,9 @@ export interface LedgerEntryResponse {
   corrected: boolean;                // true ise bu hareket ters hareketle iptal edildi
   createdBy: string | null;
   userIds?: string[];   // hareketin ilgili oldugu kullanicilar (Kasa'da kisi filtresi)
+  // Islem sonrasi kasa / banka bakiyesi (hareket yazildigi anin fotografi); kasa / banka degilse ya da gorme yetkisi yoksa null
+  sourceBalanceAfterCents?: number | null;
+  targetBalanceAfterCents?: number | null;
   createdAt: string;
 }
 

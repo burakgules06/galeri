@@ -889,6 +889,8 @@ public class LedgerServiceImpl implements LedgerService {
                 list.stream().filter(e -> e.getVehicle() != null).map(e -> e.getVehicle().getId()).distinct().toList());
         Map<UUID, Map<UUID, Long>> shares = coOwnershipService.moneyEntryShares(tenantId);
         UUID pool = coOwnershipService.poolOwnerId(tenantId);
+        // Sermayedar kasa / banka bakiyesi gormez
+        Map<UUID, Map<UUID, Long>> after = CurrentUser.isInvestor() ? Map.of() : treasuryBalancesAfter(tenantId, list);
         return list.stream().map(e -> {
             LedgerEntryResponse r = toResponse(e, corrected.contains(e.getId()));
             java.util.LinkedHashSet<UUID> users = new java.util.LinkedHashSet<>();
@@ -898,9 +900,20 @@ public class LedgerServiceImpl implements LedgerService {
             UUID original = e.getCorrectedEntryId() != null ? e.getCorrectedEntryId() : e.getId();
             users.addAll(shares.getOrDefault(original, Map.of()).keySet());
             if (users.isEmpty() && pool != null) users.add(pool);
+            Map<UUID, Long> balances = after.getOrDefault(e.getId(), Map.of());
             return new LedgerEntryResponse(r.id(), r.date(), r.type(), r.source(), r.target(), r.amountCents(), r.vehicle(), r.category(),
-                    r.description(), r.correctedEntryId(), r.corrected(), r.createdBy(), r.createdAt(), List.copyOf(users));
+                    r.description(), r.correctedEntryId(), r.corrected(), r.createdBy(), r.createdAt(), List.copyOf(users),
+                    balances.get(e.getSourceAccount().getId()), balances.get(e.getTargetAccount().getId()));
         }).toList();
+    }
+
+    /** entryId -> (kasa / banka hesabi -> islem sonrasi bakiye). */
+    private Map<UUID, Map<UUID, Long>> treasuryBalancesAfter(UUID tenantId, List<LedgerEntry> list) {
+        Map<UUID, Map<UUID, Long>> result = new HashMap<>();
+        for (Object[] row : entryRepository.treasuryBalancesAfter(tenantId, list.stream().map(LedgerEntry::getId).toList())) {
+            result.computeIfAbsent((UUID) row[0], k -> new HashMap<>()).put((UUID) row[1], ((Number) row[2]).longValue());
+        }
+        return result;
     }
 
     /** Sermaye islemleri de (CapitalServiceImpl) ayni cevap bicimini kullanir. */
