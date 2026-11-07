@@ -35,7 +35,9 @@ public class ContactController {
     private final LedgerService ledgerService;
     private final GenericResponseService responseService;
 
+    // Yetkili calisan da arar / ekler (alim satimda satici, alici): ContactResponse'ta tutar yok
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN') or @staffTrade.allowed()")
     public GenericResponse<List<ContactResponse>> search(@RequestParam(required = false) String q) {
         return responseService.success(contactService.search(q));
     }
@@ -77,6 +79,7 @@ public class ContactController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN') or @staffTrade.allowed()")
     public GenericResponse<ContactResponse> create(@Valid @RequestBody ContactRequest request) {
         return responseService.success(contactService.create(request));
     }

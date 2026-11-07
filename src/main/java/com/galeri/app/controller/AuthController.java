@@ -64,7 +64,8 @@ public class AuthController {
                 token,
                 user.getFullName() != null ? user.getFullName() : "",
                 user.getRole(),
-                tenant != null ? tenant.getDisplayName() : "")));
+                tenant != null ? tenant.getDisplayName() : "",
+                "STAFF".equals(user.getRole()) && user.isCanTrade())));
     }
 
     /** Herkes kendi sifresini degistirir; mevcut sifre zorunlu. */
@@ -87,6 +88,7 @@ public class AuthController {
         return ResponseEntity.ok(responseService.success(new MeResponse(
                 user.getId(), user.getFullName(), user.getRole(),
                 tenant != null ? tenant.getId() : null,
-                tenant != null ? tenant.getDisplayName() : null)));
+                tenant != null ? tenant.getDisplayName() : null,
+                "STAFF".equals(user.getRole()) && user.isCanTrade())));
     }
 }

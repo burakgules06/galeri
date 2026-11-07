@@ -10,6 +10,7 @@ import { DaysInStock } from "./DaysInStock";
 import { OwnershipBadge } from "./OwnershipBadge";
 import { PaymentPlanCard } from "./PaymentPlanCard";
 import { SaleForm } from "./SaleForm";
+import { StaffSaleForm } from "./StaffSaleForm";
 import { VehicleForm } from "./VehicleForm";
 import { BulkExpenseForm } from "../ledger/BulkExpenseForm";
 import { ExpenseForm } from "../ledger/ExpenseForm";
@@ -26,7 +27,7 @@ const STATUS_PILL: Record<VehicleStatus, string> = {
 export function VehicleDetailPage({ id }: { id: string }) {
   const { data, setData, error, reload } = useLoad(() => api.vehicle(id), [id]);
   const [form, setForm] = useState<"edit" | "sell" | null>(null);
-  const { isInvestor } = useAuth();   // sermayedar kendi aracini fiyatlariyla gorur; sadece satar ve masraf ekler
+  const { isInvestor, canTrade } = useAuth();   // sermayedar kendi aracini fiyatlariyla gorur; sadece satar ve masraf ekler
   const [removeError, setRemoveError] = useState<string | null>(null);
 
   if (error) return <ErrorBox message={error} />;
@@ -67,6 +68,7 @@ export function VehicleDetailPage({ id }: { id: string }) {
             <DaysInStock days={v.daysInStock} status={v.status} />
           </div>
         </div>
+        {!admin && canTrade && v.status === "IN_STOCK" && <Button onClick={() => setForm("sell")}>Satıldı olarak işaretle</Button>}
         {admin && (
           <div className="flex gap-2">
             {!isInvestor && <Button variant="secondary" onClick={() => setForm("edit")}>Düzenle</Button>}
@@ -169,6 +171,8 @@ export function VehicleDetailPage({ id }: { id: string }) {
       {admin && !isInvestor && <VehicleForm open={form === "edit"} onClose={() => setForm(null)} existing={admin}
         onSaved={(d) => { setData(d); setForm(null); }} />}
       {admin && <SaleForm open={form === "sell"} onClose={() => setForm(null)} vehicle={admin}
+        onSaved={(d) => { setData(d); setForm(null); }} />}
+      {!admin && canTrade && <StaffSaleForm open={form === "sell"} onClose={() => setForm(null)} vehicle={v}
         onSaved={(d) => { setData(d); setForm(null); }} />}
     </div>
   );

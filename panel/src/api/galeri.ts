@@ -14,7 +14,7 @@ export const api = {
   reminderSettings: () => apiFetch<{ time: string }>("/api/settings/reminder"),
   updateReminderSettings: (time: string) => apiFetch<{ time: string }>("/api/settings/reminder", json({ time }, "PUT")),
   testPush: () => apiFetch<void>("/api/push/test", json({})),
-  me: () => apiFetch<{ userId: string }>("/api/auth/me"),
+  me: () => apiFetch<{ userId: string; role: string; canTrade: boolean }>("/api/auth/me"),
   netWorth: () => apiFetch<NetWorthResponse>("/api/net-worth"),
   vehicles: (q: string, status: VehicleStatus | null) => {
     const p = new URLSearchParams();
@@ -23,11 +23,12 @@ export const api = {
     return apiFetch<VehicleSummary[]>(`/api/vehicles?${p}`);
   },
   vehicle: (id: string) => apiFetch<VehicleDetail | VehicleDetailAdmin>(`/api/vehicles/${id}`),
-  addVehicle: (request: VehicleRequest) => apiFetch<VehicleDetailAdmin>("/api/vehicles", json(request)),
+  // Calisana (STAFF) tutarsiz VehicleDetail doner
+  addVehicle: (request: VehicleRequest) => apiFetch<VehicleDetailAdmin | VehicleDetail>("/api/vehicles", json(request)),
   updateVehicle: (id: string, request: VehicleRequest) => apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}`, json(request, "PUT")),
   updateParts: (id: string, parts: Partial<Record<BodyPart, PartCondition>>) =>
     apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}/parts`, json({ parts }, "PUT")),
-  sell: (id: string, request: SaleRequest) => apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}/sale`, json(request)),
+  sell: (id: string, request: SaleRequest) => apiFetch<VehicleDetailAdmin | VehicleDetail>(`/api/vehicles/${id}/sale`, json(request)),
   sellBasket: (request: BasketSaleRequest) => apiFetch<VehicleDetailAdmin>("/api/vehicles/basket-sale", json(request)),
   removeVehicle: (id: string) => apiFetch<void>(`/api/vehicles/${id}`, { method: "DELETE" }),
   undoSale: (id: string) => apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}/sale`, { method: "DELETE" }),
@@ -119,4 +120,8 @@ export const api = {
 
 export function isAdminDetail(d: VehicleDetail | VehicleDetailAdmin): d is VehicleDetailAdmin {
   return "vehicle" in d;
+}
+
+export function vehicleIdOf(d: VehicleDetail | VehicleDetailAdmin): string {
+  return isAdminDetail(d) ? d.vehicle.id : d.id;
 }

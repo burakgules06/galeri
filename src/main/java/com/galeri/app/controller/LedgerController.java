@@ -32,8 +32,13 @@ public class LedgerController {
     private final GenericResponseService responseService;
 
     @GetMapping("/accounts")
-    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR') or @staffTrade.allowed()")
     public GenericResponse<List<AccountResponse>> moneyAccounts() {
+        if (com.galeri.app.security.CurrentUser.isStaff()) {
+            // Yetkili calisan: pesin alim / satimda hesap secer; sadece ad ve tur, bakiye asla donmez (0)
+            return responseService.success(ledgerService.moneyAccounts().stream()
+                    .map(a -> new AccountResponse(a.id(), a.type(), a.name(), 0)).toList());
+        }
         if (com.galeri.app.security.CurrentUser.isInvestor()) {
             // Sermayedar: hesaplarda sadece kendi parasi (bakiye ve baskalarinin parasi donmez)
             return responseService.success(netWorthService.holdings().accounts().stream()
