@@ -31,6 +31,11 @@ public final class CurrentUser {
         return "INVESTOR".equals(principal().role());
     }
 
+    /** Calisan mi? Hicbir tutar gormez; can_trade ise pesin alim / satim girebilir (StaffTradeGuard). */
+    public static boolean isStaff() {
+        return "STAFF".equals(principal().role());
+    }
+
     public static UUID tenantId() {
         UUID tenantId = principal().tenantId();
         if (tenantId == null) {

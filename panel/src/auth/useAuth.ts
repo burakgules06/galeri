@@ -8,6 +8,8 @@ export interface AuthContextValue {
   isAdmin: boolean;
   /** Sermayedar: sadece kendi parasini gorur (Odemeler, Kasa, Masraflar kendi kayitlariyla, islem yok). */
   isInvestor: boolean;
+  /** Calisan "araç alıp satabilir": sadece pesin alim / satim girer, tutarlari sonra goremez. */
+  canTrade: boolean;
   login: (data: LoginResponse) => void;
   logout: () => void;
 }

@@ -13,6 +13,8 @@ export interface LoginResponse {
   token: string;
   fullName: string;
   role: Role;
+  /** Calisan pesin arac alim / satimi girebilir mi (yonetici "araç alıp satabilir" isaretlediyse) */
+  canTrade?: boolean;
   tenantName: string;
 }
 

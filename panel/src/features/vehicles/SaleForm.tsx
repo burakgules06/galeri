@@ -5,7 +5,7 @@
 import { useState, type FormEvent } from "react";
 import { api } from "../../api/galeri";
 import { formatDate, percent, tl, tlToCents, todayIso } from "../../shared/format";
-import type { ContactResponse, ContactSummary, VehicleDetailAdmin, VehicleSummary } from "../../shared/types";
+import type { ContactResponse, ContactSummary, VehicleDetail, VehicleDetailAdmin, VehicleSummary } from "../../shared/types";
 import { Plate } from "../../shared/ui/Plate";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
@@ -18,7 +18,7 @@ import { toOwnerReturns, type OwnerReturnDraft } from "./ownerReturnDraft";
 import { ownerSaleShares } from "./coOwners";
 import { useAuth } from "../../auth/useAuth";
 
-interface Props { open: boolean; onClose: () => void; vehicle: VehicleDetailAdmin; onSaved: (d: VehicleDetailAdmin) => void }
+interface Props { open: boolean; onClose: () => void; vehicle: VehicleDetailAdmin; onSaved: (d: VehicleDetailAdmin | VehicleDetail) => void }
 
 export function SaleForm(props: Props) {
   return props.open ? <SaleFormContent {...props} /> : null;

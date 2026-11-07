@@ -1,5 +1,6 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.StaffCashOnlyException;
 import com.galeri.app.exception.runtime.InvalidBasketException;
 import com.galeri.app.exception.runtime.InvalidUserCounterpartyException;
 import com.galeri.app.exception.runtime.TransferLockedException;
@@ -144,6 +145,41 @@ public class VehicleServiceImpl implements VehicleService {
      * Sermayedarin alimi: arac her zaman ortakli (tek basina aldiysa %100 onun), payi kendi sermayesinden (katki kaynagi
      * sermaye); para galerinin kasasindan cikar, kasa secmez. Senetli alis, konsinye ve dukkan payi yok.
      */
+    /**
+     * Yetkili calisan (can_trade, StaffTradeGuard): sadece pesin, galeri adina alim. Satici kisi, tamami secilen kasa /
+     * bankadan; plan, konsinye, ortaklik, kullanicidan alim yok. Alan calisan kendisi.
+     */
+    private VehicleRequest staffPurchase(VehicleRequest r) {
+        boolean dealer = r.ownership() == null || r.ownership() == Ownership.DEALER;
+        if (!dealer || r.sellerId() == null || r.sellerUserId() != null || r.actualPurchaseCents() == null
+                || (r.purchasePlan() != null && !r.purchasePlan().isEmpty()) || !isMoneyAccount(r.purchaseAccountId())) {
+            throw new StaffCashOnlyException();
+        }
+        UUID me = CurrentUser.principal().userId();
+        return new VehicleRequest(r.plate(), r.make(), r.model(), r.modelYear(), r.fuel(), r.transmission(), r.mileageKm(), r.color(),
+                r.tramerCents(), r.notes(), r.purchaseDate(), r.sellerId(), me, r.actualPurchaseCents(), r.officialPurchaseCents(),
+                r.purchaseAccountId(), null, Ownership.DEALER, null, null, null, null, null, r.addToCatalog(),
+                r.catalogModel(), null, null, null, null, null);
+    }
+
+    /**
+     * Yetkili calisan: sadece pesin satis. Alici kisi; her satir simdi odenmis ve bir kasa / banka hesabina giriyor.
+     * Kullaniciya satis, devir ve ortaga donus secimi yok (ortaklarin payi varsayilanla sermayede kalir). Satan calisan kendisi.
+     */
+    private VehicleSaleRequest staffSale(VehicleSaleRequest r) {
+        if (r.buyerId() == null || r.buyerUserId() != null || r.transferOrDefault() || r.installments() == null || r.installments().isEmpty()
+                || r.installments().stream().anyMatch(i -> !i.paidNow() || !isMoneyAccount(i.accountId())
+                        || i.endorseInstallmentId() != null || i.payerId() != null)) {
+            throw new StaffCashOnlyException();
+        }
+        UUID me = CurrentUser.principal().userId();
+        return new VehicleSaleRequest(r.saleDate(), r.buyerId(), me, r.salePriceCents(), r.installments(), null);
+    }
+
+    private boolean isMoneyAccount(UUID accountId) {
+        return accountId != null && ledgerService.moneyAccounts().stream().anyMatch(a -> a.id().equals(accountId));
+    }
+
     private VehicleRequest investorPurchase(VehicleRequest r) {
         UUID me = CurrentUser.principal().userId();
         if (r.ownershipOrDefault() != Ownership.CO_OWNED || r.shares() == null
@@ -182,6 +218,7 @@ public class VehicleServiceImpl implements VehicleService {
     public VehicleDetailAdmin create(VehicleRequest request) {
         UUID tenantId = CurrentUser.tenantId();
         if (CurrentUser.isInvestor()) request = investorPurchase(request);
+        if (CurrentUser.isStaff()) request = staffPurchase(request);
         String plate = PlateUtil.normalize(request.plate());
         if (vehicleRepository.existsByTenantIdAndPlateAndStatus(tenantId, plate, VehicleStatus.IN_STOCK)) {
             throw new PlateAlreadyInStockException();
@@ -269,6 +306,7 @@ public class VehicleServiceImpl implements VehicleService {
             if (!investorOwns(vehicle)) throw new AccessDeniedException("Bu arac sermayedara ait degil");
             request = investorSale(request);
         }
+        if (CurrentUser.isStaff()) request = staffSale(request);
         if (vehicle.getStatus() != VehicleStatus.IN_STOCK) throw new VehicleAlreadySoldException();
         if (request.saleDate().isBefore(vehicle.getPurchaseDate())) throw new InvalidDateException();
         if (request.buyerUserId() != null) return sellToUser(vehicle, request);

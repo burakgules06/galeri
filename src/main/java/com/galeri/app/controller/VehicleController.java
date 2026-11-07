@@ -42,9 +42,10 @@ public class VehicleController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")   // sermayedar: kendi sermayesiyle (ortakli) alim
-    public GenericResponse<VehicleDetailAdmin> create(@Valid @RequestBody VehicleRequest request) {
-        return responseService.success(vehicleService.create(request));
+    // sermayedar: kendi sermayesiyle (ortakli) alim; yetkili calisan: pesin alim (cevapta tutar yok)
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR') or @staffTrade.allowed()")
+    public GenericResponse<Object> create(@Valid @RequestBody VehicleRequest request) {
+        return responseService.success(forCaller(vehicleService.create(request)));
     }
 
     @PutMapping("/{id}")
@@ -67,9 +68,15 @@ public class VehicleController {
     }
 
     @PostMapping("/{id}/sale")
-    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")   // sermayedar: sadece kendi araci
-    public GenericResponse<VehicleDetailAdmin> sell(@PathVariable UUID id, @Valid @RequestBody VehicleSaleRequest request) {
-        return responseService.success(vehicleService.sell(id, request));
+    // sermayedar: sadece kendi araci; yetkili calisan: pesin satis (cevapta tutar yok)
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR') or @staffTrade.allowed()")
+    public GenericResponse<Object> sell(@PathVariable UUID id, @Valid @RequestBody VehicleSaleRequest request) {
+        return responseService.success(forCaller(vehicleService.sell(id, request)));
+    }
+
+    // Calisana para alani donmez: girdigi tutari da sonra goremez (MIMARI, Yetki)
+    private static Object forCaller(VehicleDetailAdmin admin) {
+        return com.galeri.app.security.CurrentUser.isStaff() ? admin.vehicle() : admin;
     }
 
     @DeleteMapping("/{id}")

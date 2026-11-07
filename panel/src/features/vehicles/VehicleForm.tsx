@@ -13,7 +13,7 @@ import {
 } from "../../shared/format";
 import { NumberInput } from "../../shared/ui/NumberInput";
 import type {
-  CommissionType, ContactResponse, ContactSummary, Fuel, Ownership, PaymentPlanResponse, Transmission, VehicleDetailAdmin,
+  CommissionType, ContactResponse, ContactSummary, Fuel, Ownership, PaymentPlanResponse, Transmission, VehicleDetail, VehicleDetailAdmin,
   VehicleRequest,
 } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
@@ -28,7 +28,7 @@ import { endorsedRequest, endorsedTotal, type EndorsedRow } from "../payments/en
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSaved: (d: VehicleDetailAdmin) => void;
+  onSaved: (d: VehicleDetailAdmin | VehicleDetail) => void;
   existing?: VehicleDetailAdmin;
 }
 
@@ -81,7 +81,9 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const [detailsOpen, setDetailsOpen] = useState(false);
   // null: henuz secilmedi, yeni aracta kasa varsayilir. "": deftere yazilmaz.
   const [purchaseAccount, setPurchaseAccount] = useState<string | null>(existing ? (existing.purchaseAccountId ?? "") : null);
-  const { isInvestor } = useAuth();   // sermayedar: her zaman ortakli alim, payi kendi sermayesinden, kasa secmez
+  const { isInvestor, canTrade } = useAuth();   // sermayedar: her zaman ortakli alim, payi kendi sermayesinden, kasa secmez
+  // Yetkili calisan: sadece galeri adina pesin alim (satici kisi, tamami secilen kasa / bankadan); tutarlari sonra goremez
+  const staffMode = canTrade;
   const [ownership, setOwnership] = useState<Ownership>(v?.ownership ?? (isInvestor ? "CO_OWNED" : "DEALER"));
   const [consignor, setConsignor] = useState<ContactSummary | null>(existing?.consignor ?? null);
   const [commissionType, setCommissionType] = useState<CommissionType>(existing?.commissionType ?? "RATE");
@@ -98,9 +100,9 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const coOwned = ownership === "CO_OWNED";
 
   const contacts = useLoad(() => api.contacts(), []);
-  const staff = useLoad(() => api.staff(), []);
+  const staff = useLoad(() => (staffMode ? Promise.resolve([]) : api.staff()), [staffMode]);
   const accounts = useLoad(() => api.accounts(), []);
-  const partners = useLoad(() => api.partners(), []);
+  const partners = useLoad(() => (staffMode ? Promise.resolve([]) : api.partners()), [staffMode]);
   const ownerId = (partners.data ?? []).find((p) => p.owner)?.userId ?? "";
   const me = useLoad(() => api.me(), []);
   const history = useLoad(() => api.vehicles("", null), []);
@@ -289,11 +291,11 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
               Resmi bedel farklı
             </label>
             <Field label="Kimden alındı">
-              {!isInvestor && (
+              {!isInvestor && !staffMode && (
                 <Segment<"contact" | "user"> value={fromUser ? "user" : "contact"} onChange={(m) => { setFromUser(m === "user"); if (m === "user") setPayMode("CASH"); }}
                   options={[{ value: "contact", label: "Kişi" }, { value: "user", label: "Panel kullanıcısı" }]} />
               )}
-              <div className={isInvestor ? "" : "mt-2"}>
+              <div className={isInvestor || staffMode ? "" : "mt-2"}>
                 {fromUser && !isInvestor
                   ? <select className={inputClass} aria-label="Kullanıcı" value={sellerUserId} onChange={(e) => setSellerUserId(e.target.value)}>
                       <option value="">Kullanıcı seç</option>
@@ -308,7 +310,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
         </div>
 
         <div className="space-y-6 min-w-0">
-        <section className="space-y-3">
+        {!staffMode && <section className="space-y-3">
           <h3 className="font-cond font-semibold text-[18px]">Sahiplik</h3>
           {isInvestor
             ? <p className="text-[13.5px] text-murekkep-2">Senin payın sermayenden düşer; para galerinin kasasından çıkar. İstersen başka sermayedarı ya da dükkân sahibini ortak ekle.</p>
@@ -346,14 +348,15 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
             <CoOwnersEditor rows={owners} onRows={setOwners} profitDiffers={profitDiffers} onProfitDiffers={setProfitDiffers}
               priceCents={price} partners={partners.data ?? []} boundHere={boundHere} capitalOnly={isInvestor} />
           )}
-        </section>
+        </section>}
 
         {!consignment && !isInvestor && <section className="space-y-3">
           <h3 className="font-cond font-semibold text-[18px]">Ödeme</h3>
           {existing?.transferFromVehicleId && (
             <p className="text-[13.5px] text-murekkep-2">Bu araç devirle geldi ("satmak için al"); alış bedeli ve tarihi devirden gelir.</p>
           )}
-          {!userSale && <Segment<"CASH" | "PLAN"> value={payMode} onChange={setPayMode}
+          {staffMode && <p className="text-[13.5px] text-murekkep-2">Peşin alım: bedelin tamamı seçilen hesaptan çıkar. Vadeli, konsinye ve ortaklı alımı yönetici girer.</p>}
+          {!userSale && !staffMode && <Segment<"CASH" | "PLAN"> value={payMode} onChange={setPayMode}
             options={[{ value: "CASH", label: "Peşin" }, { value: "PLAN", label: "Vadeli (senet, çek, açık hesap, kart)" }]} />}
           {userSale && sellerPartner && !sellerPartner.owner && (
             <Field label={`${sellerPartner.name} sermayesine eklenecek kısım`}>
@@ -364,14 +367,14 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
               </p>
             </Field>
           )}
-          {!userSale && (
+          {!userSale && !staffMode && (
             <EndorsedInstruments rows={endorsed} onChange={setEndorsed} sellerId={seller?.id ?? null} sellerName={seller?.name ?? null} />
           )}
           {(payMode === "CASH" || userSale) && (
             <Field label={!userSale && endorsedCents > 0 ? `Kalan ${tl(Math.max(0, price - endorsedCents))} nereden` : "Ödeme nereden"}>
               <select className={inputClass} value={purchaseAccountId} onChange={(e) => setPurchaseAccount(e.target.value)}>
                 {(accounts.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                <option value="">Kasaya işleme</option>
+                {!staffMode && <option value="">Kasaya işleme</option>}
               </select>
             </Field>
           )}

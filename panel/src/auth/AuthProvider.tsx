@@ -1,6 +1,7 @@
 // Oturum durumu: kayitli token'i ilk acilista yukler, 401 gelince oturumu kapatir.
 import { useEffect, useState, type ReactNode } from "react";
 import { clearAuth, loadAuth, saveAuth, setSessionExpiredHandler } from "../api/client";
+import { api } from "../api/galeri";
 import type { LoginResponse } from "../shared/types";
 import { AuthContext, type AuthContextValue } from "./useAuth";
 
@@ -12,10 +13,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setSessionExpiredHandler(null);
   }, []);
 
+  // Calisanin alim-satim yetkisi yonetici tarafindan sonradan acilip kapanabilir: her acilista tazelenir
+  const staffToken = auth?.role === "STAFF" ? auth.token : null;
+  useEffect(() => {
+    if (!staffToken) return;
+    let ignore = false;
+    api.me().then((me) => {
+      if (ignore) return;
+      setAuth((a) => {
+        if (!a || a.token !== staffToken || a.canTrade === me.canTrade) return a;
+        const next = { ...a, canTrade: me.canTrade };
+        saveAuth(next);
+        return next;
+      });
+    }).catch(() => { /* 401 oturumu zaten kapatir */ });
+    return () => { ignore = true; };
+  }, [staffToken]);
+
   const value: AuthContextValue = {
     auth,
     isAdmin: auth?.role === "ADMIN" || auth?.role === "SUPER_ADMIN",
     isInvestor: auth?.role === "INVESTOR",
+    canTrade: auth?.role === "STAFF" && !!auth.canTrade,
     login: (data) => {
       saveAuth(data);
       setAuth(data);

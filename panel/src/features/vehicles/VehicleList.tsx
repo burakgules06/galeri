@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "../../api/galeri";
+import { api, vehicleIdOf } from "../../api/galeri";
 import { useAuth } from "../../auth/useAuth";
 import { navigate } from "../../shared/useRoute";
 import { useLoad } from "../../shared/useLoad";
@@ -15,7 +15,7 @@ import { VehicleForm } from "./VehicleForm";
 type Filter = "IN_STOCK" | "SOLD" | "ALL";
 
 export function VehicleList() {
-  const { isAdmin, isInvestor } = useAuth();
+  const { isAdmin, isInvestor, canTrade } = useAuth();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("IN_STOCK");
   const [formOpen, setFormOpen] = useState(false);
@@ -33,7 +33,7 @@ export function VehicleList() {
             Araçlar {data && <span className="sayi font-semibold text-murekkep-3">{list.length}</span>}
           </h1>
         </div>
-        {(isAdmin || isInvestor) && <Button onClick={() => setFormOpen(true)}>Araç ekle</Button>}
+        {(isAdmin || isInvestor || canTrade) && <Button onClick={() => setFormOpen(true)}>Araç ekle</Button>}
       </div>
 
       <div className="flex flex-col md:flex-row gap-2 md:items-center mb-4">
@@ -109,11 +109,11 @@ export function VehicleList() {
         </>
       )}
 
-      {(isAdmin || isInvestor) && (
+      {(isAdmin || isInvestor || canTrade) && (
         <VehicleForm
           open={formOpen}
           onClose={() => setFormOpen(false)}
-          onSaved={(d) => { setFormOpen(false); navigate(`/vehicles/${d.vehicle.id}`); }}
+          onSaved={(d) => { setFormOpen(false); navigate(`/vehicles/${vehicleIdOf(d)}`); }}
         />
       )}
     </div>

@@ -67,4 +67,5 @@ public class ErrorMessageConstant {
     public static final int CONSIGNOR_CASH_NEGATIVE = 1061;
     public static final int POCKET_EXPENSE_NOT_ALLOWED = 1062;
     public static final int ENDORSE_AMOUNT_MISMATCH = 1063;
+    public static final int STAFF_CASH_ONLY = 1064;
 }
