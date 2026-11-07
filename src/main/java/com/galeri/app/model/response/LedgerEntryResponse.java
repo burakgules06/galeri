@@ -24,12 +24,15 @@ public record LedgerEntryResponse(
         OffsetDateTime createdAt,
         // Hareketin ilgili oldugu kullanicilar (sermayesi / carisi, aracin sahipleri, tahsilattan payi olanlar); kimse yoksa
         // dukkan sahibi. Kasa ekraninda kisi filtresi icin; tek hareket donen uclarda bos.
-        List<UUID> userIds
+        List<UUID> userIds,
+        // Islem sonrasi kasa / banka bakiyesi (o anki fotograf); hesap kasa / banka degilse ya da kullanici bakiye goremiyorsa null
+        Long sourceBalanceAfterCents,
+        Long targetBalanceAfterCents
 ) {
     public LedgerEntryResponse(UUID id, LocalDate date, LedgerEntryType type, AccountSummary source, AccountSummary target, long amountCents,
                                VehicleRef vehicle, String category, String description, UUID correctedEntryId, boolean corrected,
                                String createdBy, OffsetDateTime createdAt) {
         this(id, date, type, source, target, amountCents, vehicle, category, description, correctedEntryId, corrected, createdBy, createdAt,
-                List.of());
+                List.of(), null, null);
     }
 }

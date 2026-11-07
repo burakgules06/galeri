@@ -6,7 +6,7 @@ Her iş bitince bu dosyayı güncelle: "Şu an" ve "Sıradaki"yi değiştir, bit
 
 ## Şu an (4 Kasım 2026)
 
-- Prod canlı ve kullanılıyor. main'e merge = otomatik prod deploy. Son migration `V26__vehicle_pocket_expense.sql` (#86; yenisi V27).
+- Prod canlı ve kullanılıyor. main'e merge = otomatik prod deploy. Son migration `V27__ledger_balance_after.sql` (yenisi V28).
 - Açık PR: #86 (konsinye yeniden tasarımı).
 - Alacak / verecek sıfırlama scripti (`alacak-verecek-onizleme.sql` + `alacak-verecek-sifirla.sql`) Burak'a verildi; sonucu bildirilmedi.
 - Prod veri sıfırlaması: `sifirla-pgadmin.sql` (pgAdmin Query Tool) Burak'a verildi. Test galerisi tamamen siliniyor; gerçek galeride
@@ -34,6 +34,8 @@ Her iş bitince bu dosyayı güncelle: "Şu an" ve "Sıradaki"yi değiştir, bit
 - Kişiler (`contact.kind`): CUSTOMER / SELLER / SUPPLIER. Tüzel / bireysel ayrımı var. Kullanıcılar (çalışan, sermayedar) kişi olarak görünmez.
 
 ## Son işler
+
+- Kasa son hareketlerinde işlem sonrası kasa / banka bakiyesi (V27, trigger doldurur; MIMARI §3 istisnası), `TreasuryBalanceAfterIT`.
 
 - #86 Konsinye yeniden tasarımı (kural 1-4), `ConsignmentCostIT`; ortaklı masraf yorumu sahiplik oranıyla düzeltildi.
 - #76 Kullanıcıyla alış / satış ve "satmak için al" (MIMARI §0 madde 5), `UserCounterpartyIT`.

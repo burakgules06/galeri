@@ -889,6 +889,8 @@ public class LedgerServiceImpl implements LedgerService {
                 list.stream().filter(e -> e.getVehicle() != null).map(e -> e.getVehicle().getId()).distinct().toList());
         Map<UUID, Map<UUID, Long>> shares = coOwnershipService.moneyEntryShares(tenantId);
         UUID pool = coOwnershipService.poolOwnerId(tenantId);
+        // Sermayedar kasa / banka bakiyesi gormez
+        boolean balances = !CurrentUser.isInvestor();
         return list.stream().map(e -> {
             LedgerEntryResponse r = toResponse(e, corrected.contains(e.getId()));
             java.util.LinkedHashSet<UUID> users = new java.util.LinkedHashSet<>();
@@ -899,7 +901,8 @@ public class LedgerServiceImpl implements LedgerService {
             users.addAll(shares.getOrDefault(original, Map.of()).keySet());
             if (users.isEmpty() && pool != null) users.add(pool);
             return new LedgerEntryResponse(r.id(), r.date(), r.type(), r.source(), r.target(), r.amountCents(), r.vehicle(), r.category(),
-                    r.description(), r.correctedEntryId(), r.corrected(), r.createdBy(), r.createdAt(), List.copyOf(users));
+                    r.description(), r.correctedEntryId(), r.corrected(), r.createdBy(), r.createdAt(), List.copyOf(users),
+                    balances ? e.getSourceBalanceAfterCents() : null, balances ? e.getTargetBalanceAfterCents() : null);
         }).toList();
     }
 

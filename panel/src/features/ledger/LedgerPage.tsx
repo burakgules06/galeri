@@ -198,7 +198,7 @@ export function LedgerPage() {
         )}
         {entries.data && filtered.length > 0 && (
           <LedgerEntryList entries={pageEntries} direction={(e) => entryDirection(e, selected)} onChange={reload}
-            corrections={listTab === "corrections" ? "only" : "hide"} grouped={listTab === "entries"} />
+            corrections={listTab === "corrections" ? "only" : "hide"} grouped={listTab === "entries"} balances={!person} />
         )}
         {entries.data && items.length > pageSize && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-cizgi pt-3">
           <span className="text-[13px] text-murekkep-2">{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, items.length)} / {items.length} satır</span>
