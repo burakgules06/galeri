@@ -64,6 +64,13 @@ public class LedgerEntry {
     @JoinColumn(name = "created_by_id", updatable = false)
     private PanelUser createdBy;
 
+    // Islem sonrasi kasa / banka bakiyesi; veritabani yazarken doldurur (V27 trigger), uygulama yazmaz
+    @Column(name = "source_balance_after_cents", insertable = false, updatable = false)
+    private Long sourceBalanceAfterCents;
+
+    @Column(name = "target_balance_after_cents", insertable = false, updatable = false)
+    private Long targetBalanceAfterCents;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

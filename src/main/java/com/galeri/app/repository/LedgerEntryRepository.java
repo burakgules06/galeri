@@ -11,7 +11,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,27 +24,6 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> 
             from LedgerEntry e join e.sourceAccount s join e.targetAccount t where e.id = :id""")
     List<Object[]> capitalEntryScalars(@Param("id") UUID id);
 
-
-    /**
-     * Islem sonrasi kasa / banka bakiyesi: [entryId, accountId, balanceCents]. Hareketler kayit sirasina (created_at, id)
-     * gore toplanir; defter degismedigi icin bu, hareket yazildigi andaki bakiyenin aynisidir ve sonradan degismez.
-     */
-    @Query(value = """
-            with moves as (
-                select e.id, e.created_at, e.source_account_id as account_id, -e.amount_cents as delta
-                from ledger_entry e where e.tenant_id = :tenantId
-                union all
-                select e.id, e.created_at, e.target_account_id, e.amount_cents
-                from ledger_entry e where e.tenant_id = :tenantId
-            ), running as (
-                select m.id, m.account_id,
-                       sum(m.delta) over (partition by m.account_id order by m.created_at, m.id rows unbounded preceding) as balance
-                from moves m join account a on a.id = m.account_id
-                where a.tenant_id = :tenantId and a.type in ('CASH', 'BANK')
-            )
-            select r.id, r.account_id, r.balance from running r where r.id in (:entryIds)
-            """, nativeQuery = true)
-    List<Object[]> treasuryBalancesAfter(@Param("tenantId") UUID tenantId, @Param("entryIds") Collection<UUID> entryIds);
 
     // Hesap bazinda toplamlar: [accountId, totalCents]
     @Query("select e.targetAccount.id, sum(e.amountCents) from LedgerEntry e where e.tenantId = :tenantId group by e.targetAccount.id")

@@ -137,6 +137,11 @@ ledger_entry: entry_date | source_account → target_account | amount_cents | ve
 
 Bir hesabın bakiyesi = hesaba giren hareketler − hesaptan çıkan hareketler.
 
+Tek istisna, hareketin yanındaki **işlem sonrası bakiye** (V27): kaynak / hedef hesap kasa ya da bankaysa, hareket yazılırken
+o hesabın o anki bakiyesi `source_balance_after_cents` / `target_balance_after_cents` kolonuna yazılır (fotoğraf; Kasa son
+hareketlerinde gösterilir). Veritabanı trigger'ı doldurur, hesabı kilitleyerek: uygulama bu kolonlara yazmaz. Sadece
+gösterim içindir; hiçbir hesap bakiyesi bu kolondan okunmaz.
+
 Kurallar:
 1. **Hareket silinmez ve değiştirilmez.** Yanlış girildiyse aynı tutarda ters yönde bir düzeltme hareketi atılır (`corrected_entry_id` ile bağlanır). Ekranda "düzelt" böyle çalışır.
 2. **Tutarlar kuruş cinsinden tam sayı** (`BIGINT`). 1.250.000,50 TL = `125000050`. `double`/`float` asla kullanılmaz.

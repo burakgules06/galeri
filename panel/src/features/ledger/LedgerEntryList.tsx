@@ -15,7 +15,7 @@ import { groupEntries, groupTotal } from "./entryGroups";
 const LINKED: LedgerEntryType[] = ["VEHICLE_SALE", "COLLECTION", "PAYMENT", "CONSIGNMENT_SETTLEMENT", "PARTNER_SALE_SETTLEMENT"];
 const EXPENSE: LedgerEntryType[] = ["VEHICLE_EXPENSE", "GENERAL_EXPENSE"];
 
-export function LedgerEntryList({ entries, direction, onChange, showVehicle = true, corrections, readOnly = false, grouped = false }: {
+export function LedgerEntryList({ entries, direction, onChange, showVehicle = true, corrections, readOnly = false, grouped = false, balances = false }: {
   entries: LedgerEntryResponse[];
   /** +1 giris (yesil), -1 cikis (kirmizi), 0 notr */
   direction: (e: LedgerEntryResponse) => number;
@@ -27,6 +27,8 @@ export function LedgerEntryList({ entries, direction, onChange, showVehicle = tr
   readOnly?: boolean;
   /** Ayni araca / kisiye ayni gun yapilan hareketler tek satirda toplam (entryGroups) */
   grouped?: boolean;
+  /** Kasa ekrani: her satirda islem sonrasi kasa / banka bakiyesi (hareket yazildigi anin fotografi) */
+  balances?: boolean;
 }) {
   const [showCorrections, setShowCorrections] = useState(false);
   const isCorrection = (e: LedgerEntryResponse) => e.corrected || e.correctedEntryId != null;
@@ -47,16 +49,16 @@ export function LedgerEntryList({ entries, direction, onChange, showVehicle = tr
         : (
           <ul className="divide-y divide-cizgi">
             {(grouped ? groupEntries(visible) : visible.map((e) => [e])).map((g) => g.length === 1
-              ? <Row key={g[0].id} e={g[0]} direction={direction(g[0])} onChange={onChange} showVehicle={showVehicle} readOnly={readOnly} />
-              : <GroupRow key={g[0].id} entries={g} direction={direction} onChange={onChange} showVehicle={showVehicle} readOnly={readOnly} />)}
+              ? <Row key={g[0].id} e={g[0]} direction={direction(g[0])} onChange={onChange} showVehicle={showVehicle} readOnly={readOnly} balances={balances} />
+              : <GroupRow key={g[0].id} entries={g} direction={direction} onChange={onChange} showVehicle={showVehicle} readOnly={readOnly} balances={balances} />)}
           </ul>
         )}
     </div>
   );
 }
 
-function Row({ e, direction, onChange, showVehicle, readOnly }: {
-  e: LedgerEntryResponse; direction: number; onChange: () => void; showVehicle: boolean; readOnly: boolean;
+function Row({ e, direction, onChange, showVehicle, readOnly, balances = false }: {
+  e: LedgerEntryResponse; direction: number; onChange: () => void; showVehicle: boolean; readOnly: boolean; balances?: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -114,6 +116,7 @@ function Row({ e, direction, onChange, showVehicle, readOnly }: {
           <p className="text-[12.5px] text-murekkep-2 whitespace-nowrap" title={`Kayıt: ${shortDateTime(e.createdAt)}`}>
             {formatDate(e.date)}{e.createdAt && <span className="text-murekkep-3"> · {timeOf(e.createdAt)}</span>}
           </p>
+          {balances && <BalanceAfter e={e} />}
           {active && expense && !confirming && (
             <span className="inline-flex gap-3">
               <button type="button" onClick={() => setEditing(true)} className="text-[13px] font-semibold text-plaka hover:underline">Düzenle</button>
@@ -144,8 +147,9 @@ function Row({ e, direction, onChange, showVehicle, readOnly }: {
   );
 }
 
-function GroupRow({ entries, direction, onChange, showVehicle, readOnly }: {
+function GroupRow({ entries, direction, onChange, showVehicle, readOnly, balances = false }: {
   entries: LedgerEntryResponse[]; direction: (e: LedgerEntryResponse) => number; onChange: () => void; showVehicle: boolean; readOnly: boolean;
+  balances?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const e = entries[0];
@@ -180,14 +184,33 @@ function GroupRow({ entries, direction, onChange, showVehicle, readOnly }: {
           <p className="text-[12.5px] text-murekkep-2 whitespace-nowrap">
             {formatDate(e.date)}{latest.createdAt && <span className="text-murekkep-3"> · {timeOf(latest.createdAt)}</span>}
           </p>
+          {balances && <BalanceAfter e={latest} />}
         </div>
       </button>
       {open && (
         <ul className="mt-3 ml-3 pl-3 border-l-2 border-cizgi divide-y divide-cizgi">
-          {entries.map((x) => <Row key={x.id} e={x} direction={direction(x)} onChange={onChange} showVehicle={false} readOnly={readOnly} />)}
+          {entries.map((x) => <Row key={x.id} e={x} direction={direction(x)} onChange={onChange} showVehicle={false} readOnly={readOnly} balances={balances} />)}
         </ul>
       )}
     </li>
+  );
+}
+
+/** Islem sonrasi kasa / banka bakiyesi: "Kasa: 153.400 ₺"; virmanda iki hesap alt alta */
+function BalanceAfter({ e }: { e: LedgerEntryResponse }) {
+  const items = [
+    e.sourceBalanceAfterCents != null ? { name: e.source.name, cents: e.sourceBalanceAfterCents } : null,
+    e.targetBalanceAfterCents != null ? { name: e.target.name, cents: e.targetBalanceAfterCents } : null,
+  ].filter((x): x is { name: string; cents: number } => x != null);
+  if (items.length === 0) return null;
+  return (
+    <>
+      {items.map((x) => (
+        <p key={x.name} className="text-[12.5px] text-murekkep-3 whitespace-nowrap" title="İşlem sonrası bakiye">
+          {x.name}: <span className={`font-cond font-semibold ${x.cents < 0 ? "text-tehlike" : "text-murekkep-2"}`}>{tl(x.cents)}</span>
+        </p>
+      ))}
+    </>
   );
 }
 
