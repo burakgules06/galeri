@@ -47,6 +47,9 @@ aldığımız kişi, tedarikçi, kurum). Bir insan ikisi birden olmaz: sermayeda
 - **Tek sahipli sermayedar aracı = konsinye:** mevcut konsinye ekranı ve komisyonu aynen kalır; sadece sahibi kişi değil kullanıcıdır.
 - **Masraf:** ortaklı araçta masrafı o an seçilen kasa / banka (dükkân sahibi) öder; ortağın sermayesinden hemen düşmez. Satışta masraf
   sahiplik payı oranında bölünür ve ortağın payı onun kârından düşer.
+  Araç sayfasında her sahibin **kâr dökümü** görünür: masraf öncesi kâr (satış − alış, kâr payı oranıyla), masraf payı (−), dükkân payı,
+  net kâr, satıştan alacağı; dükkân sahibinde ayrıca "kasadan ödenen masraf geri" (+). Örnek: alış 990.000, masraf 10.000, satış
+  1.100.000, 50 / 50 → ikisi de 55.000 − 5.000 = 50.000 net; dükkân sahibi masrafın 10.000'ini geri alır.
 - **Konsinye (Kasım 2026, uygulandı):**
   1. Formda isteğe bağlı "Sahibi kaça aldı" (maliyet = `actual_purchase_cents`) ve alım türü: sermayeden / hibrit / cepten. Maliyet
      doluysa kasadan araca `VEHICLE_PURCHASE` (kasa → VEHICLE, planlı alış yok) ve araç sahibinin araçlarına bağlanır (bağlı sermaye).

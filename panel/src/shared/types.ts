@@ -44,6 +44,9 @@ export interface ShareResponse {
   shareBp: number; profitShareBp: number; source: ContributionSource; pocketCents: number | null;
   contributionCents: number; profitCents: number | null; receivableCents: number | null;
   collectedCents: number | null;   // satilmis aracta tahsil edildikce bu sahibe dagitilan (alacak - bu = bekleyen)
+  // Satilmis aracta karin dokumu: masraf oncesi kar payi, masraf payi (kardan duser), dukkan payi (ortakta eksi, dukkan
+  // sahibinde arti), masraf iadesi (masrafi kasa odedi: dukkan sahibine doner)
+  grossProfitCents: number | null; expenseShareCents: number | null; shopCutCents: number | null; expenseRefundCents: number | null;
 }
 // Ortak arac satisinda ortagin alacagi: sermayede kalsin / nakit ode (tamami) / hibrit (amountCents kadari nakit)
 export type OwnerReturnMode = "KEEP" | "CASH" | "HYBRID";
