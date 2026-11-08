@@ -10,6 +10,7 @@ import { DaysInStock } from "./DaysInStock";
 import { OwnershipBadge } from "./OwnershipBadge";
 import { PaymentPlanCard } from "./PaymentPlanCard";
 import { SaleForm } from "./SaleForm";
+import { ShowroomCard } from "./ShowroomCard";
 import { StaffSaleForm } from "./StaffSaleForm";
 import { VehicleForm } from "./VehicleForm";
 import { BulkExpenseForm } from "../ledger/BulkExpenseForm";
@@ -165,15 +166,18 @@ export function VehicleDetailPage({ id }: { id: string }) {
           )}
         </div>
 
-        <Card title="Hasar durumu">
-          <DamageEditor
-            key={JSON.stringify(v.parts)}
-            vehicleId={v.id}
-            parts={v.parts}
-            editable={!!admin && !isInvestor}
-            onSaved={setData}
-          />
-        </Card>
+        <div className="space-y-4 min-w-0">
+          <Card title="Hasar durumu">
+            <DamageEditor
+              key={JSON.stringify(v.parts)}
+              vehicleId={v.id}
+              parts={v.parts}
+              editable={!!admin && !isInvestor}
+              onSaved={setData}
+            />
+          </Card>
+          {admin && !isInvestor && <ShowroomCard vehicleId={v.id} />}
+        </div>
       </div>
 
       {admin && !isInvestor && <VehicleForm open={form === "edit"} onClose={() => setForm(null)} existing={admin}

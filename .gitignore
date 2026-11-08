@@ -48,4 +48,4 @@ logs/
 Thumbs.db
 
 # ==== Maven ====
-.mvn/timing.properties
+.mvn/timing.propertiesuploads/

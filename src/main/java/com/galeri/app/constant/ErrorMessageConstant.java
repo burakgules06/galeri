@@ -68,4 +68,6 @@ public class ErrorMessageConstant {
     public static final int POCKET_EXPENSE_NOT_ALLOWED = 1062;
     public static final int ENDORSE_AMOUNT_MISMATCH = 1063;
     public static final int STAFF_CASH_ONLY = 1064;
+    public static final int INVALID_PHOTO = 1065;
+    public static final int PHOTO_LIMIT = 1066;
 }

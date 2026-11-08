@@ -35,9 +35,15 @@ export function clearAuth() {
   localStorage.removeItem(AUTH_KEY);
 }
 
+/** API kokune gore goreli yolu tam adrese cevirir (fotograf <img src> icin). */
+export function apiUrl(path: string): string {
+  return `${API_BASE}${path}`;
+}
+
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    // FormData (fotograf yukleme): tarayici multipart sinirini kendi yazar
+    ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
     ...(options.headers as Record<string, string>),
   };
   if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
@@ -67,4 +73,19 @@ export function login(phone: string, password: string) {
     method: "POST",
     body: JSON.stringify({ phone, password }),
   });
+}
+
+/** Girissiz sayfalar (musteri vitrini): token gonderilmez, 401'de oturum kapatilmaz. */
+export async function publicFetch<T>(path: string): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`);
+  } catch {
+    throw new ApiError(0, "Sunucuya ulaşılamadı");
+  }
+  const body = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
+  if (!res.ok || !body || !body.success) {
+    throw new ApiError(res.status, body?.message ?? "Beklenmeyen bir hata oluştu", body?.code ?? null);
+  }
+  return body.data;
 }

@@ -147,4 +147,16 @@ public class Vehicle extends BaseModel {
     /** Kullaniciya satista: devirde alanin nakit girisi (CAPITAL -> kasa), devirsiz satista sermayeden dusen kisim (kasa -> CAPITAL). */
     @Column(name = "sale_capital_entry_id")
     private UUID saleCapitalEntryId;
+
+    // Musteri vitrini (V29): stokta ve isaretliyse herkese acik sayfada gorunur
+    @Column(name = "show_in_showroom", nullable = false)
+    private boolean showInShowroom = false;
+
+    // Vitrinde gosterilen fiyat; bos ise "Fiyat icin arayin"
+    @Column(name = "listing_price_cents")
+    private Long listingPriceCents;
+
+    // Musteriye gorunen ilan aciklamasi (ic notlar degil)
+    @Column(name = "listing_description", columnDefinition = "text")
+    private String listingDescription;
 }
