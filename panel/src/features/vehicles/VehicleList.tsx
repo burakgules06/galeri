@@ -11,6 +11,7 @@ import { Button, Empty, ErrorBox, inputClass, Segment } from "../../shared/ui/Co
 import { DamageBadge } from "./DamageMap";
 import { DaysInStock } from "./DaysInStock";
 import { VehicleForm } from "./VehicleForm";
+import { ShowroomShareBar } from "../showroom/ShowroomShareBar";
 
 type Filter = "IN_STOCK" | "SOLD" | "ALL";
 
@@ -35,6 +36,8 @@ export function VehicleList() {
         </div>
         {(isAdmin || isInvestor || canTrade) && <Button onClick={() => setFormOpen(true)}>Araç ekle</Button>}
       </div>
+
+      {isAdmin && <ShowroomShareBar />}
 
       <div className="flex flex-col md:flex-row gap-2 md:items-center mb-4">
         <div className="relative md:w-[360px]">
