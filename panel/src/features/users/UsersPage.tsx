@@ -64,6 +64,7 @@ function UserList({ users, onEdit, onReset }: { users: UserResponse[]; onEdit: (
             <span className="block sayi text-[15px] text-murekkep-2">
               {u.canLogin && u.phone ? formatPhone(u.phone) : "Panele girişi yok"}
               {u.role === "STAFF" && u.canTrade && <span className="font-sans text-[13px]"> · alım satım yapabilir</span>}
+              {u.role === "STAFF" && u.canAddExpense && <span className="font-sans text-[13px]"> · masraf girebilir</span>}
             </span>
           </span>
           <span className="flex gap-1.5 ml-auto">
@@ -96,6 +97,7 @@ function UserForm({ existing, onClose, onSaved }: { existing: UserResponse | nul
   const [password, setPassword] = useState("");
   const [canLogin, setCanLogin] = useState(existing?.canLogin ?? true);
   const [canTrade, setCanTrade] = useState(existing?.canTrade ?? false);
+  const [canAddExpense, setCanAddExpense] = useState(existing?.canAddExpense ?? false);
   // Girisi kapali kullanici sonradan acilirsa telefon ve sifre burada istenir
   const needsLogin = canLogin && (!existing || !existing.canLogin);
   const [error, setError] = useState<string | null>(null);
@@ -108,11 +110,11 @@ function UserForm({ existing, onClose, onSaved }: { existing: UserResponse | nul
     try {
       await (existing
         ? api.updateUser(existing.id, {
-            fullName, role, active, canLogin, canTrade: role === "STAFF" && canTrade,
+            fullName, role, active, canLogin, canTrade: role === "STAFF" && canTrade, canAddExpense: role === "STAFF" && canAddExpense,
             ...(needsLogin ? { phone: phone || null, password: password || null } : {}),
           })
         : api.addUser({ fullName, phone: canLogin ? phone : null, role, password: canLogin ? password : null, canLogin,
-            canTrade: role === "STAFF" && canTrade }));
+            canTrade: role === "STAFF" && canTrade, canAddExpense: role === "STAFF" && canAddExpense }));
       onSaved();
     } catch (err) {
       setError(errorMessage(err));
@@ -134,6 +136,12 @@ function UserForm({ existing, onClose, onSaved }: { existing: UserResponse | nul
           <label className="flex items-center gap-2 text-[15px] cursor-pointer min-h-10">
             <input type="checkbox" className="w-4 h-4 accent-plaka" checked={canTrade} onChange={(e) => setCanTrade(e.target.checked)} />
             Araç alım / satımı girebilir
+          </label>
+        )}
+        {role === "STAFF" && (
+          <label className="flex items-center gap-2 text-[15px] cursor-pointer min-h-10">
+            <input type="checkbox" className="w-4 h-4 accent-plaka" checked={canAddExpense} onChange={(e) => setCanAddExpense(e.target.checked)} />
+            Araç masrafı girebilir
           </label>
         )}
         {!self && (

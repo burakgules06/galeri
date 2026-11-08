@@ -7,7 +7,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Calisan (STAFF) icin "arac alip satabilir" (can_trade) yetkisi. @PreAuthorize'da @staffTrade.allowed() ile kullanilir.
+ * Calisan (STAFF) yetkileri: "arac alip satabilir" (can_trade, @staffTrade.allowed()) ve "arac masrafi girebilir"
+ * (can_add_expense, @staffTrade.expenseAllowed()). @PreAuthorize'da kullanilir.
  * Yetki her istekte veritabanindan okunur: yonetici kaldirinca calisan yeniden giris yapmadan etkilenir.
  */
 @Component("staffTrade")
@@ -18,6 +19,15 @@ public class StaffTradeGuard {
 
     @Transactional(readOnly = true)
     public boolean allowed() {
+        return staffHas(PanelUser::isCanTrade);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean expenseAllowed() {
+        return staffHas(PanelUser::isCanAddExpense);
+    }
+
+    private boolean staffHas(java.util.function.Predicate<PanelUser> permission) {
         PanelPrincipal p;
         try {
             p = CurrentUser.principal();
@@ -27,7 +37,7 @@ public class StaffTradeGuard {
         if (!"STAFF".equals(p.role())) return false;
         return panelUserRepository.findById(p.userId())
                 .filter(PanelUser::isActive)
-                .filter(PanelUser::isCanTrade)
+                .filter(permission)
                 .filter(u -> u.getTenant() != null && u.getTenant().getId().equals(p.tenantId()))
                 .isPresent();
     }

@@ -27,7 +27,9 @@ const STATUS_PILL: Record<VehicleStatus, string> = {
 export function VehicleDetailPage({ id }: { id: string }) {
   const { data, setData, error, reload } = useLoad(() => api.vehicle(id), [id]);
   const [form, setForm] = useState<"edit" | "sell" | null>(null);
-  const { isInvestor, canTrade } = useAuth();   // sermayedar kendi aracini fiyatlariyla gorur; sadece satar ve masraf ekler
+  const [staffExpense, setStaffExpense] = useState(false);   // yetkili calisan: araca masraf (tutari sonra gormez)
+  const [staffExpenseSaved, setStaffExpenseSaved] = useState(false);
+  const { isInvestor, canTrade, canAddExpense } = useAuth();   // sermayedar kendi aracini fiyatlariyla gorur; sadece satar ve masraf ekler
   const [removeError, setRemoveError] = useState<string | null>(null);
 
   if (error) return <ErrorBox message={error} />;
@@ -68,7 +70,12 @@ export function VehicleDetailPage({ id }: { id: string }) {
             <DaysInStock days={v.daysInStock} status={v.status} />
           </div>
         </div>
-        {!admin && canTrade && v.status === "IN_STOCK" && <Button onClick={() => setForm("sell")}>Satıldı olarak işaretle</Button>}
+        {!admin && (canTrade || canAddExpense) && (
+          <div className="flex gap-2">
+            {canAddExpense && <Button variant="secondary" onClick={() => setStaffExpense(true)}>Masraf ekle</Button>}
+            {canTrade && v.status === "IN_STOCK" && <Button onClick={() => setForm("sell")}>Satıldı olarak işaretle</Button>}
+          </div>
+        )}
         {admin && (
           <div className="flex gap-2">
             {!isInvestor && <Button variant="secondary" onClick={() => setForm("edit")}>Düzenle</Button>}
@@ -78,6 +85,7 @@ export function VehicleDetailPage({ id }: { id: string }) {
         )}
       </header>
       <ErrorBox message={removeError} />
+      {staffExpenseSaved && <p role="status" className="mt-2 rounded-lg bg-yuzey-2 border border-cizgi px-3 py-2 text-[14px] text-basari font-semibold">Masraf kaydedildi.</p>}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
         <div className="space-y-4">
@@ -172,6 +180,8 @@ export function VehicleDetailPage({ id }: { id: string }) {
         onSaved={(d) => { setData(d); setForm(null); }} />}
       {admin && <SaleForm open={form === "sell"} onClose={() => setForm(null)} vehicle={admin}
         onSaved={(d) => { setData(d); setForm(null); }} />}
+      {!admin && canAddExpense && <ExpenseForm open={staffExpense} vehicle={v} onClose={() => setStaffExpense(false)}
+        onSaved={() => { setStaffExpense(false); setStaffExpenseSaved(true); }} />}
       {!admin && canTrade && <StaffSaleForm open={form === "sell"} onClose={() => setForm(null)} vehicle={v}
         onSaved={(d) => { setData(d); setForm(null); }} />}
     </div>

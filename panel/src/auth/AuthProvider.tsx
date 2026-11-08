@@ -13,7 +13,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setSessionExpiredHandler(null);
   }, []);
 
-  // Calisanin alim-satim yetkisi yonetici tarafindan sonradan acilip kapanabilir: her acilista tazelenir
+  // Calisanin alim-satim ve masraf yetkisi yonetici tarafindan sonradan acilip kapanabilir: her acilista tazelenir
   const staffToken = auth?.role === "STAFF" ? auth.token : null;
   useEffect(() => {
     if (!staffToken) return;
@@ -21,8 +21,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.me().then((me) => {
       if (ignore) return;
       setAuth((a) => {
-        if (!a || a.token !== staffToken || a.canTrade === me.canTrade) return a;
-        const next = { ...a, canTrade: me.canTrade };
+        if (!a || a.token !== staffToken || (a.canTrade === me.canTrade && a.canAddExpense === me.canAddExpense)) return a;
+        const next = { ...a, canTrade: me.canTrade, canAddExpense: me.canAddExpense };
         saveAuth(next);
         return next;
       });
@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAdmin: auth?.role === "ADMIN" || auth?.role === "SUPER_ADMIN",
     isInvestor: auth?.role === "INVESTOR",
     canTrade: auth?.role === "STAFF" && !!auth.canTrade,
+    canAddExpense: auth?.role === "STAFF" && !!auth.canAddExpense,
     login: (data) => {
       saveAuth(data);
       setAuth(data);
