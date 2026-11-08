@@ -11,6 +11,7 @@ import { Button, Empty, ErrorBox, inputClass, Segment } from "../../shared/ui/Co
 import { BalancesCard } from "./BalancesCard";
 import { PartnerCapitalCard } from "../home/PartnerCapitalCard";
 import { BulkExpenseForm } from "./BulkExpenseForm";
+import { IncomeForm } from "./IncomeForm";
 import { LedgerEntryList } from "./LedgerEntryList";
 import { PartnersPanel } from "./PartnersPanel";
 import { PeriodProfitPanel } from "./PeriodProfitPanel";
@@ -28,6 +29,7 @@ export function LedgerPage() {
   const [tab, setTab] = useState<Tab>("entries");
   const [revision, setRevision] = useState(0);
   const [expenseOpen, setExpenseOpen] = useState(false);
+  const [incomeOpen, setIncomeOpen] = useState(false);
   const [bankOpen, setBankOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [owner, setOwner] = useState("");           // kimin parasi: "" = Tumu
@@ -89,6 +91,7 @@ export function LedgerPage() {
           <a href="#/expenses" className="md:hidden basilir h-10 px-3 rounded-lg border border-cizgi-2 bg-yuzey font-semibold text-[14px] grid place-items-center">Masraflar</a>
           <a href="#/shop" className="md:hidden basilir h-10 px-3 rounded-lg border border-cizgi-2 bg-yuzey font-semibold text-[14px] grid place-items-center">Dükkân</a>
           <Button variant="secondary" onClick={() => setTransferOpen(true)}>Hesaplar arası transfer</Button>
+          <Button variant="secondary" onClick={() => setIncomeOpen(true)}>Kazanç ekle</Button>
           <Button onClick={() => setExpenseOpen(true)}>Masraf ekle</Button>
         </div>
       </header>
@@ -211,6 +214,7 @@ export function LedgerPage() {
       </section>}
 
       {transferOpen && <TransferForm onClose={() => setTransferOpen(false)} onSaved={() => { setTransferOpen(false); reload(); }} />}
+      <IncomeForm open={incomeOpen} onClose={() => setIncomeOpen(false)} onSaved={() => { setIncomeOpen(false); reload(); }} />
       {expenseOpen && <BulkExpenseForm onClose={() => setExpenseOpen(false)} onSaved={() => { setExpenseOpen(false); reload(); }} />}
     </div>
   );

@@ -11,6 +11,7 @@ import { OwnershipBadge } from "./OwnershipBadge";
 import { PaymentPlanCard } from "./PaymentPlanCard";
 import { SaleForm } from "./SaleForm";
 import { ShowroomCard } from "./ShowroomCard";
+import { IncomeForm } from "../ledger/IncomeForm";
 import { StaffSaleForm } from "./StaffSaleForm";
 import { VehicleForm } from "./VehicleForm";
 import { BulkExpenseForm } from "../ledger/BulkExpenseForm";
@@ -201,6 +202,8 @@ function CostCard({ vehicle, ownerName }: { vehicle: VehicleDetail; ownerName?: 
   const [expenseOpen, setExpenseOpen] = useState(false);
   const { isInvestor } = useAuth();
   const expenses = (data?.entries ?? []).filter((e) => e.type === "VEHICLE_EXPENSE");
+  const incomes = (data?.entries ?? []).filter((e) => e.type === "OTHER_INCOME");
+  const [incomeOpen, setIncomeOpen] = useState(false);
   const consignment = data?.ownership === "CONSIGNMENT";
   const pockets = useLoad(() => (consignment ? api.pocketExpenses(vehicle.id) : Promise.resolve([])), [vehicle.id, consignment]);
   const pocketTotal = (pockets.data ?? []).reduce((t, p) => t + p.amountCents, 0);
@@ -240,6 +243,7 @@ function CostCard({ vehicle, ownerName }: { vehicle: VehicleDetail; ownerName?: 
             </div>
             <Info label="Masraflar" value={tl(data.expenseCents)} numeric />
             <Info label="Toplam maliyet" value={tl(data.totalCents)} numeric strong />
+            {data.incomeCents !== 0 && <Info label="Kazançlar" value={tl(data.incomeCents)} numeric />}
             {data.profitCents != null && <>
               <Info label="Satış bedeli" value={tl(data.salePriceCents)} numeric />
               <ProfitInfo cents={data.profitCents} />
@@ -262,12 +266,25 @@ function CostCard({ vehicle, ownerName }: { vehicle: VehicleDetail; ownerName?: 
               <PocketExpenseList items={pockets.data ?? []} onChange={pockets.reload} />
             )}
           </div>
+          {(incomes.length > 0 || !isInvestor) && (
+            <div className="mt-4 pt-3 border-t border-cizgi">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-[15px] text-murekkep-2">Kazançlar <span className="font-normal text-[13px] text-murekkep-3">noter, kredi komisyonu…</span></h3>
+                {!isInvestor && <Button variant="secondary" className="h-9" onClick={() => setIncomeOpen(true)}>Kazanç ekle</Button>}
+              </div>
+              {incomes.length === 0
+                ? <p className="text-[14px] text-murekkep-3">Bu araca bağlı kazanç yok. Girilen kazanç aracın kârına eklenir.</p>
+                : <LedgerEntryList entries={incomes} direction={() => 1} onChange={reload} showVehicle={false} readOnly={isInvestor} />}
+            </div>
+          )}
         </>
       )}
       {expenseOpen && !isInvestor && <BulkExpenseForm vehicle={vehicle} onClose={() => setExpenseOpen(false)}
         onSaved={() => { setExpenseOpen(false); reloadAll(); }} />}
       <ExpenseForm open={expenseOpen && isInvestor} vehicle={vehicle} onClose={() => setExpenseOpen(false)}
         onSaved={() => { setExpenseOpen(false); reloadAll(); }} />
+      {!isInvestor && <IncomeForm open={incomeOpen} vehicle={vehicle} onClose={() => setIncomeOpen(false)}
+        onSaved={() => { setIncomeOpen(false); reloadAll(); }} />}
     </Card>
   );
 }

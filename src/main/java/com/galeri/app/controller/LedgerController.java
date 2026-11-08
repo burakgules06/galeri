@@ -100,6 +100,13 @@ public class LedgerController {
                 r.parentCategoryId(), r.description(), false, null);
     }
 
+    /** Diger kazanc (noter / kredi komisyonu, kira geliri ...): secilen kasa / bankaya giris. Sadece dukkan sahibi. */
+    @PostMapping("/incomes")
+    @PreAuthorize("hasRole('ADMIN')")
+    public GenericResponse<LedgerEntryResponse> addIncome(@Valid @RequestBody com.galeri.app.model.request.IncomeRequest request) {
+        return responseService.success(ledgerService.addIncome(request));
+    }
+
     @PostMapping("/expenses/bulk")
     public GenericResponse<List<LedgerEntryResponse>> addExpenses(@Valid @RequestBody BulkExpenseRequest request) {
         return responseService.success(ledgerService.addExpenses(request.items()));
@@ -140,6 +147,10 @@ public class LedgerController {
     @GetMapping("/expense-categories")
     @PreAuthorize("hasRole('ADMIN') or @staffTrade.expenseAllowed()")
     public GenericResponse<List<CategoryResponse>> categories(@RequestParam ExpenseRoot root) {
+        // Calisan sadece masraf kategorilerini gorur
+        if (root == ExpenseRoot.INCOME && com.galeri.app.security.CurrentUser.isStaff()) {
+            throw new org.springframework.security.access.AccessDeniedException("Kazanc kategorileri sadece yoneticide");
+        }
         return responseService.success(ledgerService.categories(root));
     }
 

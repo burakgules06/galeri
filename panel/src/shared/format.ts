@@ -95,6 +95,7 @@ export const ENTRY_TYPE: Record<LedgerEntryType, string> = {
   VEHICLE_SALE: "Araç satışı", COLLECTION: "Tahsilat", PAYMENT: "Ödeme", CONSIGNMENT_SETTLEMENT: "Konsinye borcu",
   PROFIT_ALLOCATION: "Kâr payı sermayeye", TRANSFER: "Hesaplar arası transfer", OPENING_BALANCE: "Açılış bakiyesi",
   VEHICLE_PROFIT_SHARE: "Ortak satış payı", CAPITAL_TRANSFER: "Sermaye aktarımı", PARTNER_SALE_SETTLEMENT: "Ortak araç alımı · sermayeden",
+  OTHER_INCOME: "Kazanç",
 };
 
 export const OWNERSHIP: Record<Ownership, string> = { DEALER: "Galeri", CONSIGNMENT: "Konsinye", CO_OWNED: "Ortak" };

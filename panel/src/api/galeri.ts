@@ -5,7 +5,7 @@ import type {
   YearlyTrades, PaymentPlanResponse, OpenItemsRequest, BasketSaleRequest, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
   LedgerEntryResponse, MonthlyTrades, PocketExpenseResponse, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
   VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary, UserResponse, UserRole, ContactPaymentRequest,
-  ShowroomListing, ShowroomSettings, PublicGallery, PublicVehicle,
+  IncomeRequest, ShowroomListing, ShowroomSettings, PublicGallery, PublicVehicle,
   CapitalMovementRequest, CapitalBase, CapitalTransferRequest, Holder, OpeningBalanceRequest, Partner, PeriodProfit, ProfitAllocationRequest, TransferRequest, CatalogItem,
 } from "../shared/types";
 
@@ -109,6 +109,7 @@ export const api = {
     apiFetch<LedgerEntryResponse[]>(`/api/ledger-entries${accountId ? `?accountId=${accountId}` : ""}`),
   correctEntry: (id: string) => apiFetch<LedgerEntryResponse>(`/api/ledger-entries/${id}/correct`, { method: "POST" }),
   addExpense: (request: ExpenseRequest) => apiFetch<LedgerEntryResponse>("/api/expenses", json(request)),
+  addIncome: (request: IncomeRequest) => apiFetch<LedgerEntryResponse>("/api/incomes", json(request)),
   expenses: (from: string | null, to: string | null) =>
     apiFetch<LedgerEntryResponse[]>(`/api/expenses?${new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}) })}`),
   // Duzenle: eski kayit terslenir + yeni kayit; sil: ters kayit (defter degismez)
