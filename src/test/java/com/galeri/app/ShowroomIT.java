@@ -131,7 +131,7 @@ class ShowroomIT {
         showroomService.updateListing(shown, new ShowroomRequests.Listing(true, 850_000 * TL, "  Hatasız, servis bakımlı  "));
         showroomService.updateListing(sold, new ShowroomRequests.Listing(true, null, null));
         showroomService.updateSettings(new ShowroomRequests.Settings("0532 111 22 33"));
-        jdbc.update("update vehicle set status = 'SOLD' where id = ?", sold);
+        jdbc.update("update vehicle set status = 'SOLD', sale_date = ? where id = ?", today, sold);
         TestSession.close();
 
         ShowroomResponses.PublicGallery g = showroomService.publicGallery(slug);
