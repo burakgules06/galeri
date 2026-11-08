@@ -38,9 +38,17 @@ public final class CapitalResponses {
      * - genel giderler (MIMARI §5). coOwnedProfitCents ortak araclarda ortaklara yazilan kar paylari: satista dogrudan
      * sermayelerine gecer, nete girmez (bilgi). Paylar donem sonundaki nakitteki sermayelerden.
      */
+    /**
+     * otherIncomeCents: araca bagli olmayan diger kazanclar (giris tarihine gore); araca bagli olanlar aracin karinda
+     * (vehicleProfitCents ve satir karinda). net = vehicleProfit + commission + otherIncome - generalExpense.
+     */
     public record PeriodProfit(LocalDate from, LocalDate to, List<SoldVehicle> vehicles,
                                long vehicleProfitCents, long commissionCents, long generalExpenseCents, long netCents,
-                               long coOwnedProfitCents, List<PartnerProfit> partners) {}
+                               long coOwnedProfitCents, List<PartnerProfit> partners,
+                               long otherIncomeCents, List<IncomeLine> otherIncomes) {}
+
+    /** Diger kazanc kategori toplami; category bos = kategorisiz. */
+    public record IncomeLine(String category, long amountCents) {}
 
     /**
      * Sermayedar gorunumu (V16 dukkan sahibi modeli). Havuz: kasa + bankalar + araclar + alacaklar - borclar. Sermayedarin

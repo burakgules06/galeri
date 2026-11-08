@@ -146,9 +146,10 @@ function PaymentsStrip({ data }: { data: DashboardResponse }) {
           {data.overdueCount ? `${data.overdueCount} taksit vadesini geçti` : "Bütün tahsilatlar zamanında"} <span className="font-semibold text-plaka">→</span>
         </p>
       </a>
-      <a href="#/payments" className="kart basilir block p-4 md:p-5 hover:shadow-md transition-shadow min-w-0">
+      {/* Kart tiklanmaz; isme dokununca o kisinin hesap ozeti (odemeleri), "Tümü" Ödemeler sayfasi */}
+      <section className="kart p-4 md:p-5 min-w-0">
         <div className="flex items-baseline justify-between gap-3">
-          <p className="etiket">Bu hafta</p>
+          <a href="#/payments" className="etiket hover:text-plaka">Bu hafta <span className="font-semibold text-plaka">→</span></a>
           <p className="text-[13px] text-murekkep-2">
             Tahsilat <b className="sayi text-[15px] text-basari">{tl(data.weekCollectCents)}</b>
             {data.weekPayCents > 0 && <> · Ödeme <b className="sayi text-[15px] text-tehlike">{tl(data.weekPayCents)}</b></>}
@@ -159,17 +160,20 @@ function PaymentsStrip({ data }: { data: DashboardResponse }) {
           : (
             <ul className="mt-2 divide-y divide-cizgi">
               {week.map((i) => (
-                <li key={i.id} className="flex items-center gap-3 py-2">
-                  <span className={`w-1.5 h-6 rounded-full shrink-0 ${i.direction === "SALE" ? "bg-basari-canli" : "bg-tehlike-canli"}`} />
-                  {i.vehicle && <Plate plate={i.vehicle.plate} size="sm" />}
-                  <span className="min-w-0 grow truncate text-[14px]"><b className="font-semibold">{i.payer.name}</b>
-                    <span className="text-murekkep-2"> · {dueLabel(i)}</span></span>
-                  <span className="sayi font-semibold text-[16px] shrink-0">{tl(i.amountCents)}</span>
+                <li key={i.id}>
+                  <a href={`#/contacts/${i.payer.id}`} title={`${i.payer.name} · ödemeleri gör`}
+                    className="flex items-center gap-3 py-2 -mx-2 px-2 rounded-lg hover:bg-yuzey-2">
+                    <span className={`w-1.5 h-6 rounded-full shrink-0 ${i.direction === "SALE" ? "bg-basari-canli" : "bg-tehlike-canli"}`} />
+                    {i.vehicle && <Plate plate={i.vehicle.plate} size="sm" />}
+                    <span className="min-w-0 grow truncate text-[14px]"><b className="font-semibold text-plaka">{i.payer.name}</b>
+                      <span className="text-murekkep-2"> · {dueLabel(i)}</span></span>
+                    <span className="sayi font-semibold text-[16px] shrink-0">{tl(i.amountCents)}</span>
+                  </a>
                 </li>
               ))}
             </ul>
           )}
-      </a>
+      </section>
     </div>
   );
 }

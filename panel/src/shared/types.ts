@@ -319,8 +319,8 @@ export interface ContactRequest { name: string; phone: string | null; type: Cont
 export type AccountType = "CASH" | "BANK" | "BALANCE" | "CAPITAL" | "VEHICLE" | "EXPENSE" | "INCOME" | "OPENING";
 export type LedgerEntryType =
   | "VEHICLE_PURCHASE" | "VEHICLE_EXPENSE" | "GENERAL_EXPENSE" | "CAPITAL" | "VEHICLE_SALE" | "COLLECTION" | "PAYMENT"
-  | "CONSIGNMENT_SETTLEMENT" | "PROFIT_ALLOCATION" | "TRANSFER" | "OPENING_BALANCE" | "VEHICLE_PROFIT_SHARE" | "CAPITAL_TRANSFER" | "PARTNER_SALE_SETTLEMENT";
-export type ExpenseRoot = "VEHICLE" | "GENERAL";
+  | "CONSIGNMENT_SETTLEMENT" | "PROFIT_ALLOCATION" | "TRANSFER" | "OPENING_BALANCE" | "VEHICLE_PROFIT_SHARE" | "CAPITAL_TRANSFER" | "PARTNER_SALE_SETTLEMENT" | "OTHER_INCOME";
+export type ExpenseRoot = "VEHICLE" | "GENERAL" | "INCOME";   // INCOME: diger kazanc kategorileri
 
 export interface AccountSummary { id: string; type: AccountType; name: string }
 export interface AccountResponse extends AccountSummary { balanceCents: number }
@@ -370,6 +370,13 @@ export interface VehicleCost {
   ownerCollectedCents: number | null;   // konsinye: alacaginin tahsil edilip sermayesine gecen kismi
   shares: ShareResponse[];           // ortak arac: sahipler, katkilar, kar paylari
   entries: LedgerEntryResponse[];
+  incomeCents: number;               // araca bagli diger kazanclar (noter / kredi komisyonu ...); satildiysa kara dahil
+}
+
+// Diger kazanc: secilen kasa / bankaya giris. vehicleId doluysa aracin karina, bossa donem karina.
+export interface IncomeRequest {
+  date: string; targetAccountId: string; amountCents: number; vehicleId: string | null;
+  categoryId: null; categoryName: string | null; parentCategoryId: null; description: string | null;
 }
 
 export interface ExpenseRequest {
@@ -448,6 +455,8 @@ export interface PeriodProfit {
   from: string; to: string; vehicles: SoldVehicleProfit[];
   vehicleProfitCents: number; commissionCents: number; generalExpenseCents: number; netCents: number;
   coOwnedProfitCents: number; partners: PartnerProfit[];
+  otherIncomeCents: number;   // araca bagli olmayan diger kazanclar (araca bagli olanlar arac karinda)
+  otherIncomes: { category: string | null; amountCents: number }[];
 }
 
 // Musteri vitrini. url / thumbUrl API kokune gore goreli (apiUrl ile tam adres olur).

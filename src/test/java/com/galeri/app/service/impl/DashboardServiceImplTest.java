@@ -151,7 +151,7 @@ class DashboardServiceImplTest {
     }
 
     private static PeriodProfit profit(long net, long commission) {
-        return new PeriodProfit(null, null, List.of(), 0, commission, 0, net, 0, List.of());
+        return new PeriodProfit(null, null, List.of(), 0, commission, 0, net, 0, List.of(), 0, List.of());
     }
 
     @Test

@@ -33,6 +33,9 @@ public interface LedgerService {
     /** Donemdeki masraflar (arac masrafi ve genel gider), duzeltmeleriyle; yeni once. */
     List<LedgerEntryResponse> expenses(java.time.LocalDate from, java.time.LocalDate to);
 
+    /** Diger kazanc: INCOME -> secilen kasa / banka (yonetici). */
+    LedgerEntryResponse addIncome(com.galeri.app.model.request.IncomeRequest request);
+
     LedgerEntryResponse addExpense(ExpenseRequest request);
 
     /** Toplu masraf: hepsi tek transaction'da, sirayla; biri hataliysa hicbiri yazilmaz. */

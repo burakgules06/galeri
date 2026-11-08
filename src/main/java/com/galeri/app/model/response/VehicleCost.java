@@ -10,6 +10,7 @@ import java.util.UUID;
 // - CONSIGNMENT: alis yok; expenseCents = galerinin ustlendigi masraflar, ownerChargedCents = sahibine yansitilanlar,
 //   kar = komisyon - galerinin ustlendigi masraflar. ownerPayoutCents = sahibinin alacagi (satis - komisyon);
 //   ownerCollectedCents bunun tahsil edilip sermayesine gecen kismi.
+// incomeCents: araca bagli diger kazanclar (noter / kredi komisyonu ...); satildiysa kara eklenir.
 // purchaseInLedger: alis odemesi deftere yazildi mi. shares: ortakli aracta karin ortaklara bolunmesi (sadece gosterim).
 public record VehicleCost(
         UUID vehicleId,
@@ -25,5 +26,6 @@ public record VehicleCost(
         long ownerChargedCents,
         Long ownerCollectedCents,
         List<ShareResponse> shares,
-        List<LedgerEntryResponse> entries
+        List<LedgerEntryResponse> entries,
+        long incomeCents
 ) {}

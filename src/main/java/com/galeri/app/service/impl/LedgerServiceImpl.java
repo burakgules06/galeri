@@ -149,6 +149,21 @@ public class LedgerServiceImpl implements LedgerService {
 
     @Override
     @Transactional
+    public LedgerEntryResponse addIncome(com.galeri.app.model.request.IncomeRequest r) {
+        UUID tenantId = CurrentUser.tenantId();
+        Account target = getMoneyAccount(r.targetAccountId());
+        Vehicle vehicle = r.vehicleId() == null ? null : getVehicle(r.vehicleId());
+        ExpenseCategory category = findOrCreateCategory(tenantId, ExpenseRoot.INCOME, r.categoryId(), r.categoryName(), r.parentCategoryId());
+        LedgerEntry e = newEntry(tenantId, LedgerEntryType.OTHER_INCOME, systemAccount(tenantId, AccountType.INCOME), target,
+                r.amountCents(), r.date());
+        e.setVehicle(vehicle);
+        e.setCategory(category);
+        e.setDescription(blankToNull(r.description()));
+        return toResponse(entryRepository.save(e), false);
+    }
+
+    @Override
+    @Transactional
     public List<LedgerEntryResponse> addExpenses(List<ExpenseRequest> requests) {
         List<LedgerEntryResponse> result = new ArrayList<>(requests.size());
         for (ExpenseRequest r : requests) result.add(toResponse(afterExpense(writeExpense(r)), false));
@@ -497,8 +512,9 @@ public class LedgerServiceImpl implements LedgerService {
         // Araca bagli masraflar gittikleri hesaba gore: aracin maliyeti (VEHICLE), galerinin genel gideri (EXPENSE, eski
         // konsinye kaydi) ya da sahibine ait (konsinye: eski kayitta carisine BALANCE, Kasim 2026'dan beri sermayesinden CAPITAL).
         // Duzeltmeler ters yonde oldugu icin kendiliginden duser.
-        long vehicleExpense = 0, absorbed = 0, charged = 0;
+        long vehicleExpense = 0, absorbed = 0, charged = 0, income = 0;
         for (LedgerEntry e : entries) {
+            if (e.getType() == LedgerEntryType.OTHER_INCOME) income -= signed(e, AccountType.INCOME);
             if (e.getType() != LedgerEntryType.VEHICLE_EXPENSE) continue;
             if (touches(e, AccountType.VEHICLE)) vehicleExpense += signed(e, AccountType.VEHICLE);
             else if (touches(e, AccountType.EXPENSE)) absorbed += signed(e, AccountType.EXPENSE);
@@ -516,7 +532,7 @@ public class LedgerServiceImpl implements LedgerService {
         long expense = consignment ? absorbed : vehicleExpense;
         long total = purchase + expense;
         Long commission = consignment ? ConsignmentMath.commission(vehicle, sale) : null;
-        Long profit = !sold ? null : consignment ? (commission == null ? 0 : commission) - expense : sale - total;
+        Long profit = !sold ? null : (consignment ? (commission == null ? 0 : commission) - expense : sale - total) + income;
         Long payout = consignment && sold && commission != null ? sale - commission : null;
 
         // Ortak arac: sahipler, katkilari, satildiysa kar paylari (dukkan payi dusulmus) ve alacaklari
@@ -524,7 +540,7 @@ public class LedgerServiceImpl implements LedgerService {
         CoOwnershipService.ConsignmentShare share = consignment ? coOwnershipService.consignmentShare(vehicle) : null;
         Long collected = share == null ? null : share.collectedCents();
         return new VehicleCost(vehicle.getId(), vehicle.getOwnership(), purchase, purchaseInLedger, expense, total, sale, profit,
-                commission, payout, consignment ? charged : 0, collected, shares, toResponse(entries));
+                commission, payout, consignment ? charged : 0, collected, shares, toResponse(entries), income);
     }
 
     // ------------------------------------------------------------------ cepten masraf (konsinye, V26)

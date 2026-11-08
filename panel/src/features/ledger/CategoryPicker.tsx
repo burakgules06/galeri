@@ -34,7 +34,7 @@ export function CategoryPicker({ root, name, onChange }: { root: ExpenseRoot; na
         </div>
       )}
       <div className="relative">
-        <input className={inputClass} value={name} placeholder={root === "VEHICLE" ? "Boya, ekspertiz, lastik…" : "Kira, fatura, maaş…"}
+        <input className={inputClass} value={name} placeholder={root === "VEHICLE" ? "Boya, ekspertiz, lastik…" : root === "INCOME" ? "Kredi komisyonu, noter, kira geliri…" : "Kira, fatura, maaş…"}
           onChange={(e) => { onChange(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} />
         {open && (suggestions.length > 0 || isNew) && (

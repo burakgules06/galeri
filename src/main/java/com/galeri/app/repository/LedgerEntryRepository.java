@@ -26,6 +26,27 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> 
     List<Object[]> capitalEntryScalars(@Param("id") UUID id);
 
 
+    /** Araca bagli diger kazanclar (net, duzeltmeler dahil): [vehicleId, cents]. */
+    @Query("""
+            select e.vehicle.id, sum(case when e.sourceAccount.type = com.galeri.app.model.enums.AccountType.INCOME
+                                          then e.amountCents else -e.amountCents end)
+            from LedgerEntry e
+            where e.tenantId = :tenantId and e.type = com.galeri.app.model.enums.LedgerEntryType.OTHER_INCOME and e.vehicle is not null
+            group by e.vehicle.id
+            """)
+    List<Object[]> vehicleIncomeTotals(@Param("tenantId") UUID tenantId);
+
+    /** Araca bagli olmayan diger kazanclar, donemde, kategoriye gore (net): [categoryName | null, cents]. */
+    @Query("""
+            select c.name, sum(case when e.sourceAccount.type = com.galeri.app.model.enums.AccountType.INCOME
+                                    then e.amountCents else -e.amountCents end)
+            from LedgerEntry e left join e.category c
+            where e.tenantId = :tenantId and e.type = com.galeri.app.model.enums.LedgerEntryType.OTHER_INCOME and e.vehicle is null
+              and e.entryDate between :from and :to
+            group by c.name
+            """)
+    List<Object[]> otherIncomeByCategory(@Param("tenantId") UUID tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
     // Hesap bazinda toplamlar: [accountId, totalCents]
     @Query("select e.targetAccount.id, sum(e.amountCents) from LedgerEntry e where e.tenantId = :tenantId group by e.targetAccount.id")
     List<Object[]> incomingTotals(@Param("tenantId") UUID tenantId);

@@ -66,18 +66,33 @@ export function PeriodProfitPanel() {
 function ProfitSummary({ p }: { p: PeriodProfit }) {
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatTile label="Araç kârı" value={tl(p.vehicleProfitCents)} tone={p.vehicleProfitCents >= 0 ? "positive" : "negative"}
           sub={`${p.vehicles.filter((v) => v.ownership === "DEALER").length} galeri aracı · ${p.vehicles.filter((v) => v.ownership === "CO_OWNED").length} ortak araç Havuz payı`} />
         {/* Komisyon ayri satir: sermaye karina girip girmeyecegi acik soru (MIMARI §13) */}
         <StatTile label="Konsinye komisyonu" value={tl(p.commissionCents)} tone={p.commissionCents > 0 ? "positive" : "neutral"}
           sub={`${p.vehicles.filter((v) => v.ownership === "CONSIGNMENT").length} konsinye satış`} />
+        <StatTile label="Diğer kazançlar" value={tl(p.otherIncomeCents)} tone={p.otherIncomeCents > 0 ? "positive" : "neutral"}
+          sub={p.otherIncomes.length ? p.otherIncomes.slice(0, 2).map((i) => i.category ?? "Diğer").join(", ") + (p.otherIncomes.length > 2 ? "…" : "") : "Araca bağlı olanlar araç kârında"} />
         <StatTile label="Genel giderler" value={tl(p.generalExpenseCents)} tone={p.generalExpenseCents > 0 ? "negative" : "neutral"}
           />
         <StatTile label={p.netCents >= 0 ? "Net kâr" : "Net zarar"} value={tl(Math.abs(p.netCents))} tone={p.netCents >= 0 ? "positive" : "negative"}
           />
       </div>
 
+      {p.otherIncomes.length > 0 && (
+        <section className="kart p-4 md:p-5">
+          <h2 className="etiket mb-2">Diğer kazançlar</h2>
+          <ul className="divide-y divide-cizgi">
+            {p.otherIncomes.map((i) => (
+              <li key={i.category ?? "-"} className="flex items-baseline justify-between gap-3 py-2">
+                <span className="text-[15px] font-semibold truncate">{i.category ?? "Kategorisiz"}</span>
+                <span className="sayi font-semibold text-[17px] text-basari shrink-0">{tl(i.amountCents)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </>
   );
 }

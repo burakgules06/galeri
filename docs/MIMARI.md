@@ -177,6 +177,7 @@ Gösterimde işaret hesap türüne göre çevrilir: `CAPITAL` hesabından 2 mily
 | Alıcı 300.000 TL peşinat verdi | BALANCE(alıcı) → CASH 300.000 |
 | Evim şirketi kalan 1.000.000 TL'yi ödedi | BALANCE(Evim şirketi) → BANK 1.000.000 (satışta bu tutar alıcının değil şirketin carisine yazılır) |
 | Konsinye araç satıldı, komisyon %3 | INCOME → BALANCE(alıcı) 1.300.000 ve BALANCE(araç sahibi) → INCOME 1.261.000 (galeri sahibine borçlu); INCOME'da net 39.000 komisyon kalır |
+| Diğer kazanç (kredi komisyonu, kira geliri…) bankaya girdi | INCOME → BANK; kategori (`expense_category`, kök `INCOME`); araca bağlıysa `vehicle_id` dolu |
 | Ortaklar kâr payını sermayeye eklemeye karar verdi | CAPITAL(Burak) → INCOME X (elle girilir, bkz. 5; sermaye girişiyle aynı yön: sermaye hesabından çıkış = sermaye artar) |
 | Kasadan bankaya para yatırıldı (virman) | CASH → BANK 100.000 (toplam nakit değişmez) |
 | Sisteme geçişte kasada 120.000 TL vardı | OPENING → CASH 120.000 (hesap başına bir kez) |
@@ -215,7 +216,7 @@ Uygulama (Adım 4B):
 - Konsinye satış: `VEHICLE_SALE` INCOME → BALANCE(alıcı) (her satışta olduğu gibi) + `CONSIGNMENT_SETTLEMENT` BALANCE(sahibi) → INCOME
   (satış − komisyon). Sahibine ödeme `PAYMENT` CASH/BANK → BALANCE(sahibi), kısmi olabilir.
 - Konsinye masraf: sahibine yansıtılırsa CASH/BANK → BALANCE(sahibi), değilse CASH/BANK → EXPENSE; ikisi de `VEHICLE_EXPENSE` ve araca bağlı.
-  Araç kârı = komisyon − galerinin üstlendiği masraf. Dönem kârında üstlenilen masraf genel giderlerin içinde sayılır (çift sayılmaz).
+  Araç kârı = komisyon − galerinin üstlendiği masraf (+ araca bağlı diğer kazançlar). Dönem kârında üstlenilen masraf genel giderlerin içinde sayılır (çift sayılmaz).
 - Ortak araç: defter `DEALER` ile aynı; sahiplik ve kâr payı oranları aşağıdaki PR 3 kurallarıyla hesaplanır.
 
 Uygulama (Revizyon PR 3, ortak finansmanı):
@@ -514,3 +515,11 @@ Ortak alıcılı araç satışında ödeme planı satırı, sermaye kaynaklı tu
 - Müşteriye giden alanlar sadece `ShowroomResponses.Public*` kayıtlarındakiler: marka, model, yıl, km, yakıt, vites, renk, plaka (WhatsApp mesajında), ilan fiyatı (boşsa "Fiyat için arayın"), tramer, boya / değişen, ilan açıklaması, fotoğraflar, galeri adı ve WhatsApp numarası. Alış fiyatı, maliyet, satıcı, sahiplik ve iç notlar asla dönmez; yeni alan eklerken bu kurala uy.
 - Fotoğraflar sunucu diskinde: `UPLOAD_DIR/<tenantId>/<fotoId>.jpg` (en fazla 1600 px) ve `_t.jpg` (480 px). Panel yüklemeden önce küçültür, sunucu yeniden kodlar (EXIF / konum atılır). Araç başına en fazla 20. Dosya adresi tahmin edilemez (UUID), `/api/public/photos/...` girişsiz servis edilir.
 - Yönetim sadece dükkân sahibinde: araç detayında "Vitrin" kartı, Hesabım'da link ve WhatsApp numarası (`tenant.showroom_phone`).
+
+## Diğer kazançlar (V30)
+
+- `OTHER_INCOME`: INCOME → seçilen kasa / banka. Sadece dükkân sahibi girer; yanlışsa Kasa'da "Düzelt" (ters kayıt).
+- Kategoriler masraf kategorileri tablosunda, kök `INCOME` (çalışan göremez).
+- **Araca bağlıysa** o aracın kârına eklenir, aracın **satış dönemine** (masraflar gibi). Ortak araçta ortaklara pay edilmez, havuzun.
+- **Araca bağlı değilse** dönem kârında ayrı satır "Diğer kazançlar", **giriş tarihine** göre, kategori kırılımıyla.
+- Dönem net kârı = araç kârı + konsinye komisyonu + diğer kazançlar − genel giderler.

@@ -18,6 +18,7 @@ import com.galeri.app.model.enums.Ownership;
 import com.galeri.app.model.enums.VehicleStatus;
 import com.galeri.app.model.request.CapitalRequests;
 import com.galeri.app.model.response.CapitalResponses.Partner;
+import com.galeri.app.model.response.CapitalResponses.IncomeLine;
 import com.galeri.app.model.response.CapitalResponses.PartnerProfit;
 import com.galeri.app.model.response.CapitalResponses.PeriodProfit;
 import com.galeri.app.model.response.CapitalResponses.SoldVehicle;
@@ -220,6 +221,9 @@ public class CapitalServiceImpl implements CapitalService {
         for (Object[] s : entryRepository.vehicleExpenseTotals(tenantId, LedgerEntryType.VEHICLE_EXPENSE, AccountType.VEHICLE)) {
             expenses.put((UUID) s[0], ((Number) s[1]).longValue());
         }
+        // Araca bagli diger kazanclar (noter / kredi komisyonu ...): aracin karina, satis doneminde; ortaklara pay edilmez
+        Map<UUID, Long> incomes = new HashMap<>();
+        for (Object[] s : entryRepository.vehicleIncomeTotals(tenantId)) incomes.put((UUID) s[0], ((Number) s[1]).longValue());
         List<SoldVehicle> vehicles = new ArrayList<>();
         long vehicleProfit = 0, commission = 0, coOwned = 0;
         for (Vehicle v : vehicleRepository.findByTenantIdAndSaleDateBetween(tenantId, from, to)) {
@@ -228,12 +232,15 @@ public class CapitalServiceImpl implements CapitalService {
             if (v.getOwnership() == Ownership.CONSIGNMENT) {
                 Long c = ConsignmentMath.commission(v, v.getSalePriceCents());
                 long amount = c == null ? 0 : c;
+                long extra = incomes.getOrDefault(v.getId(), 0L);
                 commission += amount;
-                vehicles.add(new SoldVehicle(ref, v.getOwnership(), v.getSaleDate(), v.getSalePriceCents(), null, amount, amount));
+                vehicleProfit += extra;
+                vehicles.add(new SoldVehicle(ref, v.getOwnership(), v.getSaleDate(), v.getSalePriceCents(), null, amount + extra, amount + extra));
             } else {
                 long cost = (v.getActualPurchaseCents() == null ? 0 : v.getActualPurchaseCents()) + expenses.getOrDefault(v.getId(), 0L);
-                long profit = v.getSalePriceCents() - cost;
-                // Ortak arac: ortaklarin payi (tahsil edildikce sermayelerine gecer); kalan havuzun payi (dukkan payi dahil)
+                long profit = v.getSalePriceCents() - cost + incomes.getOrDefault(v.getId(), 0L);
+                // Ortak arac: ortaklarin payi (tahsil edildikce sermayelerine gecer); kalan havuzun payi (dukkan payi ve
+                // araca bagli diger kazanclar dahil)
                 long partners = v.getOwnership() == Ownership.CO_OWNED ? coOwnershipService.partnersProfit(v) : 0;
                 vehicleProfit += profit - partners;
                 coOwned += partners;
@@ -244,10 +251,17 @@ public class CapitalServiceImpl implements CapitalService {
 
         // Genel giderler: donemde gider hesabina net giris (konsinye aracta galerinin ustlendigi masraf da burada)
         long general = entryRepository.netInto(tenantId, AccountType.EXPENSE, from, to);
-        long net = vehicleProfit + commission - general;
+        // Araca bagli olmayan diger kazanclar: giris tarihine gore
+        List<IncomeLine> otherIncomes = entryRepository.otherIncomeByCategory(tenantId, from, to).stream()
+                .map(r -> new IncomeLine((String) r[0], ((Number) r[1]).longValue()))
+                .filter(l -> l.amountCents() != 0)
+                .sorted(Comparator.comparingLong(IncomeLine::amountCents).reversed())
+                .toList();
+        long otherIncome = otherIncomes.stream().mapToLong(IncomeLine::amountCents).sum();
+        long net = vehicleProfit + commission + otherIncome - general;
 
         return new PeriodProfit(from, to, vehicles, vehicleProfit, commission, general, net, coOwned,
-                partnerProfits(tenantId, from, to, net));
+                partnerProfits(tenantId, from, to, net), otherIncome, otherIncomes);
     }
 
     /**
