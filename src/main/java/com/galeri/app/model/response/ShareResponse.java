@@ -18,5 +18,17 @@ public record ShareResponse(
         long contributionCents,
         Long profitCents,
         Long receivableCents,
-        Long collectedCents   // satilmis aracta tahsil edilip bu sahibe dagitilan; alacak - bu = tahsil edilmemis payi
-) {}
+        Long collectedCents,   // satilmis aracta tahsil edilip bu sahibe dagitilan; alacak - bu = tahsil edilmemis payi
+        // Satilmis aracta karin dokumu (gosterim): masraf oncesi kar payi, masraf payi (sahiplik oraniyla, kardan duser),
+        // dukkan payi (ortakta eksi, dukkan sahibinde arti), masraf iadesi (masrafi kasa odedi: dukkan sahibine geri doner)
+        Long grossProfitCents,
+        Long expenseShareCents,
+        Long shopCutCents,
+        Long expenseRefundCents
+) {
+    public ShareResponse(UUID userId, String name, boolean owner, int shareBp, int profitShareBp, ContributionSource source,
+                         Long pocketCents, long contributionCents, Long profitCents, Long receivableCents, Long collectedCents) {
+        this(userId, name, owner, shareBp, profitShareBp, source, pocketCents, contributionCents, profitCents, receivableCents,
+                collectedCents, null, null, null, null);
+    }
+}

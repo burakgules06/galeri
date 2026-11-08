@@ -276,11 +276,38 @@ class CoFinancingIT {
     }
 
     @Test
+    void satisDokumu_masrafPayiHerOrtaktanDuser_kasaninOdedigiMasrafDukkanSahibineIadeEdilir() {
+        // Burak'in ornegi: alis 990.000 (50 / 50), kasadan masraf 10.000, satis 1.100.000.
+        // Masrafsiz kar 110.000 -> 55.000 / 55.000; masraf payi 5.000 / 5.000 -> net 50.000 / 50.000; dukkan sahibine masraf iadesi 10.000.
+        UUID v = coOwned(990_000 * TL, half(burak, ContributionSource.CAPITAL, null));
+        ledgerService.addExpense(new ExpenseRequest(today, cash, 10_000 * TL, v, null, "Boya", null, null, null));
+        sell(v, 1_100_000 * TL);
+
+        var partner = owner(v, burak);
+        assertThat(partner.grossProfitCents()).isEqualTo(55_000 * TL);
+        assertThat(partner.expenseShareCents()).isEqualTo(5_000 * TL);
+        assertThat(partner.shopCutCents()).isZero();
+        assertThat(partner.expenseRefundCents()).isZero();
+        assertThat(partner.profitCents()).isEqualTo(50_000 * TL);
+        assertThat(partner.receivableCents()).isEqualTo(545_000 * TL);
+        var shop = owner(v, owner);
+        assertThat(shop.grossProfitCents()).isEqualTo(55_000 * TL);
+        assertThat(shop.expenseShareCents()).isEqualTo(5_000 * TL);
+        assertThat(shop.expenseRefundCents()).isEqualTo(10_000 * TL);
+        assertThat(shop.profitCents()).isEqualTo(50_000 * TL);
+        // Satis parasi tam dagilir: ortak 545.000 + dukkan sahibi 495.000 + 50.000 + masraf iadesi 10.000 = 1.100.000
+        assertThat(partner.receivableCents() + shop.receivableCents() + shop.expenseRefundCents()).isEqualTo(1_100_000 * TL);
+        check("satis dokumu");
+    }
+
+    @Test
     void dukkanPayi_oran10_ortaginPayindanDuser_havuzaKalir() {
         UUID v = vehicleService.create(request(2_000_000 * TL, cash, null, half(burak, ContributionSource.CAPITAL, null),
                 CommissionType.RATE, 1000, null)).vehicle().id();
         sell(v, 2_300_000 * TL);
         assertThat(owner(v, burak).profitCents()).isEqualTo(135_000 * TL);   // 150.000 - %10
+        assertThat(owner(v, burak).shopCutCents()).isEqualTo(-15_000 * TL);
+        assertThat(owner(v, owner).shopCutCents()).isEqualTo(15_000 * TL);
         assertThat(monthProfit().netCents()).isEqualTo(165_000 * TL);         // havuz 150.000 + dukkan payi 15.000
         check("dukkan payi");
     }

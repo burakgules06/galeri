@@ -80,7 +80,19 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
      * Ortagin bu aractaki durumu: odenmis katkisi; satildiysa kar payi, alacagi (tahsilattan alacagi toplam) ve su ana kadar
      * tahsil edilip ona dagitilan.
      */
-    record Settlement(VehicleShare owner, long contributionCents, Long profitCents, Long receivableCents, Long collectedCents) {}
+    record Settlement(VehicleShare owner, long contributionCents, Long profitCents, Long receivableCents, Long collectedCents,
+                      Breakdown breakdown) {
+        Settlement(VehicleShare owner, long contributionCents, Long profitCents, Long receivableCents, Long collectedCents) {
+            this(owner, contributionCents, profitCents, receivableCents, collectedCents, null);
+        }
+    }
+
+    /**
+     * Satilmis aracta karin dokumu (sadece gosterim): masraf oncesi kar payi (satis - alis, kar payi oraniyla), masraf payi
+     * (sahiplik oraniyla), dukkan payi (ortaktan duser / dukkan sahibine eklenir, isaretli) ve masraf iadesi (masraflari kasa
+     * odedigi icin dukkan sahibine geri doner). Net kar Settlement.profitCents'tir (zararda katki siniri nedeniyle farkli olabilir).
+     */
+    record Breakdown(long grossProfitCents, long expenseShareCents, long shopCutCents, long expenseRefundCents) {}
 
     /** Defterde istenen hareket: kaynak, hedef, tutar, tarih (diff icin). */
     record Wanted(Account source, Account target, long amountCents, LocalDate date, String description) {
@@ -489,9 +501,13 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
             partnersProfit += shares.get(k);
         }
         long cut = CoOwnershipMath.shopCut(partnersProfit, vehicle.getShopCutType(), vehicle.getShopCutRateBp(), vehicle.getShopCutCents());
+        long[] cutOf = new long[owners.size()];
         if (cut > 0) {
             List<Long> cuts = MoneyMath.splitByWeights(cut, partners.stream().map(k -> (long) owners.get(k).getProfitShareBp()).toList());
-            for (int j = 0; j < partners.size(); j++) shares.set(partners.get(j), shares.get(partners.get(j)) - cuts.get(j));
+            for (int j = 0; j < partners.size(); j++) {
+                shares.set(partners.get(j), shares.get(partners.get(j)) - cuts.get(j));
+                cutOf[partners.get(j)] = cuts.get(j);
+            }
         }
         long[] entitled = new long[owners.size()];
         for (int k : partners) entitled[k] = Math.max(0, contributions.getOrDefault(holderKey(owners.get(k)), 0L) + shares.get(k));
@@ -532,9 +548,11 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
             if (o.isPool()) {
                 // Dukkan sahibi havuzun kalani: arac kari - ortaklarin kari; alacagi = katkisi + kari (parasi zaten kasada)
                 long poolProfit = profit - partnersProfitAfter;
-                list.add(new Settlement(o, contribution, poolProfit, contribution + poolProfit, null));
+                list.add(new Settlement(o, contribution, poolProfit, contribution + poolProfit, null,
+                        new Breakdown(gross.get(k), expenseParts.get(k), cut, expenses)));
             } else {
-                list.add(new Settlement(o, contribution, entitled[k] - contribution, entitled[k], given[k]));
+                list.add(new Settlement(o, contribution, entitled[k] - contribution, entitled[k], given[k],
+                        new Breakdown(gross.get(k), expenseParts.get(k), -cutOf[k], 0)));
             }
         }
         return new Distribution(list, wanted, byEntry);
@@ -723,9 +741,12 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         if (vehicle.getId() == null) return List.of();
         return settlements(vehicle).stream().map(s -> {
             VehicleShare o = s.owner();
+            Breakdown b = s.breakdown();
             return new ShareResponse(o.getUser().getId(), o.getUser().getFullName(), o.isPool(),
                     o.getShareBp(), o.getProfitShareBp(), o.getContributionSource(), o.getPocketCents(),
-                    s.contributionCents(), s.profitCents(), s.receivableCents(), s.collectedCents());
+                    s.contributionCents(), s.profitCents(), s.receivableCents(), s.collectedCents(),
+                    b == null ? null : b.grossProfitCents(), b == null ? null : b.expenseShareCents(),
+                    b == null ? null : b.shopCutCents(), b == null ? null : b.expenseRefundCents());
         }).toList();
     }
 

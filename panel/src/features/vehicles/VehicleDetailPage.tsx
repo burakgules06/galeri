@@ -291,11 +291,40 @@ function CostCard({ vehicle, ownerName }: { vehicle: VehicleDetail; ownerName?: 
 
 // Ortakli aracin sahipleri: sahiplik (koydugu para) ve kar payi orani her zaman; satildiysa her tahsilatin kar payi
 // oraniyla bolundugu, sahibin alacagi, su ana kadar ona dagitilan ve bekleyen.
+// Masraf ya da dukkan payi varsa karin nasil olustugu satirin altinda gorunur
+function hasBreakdown(s: ShareResponse): boolean {
+  return s.grossProfitCents != null && ((s.expenseShareCents ?? 0) !== 0 || (s.shopCutCents ?? 0) !== 0 || (s.expenseRefundCents ?? 0) !== 0);
+}
+
+// Ornek (ortak): Masraf öncesi kâr 55.000 · Masraf payı −5.000 · Net kâr 50.000 · Satıştan alacağı 545.000
+// Ornek (dukkan sahibi): Masraf öncesi kâr 55.000 · Masraf payı −5.000 · Net kâr 50.000 · Kasadan ödenen masraf geri +10.000 · Satıştan payı 555.000
+function ProfitBreakdown({ s }: { s: ShareResponse }) {
+  const cut = s.shopCutCents ?? 0;
+  const refund = s.expenseRefundCents ?? 0;
+  const total = (s.receivableCents ?? 0) + refund;
+  const signed = (cents: number) => `${cents < 0 ? "−" : "+"}${tl(Math.abs(cents))}`;
+  const item = (label: string, value: string, tone = "") => (
+    <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+      <span className="text-murekkep-2">{label}</span><span className={`sayi font-semibold ${tone}`}>{value}</span>
+    </span>
+  );
+  return (
+    <div className="rounded-lg bg-yuzey-2 px-3 py-2 text-[13px] flex flex-wrap gap-x-4 gap-y-1">
+      {item("Masraf öncesi kâr", tl(s.grossProfitCents ?? 0))}
+      {(s.expenseShareCents ?? 0) !== 0 && item("Masraf payı", signed(-(s.expenseShareCents ?? 0)), "text-tehlike")}
+      {cut !== 0 && item(cut < 0 ? "Dükkân payı" : "Dükkân payı (ortaklardan)", signed(cut), cut < 0 ? "text-tehlike" : "text-basari")}
+      {item("Net kâr", tl(s.profitCents ?? 0), (s.profitCents ?? 0) >= 0 ? "text-basari" : "text-tehlike")}
+      {refund !== 0 && item("Kasadan ödenen masraf geri", signed(refund), "text-basari")}
+      {item(s.owner ? "Satıştan payı" : "Satıştan alacağı", tl(total), "text-murekkep")}
+    </div>
+  );
+}
+
 function SharesTable({ shares, sold }: { shares: ShareResponse[]; sold: boolean }) {
   return (
     <div className="mt-4 pt-3 border-t border-cizgi">
       <h3 className="etiket mb-1">{sold ? "Satış parasının dağıtımı" : "Ortak payları"}</h3>
-      {sold && <p className="text-[13px] text-murekkep-2 mb-3">Kâr, kâr payı oranlarıyla bölünür; ortağın alacağı koyduğu para + kâr payı. Her tahsilattan alacağı oranında payı sermayesine geçer.</p>}
+      {sold && <p className="text-[13px] text-murekkep-2 mb-3">Masraf öncesi kâr (satış − alış) kâr payı oranlarıyla bölünür, araç masrafı sahiplik oranıyla her ortağın kârından düşer. Masrafı kasa ödediği için dükkân sahibine geri döner. Ortağın alacağı koyduğu para + net kârı; her tahsilattan alacağı oranında payı sermayesine geçer.</p>}
       <div className="overflow-x-auto -mx-1 px-1">
         <table className="w-full text-[14px] min-w-[420px]">
           <thead>
@@ -334,6 +363,16 @@ function SharesTable({ shares, sold }: { shares: ShareResponse[]; sold: boolean 
           </tbody>
         </table>
       </div>
+      {sold && shares.some(hasBreakdown) && (
+        <ul className="mt-3 space-y-2">
+          {shares.filter(hasBreakdown).map((s) => (
+            <li key={s.userId}>
+              <p className="text-[13px] font-semibold mb-1">{s.name} · kâr dökümü</p>
+              <ProfitBreakdown s={s} />
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
