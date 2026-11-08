@@ -46,4 +46,8 @@ public class Tenant extends BaseModel {
 
     @Column(name = "reminder_sent_on")
     private LocalDate reminderSentOn;
+
+    // Vitrin sayfasindaki WhatsApp / ara butonu (V29); bos ise buton cikmaz
+    @Column(name = "showroom_phone", length = 20)
+    private String showroomPhone;
 }

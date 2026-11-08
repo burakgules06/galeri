@@ -110,7 +110,7 @@ Oto galeri sahibinin parasını takip etmesi için:
 - Hangi çalışanın hangi ay kaç araç aldığı ve sattığı
 - Ödeme günü gelen tahsilat ve ödemeler için telefona bildirim
 
-Fotoğraf yok. Döviz yok (her şey TL; ileride gerekirse eklenir).
+Fotoğraf sadece müşteri vitrini için (aşağıda "Müşteri vitrini"). Döviz yok (her şey TL; ileride gerekirse eklenir).
 
 ## 2. Kavramlar
 
@@ -506,3 +506,11 @@ API: `/api/vehicles` (`/{id}/parts`, `/{id}/sale`, `/{id}/cost`), `/api/contacts
 ## Ortak alıcının araç finansmanı
 
 Ortak alıcılı araç satışında ödeme planı satırı, sermaye kaynaklı tutarı capital_cents ile saklar. Nakit kaynaklı kalan kısım tahsilatta seçilen kasa/banka hesabına, sermaye kısmı ise BALANCE(ortak) -> CAPITAL(ortak) olarak PARTNER_SALE_SETTLEMENT hareketiyle yazılır. Her iki hareket de aynı installment kaydına bağlıdır; geri alma ikisini de tersler. Hibrit taksit kısmi tahsil edilirse sermaye payı önce kapatılır; kalan taksit sermaye ve nakit paylarının kalanını taşır. Sermaye taahhüdü, nakitteki kullanılabilir sermayeyi ve açık plan rezervlerini aşamaz.
+
+## Müşteri vitrini
+
+- Herkese açık sayfa: panel adresinde `/vitrin/{galeri-slug}` (liste) ve `/vitrin/{slug}/{araçId}` (detay). Girişsiz; `main.tsx` adrese bakıp panel yerine `ShowroomApp`'i açar.
+- Görünen araç: **stokta** ve araç sayfasında **"Vitrinde göster"** işaretli. Satılınca kendiliğinden kalkar.
+- Müşteriye giden alanlar sadece `ShowroomResponses.Public*` kayıtlarındakiler: marka, model, yıl, km, yakıt, vites, renk, plaka (WhatsApp mesajında), ilan fiyatı (boşsa "Fiyat için arayın"), tramer, boya / değişen, ilan açıklaması, fotoğraflar, galeri adı ve WhatsApp numarası. Alış fiyatı, maliyet, satıcı, sahiplik ve iç notlar asla dönmez; yeni alan eklerken bu kurala uy.
+- Fotoğraflar sunucu diskinde: `UPLOAD_DIR/<tenantId>/<fotoId>.jpg` (en fazla 1600 px) ve `_t.jpg` (480 px). Panel yüklemeden önce küçültür, sunucu yeniden kodlar (EXIF / konum atılır). Araç başına en fazla 20. Dosya adresi tahmin edilemez (UUID), `/api/public/photos/...` girişsiz servis edilir.
+- Yönetim sadece dükkân sahibinde: araç detayında "Vitrin" kartı, Hesabım'da link ve WhatsApp numarası (`tenant.showroom_phone`).

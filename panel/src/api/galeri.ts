@@ -1,16 +1,35 @@
-import { apiFetch } from "./client";
+import { apiFetch, publicFetch } from "./client";
 import type {
   HoldingsResponse,
   NetWorthResponse, AccountResponse, BodyPart, CategoryResponse, ContactRequest, ContactResponse, DashboardResponse, ExpenseRequest, ExpenseRoot,
   YearlyTrades, PaymentPlanResponse, OpenItemsRequest, BasketSaleRequest, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
   LedgerEntryResponse, MonthlyTrades, PocketExpenseResponse, PartCondition, SaleRequest, StaffSummary, VehicleCost, VehicleDetail,
   VehicleDetailAdmin, VehicleRequest, VehicleStatus, VehicleSummary, UserResponse, UserRole, ContactPaymentRequest,
+  ShowroomListing, ShowroomSettings, PublicGallery, PublicVehicle,
   CapitalMovementRequest, CapitalBase, CapitalTransferRequest, Holder, OpeningBalanceRequest, Partner, PeriodProfit, ProfitAllocationRequest, TransferRequest, CatalogItem,
 } from "../shared/types";
 
 const json = (body: unknown, method = "POST"): RequestInit => ({ method, body: JSON.stringify(body) });
 
 export const api = {
+  // Musteri vitrini (yonetici)
+  listing: (vehicleId: string) => apiFetch<ShowroomListing>(`/api/vehicles/${vehicleId}/listing`),
+  updateListing: (vehicleId: string, request: { showInShowroom: boolean; listingPriceCents: number | null; listingDescription: string | null }) =>
+    apiFetch<ShowroomListing>(`/api/vehicles/${vehicleId}/listing`, json(request, "PUT")),
+  addPhoto: (vehicleId: string, file: Blob) => {
+    const body = new FormData();
+    body.append("file", file, "foto.jpg");
+    return apiFetch<ShowroomListing>(`/api/vehicles/${vehicleId}/photos`, { method: "POST", body });
+  },
+  deletePhoto: (vehicleId: string, photoId: string) =>
+    apiFetch<ShowroomListing>(`/api/vehicles/${vehicleId}/photos/${photoId}`, { method: "DELETE" }),
+  reorderPhotos: (vehicleId: string, photoIds: string[]) =>
+    apiFetch<ShowroomListing>(`/api/vehicles/${vehicleId}/photos/order`, json({ photoIds }, "PUT")),
+  showroomSettings: () => apiFetch<ShowroomSettings>("/api/settings/showroom"),
+  updateShowroomSettings: (phone: string | null) => apiFetch<ShowroomSettings>("/api/settings/showroom", json({ phone }, "PUT")),
+  // Herkese acik vitrin (giris yok)
+  publicGallery: (slug: string) => publicFetch<PublicGallery>(`/api/public/showroom/${encodeURIComponent(slug)}`),
+  publicVehicle: (slug: string, id: string) => publicFetch<PublicVehicle>(`/api/public/showroom/${encodeURIComponent(slug)}/vehicles/${id}`),
   reminderSettings: () => apiFetch<{ time: string }>("/api/settings/reminder"),
   updateReminderSettings: (time: string) => apiFetch<{ time: string }>("/api/settings/reminder", json({ time }, "PUT")),
   testPush: () => apiFetch<void>("/api/push/test", json({})),

@@ -41,6 +41,7 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/login").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/public/**").permitAll()   // musteri vitrini
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 ).exceptionHandling(ex -> ex
