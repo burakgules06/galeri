@@ -159,7 +159,6 @@ public class LedgerServiceImpl implements LedgerService {
         e.setVehicle(vehicle);
         e.setCategory(category);
         e.setDescription(blankToNull(r.description()));
-        log.info("Kazanc eklendi: {} kurus, hesap {}, arac {}", r.amountCents(), target.getId(), vehicle == null ? "-" : vehicle.getId());
         return toResponse(entryRepository.save(e), false);
     }
 
