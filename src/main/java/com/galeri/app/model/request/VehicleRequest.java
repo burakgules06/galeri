@@ -56,8 +56,26 @@ public record VehicleRequest(
         @PositiveOrZero Long shopCutCents,
         // Araci panel kullanicisindan aldik (sellerId yerine). Bedelin sellerCapitalCents kadari kasadan cikmaz, onun sermayesine eklenir.
         UUID sellerUserId,
-        @PositiveOrZero Long sellerCapitalCents
+        @PositiveOrZero Long sellerCapitalCents,
+        // Dukkan sahibi araci cebinden aldi (sadece galeri araci, pesin): bu kadari kasadan / bankadan cikmaz, girisi yapan
+        // dukkan sahibinin sermayesine eklenir. Kalani purchaseAccountId'den.
+        @PositiveOrZero Long pocketCents
 ) {
+    /** Cepten kisim olmadan (eski cagrilar). */
+    public VehicleRequest(String plate, String make, String model, Short modelYear, Fuel fuel, Transmission transmission,
+                          Integer mileageKm, String color, Long tramerCents, String notes, LocalDate purchaseDate,
+                          UUID sellerId, UUID boughtById, Long actualPurchaseCents, Long officialPurchaseCents,
+                          UUID purchaseAccountId, List<InstallmentRequest> purchasePlan, Ownership ownership, UUID consignorId,
+                          CommissionType commissionType, Integer commissionRateBp, Long commissionCents,
+                          List<ShareRequest> shares, Boolean addToCatalog, String catalogModel,
+                          CommissionType shopCutType, Integer shopCutRateBp, Long shopCutCents,
+                          UUID sellerUserId, Long sellerCapitalCents) {
+        this(plate, make, model, modelYear, fuel, transmission, mileageKm, color, tramerCents, notes, purchaseDate, sellerId,
+                boughtById, actualPurchaseCents, officialPurchaseCents, purchaseAccountId, purchasePlan, ownership, consignorId,
+                commissionType, commissionRateBp, commissionCents, shares, addToCatalog, catalogModel,
+                shopCutType, shopCutRateBp, shopCutCents, sellerUserId, sellerCapitalCents, null);
+    }
+
     /** Kullanici saticisiz (eski cagrilar). */
     public VehicleRequest(String plate, String make, String model, Short modelYear, Fuel fuel, Transmission transmission,
                           Integer mileageKm, String color, Long tramerCents, String notes, LocalDate purchaseDate,

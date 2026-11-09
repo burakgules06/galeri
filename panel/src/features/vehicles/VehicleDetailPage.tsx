@@ -118,6 +118,9 @@ export function VehicleDetailPage({ id }: { id: string }) {
                   <Info label="Alan çalışan" value={admin.boughtBy?.name ?? "—"} />
                   <Info label="Gerçek alış bedeli" value={tl(admin.actualPurchaseCents)} numeric strong />
                   <Info label="Resmi alış bedeli" value={tl(admin.officialPurchaseCents)} numeric />
+                  {admin.pocketCents > 0 && (
+                    <Info label="Cepten ödenen (sermayeye eklendi)" value={tl(admin.pocketCents)} numeric />
+                  )}
                   {admin.sellerUser && (admin.sellerCapitalCents ?? 0) > 0 && (
                     <Info label={`${admin.sellerUser.name} sermayesine`} value={tl(admin.sellerCapitalCents)} numeric />
                   )}

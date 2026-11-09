@@ -28,5 +28,6 @@ public record VehicleDetailAdmin(
         Long sellerCapitalCents,     // kullanicidan alista bedelin onun sermayesine eklenen kismi
         ContactSummary buyerUser,    // araci panel kullanicisina sattik
         UUID transferFromVehicleId,  // "satmak icin al" ile gelen kayit: satilan eski kayit
-        UUID transferToVehicleId     // satilan kayit: alanin stogundaki yeni kayit
+        UUID transferToVehicleId,    // satilan kayit: alanin stogundaki yeni kayit
+        long pocketCents             // dukkan sahibinin cebinden odedigi kisim (kasadan cikmadi, sermayesine eklendi; V31)
 ) {}
