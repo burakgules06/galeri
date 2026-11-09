@@ -30,6 +30,9 @@ public interface CapitalService {
      */
     LedgerEntryResponse transferCapital(CapitalRequests.CapitalTransfer request);
 
+    /** Kullanicinin sermaye hesabi; yoksa (ya da kapatilmissa) acilir. Cepten arac alisi bu hesaptan yazilir. */
+    UUID capitalAccountId(UUID userId);
+
     /** Sermaye girisi (CAPITAL -> kasa/banka) ya da cekisi (ters yon, sermayeden fazla olamaz). */
     LedgerEntryResponse move(UUID userId, CapitalRequests.Movement request);
 

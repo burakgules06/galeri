@@ -144,6 +144,14 @@ public class Vehicle extends BaseModel {
     @Column(name = "purchase_capital_entry_id")
     private UUID purchaseCapitalEntryId;
 
+    /** Dukkan sahibinin cebinden odedigi kisim: kasadan / bankadan cikmaz, sermayesine eklenir (V31). */
+    @Column(name = "purchase_pocket_cents", nullable = false)
+    private long purchasePocketCents;
+
+    /** Cepten kismin hareketi: CAPITAL(sahibi) -> VEHICLE. */
+    @Column(name = "purchase_pocket_entry_id")
+    private UUID purchasePocketEntryId;
+
     /** Kullaniciya satista: devirde alanin nakit girisi (CAPITAL -> kasa), devirsiz satista sermayeden dusen kisim (kasa -> CAPITAL). */
     @Column(name = "sale_capital_entry_id")
     private UUID saleCapitalEntryId;
