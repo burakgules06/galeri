@@ -1,5 +1,6 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.BankAccountNotRemovableException;
 import com.galeri.app.exception.runtime.NotAPartnerException;
 import com.galeri.app.exception.runtime.HolderTransferExceededException;
 import com.galeri.app.exception.runtime.CategoryDepthLimitException;
@@ -101,6 +102,8 @@ public class LedgerServiceImpl implements LedgerService {
         Map<UUID, Long> balances = balances(tenantId);
         return accountRepository.findByTenantIdAndTypeInOrderByCreatedAtAsc(tenantId, List.of(AccountType.CASH, AccountType.BANK))
                 .stream()
+                // Kaldirilan (arsivlenen) banka gorunmez; sonradan bir duzeltmeyle parasi olursa para kaybolmasin diye yine gorunur
+                .filter(a -> !a.isClosed() || balances.getOrDefault(a.getId(), 0L) != 0)
                 .sorted(Comparator.comparing(Account::getType))   // once kasa, sonra bankalar (eklenme sirasiyla)
                 .map(a -> new AccountResponse(a.getId(), a.getType(), a.getName(), balances.getOrDefault(a.getId(), 0L)))
                 .toList();
@@ -115,6 +118,33 @@ public class LedgerServiceImpl implements LedgerService {
         a.setName(request.name().trim());
         Account saved = accountRepository.save(a);
         return new AccountResponse(saved.getId(), saved.getType(), saved.getName(), 0L);
+    }
+
+    @Override
+    @Transactional
+    public AccountResponse renameBank(UUID accountId, AccountRequest request) {
+        Account a = getBank(accountId);
+        a.setName(request.name().trim());
+        return new AccountResponse(a.getId(), a.getType(), a.getName(), balances(a.getTenantId()).getOrDefault(a.getId(), 0L));
+    }
+
+    @Override
+    @Transactional
+    public void removeBank(UUID accountId) {
+        Account a = getBank(accountId);
+        if (!entryRepository.existsBySourceAccount_IdOrTargetAccount_Id(a.getId(), a.getId())) {
+            accountRepository.delete(a);   // hic kullanilmamis (yanlislikla acilmis): tamamen silinir
+            return;
+        }
+        if (balances(a.getTenantId()).getOrDefault(a.getId(), 0L) != 0) throw new BankAccountNotRemovableException();
+        a.setClosed(true);   // hareketleri silinmez: hesap arsivlenir
+    }
+
+    /** Bu galerinin acik banka hesabi (kasa ve diger hesap turleri duzenlenmez / kaldirilmaz). */
+    private Account getBank(UUID id) {
+        Account a = getAccount(id);
+        if (a.getType() != AccountType.BANK || a.isClosed()) throw new InvalidAccountException();
+        return a;
     }
 
     // ------------------------------------------------------------------ hareketler
@@ -899,7 +929,7 @@ public class LedgerServiceImpl implements LedgerService {
 
     private Account getMoneyAccount(UUID id) {
         Account a = getAccount(id);
-        if (!a.getType().isMoneyAccount()) throw new InvalidAccountException();
+        if (!a.getType().isMoneyAccount() || a.isClosed()) throw new InvalidAccountException();   // kaldirilan bankaya islem yazilmaz
         return a;
     }
 

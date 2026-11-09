@@ -125,6 +125,9 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> 
 
     boolean existsByCorrectedEntryId(UUID entryId);
 
+    /** Hesaba dokunan hareket var mi (banka hesabi kaldirilirken: yoksa silinir, varsa arsivlenir). */
+    boolean existsBySourceAccount_IdOrTargetAccount_Id(UUID sourceAccountId, UUID targetAccountId);
+
     /**
      * Hareketi satir kilidiyle okur (SELECT ... FOR UPDATE): ayni hareket iki istekte birden terslenmesin.
      * Kilit satiri degistirmez; hareket tablosunun UPDATE/DELETE yasagi (trigger) etkilenmez.

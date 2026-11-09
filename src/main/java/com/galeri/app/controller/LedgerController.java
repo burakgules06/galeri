@@ -52,6 +52,17 @@ public class LedgerController {
         return responseService.success(ledgerService.addBank(request));
     }
 
+    @PutMapping("/accounts/{id}")
+    public GenericResponse<AccountResponse> renameBank(@PathVariable UUID id, @Valid @RequestBody AccountRequest request) {
+        return responseService.success(ledgerService.renameBank(id, request));
+    }
+
+    @DeleteMapping("/accounts/{id}")
+    public GenericResponse<Void> removeBank(@PathVariable UUID id) {
+        ledgerService.removeBank(id);
+        return responseService.success(null);
+    }
+
     @GetMapping("/ledger-entries")
     @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")   // sermayedar: sadece kendi sermaye ve cari hareketleri
     public GenericResponse<List<LedgerEntryResponse>> entries(@RequestParam(required = false) UUID accountId) {

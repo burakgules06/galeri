@@ -7,7 +7,7 @@ import { SplitBar } from "../../shared/charts/Donut";
 import { entryDirection, percent, SERIES, tl } from "../../shared/format";
 import type { LedgerEntryResponse } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
-import { Button, Empty, ErrorBox, inputClass, Segment } from "../../shared/ui/Common";
+import { Button, Empty, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
 import { BalancesCard } from "./BalancesCard";
 import { PartnerCapitalCard } from "../home/PartnerCapitalCard";
 import { BulkExpenseForm } from "./BulkExpenseForm";
@@ -32,6 +32,7 @@ export function LedgerPage() {
   const [incomeOpen, setIncomeOpen] = useState(false);
   const [bankOpen, setBankOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [editBank, setEditBank] = useState<{ id: string; name: string; balanceCents: number } | null>(null);
   const [owner, setOwner] = useState("");           // kimin parasi: "" = Tumu
   const [listTab, setListTab] = useState<"entries" | "corrections">("entries");
   const [related, setRelated] = useState("");   // ilgili kisi (kullanici id)
@@ -79,6 +80,8 @@ export function LedgerPage() {
   const page = Math.min(entryPage, pageCount);
   const pageEntries = items.slice((page - 1) * pageSize, page * pageSize).flat();
   const changeAccount = (id: string | null) => { setSelected(id); setEntryPage(1); };
+  // Secili hesap bankaysa adi degistirilebilir / kaldirilabilir (kasa degil)
+  const selectedBank = list.find((a) => a.id === selected && a.type === "BANK") ?? null;
 
   return (
     <div className="space-y-5">
@@ -117,7 +120,12 @@ export function LedgerPage() {
           </div>
           {bankOpen
             ? <BankForm onClose={() => setBankOpen(false)} onAdded={() => { setBankOpen(false); reload(); }} />
-            : <Button variant="secondary" onClick={() => setBankOpen(true)}>+ Banka hesabı</Button>}
+            : <div className="flex flex-wrap gap-2">
+                {selectedBank && (
+                  <Button variant="secondary" onClick={() => setEditBank(selectedBank)}>{selectedBank.name} · düzenle</Button>
+                )}
+                <Button variant="secondary" onClick={() => setBankOpen(true)}>+ Banka hesabı</Button>
+              </div>}
         </div>
         <div className="mt-4"><SplitBar height={10} parts={shown.map((a) => ({ key: a.id, value: Math.max(0, a.amount), color: a.color }))} /></div>
         {/* Tumu: hesabin bakiyesi ve altinda kimin ne kadari. Kisi secili: o kisinin o hesaptaki parasi. Hepsi backend'den. */}
@@ -213,6 +221,10 @@ export function LedgerPage() {
         </div>}
       </section>}
 
+      {editBank && (
+        <BankEditForm account={editBank} onClose={() => setEditBank(null)}
+          onSaved={(removed) => { setEditBank(null); if (removed) changeAccount(null); reload(); }} />
+      )}
       {transferOpen && <TransferForm onClose={() => setTransferOpen(false)} onSaved={() => { setTransferOpen(false); reload(); }} />}
       <IncomeForm open={incomeOpen} onClose={() => setIncomeOpen(false)} onSaved={() => { setIncomeOpen(false); reload(); }} />
       {expenseOpen && <BulkExpenseForm onClose={() => setExpenseOpen(false)} onSaved={() => { setExpenseOpen(false); reload(); }} />}
@@ -277,5 +289,70 @@ function BankForm({ onClose, onAdded }: { onClose: () => void; onAdded: () => vo
       <Button type="submit">Ekle</Button>
       {error && <p className="w-full text-[13px] text-tehlike">{error}</p>}
     </form>
+  );
+}
+
+// Banka hesabini duzenle: ad degisir (gecmis hareketler ayni hesapta kalir) ya da hesap kaldirilir.
+// Kaldirma: hic hareketi yoksa silinir; varsa bakiyesi 0 olmali, arsivlenir (gecmis hareketlerde adi gorunur).
+function BankEditForm({ account, onClose, onSaved }: {
+  account: { id: string; name: string; balanceCents: number };
+  onClose: () => void;
+  onSaved: (removed: boolean) => void;
+}) {
+  const [name, setName] = useState(account.name);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const run = async (action: () => Promise<unknown>, removed: boolean) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await action();
+      onSaved(removed);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return setError("Hesap adını yaz.");
+    run(() => api.renameBank(account.id, name.trim()), false);
+  };
+  return (
+    <Modal title="Banka hesabını düzenle" open onClose={onClose}
+      footer={<>
+        <Button variant="secondary" type="button" onClick={onClose}>Vazgeç</Button>
+        <Button type="submit" form="bank-edit-form" disabled={saving}>{saving ? "Kaydediliyor…" : "Kaydet"}</Button>
+      </>}>
+      <form id="bank-edit-form" onSubmit={submit} className="space-y-4">
+        <ErrorBox message={error} />
+        <Field label="Hesap adı">
+          <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        </Field>
+        <div className="border-t border-cizgi pt-4 space-y-2">
+          {account.balanceCents !== 0 ? (
+            <p className="text-[13.5px] text-murekkep-2">
+              Bu hesapta <span className="sayi">{tl(account.balanceCents)}</span> var. Kaldırmak için önce parayı başka bir hesaba aktar.
+            </p>
+          ) : confirmRemove ? (
+            <>
+              <p className="text-[13.5px] text-murekkep-2">
+                Hesap listelerden kalkar. Geçmiş hareketler silinmez, adıyla görünmeye devam eder.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="danger" disabled={saving} onClick={() => run(() => api.removeBank(account.id), true)}>
+                  Evet, hesabı kaldır
+                </Button>
+                <Button type="button" variant="quiet" onClick={() => setConfirmRemove(false)}>Vazgeç</Button>
+              </div>
+            </>
+          ) : (
+            <Button type="button" variant="danger" onClick={() => setConfirmRemove(true)}>Hesabı kaldır</Button>
+          )}
+        </div>
+      </form>
+    </Modal>
   );
 }

@@ -72,4 +72,5 @@ public class ErrorMessageConstant {
     public static final int PHOTO_LIMIT = 1066;
     public static final int POCKET_PURCHASE_NOT_ALLOWED = 1067;
     public static final int HOLDER_TRANSFER_EXCEEDED = 1068;
+    public static final int BANK_ACCOUNT_NOT_REMOVABLE = 1069;
 }

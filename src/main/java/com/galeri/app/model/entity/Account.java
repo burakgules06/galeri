@@ -41,7 +41,8 @@ public class Account extends BaseModel {
     @Column(name = "vehicle_id", updatable = false)
     private UUID vehicleId;
 
-    // CAPITAL icin: ortak kaldirildi (V17)
+    // CAPITAL icin: ortak kaldirildi (V17). BANK icin: hesap kaldirildi (hareketi oldugu icin silinmedi, arsivlendi);
+    // secim listelerinden kalkar, gecmis hareketlerde adi gorunur.
     @Column(nullable = false)
     private boolean closed = false;
 }
