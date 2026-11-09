@@ -27,6 +27,15 @@ public interface LedgerService {
 
     AccountResponse addBank(AccountRequest request);
 
+    /** Banka hesabinin adini degistirir (gecmis hareketler ayni hesapta kalir, yeni ad gorunur). */
+    AccountResponse renameBank(java.util.UUID accountId, AccountRequest request);
+
+    /**
+     * Banka hesabini kaldirir: hic hareketi yoksa silinir; varsa bakiyesi 0 olmali, arsivlenir (secim listelerinden kalkar,
+     * gecmis hareketlerde adi gorunur). Kasa kaldirilamaz.
+     */
+    void removeBank(java.util.UUID accountId);
+
     /** accountId null ise galerinin tum hareketleri; yeniden eskiye. */
     List<LedgerEntryResponse> entries(UUID accountId);
 

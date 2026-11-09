@@ -249,6 +249,8 @@ public class NetWorthServiceImpl implements NetWorthService {
                 parts.add(new AccountHoldings.Part(h.userId(), h.name(), false, cents));
                 investorsHere += cents;
             }
+            // Kaldirilan (arsivlenen) banka: kimsenin parasi kalmadiysa gosterilmez
+            if (a.isClosed() && bal == 0 && parts.isEmpty()) continue;
             parts.addFirst(new AccountHoldings.Part(owner == null ? null : owner.userId(), owner == null ? "Dükkân sahibi" : owner.name(), true,
                     bal - investorsHere));
             result.add(new AccountHoldings(a.getId(), a.getName(), a.getType(), bal, parts));

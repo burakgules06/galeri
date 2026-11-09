@@ -70,4 +70,5 @@ public class ErrorMessageConstant {
     public static final int STAFF_CASH_ONLY = 1064;
     public static final int INVALID_PHOTO = 1065;
     public static final int PHOTO_LIMIT = 1066;
+    public static final int BANK_ACCOUNT_NOT_REMOVABLE = 1069;   // 1067 cepten alis, 1068 sermayedar transferi (ayri PR'lar)
 }

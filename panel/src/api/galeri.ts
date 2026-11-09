@@ -105,6 +105,9 @@ export const api = {
   // Para defteri (sadece ADMIN)
   accounts: () => apiFetch<AccountResponse[]>("/api/accounts"),
   addBank: (name: string) => apiFetch<AccountResponse>("/api/accounts", json({ name })),
+  renameBank: (id: string, name: string) => apiFetch<AccountResponse>(`/api/accounts/${id}`, json({ name }, "PUT")),
+  // Hic hareketi yoksa silinir; varsa bakiyesi 0 iken arsivlenir (gecmis hareketlerde adi kalir)
+  removeBank: (id: string) => apiFetch<void>(`/api/accounts/${id}`, { method: "DELETE" }),
   ledgerEntries: (accountId: string | null) =>
     apiFetch<LedgerEntryResponse[]>(`/api/ledger-entries${accountId ? `?accountId=${accountId}` : ""}`),
   correctEntry: (id: string) => apiFetch<LedgerEntryResponse>(`/api/ledger-entries/${id}/correct`, { method: "POST" }),
