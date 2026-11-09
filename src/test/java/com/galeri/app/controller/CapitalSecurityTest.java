@@ -58,7 +58,7 @@ class CapitalSecurityTest {
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> capital.periodProfit(DAY, DAY)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> capital.allocate(new CapitalRequests.Allocation(id, DAY, 1L, DAY, DAY))).isInstanceOf(AccessDeniedException.class);
-        // Hesaplar arasi transfer sermayedara acik (V32): sadece kendi parasini tasir, HolderTransferIT'te
+        assertThatThrownBy(() -> capital.transfer(new CapitalRequests.Transfer(id, id, DAY, 1L, null))).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> capital.openingBalance(new CapitalRequests.Opening(id, null, null, DAY, 1L))).isInstanceOf(AccessDeniedException.class);
     }
 
@@ -74,7 +74,7 @@ class CapitalSecurityTest {
         assertThatThrownBy(() -> capital.move(id, new CapitalRequests.Movement(CapitalRequests.Direction.IN, id, DAY, 1L, null)))
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> capital.periodProfit(DAY, DAY)).isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(() -> capital.transfer(new CapitalRequests.Transfer(id, id, DAY, 1L, null))).isInstanceOf(AccessDeniedException.class);
+        // Hesaplar arasi transfer sermayedara acik (V32): sadece kendi parasini, kendi payi kadar tasir (HolderTransferIT)
     }
 
     @Test
