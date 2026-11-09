@@ -9,9 +9,18 @@ import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../share
 import { ContactPicker } from "../contacts/ContactPicker";
 import { NumberInput } from "../../shared/ui/NumberInput";
 
-export function TransferForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+// investor: sermayedar kendi parasini tasir (hesaplar onun payiyla gelir). Dukkan sahibi kimin parasini tasidigini secer.
+export function TransferForm({ onClose, onSaved, investor = false }: { onClose: () => void; onSaved: () => void; investor?: boolean }) {
   const accounts = useLoad(() => api.accounts(), []);
+  const holders = useLoad(() => (investor ? Promise.resolve([]) : api.holders()), [investor]);
+  const holdings = useLoad(() => (investor ? Promise.resolve(null) : api.holdings()), [investor]);
+  const [holder, setHolder] = useState("");   // "" = dukkan sahibi
+  const people = (holders.data ?? []).filter((h): h is typeof h & { userId: string } => !h.owner && h.userId != null);
   const list = accounts.data ?? [];
+  // Secilen kisinin o hesaptaki parasi (dukkan sahibinde hesabin bakiyesi, eskisi gibi)
+  const amountIn = (accountId: string, balance: number) => !holder ? balance
+    : (holdings.data?.accounts.find((h) => h.accountId === accountId)?.parts ?? [])
+        .filter((p) => !p.owner && p.userId === holder).reduce((t, p) => t + p.cents, 0);
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
   const [amount, setAmount] = useState("");
@@ -30,7 +39,8 @@ export function TransferForm({ onClose, onSaved }: { onClose: () => void; onSave
     setSaving(true);
     setError(null);
     try {
-      await api.transfer({ fromAccountId: from, toAccountId: to, date, amountCents: cents, description: description.trim() || null });
+      await api.transfer({ fromAccountId: from, toAccountId: to, date, amountCents: cents, description: description.trim() || null,
+        holderUserId: investor ? null : holder || null });
       onSaved();
     } catch (err) {
       setError(errorMessage(err));
@@ -39,9 +49,9 @@ export function TransferForm({ onClose, onSaved }: { onClose: () => void; onSave
     }
   };
 
-  const options = list.map((a) => ({ value: a.id, label: `${a.name} · ${tl(a.balanceCents)}` }));
+  const options = list.map((a) => ({ value: a.id, label: `${a.name} · ${tl(amountIn(a.id, a.balanceCents))}` }));
   return (
-    <Modal title="Hesaplar arası transfer" open onClose={onClose}
+    <Modal title={investor ? "Paramı hesaplar arası taşı" : "Hesaplar arası transfer"} open onClose={onClose}
       footer={<>
         <Button variant="secondary" type="button" onClick={onClose}>Vazgeç</Button>
         <Button type="submit" form="transfer-form" disabled={saving || list.length < 2}>{saving ? "Kaydediliyor…" : "Aktar"}</Button>
@@ -49,6 +59,13 @@ export function TransferForm({ onClose, onSaved }: { onClose: () => void; onSave
       <form id="transfer-form" onSubmit={submit} className="space-y-4">
         <ErrorBox message={error} />
         {accounts.data && list.length < 2 && <p className="text-[14px] text-uyari">Transfer için en az iki hesap gerekir; önce banka hesabı ekleyin.</p>}
+        {!investor && people.length > 0 && (
+          <Field label="Kimin parası">
+            <Segment<string> value={holder} onChange={setHolder}
+              options={[{ value: "", label: "Dükkân sahibi" }, ...people.map((p) => ({ value: p.userId, label: p.name }))]} />
+          </Field>
+        )}
+        {investor && <p className="text-[13.5px] text-murekkep-2">Kasa ve bankalardaki kendi paranı hesaplar arasında taşırsın; toplam paran değişmez.</p>}
         <Field label="Nereden"><Segment<string> value={from} onChange={setFromId} options={options} /></Field>
         <Field label="Nereye"><Segment<string> value={to} onChange={setToId} options={options.filter((o) => o.value !== from)} /></Field>
         <Field label="Tutar">

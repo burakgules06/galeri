@@ -204,10 +204,15 @@ public class NetWorthServiceImpl implements NetWorthService {
             boolean srcMoney = held.containsKey(src.getId()), tgtMoney = held.containsKey(tgt.getId());
             long amount = e.getAmountCents();
             if (srcMoney && tgtMoney) {
-                // Hesaplar arasi transfer: dukkan sahibinin parasi tasinir (transferi o yapar, fiziksel kasa / bankayi o yonetir).
-                // Sermayedarin parasi girdigi hesapta kalir. Dukkan sahibi her hesapta kalan oldugu icin haritaya bir sey yazilmaz.
+                // Hesaplar arasi transfer: varsayilan dukkan sahibinin parasi tasinir (her hesapta kalan oldugu icin haritaya bir sey
+                // yazilmaz). Transfer bir sermayedarin parasiysa (V32) onun payi kaynak hesaptan hedef hesaba gecer.
                 balance.merge(src.getId(), -amount, Long::sum);
                 balance.merge(tgt.getId(), amount, Long::sum);
+                UUID holder = e.getTransferHolderId();
+                if (holder != null && investors.containsKey(holder)) {
+                    held.get(src.getId()).merge(holder, -amount, Long::sum);
+                    held.get(tgt.getId()).merge(holder, amount, Long::sum);
+                }
                 continue;
             }
             UUID account = srcMoney ? src.getId() : tgt.getId();
@@ -263,6 +268,15 @@ public class NetWorthServiceImpl implements NetWorthService {
             long cents = mine.stream().mapToLong(AccountHoldings.Part::cents).sum();
             return new AccountHoldings(h.accountId(), h.name(), h.type(), cents, mine);
         }).toList(), unassigned.stream().filter(p -> me.equals(p.userId()) && !p.owner()).toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long heldIn(UUID accountId, UUID userId) {
+        return holdings().accounts().stream().filter(h -> h.accountId().equals(accountId))
+                .flatMap(h -> h.parts().stream())
+                .filter(p -> !p.owner() && userId.equals(p.userId()))
+                .mapToLong(AccountHoldings.Part::cents).sum();
     }
 
     /** Stoktaki araclarda secilen sahiplerin odenmis katkisi, buyukten kucuge. */

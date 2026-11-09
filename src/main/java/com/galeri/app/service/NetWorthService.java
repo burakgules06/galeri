@@ -12,4 +12,7 @@ public interface NetWorthService {
 
     /** Kasa ve bankalardaki paranin kisilere dagilimi (dukkan sahibi kalan). */
     com.galeri.app.model.response.AccountHoldings.Response holdings();
+
+    /** Sermayedarin bu kasa / bankadaki parasi (hesap basina dagilimdaki payi). */
+    long heldIn(java.util.UUID accountId, java.util.UUID userId);
 }

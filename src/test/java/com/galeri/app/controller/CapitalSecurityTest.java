@@ -74,7 +74,7 @@ class CapitalSecurityTest {
         assertThatThrownBy(() -> capital.move(id, new CapitalRequests.Movement(CapitalRequests.Direction.IN, id, DAY, 1L, null)))
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> capital.periodProfit(DAY, DAY)).isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(() -> capital.transfer(new CapitalRequests.Transfer(id, id, DAY, 1L, null))).isInstanceOf(AccessDeniedException.class);
+        // Hesaplar arasi transfer sermayedara acik (V32): sadece kendi parasini, kendi payi kadar tasir (HolderTransferIT)
     }
 
     @Test
