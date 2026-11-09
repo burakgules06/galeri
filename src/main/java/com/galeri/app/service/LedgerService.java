@@ -81,6 +81,15 @@ public interface LedgerService {
      */
     void syncVehiclePurchase(Vehicle vehicle, UUID purchaseAccountId);
 
+    /**
+     * Dukkan sahibinin cebinden odedigi kismi (vehicle.purchasePocketCents) VEHICLE_PURCHASE CAPITAL(sahibi) -> VEHICLE olarak
+     * esitler: tutar, tarih ya da kisi degistiyse eskisi terslenir, yenisi yazilir; 0 ise varsa terslenir.
+     */
+    void syncPocketPurchase(Vehicle vehicle, UUID capitalAccountId);
+
+    /** Cepten kismin yazildigi sermaye hesabi (yoksa null). */
+    UUID pocketCapitalAccountId(Vehicle vehicle);
+
     /** Aracin gecerli alis hareketinin kaynak hesabi; yoksa null. */
     UUID purchaseAccountId(UUID vehicleId);
 

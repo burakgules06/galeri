@@ -112,6 +112,12 @@ public class CapitalServiceImpl implements CapitalService {
 
     @Override
     @Transactional
+    public UUID capitalAccountId(UUID userId) {
+        return capitalAccount(getHolder(userId), true).getId();
+    }
+
+    @Override
+    @Transactional
     public void removePartner(UUID userId) {
         PanelUser user = getHolder(userId);
         if (user.isOwner()) throw new PartnerNotRemovableException("Dükkân sahibi kaldırılamaz.");

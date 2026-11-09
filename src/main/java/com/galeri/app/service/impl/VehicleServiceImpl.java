@@ -1,5 +1,6 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.PocketPurchaseNotAllowedException;
 import com.galeri.app.exception.runtime.StaffCashOnlyException;
 import com.galeri.app.exception.runtime.InvalidBasketException;
 import com.galeri.app.exception.runtime.InvalidUserCounterpartyException;
@@ -229,8 +230,10 @@ public class VehicleServiceImpl implements VehicleService {
         apply(vehicle, request);
         Vehicle saved = vehicleRepository.save(vehicle);
         coOwnershipService.syncOwners(saved, request.shares());
+        preparePocket(saved, request);
         syncPurchase(saved, request);
         syncSellerCapital(saved, request);
+        syncPocket(saved);
         coOwnershipService.syncContributions(saved);   // ortak aracta cepten katki ve nakit sermaye kontrolu
         if (saved.getActualPurchaseCents() != null) coOwnershipService.checkConsignorCash(saved);   // konsinye: sermayeden kisim yetmeli
         return toAdmin(saved, toDetail(saved));
@@ -257,8 +260,10 @@ public class VehicleServiceImpl implements VehicleService {
             throw new InvalidDateException();
         }
         coOwnershipService.syncOwners(vehicle, request.shares());
+        preparePocket(vehicle, request);
         syncPurchase(vehicle, request);
         syncSellerCapital(vehicle, request);
+        syncPocket(vehicle);
         if (vehicle.getActualPurchaseCents() != null
                 && !consignmentBefore.equals(consignmentFunding(vehicle, vehicle.getPurchaseCapitalEntryId()))) {
             coOwnershipService.checkConsignorCash(vehicle);
@@ -340,6 +345,7 @@ public class VehicleServiceImpl implements VehicleService {
         ledgerService.reverseVehicleEntries(vehicle.getId());   // alis, pesinat, masraflar, ortak katkilari: para geldigi yere doner
         ledgerService.reverseIfActive(vehicle.getPurchaseCapitalEntryId());   // kullanicidan alista sermayesine eklenen kisim
         vehicle.setPurchaseCapitalEntryId(null);
+        vehicle.setPurchasePocketEntryId(null);   // cepten kisim araca bagli; yukarida terslendi, sermaye eski haline doner
         vehicle.setStatus(VehicleStatus.REMOVED);
     }
 
@@ -504,6 +510,40 @@ public class VehicleServiceImpl implements VehicleService {
     private static List<Object> consignmentFunding(Vehicle v, UUID capitalEntryId) {
         return java.util.Arrays.asList(v.getOwnership(), v.getConsignor() == null ? null : v.getConsignor().getId(),
                 v.getActualPurchaseCents(), v.getPurchaseDate(), capitalEntryId);
+    }
+
+    // ------------------------------------------------------------------ cepten alis (V31)
+
+    /**
+     * Dukkan sahibi araci (kismen ya da tamamen) cebinden aldi: o kisim kasadan / bankadan cikmaz, sermayesine eklenir.
+     * Sadece dukkan sahibi, galeri araci, pesin ve kisiden alista. Tutar syncPurchase'tan once araca yazilir; kasa / banka
+     * hareketi kalan kadar olur.
+     */
+    private void preparePocket(Vehicle vehicle, VehicleRequest r) {
+        long pocket = r.pocketCents() == null ? 0 : r.pocketCents();
+        if (pocket > 0) {
+            if (!CurrentUser.isAdmin()) throw new PocketPurchaseNotAllowedException("Cepten alışı sadece dükkân sahibi girer");
+            if (vehicle.getOwnership() != Ownership.DEALER) {
+                throw new PocketPurchaseNotAllowedException("Cepten alış sadece galeri aracında seçilir");
+            }
+            if (r.purchasePlan() != null && !r.purchasePlan().isEmpty()) {
+                throw new PocketPurchaseNotAllowedException("Cepten alışta ödeme planı ya da çek / senet kullanılmaz");
+            }
+            if (vehicle.getSellerUser() != null) throw new PocketPurchaseNotAllowedException("Kullanıcıdan alışta cepten seçilmez");
+            long price = vehicle.getActualPurchaseCents() == null ? 0 : vehicle.getActualPurchaseCents();
+            if (pocket > price) throw new PocketPurchaseNotAllowedException("Cepten kısım alış bedelini aşamaz");
+        }
+        vehicle.setPurchasePocketCents(pocket);
+    }
+
+    /** Cepten kismin hareketi: ilk yazan dukkan sahibinin sermayesine; duzenlemede ayni kiside kalir. */
+    private void syncPocket(Vehicle vehicle) {
+        UUID capitalAccount = null;
+        if (vehicle.getPurchasePocketCents() > 0) {
+            capitalAccount = ledgerService.pocketCapitalAccountId(vehicle);
+            if (capitalAccount == null) capitalAccount = capitalService.capitalAccountId(CurrentUser.principal().userId());
+        }
+        ledgerService.syncPocketPurchase(vehicle, capitalAccount);
     }
 
     // ------------------------------------------------------------------ panel kullanicisiyla alis / satis (V25)
@@ -741,7 +781,8 @@ public class VehicleServiceImpl implements VehicleService {
                 v.getPurchaseCapitalEntryId() == null ? null : ledgerService.capitalEntryInfo(v.getPurchaseCapitalEntryId())
                         .filter(LedgerService.CapitalEntryInfo::active).map(LedgerService.CapitalEntryInfo::amountCents).orElse(null),
                 userSummary(v.getBuyerUser()), v.getTransferFromVehicleId(),
-                vehicleRepository.findByTransferFromVehicleId(v.getId()).map(Vehicle::getId).orElse(null));
+                vehicleRepository.findByTransferFromVehicleId(v.getId()).map(Vehicle::getId).orElse(null),
+                v.getPurchasePocketCents());
     }
 
     private static ContactSummary userSummary(PanelUser u) {

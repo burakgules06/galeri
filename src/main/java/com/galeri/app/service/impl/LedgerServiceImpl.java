@@ -284,8 +284,10 @@ public class LedgerServiceImpl implements LedgerService {
         LedgerEntry original = reversible(entryId);
         // Satis, planli alis (saticinin carisinden) ve taksit hareketleri plana bagli: kasa ekranindan terslenirse
         // plan ile defter ayrisir.
+        // Cepten alis (sahibinin sermayesinden) da aracin alis bilgisine bagli: arac formundan degisir.
         boolean plannedPurchase = original.getType() == LedgerEntryType.VEHICLE_PURCHASE
-                && original.getSourceAccount().getType() == AccountType.BALANCE;
+                && (original.getSourceAccount().getType() == AccountType.BALANCE
+                    || original.getSourceAccount().getType() == AccountType.CAPITAL);
         if (original.getType() == LedgerEntryType.VEHICLE_SALE || original.getType() == LedgerEntryType.CONSIGNMENT_SETTLEMENT
                 || plannedPurchase
                 || coOwnershipService.isLinkedEntry(original)
@@ -729,9 +731,11 @@ public class LedgerServiceImpl implements LedgerService {
     @Override
     @Transactional
     public void syncVehiclePurchase(Vehicle vehicle, UUID purchaseAccountId) {
-        long amount = vehicle.getActualPurchaseCents() == null ? 0 : vehicle.getActualPurchaseCents();
+        // Dukkan sahibinin cebinden odedigi kisim kasadan / bankadan cikmaz (ayri hareket, syncPocketPurchase)
+        long amount = (vehicle.getActualPurchaseCents() == null ? 0 : vehicle.getActualPurchaseCents()) - vehicle.getPurchasePocketCents();
         boolean shouldWrite = purchaseAccountId != null && amount > 0;
-        LedgerEntry active = activePurchase(vehicle.getId());
+        LedgerEntry active = activeVehiclePurchases(vehicle.getId()).stream()
+                .filter(e -> !e.getId().equals(vehicle.getPurchasePocketEntryId())).findFirst().orElse(null);
 
         if (active != null && shouldWrite
                 && active.getSourceAccount().getId().equals(purchaseAccountId)
@@ -750,6 +754,36 @@ public class LedgerServiceImpl implements LedgerService {
             e.setDescription("Araç alışı");
             entryRepository.save(e);
         }
+    }
+
+    @Override
+    @Transactional
+    public void syncPocketPurchase(Vehicle vehicle, UUID capitalAccountId) {
+        long amount = vehicle.getPurchasePocketCents();
+        UUID existing = vehicle.getPurchasePocketEntryId();
+        LedgerEntry active = existing == null ? null : activeVehiclePurchases(vehicle.getId()).stream()
+                .filter(e -> e.getId().equals(existing)).findFirst().orElse(null);
+        if (active != null && amount > 0 && active.getAmountCents() == amount && active.getEntryDate().equals(vehicle.getPurchaseDate())
+                && active.getSourceAccount().getId().equals(capitalAccountId)) {
+            return;   // degisiklik yok
+        }
+        if (active != null) writeReversal(active);
+        vehicle.setPurchasePocketEntryId(null);
+        if (amount <= 0) return;
+        Account capital = getAccount(capitalAccountId);
+        if (capital.getType() != AccountType.CAPITAL) throw new InvalidAccountException();
+        LedgerEntry e = newEntry(vehicle.getTenantId(), LedgerEntryType.VEHICLE_PURCHASE, capital, vehicleAccount(vehicle),
+                amount, vehicle.getPurchaseDate());
+        e.setVehicle(vehicle);
+        e.setDescription("Araç alışı (cepten)");
+        vehicle.setPurchasePocketEntryId(entryRepository.save(e).getId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UUID pocketCapitalAccountId(Vehicle vehicle) {
+        UUID id = vehicle.getPurchasePocketEntryId();
+        return id == null ? null : entryRepository.findById(id).map(e -> e.getSourceAccount().getId()).orElse(null);
     }
 
     @Override

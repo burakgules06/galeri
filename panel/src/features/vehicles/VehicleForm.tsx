@@ -32,6 +32,9 @@ interface Props {
   existing?: VehicleDetailAdmin;
 }
 
+// "Odeme nereden" listesinde cepten secenegi (hesap kimligiyle karismasin)
+const POCKET = "__pocket__";
+
 export function VehicleForm(props: Props) {
   return props.open ? <VehicleFormLoader {...props} /> : null;
 }
@@ -81,6 +84,10 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const [detailsOpen, setDetailsOpen] = useState(false);
   // null: henuz secilmedi, yeni aracta kasa varsayilir. "": deftere yazilmaz.
   const [purchaseAccount, setPurchaseAccount] = useState<string | null>(existing ? (existing.purchaseAccountId ?? "") : null);
+  // Cepten: dukkan sahibi araci (kismen) kendi cebinden aldi; o kisim kasadan cikmaz, sermayesine eklenir. Bos tutar = tamami.
+  const [pocket, setPocket] = useState(() => (existing?.pocketCents ?? 0) > 0);
+  const [pocketAmount, setPocketAmount] = useState(() => existing && existing.pocketCents > 0 && existing.pocketCents !== existing.actualPurchaseCents
+    ? centsToInput(existing.pocketCents) : "");
   const { isInvestor, canTrade } = useAuth();   // sermayedar: her zaman ortakli alim, payi kendi sermayesinden, kasa secmez
   // Yetkili calisan: sadece galeri adina pesin alim (satici kisi, tamami secilen kasa / bankadan); tutarlari sonra goremez
   const staffMode = canTrade;
@@ -146,6 +153,13 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const userSale = fromUser && !consignment && !isInvestor;
   const sellerCapitalCents = userSale && sellerPartner && !sellerPartner.owner ? tlToCents(sellerCapital) ?? 0 : 0;
   const consignCapitalCents = consignFunding === "MIXED" ? tlToCents(consignCapital) ?? 0 : 0;
+  // Cepten sadece dukkan sahibinin pesin galeri alisinda (kisiden; cek / senet ve plan yok)
+  const canPocket = !consignment && !coOwned && !isInvestor && !staffMode && !userSale && payMode === "CASH" && endorsed.length === 0;
+  const pocketActive = canPocket && pocket;
+  const pocketCents = !pocketActive ? 0 : pocketAmount.trim() ? tlToCents(pocketAmount) ?? 0 : price;
+  const pocketRest = pocketActive && !Number.isNaN(pocketCents) ? Math.max(0, price - pocketCents) : 0;
+  const cashAccountId = (accounts.data?.find((a) => a.type === "CASH") ?? accounts.data?.[0])?.id ?? "";
+  const restAccountId = purchaseAccountId || cashAccountId;
   // Konsinyede sahibinin sermayesine eklenecek cepten kisim (sermayeden: 0, cepten: tamami, hibrit: kalan)
   const consignPocketCents = !consignment || price <= 0 ? 0
     : consignFunding === "POCKET" ? price : consignFunding === "MIXED" ? price - consignCapitalCents : 0;
@@ -171,6 +185,9 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
     if (coOwned) {
       const problem = ownersProblem(owners, profitDiffers, price, { enabled: false, type: "RATE", rate: "", fixed: "" });
       if (problem) return setError(problem);
+    }
+    if (pocketActive && (Number.isNaN(pocketCents) || pocketCents <= 0 || pocketCents > price)) {
+      return setError("Cepten ödenen kısım alış bedelini aşamaz.");
     }
     if (userSale) {
       if (!sellerUserId) return setError("Aracı hangi kullanıcıdan aldığını seç.");
@@ -208,7 +225,9 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       sellerCapitalCents: consignment ? (consignPocketCents > 0 ? consignPocketCents : null)
         : userSale && sellerCapitalCents > 0 ? sellerCapitalCents : null,
       actualPurchaseCents: amounts[1], officialPurchaseCents: consignment ? null : amounts[2],
-      purchaseAccountId: !consignment && !isInvestor && ((payMode === "CASH" && endorsed.length === 0) || userSale) ? purchaseAccountId || null : null,
+      purchaseAccountId: pocketActive ? (pocketRest > 0 ? restAccountId : null)
+        : !consignment && !isInvestor && ((payMode === "CASH" && endorsed.length === 0) || userSale) ? purchaseAccountId || null : null,
+      pocketCents: pocketActive ? pocketCents : null,
       purchasePlan: purchasePlanRequest(),
       ownership,
       consignorId: consignment ? consignor?.id ?? null : null,
@@ -372,11 +391,34 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
           )}
           {(payMode === "CASH" || userSale) && (
             <Field label={!userSale && endorsedCents > 0 ? `Kalan ${tl(Math.max(0, price - endorsedCents))} nereden` : "Ödeme nereden"}>
-              <select className={inputClass} value={purchaseAccountId} onChange={(e) => setPurchaseAccount(e.target.value)}>
+              <select className={inputClass} value={pocketActive ? POCKET : purchaseAccountId}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setPocket(value === POCKET);
+                  if (value !== POCKET) setPurchaseAccount(value);
+                }}>
                 {(accounts.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                {canPocket && <option value={POCKET}>Cepten (sermayeme eklenir)</option>}
                 {!staffMode && <option value="">Kasaya işleme</option>}
               </select>
             </Field>
+          )}
+          {pocketActive && (
+            <>
+              <Field label="Cepten ödenen">
+                <NumberInput value={pocketAmount} onValueChange={setPocketAmount} placeholder={price > 0 ? `${tl(price)} (tamamı)` : "Tamamı"} />
+                <p className="text-[13px] text-murekkep-2 mt-1">
+                  Bu kısım kasadan / bankadan çıkmaz, sermayene eklenir. Boş bırakırsan bedelin tamamı.
+                </p>
+              </Field>
+              {pocketRest > 0 && (
+                <Field label={`Kalan ${tl(pocketRest)} nereden`}>
+                  <select className={inputClass} value={restAccountId} onChange={(e) => setPurchaseAccount(e.target.value)}>
+                    {(accounts.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </Field>
+              )}
+            </>
           )}
           {payMode === "PLAN" && !userSale && (
             <>

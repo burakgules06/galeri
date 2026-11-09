@@ -131,6 +131,7 @@ export interface VehicleDetailAdmin {
   buyerUser: ContactSummary | null;        // araci panel kullanicisina sattik
   transferFromVehicleId: string | null;    // "satmak icin al" ile gelen kayit: eski kayit
   transferToVehicleId: string | null;      // satilan kayit: alanin stogundaki yeni kayit
+  pocketCents: number;                     // dukkan sahibinin cebinden odedigi kisim (kasadan cikmadi, sermayesine eklendi)
 }
 
 // Ana tur: musteri / alis yaptiklarim (arac aldigimiz kisi) / tedarikci. Bicim (type): bireysel / tuzel.
@@ -207,6 +208,7 @@ export interface VehicleRequest {
   shopCutCents: number | null;
   sellerUserId?: string | null;          // araci panel kullanicisindan aldik (sellerId yerine)
   sellerCapitalCents?: number | null;    // bedelin kasadan cikmayip onun sermayesine eklenen kismi
+  pocketCents?: number | null;           // dukkan sahibinin cebinden odedigi kisim: kasadan cikmaz, sermayesine eklenir
 }
 
 export interface SaleRequest {
