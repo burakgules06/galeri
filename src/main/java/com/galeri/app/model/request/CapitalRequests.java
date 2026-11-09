@@ -53,8 +53,15 @@ public final class CapitalRequests {
             @NotNull UUID toAccountId,
             @NotNull LocalDate date,
             @NotNull @Positive Long amountCents,
-            @Size(max = 500) String description
-    ) {}
+            @Size(max = 500) String description,
+            // Kimin parasi tasiniyor: bos = dukkan sahibi; dolu = o sermayedar (kaynak hesaptaki parasindan fazla olamaz).
+            // Sermayedar transfer yaparsa her zaman kendisi.
+            UUID holderUserId
+    ) {
+        public Transfer(UUID fromAccountId, UUID toAccountId, LocalDate date, Long amountCents, String description) {
+            this(fromAccountId, toAccountId, date, amountCents, description, null);
+        }
+    }
 
     public enum OpeningSide { RECEIVABLE, PAYABLE }
 

@@ -1,10 +1,13 @@
-// Sermayedarin Kasa sayfasi: sadece kendi parasi. Kasa ve bankalardaki toplam parasi (defterden kesin; hangi hesapta durdugu
-// tutulmaz), sermayesinin dagilimi (nakit / aracta / alacak) ve kendi sermaye / cari hareketleri. Islem yok.
+// Sermayedarin Kasa sayfasi: sadece kendi parasi. Kasa ve bankalardaki toplam parasi ve hesap basina dagilimi (defterden),
+// sermayesinin dagilimi (nakit / aracta / alacak) ve kendi sermaye / cari hareketleri. Tek islem: kendi parasini hesaplar arasi
+// tasimak (V32).
 // Hareket yonu sermaye acisindan: sermayeden cikan (giris, satis payi) arti, sermayeye giren (cekis, katkinin satisa gecmesi) eksi.
+import { useState } from "react";
 import { api } from "../../api/galeri";
 import { tl } from "../../shared/format";
 import { useLoad } from "../../shared/useLoad";
-import { Empty, ErrorBox } from "../../shared/ui/Common";
+import { Button, Empty, ErrorBox } from "../../shared/ui/Common";
+import { TransferForm } from "./TreasuryForms";
 import { PartnerCapitalCard } from "../home/PartnerCapitalCard";
 import { LedgerEntryList } from "./LedgerEntryList";
 
@@ -12,6 +15,10 @@ export function InvestorLedgerPage() {
   // Sermayedara /api/holders sadece kendi satirini doner: kasa ve bankalardaki parasi backend'den
   const partners = useLoad(() => api.holders(), []);
   const entries = useLoad(() => api.ledgerEntries(null), []);
+  // Sermayedara /api/accounts hesap basina sadece kendi parasini doner
+  const accounts = useLoad(() => api.accounts(), []);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const reload = () => { partners.reload(); entries.reload(); accounts.reload(); };
   const mine = (partners.data ?? []).find((p) => !p.owner);
   const total = mine?.cashCents ?? 0;
 
@@ -28,7 +35,23 @@ export function InvestorLedgerPage() {
         <p className={`sayi font-bold text-[34px] md:text-[40px] leading-none tracking-tight mt-1.5 ${total < 0 ? "text-tehlike" : ""}`}>
           {mine ? tl(total) : "…"}
         </p>
+        {(accounts.data ?? []).length > 0 && (
+          <ul className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+            {(accounts.data ?? []).map((a) => (
+              <li key={a.id} className="rounded-[12px] border border-cizgi px-3 py-2">
+                <p className="text-[13px] text-murekkep-2 truncate">{a.name}</p>
+                <p className={`sayi font-semibold text-[17px] ${a.balanceCents < 0 ? "text-tehlike" : ""}`}>{tl(a.balanceCents)}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+        {(accounts.data ?? []).length > 1 && (
+          <div className="mt-3">
+            <Button variant="secondary" onClick={() => setTransferOpen(true)}>Hesaplar arası taşı</Button>
+          </div>
+        )}
       </section>
+      {transferOpen && <TransferForm investor onClose={() => setTransferOpen(false)} onSaved={() => { setTransferOpen(false); reload(); }} />}
 
       <PartnerCapitalCard />
 
@@ -37,7 +60,7 @@ export function InvestorLedgerPage() {
         {entries.data && entries.data.length === 0 && <Empty title="Henüz hareket yok" />}
         {entries.data && entries.data.length > 0 && (
           <LedgerEntryList entries={entries.data} direction={(e) => (e.source.type === "CAPITAL" ? 1 : e.target.type === "CAPITAL" ? -1 : 0)}
-            onChange={entries.reload} readOnly corrections="hide" />
+            onChange={reload} readOnly corrections="hide" />
         )}
       </section>
     </div>
