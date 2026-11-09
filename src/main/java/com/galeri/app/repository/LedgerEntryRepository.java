@@ -104,6 +104,16 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> 
             """)
     List<LedgerEntry> accountEntries(@Param("tenantId") UUID tenantId, @Param("accountId") UUID accountId, Pageable page);
 
+    /** Sermayedarin parasinin tasindigi hesaplar arasi transferler (V32). */
+    @Query("""
+            select e from LedgerEntry e
+            join fetch e.sourceAccount join fetch e.targetAccount join fetch e.createdBy
+            left join fetch e.vehicle left join fetch e.category
+            where e.tenantId = :tenantId and e.transferHolderId = :userId
+            order by e.entryDate desc, e.createdAt desc
+            """)
+    List<LedgerEntry> holderTransfers(@Param("tenantId") UUID tenantId, @Param("userId") UUID userId, Pageable page);
+
     @Query("""
             select e from LedgerEntry e
             join fetch e.sourceAccount join fetch e.targetAccount join fetch e.createdBy

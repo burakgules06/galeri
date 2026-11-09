@@ -72,6 +72,7 @@ public class CapitalController {
     }
 
     @PostMapping("/transfers")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")   // sermayedar: sadece kendi parasini, kendi payi kadar
     public GenericResponse<LedgerEntryResponse> transfer(@Valid @RequestBody CapitalRequests.Transfer request) {
         return responseService.success(ledgerService.transfer(request));
     }

@@ -78,6 +78,7 @@ class LedgerServiceImplTest {
     @Mock private ContactRepository contactRepository;
     @Mock private PaymentPlanRepository planRepository;
     @Mock private com.galeri.app.repository.VehiclePocketExpenseRepository pocketExpenseRepository;
+    @Mock private com.galeri.app.service.NetWorthService netWorthService;
 
     private static final LocalDate DAY = LocalDate.of(2026, 7, 1);
 
@@ -91,7 +92,7 @@ class LedgerServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new LedgerServiceImpl(accountRepository, entryRepository, categoryRepository, vehicleRepository, panelUserRepository,
-                installmentRepository, contactRepository, coOwnershipService, planRepository, pocketExpenseRepository);
+                installmentRepository, contactRepository, coOwnershipService, planRepository, pocketExpenseRepository, netWorthService);
         TestSession.open(userId, tenantId, "ADMIN");
 
         cash = account(AccountType.CASH, tenantId);

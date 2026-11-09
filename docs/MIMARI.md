@@ -272,6 +272,7 @@ Uygulama (Adım 5):
   − genel giderler (EXPENSE hesabına net giriş; galerinin üstlendiği konsinye masrafı dahil). Ortaklara sermayelerine yazılan paylar nete girmez.
 - Önerilen pay = Havuz net kârı × (dönem sonu nakit sermaye − bu dönemin kârından eklenen) / toplam nakit sermaye; kuruş kalanı en büyük paya.
 - Virman TRANSFER; açılış bakiyesi OPENING_BALANCE (hesap başına bir kez, düzeltilirse yeniden).
+- Virmanda kimin parası taşındığı seçilir (V32, `ledger_entry.transfer_holder_id`): boş = dükkân sahibi (eskisi gibi); dolu = o sermayedar, hesap başına dağılımda onun payı kaynak hesaptan hedefe geçer, kaynak hesaptaki parasını aşamaz (1068). Sermayedar da `POST /api/transfers` ile sadece kendi parasını taşır.
 
 ### Varlıklar (Revizyon PR 4)
 

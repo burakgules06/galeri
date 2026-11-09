@@ -60,6 +60,10 @@ public class LedgerEntry {
     @Column(name = "corrected_entry_id", updatable = false)
     private UUID correctedEntryId;
 
+    /** Hesaplar arasi transferde tasinan para kimin (V32): bos = dukkan sahibi, dolu = o sermayedar. */
+    @Column(name = "transfer_holder_id", updatable = false)
+    private UUID transferHolderId;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by_id", updatable = false)
     private PanelUser createdBy;

@@ -1,5 +1,7 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.NotAPartnerException;
+import com.galeri.app.exception.runtime.HolderTransferExceededException;
 import com.galeri.app.exception.runtime.CategoryDepthLimitException;
 import com.galeri.app.exception.runtime.CommissionExceedsSaleException;
 import com.galeri.app.exception.runtime.ConsignorCashNegativeException;
@@ -87,6 +89,7 @@ public class LedgerServiceImpl implements LedgerService {
     private final CoOwnershipService coOwnershipService;
     private final PaymentPlanRepository planRepository;
     private final VehiclePocketExpenseRepository pocketExpenseRepository;
+    private final com.galeri.app.service.NetWorthService netWorthService;
 
     // ------------------------------------------------------------------ hesaplar
 
@@ -130,6 +133,7 @@ public class LedgerServiceImpl implements LedgerService {
                 Account own = userAccount(tenantId, me, type);
                 if (own != null) entryRepository.accountEntries(tenantId, own.getId(), page).forEach(e -> mine.put(e.getId(), e));
             }
+            entryRepository.holderTransfers(tenantId, me, page).forEach(e -> mine.put(e.getId(), e));   // parasinin tasindigi transferler
             list = mine.values().stream().sorted(java.util.Comparator.comparing(LedgerEntry::getEntryDate)
                     .thenComparing(LedgerEntry::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())).reversed()).toList();
         } else if (accountId == null) {
@@ -661,9 +665,22 @@ public class LedgerServiceImpl implements LedgerService {
         Account from = getMoneyAccount(r.fromAccountId());
         Account to = getMoneyAccount(r.toAccountId());
         if (from.getId().equals(to.getId())) throw new SameAccountException();
+        // Kimin parasi: sermayedar sadece kendi parasini tasir; dukkan sahibi kendi parasini (bos) ya da bir sermayedarinkini
+        UUID holder = CurrentUser.isInvestor() ? CurrentUser.principal().userId() : r.holderUserId();
+        PanelUser holderUser = null;
+        if (holder != null) {
+            holderUser = panelUserRepository.findById(holder).orElseThrow(RecordNotFoundException::new);
+            if (holderUser.getTenant() == null || !holderUser.getTenant().getId().equals(from.getTenantId())) {
+                throw new SourceNotBelongToTenantException();
+            }
+            if (holderUser.isOwner()) holder = null;   // dukkan sahibinin parasi: eskisi gibi
+            else if (!holderUser.isCapitalHolder()) throw new NotAPartnerException();
+            else if (netWorthService.heldIn(from.getId(), holder) < r.amountCents()) throw new HolderTransferExceededException();
+        }
         LedgerEntry e = newEntry(from.getTenantId(), LedgerEntryType.TRANSFER, from, to, r.amountCents(), r.date());
+        e.setTransferHolderId(holder);
         String description = blankToNull(r.description());
-        e.setDescription(description == null ? "Virman" : description);
+        e.setDescription(description == null ? (holder == null ? "Virman" : "Virman: " + holderUser.getFullName()) : description);
         return toResponse(entryRepository.save(e), false);
     }
 
@@ -824,6 +841,7 @@ public class LedgerServiceImpl implements LedgerService {
         reversal.setCategory(original.getCategory());
         reversal.setDescription("Düzeltme" + (original.getDescription() == null ? "" : ": " + original.getDescription()));
         reversal.setCorrectedEntryId(original.getId());
+        reversal.setTransferHolderId(original.getTransferHolderId());   // sermayedarin transferi terslenince payi geri doner
         return entryRepository.save(reversal);
     }
 
@@ -946,6 +964,7 @@ public class LedgerServiceImpl implements LedgerService {
             java.util.LinkedHashSet<UUID> users = new java.util.LinkedHashSet<>();
             if (e.getSourceAccount().getUserId() != null) users.add(e.getSourceAccount().getUserId());
             if (e.getTargetAccount().getUserId() != null) users.add(e.getTargetAccount().getUserId());
+            if (e.getTransferHolderId() != null) users.add(e.getTransferHolderId());
             if (e.getVehicle() != null) users.addAll(owners.getOrDefault(e.getVehicle().getId(), List.of()));
             UUID original = e.getCorrectedEntryId() != null ? e.getCorrectedEntryId() : e.getId();
             users.addAll(shares.getOrDefault(original, Map.of()).keySet());
