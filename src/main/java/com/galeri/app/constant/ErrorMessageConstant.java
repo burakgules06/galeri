@@ -70,5 +70,6 @@ public class ErrorMessageConstant {
     public static final int STAFF_CASH_ONLY = 1064;
     public static final int INVALID_PHOTO = 1065;
     public static final int PHOTO_LIMIT = 1066;
-    public static final int HOLDER_TRANSFER_EXCEEDED = 1068;   // 1067: cepten alis (ayri PR)
+    public static final int POCKET_PURCHASE_NOT_ALLOWED = 1067;
+    public static final int HOLDER_TRANSFER_EXCEEDED = 1068;
 }

@@ -173,6 +173,7 @@ Gösterimde işaret hesap türüne göre çevrilir: `CAPITAL` hesabından 2 mily
 | Burak 2.000.000 TL sermaye koydu | CAPITAL(Burak) → CASH 2.000.000 |
 | Araç peşin alındı, 1.000.000 TL | CASH → VEHICLE(#12) 1.000.000 |
 | Araç senetle alındı | BALANCE(satıcı) → VEHICLE(#12) 1.000.000; her senet ödendiğinde CASH → BALANCE(satıcı) |
+| Dükkân sahibi aracı cebinden aldı (V31), 1.000.000; 300.000'i kasadan | CAPITAL(girişi yapan sahibi) → VEHICLE(#12) 700.000 (`VEHICLE_PURCHASE`, `purchase_pocket_entry_id`) ve CASH → VEHICLE(#12) 300.000. Sadece galeri aracı, peşin, kişiden alışta; kasadan sadece kalan çıkar, sermayesi cepten kısım kadar artar |
 | Araca boya masrafı, kasadan 5.000 TL | CASH → VEHICLE(#12) 5.000, kategori: Boya |
 | Masrafı Furkan kendi cebinden ödedi | BALANCE(Furkan) → VEHICLE(#12) 5.000 (galeri Furkan'a borçlu) |
 | Kira ödendi | CASH → EXPENSE 40.000, kategori: Kira |
