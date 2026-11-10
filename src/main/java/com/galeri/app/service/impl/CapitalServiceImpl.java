@@ -389,7 +389,9 @@ public class CapitalServiceImpl implements CapitalService {
     private Account moneyAccount(UUID id) {
         Account a = accountRepository.findById(id).orElseThrow(RecordNotFoundException::new);
         if (!a.getTenantId().equals(CurrentUser.tenantId())) throw new SourceNotBelongToTenantException();
-        if (!a.getType().isMoneyAccount() || a.isClosed()) throw new InvalidAccountException();   // kaldirilan bankaya islem yazilmaz
+        if (!a.getType().isMoneyAccount()) throw new InvalidAccountException();
+        // Kaldirilan banka: parasi yoksa islem yazilmaz; parasi olduysa bitene kadar kullanilir (LedgerServiceImpl ile ayni kural)
+        if (a.isClosed() && entryRepository.accountBalance(a.getId()) == 0) throw new InvalidAccountException();
         return a;
     }
 

@@ -929,7 +929,10 @@ public class LedgerServiceImpl implements LedgerService {
 
     private Account getMoneyAccount(UUID id) {
         Account a = getAccount(id);
-        if (!a.getType().isMoneyAccount() || a.isClosed()) throw new InvalidAccountException();   // kaldirilan bankaya islem yazilmaz
+        if (!a.getType().isMoneyAccount()) throw new InvalidAccountException();
+        // Kaldirilan (arsivlenen) bankaya islem yazilmaz. Sonradan bir duzeltmeyle parasi olduysa listede yine gorunur ve parasi
+        // bitene kadar normal hesap gibi kullanilir (yoksa para hesapta kilitli kalirdi); bakiye 0'a inince yine gizlenir.
+        if (a.isClosed() && entryRepository.accountBalance(a.getId()) == 0) throw new InvalidAccountException();
         return a;
     }
 
