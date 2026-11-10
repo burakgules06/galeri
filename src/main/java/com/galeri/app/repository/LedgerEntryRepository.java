@@ -128,6 +128,13 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> 
     /** Hesaba dokunan hareket var mi (banka hesabi kaldirilirken: yoksa silinir, varsa arsivlenir). */
     boolean existsBySourceAccount_IdOrTargetAccount_Id(UUID sourceAccountId, UUID targetAccountId);
 
+    /** Tek hesabin bakiyesi (giren - cikan). */
+    @Query("""
+            select coalesce(sum(case when e.targetAccount.id = :accountId then e.amountCents else -e.amountCents end), 0)
+            from LedgerEntry e where e.sourceAccount.id = :accountId or e.targetAccount.id = :accountId
+            """)
+    long accountBalance(@Param("accountId") UUID accountId);
+
     /**
      * Hareketi satir kilidiyle okur (SELECT ... FOR UPDATE): ayni hareket iki istekte birden terslenmesin.
      * Kilit satiri degistirmez; hareket tablosunun UPDATE/DELETE yasagi (trigger) etkilenmez.

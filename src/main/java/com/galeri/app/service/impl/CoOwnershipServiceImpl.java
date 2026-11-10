@@ -1,5 +1,6 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.ClosedAccountException;
 import com.galeri.app.exception.runtime.CommissionExceedsSaleException;
 import com.galeri.app.exception.runtime.InsufficientCapitalException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
@@ -862,6 +863,8 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         Account a = accountRepository.findById(id).orElseThrow(RecordNotFoundException::new);
         if (!a.getTenantId().equals(tenantId)) throw new SourceNotBelongToTenantException();
         if (!a.getType().isMoneyAccount()) throw new InvalidAccountException();
+        // Kaldirilan banka: parasi yoksa islem yazilmaz (LedgerServiceImpl ile ayni kural)
+        if (a.isClosed() && entryRepository.accountBalance(a.getId()) == 0) throw new ClosedAccountException(a.getName());
         return a;
     }
 

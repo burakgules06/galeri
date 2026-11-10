@@ -1,6 +1,7 @@
 package com.galeri.app;
 
 import com.galeri.app.exception.runtime.BankAccountNotRemovableException;
+import com.galeri.app.exception.runtime.ClosedAccountException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.model.enums.AccountType;
 import com.galeri.app.model.request.AccountRequest;
@@ -110,9 +111,28 @@ class BankAccountIT {
         assertThat(netWorthService.holdings().accounts()).noneMatch(h -> h.accountId().equals(bank));
         assertThat(ledgerService.entries(null)).as("gecmis hareketler duruyor").anyMatch(e -> e.target().id().equals(bank));
         assertThatThrownBy(() -> ledgerService.transfer(new CapitalRequests.Transfer(cash, bank, today, 1 * TL, null)))
-                .as("kaldirilan hesaba islem yazilmaz").isInstanceOf(InvalidAccountException.class);
+                .as("kaldirilan hesaba islem yazilmaz").isInstanceOf(ClosedAccountException.class);
         assertThatThrownBy(() -> ledgerService.renameBank(bank, new AccountRequest("X"))).isInstanceOf(InvalidAccountException.class);
         new LedgerInvariants(jdbc, capitalService, coOwnershipService).check(tenant, "arsivlendi");
+        assertThat(netWorthService.summary().differenceCents()).isZero();
+    }
+
+    @Test
+    void arsivlenenHesabaDuzeltmeyleParaGelirse_gorunur_paraCikarilabilir_bitinceYineGizlenir() {
+        UUID bank = ledgerService.addBank(new AccountRequest("Babamın Vakıfbank")).id();
+        ledgerService.transfer(new CapitalRequests.Transfer(cash, bank, today, 20_000 * TL, null));
+        var drain = ledgerService.transfer(new CapitalRequests.Transfer(bank, cash, today, 20_000 * TL, null));
+        ledgerService.removeBank(bank);
+
+        ledgerService.correct(drain.id());   // bosaltan transfer duzeltildi: para arsivli hesaba geri dondu
+        assertThat(ledgerService.moneyAccounts()).as("parasi olunca gorunur")
+                .anyMatch(a -> a.id().equals(bank) && a.balanceCents() == 20_000 * TL);
+
+        ledgerService.transfer(new CapitalRequests.Transfer(bank, cash, today, 20_000 * TL, null));
+        assertThat(ledgerService.moneyAccounts()).as("para bitince yine gizli").noneMatch(a -> a.id().equals(bank));
+        assertThatThrownBy(() -> ledgerService.transfer(new CapitalRequests.Transfer(cash, bank, today, 1 * TL, null)))
+                .isInstanceOf(ClosedAccountException.class);
+        new LedgerInvariants(jdbc, capitalService, coOwnershipService).check(tenant, "arsivli hesap bosaltildi");
         assertThat(netWorthService.summary().differenceCents()).isZero();
     }
 
