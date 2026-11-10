@@ -1,5 +1,6 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.ClosedAccountException;
 import com.galeri.app.exception.runtime.CapitalExceededException;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidPeriodException;
@@ -391,7 +392,7 @@ public class CapitalServiceImpl implements CapitalService {
         if (!a.getTenantId().equals(CurrentUser.tenantId())) throw new SourceNotBelongToTenantException();
         if (!a.getType().isMoneyAccount()) throw new InvalidAccountException();
         // Kaldirilan banka: parasi yoksa islem yazilmaz; parasi olduysa bitene kadar kullanilir (LedgerServiceImpl ile ayni kural)
-        if (a.isClosed() && entryRepository.accountBalance(a.getId()) == 0) throw new InvalidAccountException();
+        if (a.isClosed() && entryRepository.accountBalance(a.getId()) == 0) throw new ClosedAccountException(a.getName());
         return a;
     }
 

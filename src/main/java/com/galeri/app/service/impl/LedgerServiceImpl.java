@@ -1,5 +1,6 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.ClosedAccountException;
 import com.galeri.app.exception.runtime.BankAccountNotRemovableException;
 import com.galeri.app.exception.runtime.NotAPartnerException;
 import com.galeri.app.exception.runtime.HolderTransferExceededException;
@@ -932,7 +933,7 @@ public class LedgerServiceImpl implements LedgerService {
         if (!a.getType().isMoneyAccount()) throw new InvalidAccountException();
         // Kaldirilan (arsivlenen) bankaya islem yazilmaz. Sonradan bir duzeltmeyle parasi olduysa listede yine gorunur ve parasi
         // bitene kadar normal hesap gibi kullanilir (yoksa para hesapta kilitli kalirdi); bakiye 0'a inince yine gizlenir.
-        if (a.isClosed() && entryRepository.accountBalance(a.getId()) == 0) throw new InvalidAccountException();
+        if (a.isClosed() && entryRepository.accountBalance(a.getId()) == 0) throw new ClosedAccountException(a.getName());
         return a;
     }
 
