@@ -324,10 +324,11 @@ export interface ContactRequest { name: string; phone: string | null; type: Cont
 export type AccountType = "CASH" | "BANK" | "BALANCE" | "CAPITAL" | "VEHICLE" | "EXPENSE" | "INCOME" | "OPENING";
 export type LedgerEntryType =
   | "VEHICLE_PURCHASE" | "VEHICLE_EXPENSE" | "GENERAL_EXPENSE" | "CAPITAL" | "VEHICLE_SALE" | "COLLECTION" | "PAYMENT"
-  | "CONSIGNMENT_SETTLEMENT" | "PROFIT_ALLOCATION" | "TRANSFER" | "OPENING_BALANCE" | "VEHICLE_PROFIT_SHARE" | "CAPITAL_TRANSFER" | "PARTNER_SALE_SETTLEMENT" | "OTHER_INCOME";
+  | "CONSIGNMENT_SETTLEMENT" | "PROFIT_ALLOCATION" | "TRANSFER" | "OPENING_BALANCE" | "VEHICLE_PROFIT_SHARE" | "CAPITAL_TRANSFER" | "PARTNER_SALE_SETTLEMENT" | "OTHER_INCOME"
+  | "LOAN" | "LOAN_REPAYMENT";   // kisiler arasi borc (V33)
 export type ExpenseRoot = "VEHICLE" | "GENERAL" | "INCOME";   // INCOME: diger kazanc kategorileri
 
-export interface AccountSummary { id: string; type: AccountType; name: string }
+export interface AccountSummary { id: string; type: AccountType; name: string; userId?: string | null }
 export interface AccountResponse extends AccountSummary { balanceCents: number }
 
 // Kasa / banka hesabindaki paranin kisilere dagilimi (dukkan sahibi kalan). parts toplami = balanceCents.
@@ -434,6 +435,10 @@ export interface Holder {
 }
 export interface CapitalTransferRequest { fromUserId: string; toUserId: string; date: string; amountCents: number; description: string | null }
 export type CapitalDirection = "IN" | "OUT";
+// Kisiler arasi borc (V33). accountId: paranin durdugu kasa / banka (borcta verenin, odemede borclunun o hesaptaki parasi)
+export interface LoanRequest { lenderUserId: string; borrowerUserId: string; accountId: string; date: string; amountCents: number; description: string | null }
+// borrower, lender'a outstandingCents borclu
+export interface LoanBalance { lenderUserId: string; lenderName: string; borrowerUserId: string; borrowerName: string; outstandingCents: number }
 export interface CapitalMovementRequest { direction: CapitalDirection; accountId: string; date: string; amountCents: number; description: string | null }
 export interface ProfitAllocationRequest { userId: string; date: string; amountCents: number; periodFrom: string; periodTo: string }
 // holderUserId: kimin parasi tasiniyor (bos = dukkan sahibi); sermayedar gonderirse her zaman kendisi

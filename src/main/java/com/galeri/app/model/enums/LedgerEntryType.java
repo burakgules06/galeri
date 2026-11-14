@@ -12,5 +12,8 @@ public enum LedgerEntryType {
     VEHICLE_PURCHASE, VEHICLE_EXPENSE, GENERAL_EXPENSE, CAPITAL, VEHICLE_SALE, COLLECTION, PAYMENT, CONSIGNMENT_SETTLEMENT,
     PROFIT_ALLOCATION, TRANSFER, OPENING_BALANCE, VEHICLE_PROFIT_SHARE, CAPITAL_TRANSFER, PARTNER_SALE_SETTLEMENT,
     // Diger kazanc (V30): INCOME -> CASH/BANK; araca bagliysa aracin karina, degilse donem karina "diger kazanc" olarak
-    OTHER_INCOME
+    OTHER_INCOME,
+    // Kisiler arasi borc (V33): LOAN CAPITAL(alan) -> CAPITAL(veren); LOAN_REPAYMENT CAPITAL(veren) -> CAPITAL(alan).
+    // loan_account_id paranin durdugu kasa / banka.
+    LOAN, LOAN_REPAYMENT
 }

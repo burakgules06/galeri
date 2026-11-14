@@ -9,20 +9,23 @@ import { Button, Empty, ErrorBox, Field, inputClass, Modal, Segment } from "../.
 import { PartnerCapitalCard } from "../home/PartnerCapitalCard";
 import { NumberInput } from "../../shared/ui/NumberInput";
 import { confirmOwnerCash } from "../../shared/ownerCash";
+import { LoanForm } from "./LoanForm";
 
 const BASES: { value: CapitalBase; label: string }[] = [
   { value: "ALL", label: "Tüm varlık" }, { value: "VEHICLES", label: "Araçlar" }, { value: "CASH", label: "Nakit" },
 ];
 
 export function PartnersPanel({ onChange }: { onChange: () => void }) {
-  const { data, error, reload } = useLoad(() => Promise.all([api.partners(), api.holders()]), []);
+  const { data, error, reload } = useLoad(() => Promise.all([api.partners(), api.holders(), api.loans()]), []);
   const [moving, setMoving] = useState<{ partner: Partner; direction: CapitalDirection } | null>(null);
   const [transferring, setTransferring] = useState(false);
   const [paying, setPaying] = useState<{ partner: Partner; owedCents: number } | null>(null);
+  const [loan, setLoan] = useState<{ mode: "lend" | "repay"; lenderId?: string; borrowerId?: string; maxCents?: number } | null>(null);
   const [revision, setRevision] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const partners = data?.[0] ?? [];
   const holders = data?.[1] ?? [];
+  const loans = data?.[2] ?? [];
   const holderOf = (p: Partner) => holders.find((h) => h.userId === p.userId);
   const changed = () => { reload(); setRevision((r) => r + 1); onChange(); };
 
@@ -45,6 +48,7 @@ export function PartnersPanel({ onChange }: { onChange: () => void }) {
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 md:px-5 pt-4 pb-3 border-b border-cizgi">
           <h2 className="font-cond font-bold text-[21px] tracking-tight">Ortaklar</h2>
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            {partners.length > 1 && <Button variant="secondary" onClick={() => setLoan({ mode: "lend" })}>Borç ver</Button>}
             {partners.length > 1 && <Button variant="secondary" onClick={() => setTransferring(true)}>Para aktar</Button>}
           </div>
         </div>
@@ -60,6 +64,21 @@ export function PartnersPanel({ onChange }: { onChange: () => void }) {
                     {p.owner && <span className="text-[12px] font-semibold text-plaka bg-plaka-acik rounded px-1.5 py-0.5">Dükkân sahibi</span>}
                   </span>
                   {p.phone && <span className="block sayi text-[14px] text-murekkep-3">{formatPhone(p.phone)}</span>}
+                  {loans.filter((l) => l.borrowerUserId === p.userId).map((l) => (
+                    <span key={l.lenderUserId} className="flex items-center gap-2 text-[14px] mt-1">
+                      <span className="text-tehlike">Borcu: <span className="sayi font-semibold">{tl(l.outstandingCents)}</span></span>
+                      <span className="text-murekkep-2">· alacaklı {l.lenderName}</span>
+                      <button type="button" className="text-plaka font-semibold underline-offset-2 hover:underline"
+                        onClick={() => setLoan({ mode: "repay", lenderId: l.lenderUserId, borrowerId: l.borrowerUserId, maxCents: l.outstandingCents })}>
+                        Öde
+                      </button>
+                    </span>
+                  ))}
+                  {loans.filter((l) => l.lenderUserId === p.userId).map((l) => (
+                    <span key={l.borrowerUserId} className="block text-[14px] text-murekkep-2 mt-1">
+                      Alacağı: <span className="sayi font-semibold text-murekkep">{tl(l.outstandingCents)}</span> · borçlu {l.borrowerName}
+                    </span>
+                  ))}
                 </span>
                 <span className="text-right">
                   <span className="block sayi font-bold text-[20px] leading-tight">{tl(h?.capitalCents ?? p.capitalCents)}</span>
@@ -97,6 +116,8 @@ export function PartnersPanel({ onChange }: { onChange: () => void }) {
         onClose={() => setMoving(null)} onSaved={() => { setMoving(null); changed(); }} />}
       {paying && <PayUserForm partner={paying.partner} owedCents={paying.owedCents} onClose={() => setPaying(null)}
         onSaved={() => { setPaying(null); changed(); }} />}
+      {loan && <LoanForm mode={loan.mode} partners={partners} lenderId={loan.lenderId} borrowerId={loan.borrowerId} maxCents={loan.maxCents}
+        onClose={() => setLoan(null)} onSaved={() => { setLoan(null); changed(); }} />}
       {transferring && <TransferForm partners={partners} holders={holders} onClose={() => setTransferring(false)}
         onSaved={() => { setTransferring(false); changed(); }} />}
     </div>

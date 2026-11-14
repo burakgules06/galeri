@@ -64,6 +64,10 @@ public class LedgerEntry {
     @Column(name = "transfer_holder_id", updatable = false)
     private UUID transferHolderId;
 
+    /** Borc ve geri odemede paranin durdugu kasa / banka (V33). */
+    @Column(name = "loan_account_id", updatable = false)
+    private UUID loanAccountId;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by_id", updatable = false)
     private PanelUser createdBy;

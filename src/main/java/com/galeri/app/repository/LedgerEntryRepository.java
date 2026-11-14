@@ -54,6 +54,15 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> 
     @Query("select e.sourceAccount.id, sum(e.amountCents) from LedgerEntry e where e.tenantId = :tenantId group by e.sourceAccount.id")
     List<Object[]> outgoingTotals(@Param("tenantId") UUID tenantId);
 
+    /** Kisiler arasi borc ve geri odeme hareketleri (V33). */
+    @Query("""
+            select e from LedgerEntry e
+            join fetch e.sourceAccount join fetch e.targetAccount
+            where e.tenantId = :tenantId and e.type in (com.galeri.app.model.enums.LedgerEntryType.LOAN,
+                                                        com.galeri.app.model.enums.LedgerEntryType.LOAN_REPAYMENT)
+            """)
+    List<LedgerEntry> loanEntries(@Param("tenantId") UUID tenantId);
+
     /** Bu turdeki hesaplara (ornegin tum CAPITAL hesaplari) giren ya da cikan hareketler; tarih filtresi cagirida. */
     @Query("""
             select e from LedgerEntry e

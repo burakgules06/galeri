@@ -1,5 +1,7 @@
 import { apiFetch, publicFetch } from "./client";
 import type {
+  LoanBalance,
+  LoanRequest,
   HoldingsResponse,
   NetWorthResponse, AccountResponse, BodyPart, CategoryResponse, ContactRequest, ContactResponse, DashboardResponse, ExpenseRequest, ExpenseRoot,
   YearlyTrades, PaymentPlanResponse, OpenItemsRequest, BasketSaleRequest, InstallmentResponse, InstallmentStatus, PlanDirection, ContactStatement,
@@ -82,6 +84,10 @@ export const api = {
   holders: () => apiFetch<Holder[]>("/api/holders"),
   holdings: () => apiFetch<HoldingsResponse>("/api/holdings"),
   capitalTransfer: (request: CapitalTransferRequest) => apiFetch<LedgerEntryResponse>("/api/capital-transfers", json(request)),
+  // Kisiler arasi borc (V33): acik borclar, borc ver, geri ode
+  loans: () => apiFetch<LoanBalance[]>("/api/loans"),
+  lend: (request: LoanRequest) => apiFetch<LedgerEntryResponse>("/api/loans", json(request)),
+  repayLoan: (request: LoanRequest) => apiFetch<LedgerEntryResponse>("/api/loans/repayments", json(request)),
   moveCapital: (userId: string, request: CapitalMovementRequest) =>
     apiFetch<LedgerEntryResponse>(`/api/partners/${userId}/capital`, json(request)),
   periodProfit: (from: string, to: string) => apiFetch<PeriodProfit>(`/api/reports/period-profit?from=${from}&to=${to}`),
