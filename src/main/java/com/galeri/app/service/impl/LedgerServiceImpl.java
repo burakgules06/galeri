@@ -1023,7 +1023,7 @@ public class LedgerServiceImpl implements LedgerService {
     }
 
     private static AccountSummary accountSummary(Account a) {
-        return new AccountSummary(a.getId(), a.getType(), a.getName());
+        return new AccountSummary(a.getId(), a.getType(), a.getName(), a.getUserId());
     }
 
     /** "kaporta" -> "Kaporta", "ışık" -> "Işık" (Turkce buyuk harf). */
