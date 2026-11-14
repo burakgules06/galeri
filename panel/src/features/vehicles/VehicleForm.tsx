@@ -21,8 +21,9 @@ import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../share
 import { ContactPicker } from "../contacts/ContactPicker";
 import { row, rowProblem, toRequest, usePlan, type PlanRow } from "../payments/plan";
 import { useAuth } from "../../auth/useAuth";
-import { ShortfallLoanDialog } from "../ledger/ShortfallLoanDialog";
-import { useShortfallLoan } from "../ledger/useShortfallLoan";
+import { OwnerLoanPicker } from "../ledger/OwnerLoanPicker";
+import { ownerLoanOf, shortfallsOf } from "../ledger/ownerLoan";
+import type { Shortfall } from "../../shared/types";
 import { PlanBuilder, PlanSummary } from "../payments/PlanBuilder";
 import { EndorsedInstruments } from "../payments/EndorsedInstruments";
 import { endorsedRequest, endorsedTotal, type EndorsedRow } from "../payments/endorsedRows";
@@ -90,8 +91,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const [pocket, setPocket] = useState(() => (existing?.pocketCents ?? 0) > 0);
   const [pocketAmount, setPocketAmount] = useState(() => existing && existing.pocketCents > 0 && existing.pocketCents !== existing.actualPurchaseCents
     ? centsToInput(existing.pocketCents) : "");
-  const { isInvestor, canTrade } = useAuth();
-  const loan = useShortfallLoan();   // sermayedar: her zaman ortakli alim, payi kendi sermayesinden, kasa secmez
+  const { isInvestor, canTrade, isAdmin } = useAuth();   // sermayedar: her zaman ortakli alim, payi kendi sermayesinden, kasa secmez
   // Yetkili calisan: sadece galeri adina pesin alim (satici kisi, tamami secilen kasa / bankadan); tutarlari sonra goremez
   const staffMode = canTrade;
   const [ownership, setOwnership] = useState<Ownership>(v?.ownership ?? (isInvestor ? "CO_OWNED" : "DEALER"));
@@ -106,6 +106,11 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const [profitDiffers, setProfitDiffers] = useState(() => (existing?.shares ?? []).some((s) => s.profitShareBp !== s.shareBp));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Ortak / konsinye alista nakdi yetmeyenler (sunucu 1042 ile doner): yonetici her biri icin dukkan sahibinin borcunu secer,
+  // Kaydet arac ve borcu birlikte yazar. Secim: hesap id'si ya da cebinden (bos = alis hesabi).
+  const [shortfalls, setShortfalls] = useState<Shortfall[]>([]);
+  const [loanChoices, setLoanChoices] = useState<Record<string, string>>({});
+  const holdings = useLoad(() => (shortfalls.length > 0 ? api.holdings() : Promise.resolve(null)), [shortfalls.length > 0]);
   const consignment = ownership === "CONSIGNMENT";
   const coOwned = ownership === "CO_OWNED";
 
@@ -163,6 +168,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const pocketRest = pocketActive && !Number.isNaN(pocketCents) ? Math.max(0, price - pocketCents) : 0;
   const cashAccountId = (accounts.data?.find((a) => a.type === "CASH") ?? accounts.data?.[0])?.id ?? "";
   const restAccountId = purchaseAccountId || cashAccountId;
+  const loanAccountId = restAccountId;   // borcun varsayilan hesabi ve cebinden borcta paranin girdigi hesap
   // Konsinyede sahibinin sermayesine eklenecek cepten kisim (sermayeden: 0, cepten: tamami, hibrit: kalan)
   const consignPocketCents = !consignment || price <= 0 ? 0
     : consignFunding === "POCKET" ? price : consignFunding === "MIXED" ? price - consignCapitalCents : 0;
@@ -243,15 +249,24 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
       shopCutType: null,
       shopCutRateBp: null,
       shopCutCents: null,
+      shortfallLoans: shortfalls.length > 0
+        ? shortfalls.map((s) => ({ userId: s.userId, ...ownerLoanOf(loanChoices[s.userId] || loanAccountId, loanAccountId) }))
+        : null,
     };
     setSaving(true);
     setError(null);
     try {
-      // Ortak / konsinye alista bir kisinin nakdi yetmezse yoneticiye "Kimden borc alsin?" sorulur, sonra kayit tekrar denenir
-      onSaved(await loan.run(() => (v ? api.updateVehicle(v.id, request) : api.addVehicle(request)),
-        { accountId: request.purchaseAccountId, date: purchaseDate }));
+      onSaved(v ? await api.updateVehicle(v.id, request) : await api.addVehicle(request));
     } catch (err) {
-      setError(errorMessage(err));
+      const missing = isAdmin ? shortfallsOf(err) : [];
+      if (missing.length > 0) {
+        // Onceki secimler kalir; yeni eksikler eklenir (sunucu parasi yetene borc yazmaz)
+        setShortfalls((prev) => [...prev.filter((p) => !missing.some((m) => m.userId === p.userId)), ...missing]);
+        // Secim formun basinda: Kaydet alttayken gorunsun
+        requestAnimationFrame(() => document.getElementById("shortfall-loans")?.scrollIntoView({ block: "center", behavior: "smooth" }));
+      } else {
+        setError(errorMessage(err));
+      }
     } finally {
       setSaving(false);
     }
@@ -270,6 +285,15 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
     >
       <form id="vehicle-form" onSubmit={submit} className="grid gap-x-8 gap-y-6 md:grid-cols-2 md:items-start [&>*]:min-w-0">
         <div className="md:col-span-2 empty:hidden"><ErrorBox message={error ?? me.error} /></div>
+        {shortfalls.length > 0 && (
+          <div id="shortfall-loans" className="md:col-span-2 space-y-2">
+            <p className="text-[14px] font-semibold text-tehlike">Araç henüz kaydedilmedi: nakitteki para katkıya yetmiyor. Borcu seçip tekrar Kaydet'e bas.</p>
+            {shortfalls.map((s) => (
+              <OwnerLoanPicker key={s.userId} borrowerName={s.name} shortfallCents={s.shortfallCents} holdings={holdings.data}
+                value={loanChoices[s.userId] || loanAccountId} onChange={(c) => setLoanChoices((prev) => ({ ...prev, [s.userId]: c }))} />
+            ))}
+          </div>
+        )}
 
         <div className="space-y-6 min-w-0">
         <section className="space-y-3">
@@ -462,7 +486,6 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
           </div>
         </details>
       </form>
-      <ShortfallLoanDialog prompt={loan.prompt} />
     </Modal>
   );
 }

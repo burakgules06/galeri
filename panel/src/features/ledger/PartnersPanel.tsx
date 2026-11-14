@@ -10,8 +10,8 @@ import { PartnerCapitalCard } from "../home/PartnerCapitalCard";
 import { NumberInput } from "../../shared/ui/NumberInput";
 import { confirmOwnerCash } from "../../shared/ownerCash";
 import { LoanForm } from "./LoanForm";
-import { ShortfallLoanDialog } from "./ShortfallLoanDialog";
-import { useShortfallLoan } from "./useShortfallLoan";
+import { OwnerLoanPicker } from "./OwnerLoanPicker";
+import { ownerLoanOf } from "./ownerLoan";
 
 const BASES: { value: CapitalBase; label: string }[] = [
   { value: "ALL", label: "Tüm varlık" }, { value: "VEHICLES", label: "Araçlar" }, { value: "CASH", label: "Nakit" },
@@ -126,10 +126,15 @@ export function PartnersPanel({ onChange }: { onChange: () => void }) {
   );
 }
 
-/** Dukkan sahibi sinirsiz ama kasadaki payi biterse uyarilir. Sermayedarin nakdi yetmezse sunucu eksik tutari doner,
- *  "Kimden borc alsin?" sorulur (useShortfallLoan). */
+/** Dukkan sahibi sinirsiz ama kasadaki payi biterse uyarilir. Sermayedarin nakdi yetmezse formda borc secenegi cikar. */
 async function allowed(partner: Partner, cents: number): Promise<boolean> {
   return partner.owner ? confirmOwnerCash(cents) : true;
+}
+
+/** Sermayedarin nakitteki parasini asan kisim (dukkan sahibi icin 0). */
+function missingCents(partner: Partner | undefined, holder: Holder | undefined, cents: number | null): number {
+  if (!partner || partner.owner || cents == null || Number.isNaN(cents)) return 0;
+  return Math.max(0, cents - Math.max(0, holder?.cashCents ?? 0));
 }
 
 function CapitalMovementForm({ partner, holder, direction, onClose, onSaved }: {
@@ -144,7 +149,10 @@ function CapitalMovementForm({ partner, holder, direction, onClose, onSaved }: {
   const accounts = useLoad(() => api.accounts(), []);
   const selected = accountId || accounts.data?.[0]?.id || "";
   const into = direction === "IN";
-  const loan = useShortfallLoan();
+  // Cekiste nakdi yetmezse eksik kadar dukkan sahibi borc verir: hangi hesaptan ya da cebinden (bos = cekilen hesap)
+  const [loanChoice, setLoanChoice] = useState("");
+  const missing = into ? 0 : missingCents(partner, holder, tlToCents(amount));
+  const holdings = useLoad(() => (into || partner.owner ? Promise.resolve(null) : api.holdings()), []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -154,8 +162,8 @@ function CapitalMovementForm({ partner, holder, direction, onClose, onSaved }: {
     setSaving(true);
     setError(null);
     try {
-      const request = { direction, accountId: selected, date, amountCents: cents, description: description.trim() || null };
-      await loan.run(() => api.moveCapital(partner.userId, request), { accountId: selected, date });
+      await api.moveCapital(partner.userId, { direction, accountId: selected, date, amountCents: cents, description: description.trim() || null,
+        ownerLoan: missing > 0 ? ownerLoanOf(loanChoice || selected, selected) : null });
       onSaved();
     } catch (err) {
       setError(errorMessage(err));
@@ -177,7 +185,7 @@ function CapitalMovementForm({ partner, holder, direction, onClose, onSaved }: {
             placeholder="1.000.000" autoFocus />
         </Field>
         {!into && holder && !partner.owner && (
-          <p className="text-[13px] text-murekkep-2 -mt-2">Nakitteki parası {tl(Math.max(0, holder.cashCents))}; fazlası için borç sorulur.</p>
+          <p className="text-[13px] text-murekkep-2 -mt-2">Nakitteki parası {tl(Math.max(0, holder.cashCents))}.</p>
         )}
         <Field label={into ? "Hangi hesaba girdi" : "Hangi hesaptan çıktı"}>
           {accounts.data && (
@@ -185,12 +193,15 @@ function CapitalMovementForm({ partner, holder, direction, onClose, onSaved }: {
               options={accounts.data.map((a) => ({ value: a.id, label: `${a.name} · ${tl(a.balanceCents)}` }))} />
           )}
         </Field>
+        {missing > 0 && (
+          <OwnerLoanPicker borrowerName={partner.name} shortfallCents={missing} holdings={holdings.data}
+            value={loanChoice || selected} onChange={setLoanChoice} />
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Tarih"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
           <Field label="Açıklama"><input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="İsteğe bağlı" /></Field>
         </div>
       </form>
-      <ShortfallLoanDialog prompt={loan.prompt} />
     </Modal>
   );
 }
@@ -206,7 +217,12 @@ function TransferForm({ partners, holders, onClose, onSaved }: {
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const loan = useShortfallLoan();
+  // Gonderenin nakdi yetmezse eksik kadar dukkan sahibi borc verir: hangi hesaptan ya da cebinden (cebinden: kasaya)
+  const [loanChoice, setLoanChoice] = useState("");
+  const holdings = useLoad(() => api.holdings(), []);
+  const sender = partners.find((p) => p.userId === from);
+  const missing = missingCents(sender, holders.find((h) => h.userId === from), tlToCents(amount));
+  const cashAccount = holdings.data?.accounts.find((a) => a.type === "CASH")?.accountId ?? holdings.data?.accounts[0]?.accountId ?? "";
   const label = (p: Partner) => {
     const h = holders.find((x) => x.userId === p.userId);
     return `${p.name} · ${tl(h?.cashCents ?? 0)}`;
@@ -217,13 +233,13 @@ function TransferForm({ partners, holders, onClose, onSaved }: {
     const cents = tlToCents(amount);
     if (cents == null || Number.isNaN(cents) || cents <= 0) return setError("Tutarı 1.000.000 gibi yaz.");
     if (!from || !to || from === to) return setError("Gönderen ve alan farklı kişiler olmalı.");
-    const sender = partners.find((p) => p.userId === from)!;
-    if (!(await allowed(sender, cents))) return;
+    if (!sender || !(await allowed(sender, cents))) return;
+    if (missing > 0 && !cashAccount) return setError("Hesaplar yükleniyor, tekrar dene.");
     setSaving(true);
     setError(null);
     try {
-      const request = { fromUserId: from, toUserId: to, date, amountCents: cents, description: description.trim() || null };
-      await loan.run(() => api.capitalTransfer(request), { date });
+      await api.capitalTransfer({ fromUserId: from, toUserId: to, date, amountCents: cents, description: description.trim() || null,
+        ownerLoan: missing > 0 ? ownerLoanOf(loanChoice || cashAccount, cashAccount) : null });
       onSaved();
     } catch (err) {
       setError(errorMessage(err));
@@ -255,12 +271,15 @@ function TransferForm({ partners, holders, onClose, onSaved }: {
         <Field label="Tutar">
           <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount} placeholder="1.000.000" autoFocus />
         </Field>
+        {missing > 0 && sender && (
+          <OwnerLoanPicker borrowerName={sender.name} shortfallCents={missing} holdings={holdings.data}
+            value={loanChoice || cashAccount} onChange={setLoanChoice} />
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Tarih"><input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
           <Field label="Açıklama"><input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="İsteğe bağlı" /></Field>
         </div>
       </form>
-      <ShortfallLoanDialog prompt={loan.prompt} />
     </Modal>
   );
 }

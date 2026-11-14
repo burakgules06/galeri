@@ -209,6 +209,7 @@ export interface VehicleRequest {
   sellerUserId?: string | null;          // araci panel kullanicisindan aldik (sellerId yerine)
   sellerCapitalCents?: number | null;    // bedelin kasadan cikmayip onun sermayesine eklenen kismi
   pocketCents?: number | null;           // dukkan sahibinin cebinden odedigi kisim: kasadan cikmaz, sermayesine eklenir
+  shortfallLoans?: ShortfallLoan[] | null; // ortak / konsinye: nakdi yetmeyen kisiye dukkan sahibi borc verir (ayni kayitta)
 }
 
 export interface SaleRequest {
@@ -433,13 +434,25 @@ export interface Holder {
   vehicleCents: number; otherCents: number; shareBp: number; vehicles: { vehicle: VehicleRef; cents: number }[];
   balanceCents: number;   // kullanicinin carisi: artisi dukkana borclu, eksisi dukkan ona borclu
 }
-export interface CapitalTransferRequest { fromUserId: string; toUserId: string; date: string; amountCents: number; description: string | null }
+export interface CapitalTransferRequest {
+  fromUserId: string; toUserId: string; date: string; amountCents: number; description: string | null;
+  ownerLoan?: OwnerLoan | null;   // gonderenin nakdi yetmezse eksik kadar dukkan sahibi borc verir (ayni islemde)
+}
 export type CapitalDirection = "IN" | "OUT";
 // Kisiler arasi borc (V33). accountId: paranin durdugu kasa / banka (borcta verenin, odemede borclunun o hesaptaki parasi)
 export interface LoanRequest { lenderUserId: string; borrowerUserId: string; accountId: string; date: string; amountCents: number; description: string | null }
 // borrower, lender'a outstandingCents borclu
 export interface LoanBalance { lenderUserId: string; lenderName: string; borrowerUserId: string; borrowerName: string; outstandingCents: number }
-export interface CapitalMovementRequest { direction: CapitalDirection; accountId: string; date: string; amountCents: number; description: string | null }
+export interface CapitalMovementRequest {
+  direction: CapitalDirection; accountId: string; date: string; amountCents: number; description: string | null;
+  ownerLoan?: OwnerLoan | null;   // cekiste nakdi yetmezse eksik kadar dukkan sahibi borc verir (ayni islemde)
+}
+/** Dukkan sahibinin borcu: accountId'de durur; pocket: cebinden koydu (once o hesaba sermaye girisi). */
+export interface OwnerLoan { accountId: string; pocket: boolean }
+/** Arac alisinda nakdi yetmeyen kisiye dukkan sahibinin borcu (sunucu eksik tutari kendisi hesaplar). */
+export interface ShortfallLoan extends OwnerLoan { userId: string }
+/** Parasi yetmeyen kisi ve eksik tutar (1036 / 1042 hata cevabinin data alani). */
+export interface Shortfall { userId: string; name: string; shortfallCents: number }
 export interface ProfitAllocationRequest { userId: string; date: string; amountCents: number; periodFrom: string; periodTo: string }
 // holderUserId: kimin parasi tasiniyor (bos = dukkan sahibi); sermayedar gonderirse her zaman kendisi
 export interface TransferRequest { fromAccountId: string; toAccountId: string; date: string; amountCents: number; description: string | null; holderUserId?: string | null }

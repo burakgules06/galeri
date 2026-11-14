@@ -6,6 +6,7 @@ import com.galeri.app.model.enums.AccountType;
 import com.galeri.app.model.request.AccountRequest;
 import com.galeri.app.model.request.CapitalRequests;
 import com.galeri.app.model.request.LoanRequest;
+import com.galeri.app.model.request.OwnerLoan;
 import com.galeri.app.model.response.AccountHoldings;
 import com.galeri.app.model.response.CapitalResponses;
 import com.galeri.app.model.response.LoanBalance;
@@ -170,37 +171,60 @@ class LoanIT {
     }
 
     @Test
-    void cekisYetmezse_eksikTutarDoner_borcAlincaCekisGecer() {
-        CapitalRequests.Movement out = new CapitalRequests.Movement(CapitalRequests.Direction.OUT, cash, today, 350_000 * TL, null);
-
-        assertThatThrownBy(() -> capitalService.move(burak, out))
+    void cekisYetmezse_borcSecilmediyseEksikTutarDoner_secildiyseEksikKadarBorclaTekIslemde() {
+        assertThatThrownBy(() -> loanService.move(burak,
+                new CapitalRequests.Movement(CapitalRequests.Direction.OUT, cash, today, 350_000 * TL, null)))
                 .isInstanceOfSatisfying(CapitalExceededException.class, e ->
                         assertThat(e.getData()).isEqualTo(new Shortfall(burak, "Burak", 50_000 * TL)));
+        assertThat(loanService.balances()).isEmpty();
 
-        // Panelin "Kimden borc alsin?" akisi: eksik kadar borc, sonra ayni istek tekrar
-        loanService.lend(new LoanRequest(furkan, burak, cash, today, 50_000 * TL, null));
-        capitalService.move(burak, out);
+        long cashBefore = cashBalance();
+        loanService.move(burak, new CapitalRequests.Movement(CapitalRequests.Direction.OUT, cash, today, 350_000 * TL, null,
+                new OwnerLoan(cash, false)));
 
+        assertThat(cashBalance()).isEqualTo(cashBefore - 350_000 * TL);
         assertThat(capital(burak)).isZero();
         assertThat(part(cash, burak)).isZero();
-        assertThat(outstanding(burak, furkan)).isEqualTo(50_000 * TL);
+        assertThat(outstanding(burak, furkan)).as("sadece eksik kadar").isEqualTo(50_000 * TL);
+        assertThat(capital(furkan)).isEqualTo(1_950_000 * TL);
         check("borcla cekis");
     }
 
     @Test
-    void aktarimYetmezse_eksikTutarDoner_borcAlincaAktarimGecer() {
-        CapitalRequests.CapitalTransfer transfer = new CapitalRequests.CapitalTransfer(yusuf, burak, today, 70_000 * TL, null);
+    void parasiYetenCekiste_borcSecenegiYokSayilir() {
+        loanService.move(burak, new CapitalRequests.Movement(CapitalRequests.Direction.OUT, cash, today, 100_000 * TL, null,
+                new OwnerLoan(cash, false)));
 
-        assertThatThrownBy(() -> capitalService.transferCapital(transfer))
-                .isInstanceOfSatisfying(CapitalExceededException.class, e ->
-                        assertThat(e.getData()).isEqualTo(new Shortfall(yusuf, "Yusuf", 20_000 * TL)));
+        assertThat(loanService.balances()).isEmpty();
+        assertThat(capital(burak)).isEqualTo(200_000 * TL);
+        check("borcsuz cekis");
+    }
 
-        loanService.lend(new LoanRequest(furkan, yusuf, cash, today, 20_000 * TL, null));
-        capitalService.transferCapital(transfer);
+    @Test
+    void aktarimda_cepten_borc_kasayaDukkanSahibininParasiGirer_sermayesiDegismez() {
+        long cashBefore = cashBalance();
 
+        loanService.transferCapital(new CapitalRequests.CapitalTransfer(yusuf, burak, today, 70_000 * TL, null, new OwnerLoan(cash, true)));
+
+        assertThat(cashBalance()).as("dukkan sahibi cebinden 20.000 koydu").isEqualTo(cashBefore + 20_000 * TL);
+        assertThat(capital(furkan)).as("koydugu kadar borc verdi").isEqualTo(2_000_000 * TL);
         assertThat(capital(yusuf)).isZero();
         assertThat(capital(burak)).isEqualTo(370_000 * TL);
-        check("borcla aktarim");
+        assertThat(outstanding(yusuf, furkan)).isEqualTo(20_000 * TL);
+        check("cepten borcla aktarim");
+    }
+
+    @Test
+    void islemHataVerirseBorcDaGeriAlinir() {
+        UUID staff = TestUsers.add(jdbc, tenant, "Calisan", "STAFF");
+
+        assertThatThrownBy(() -> loanService.transferCapital(
+                new CapitalRequests.CapitalTransfer(yusuf, staff, today, 70_000 * TL, null, new OwnerLoan(cash, false))))
+                .as("calisana sermaye aktarilamaz");
+
+        assertThat(loanService.balances()).as("borc yazilmadi").isEmpty();
+        assertThat(capital(yusuf)).isEqualTo(50_000 * TL);
+        check("geri alindi");
     }
 
     // ------------------------------------------------------------------ yardimcilar

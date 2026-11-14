@@ -69,12 +69,12 @@ public class CapitalController {
 
     @PostMapping("/capital-transfers")
     public GenericResponse<LedgerEntryResponse> transferCapital(@Valid @RequestBody CapitalRequests.CapitalTransfer request) {
-        return responseService.success(capitalService.transferCapital(request));
+        return responseService.success(loanService.transferCapital(request));   // nakdi yetmezse istege bagli borcla
     }
 
     @PostMapping("/partners/{userId}/capital")
     public GenericResponse<LedgerEntryResponse> move(@PathVariable UUID userId, @Valid @RequestBody CapitalRequests.Movement request) {
-        return responseService.success(capitalService.move(userId, request));
+        return responseService.success(loanService.move(userId, request));   // cekiste nakdi yetmezse istege bagli borcla
     }
 
     @GetMapping("/reports/period-profit")

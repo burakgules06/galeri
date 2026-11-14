@@ -150,7 +150,25 @@ class ConsignmentCostIT {
         assertThatThrownBy(() -> vehicleService.create(consignment(1_200_000 * TL, null, CommissionType.RATE, 300, null)))
                 .isInstanceOfSatisfying(InsufficientCapitalException.class, e ->
                         assertThat(e.getData()).as("eksik tutar: 1.200.000 - 1.000.000")
-                                .isEqualTo(new com.galeri.app.model.response.Shortfall(zeki, "Zeki", 200_000 * TL)));
+                                .isEqualTo(List.of(new com.galeri.app.model.response.Shortfall(zeki, "Zeki", 200_000 * TL))));
+    }
+
+    @Test
+    void sermayedenAlis_nakdiYetmezseDukkanSahibiBorcVerir_aracVeBorcAyniKayitta() {
+        VehicleRequest r = consignment(1_200_000 * TL, null, CommissionType.RATE, 300, null);
+        VehicleRequest withLoan = new VehicleRequest(r.plate(), r.make(), r.model(), r.modelYear(), r.fuel(), r.transmission(),
+                r.mileageKm(), r.color(), r.tramerCents(), r.notes(), r.purchaseDate(), r.sellerId(), r.boughtById(),
+                r.actualPurchaseCents(), r.officialPurchaseCents(), r.purchaseAccountId(), r.purchasePlan(), r.ownership(),
+                r.consignorId(), r.commissionType(), r.commissionRateBp(), r.commissionCents(), r.shares(), r.addToCatalog(),
+                r.catalogModel(), r.shopCutType(), r.shopCutRateBp(), r.shopCutCents(), r.sellerUserId(), r.sellerCapitalCents(),
+                r.pocketCents(), List.of(new com.galeri.app.model.request.ShortfallLoan(zeki, cash, false)));
+
+        vehicleService.create(withLoan);
+
+        assertThat(cashBalance()).as("alis kasadan, borc kasayi degistirmez").isEqualTo(4_800_000 * TL);
+        expectZeki("borcla alis: 200.000 borc, nakdi 0", 1_200_000 * TL, 0, 1_200_000 * TL);
+        expectFurkan("borc verdi", 4_800_000 * TL);
+        check("borcla alis");
     }
 
     @Test

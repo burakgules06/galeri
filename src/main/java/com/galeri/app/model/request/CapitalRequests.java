@@ -1,6 +1,7 @@
 package com.galeri.app.model.request;
 
 import com.galeri.app.model.enums.CapitalBase;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
@@ -26,8 +27,14 @@ public final class CapitalRequests {
             @NotNull UUID toUserId,
             @NotNull LocalDate date,
             @NotNull @Positive Long amountCents,
-            @Size(max = 500) String description
-    ) {}
+            @Size(max = 500) String description,
+            // Gonderen sermayedarin nakdi yetmezse eksik kadar dukkan sahibi borc verir (bos: borc yok, yetmezse 1036)
+            @Valid OwnerLoan ownerLoan
+    ) {
+        public CapitalTransfer(UUID fromUserId, UUID toUserId, LocalDate date, Long amountCents, String description) {
+            this(fromUserId, toUserId, date, amountCents, description, null);
+        }
+    }
 
     /** IN: sermaye girisi CAPITAL(ortak) -> kasa/banka; OUT: sermaye cekisi kasa/banka -> CAPITAL(ortak). */
     public record Movement(
@@ -35,8 +42,14 @@ public final class CapitalRequests {
             @NotNull UUID accountId,
             @NotNull LocalDate date,
             @NotNull @Positive Long amountCents,
-            @Size(max = 500) String description
-    ) {}
+            @Size(max = 500) String description,
+            // Cekiste sermayedarin nakdi yetmezse eksik kadar dukkan sahibi borc verir (bos: borc yok, yetmezse 1036)
+            @Valid OwnerLoan ownerLoan
+    ) {
+        public Movement(Direction direction, UUID accountId, LocalDate date, Long amountCents, String description) {
+            this(direction, accountId, date, amountCents, description, null);
+        }
+    }
 
     /** Kar payini sermayeye ekle: elle girilir (sistem kar dagitmaz). Donem aciklamaya yazilir. */
     public record Allocation(

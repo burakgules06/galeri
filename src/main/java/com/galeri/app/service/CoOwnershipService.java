@@ -28,6 +28,15 @@ public interface CoOwnershipService {
      */
     void syncContributions(Vehicle vehicle);
 
+    /** check=false: katkilar yazilir ama nakit kontrolu yapilmaz (arac kaydi eksikleri borcla kapatip shortfalls ile kendisi kontrol eder). */
+    void syncContributions(Vehicle vehicle, boolean check);
+
+    /**
+     * Araca katki yapan kisilerden nakitteki sermayesi eksiye dusenler ve eksik tutar: ortak aracin ortaklari, consignor true ise
+     * stoktaki konsinye aracin sahibi de. Bos liste: herkesin parasi yetiyor.
+     */
+    List<com.galeri.app.model.response.Shortfall> shortfalls(Vehicle vehicle, boolean consignor);
+
     /**
      * Maliyeti girilmis stoktaki konsinye arac (Kasim 2026): sahibinin nakitteki sermayesi (sermaye - araclarda bagli) eksiye
      * dusuyorsa 1042. Konsinye degilse ya da maliyet yoksa bir sey yapmaz.
