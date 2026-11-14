@@ -524,7 +524,7 @@ class VehicleServiceImplTest {
         order.verify(coOwnershipService).syncOwners(saved.getValue(), owners);
         order.verify(paymentPlanService).syncPurchase(saved.getValue(), cashId, null);
         order.verify(coOwnershipService).syncContributions(saved.getValue(), false);   // cepten katki alis hareketinden sonra
-        order.verify(coOwnershipService).shortfalls(saved.getValue(), false);         // nakit kontrolu en sonda
+        order.verify(coOwnershipService).shortfalls(saved.getValue(), true);          // nakit kontrolu en sonda (maliyet girili)
     }
 
     @Test
