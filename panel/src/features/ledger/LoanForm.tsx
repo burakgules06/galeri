@@ -1,6 +1,6 @@
 // Kisiler arasi borc (V33): borc ver ya da geri ode. Para kasada / bankada kalir; secilen hesapta kimin parasi oldugu degisir.
 // Borc vermede verenin, geri odemede borclunun o hesaptaki parasi gosterilir (dukkan sahibi icin hesabin kalani, sinir yok).
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { api } from "../../api/galeri";
 import { centsToInput, tl, tlToCents, todayIso } from "../../shared/format";
 import type { Partner } from "../../shared/types";
@@ -8,12 +8,14 @@ import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../shared/ui/Common";
 import { NumberInput } from "../../shared/ui/NumberInput";
 
-export function LoanForm({ mode, partners, lenderId, borrowerId, maxCents, onClose, onSaved }: {
+export function LoanForm({ mode, partners, lenderId, borrowerId, maxCents, shortfall, onClose, onSaved }: {
   mode: "lend" | "repay";
   partners: Partner[];
   lenderId?: string;
   borrowerId?: string;
   maxCents?: number;          // geri odemede kalan borc
+  // Parasi yetmeyen bir islemden acildiysa: borc alan sabit, tutar eksik kadar, hesap / tarih islemden
+  shortfall?: { cents: number; accountId?: string; date?: string; intro: ReactNode };
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -21,9 +23,9 @@ export function LoanForm({ mode, partners, lenderId, borrowerId, maxCents, onClo
   const owner = partners.find((p) => p.owner);
   const [lender, setLender] = useState(lenderId ?? owner?.userId ?? partners[0]?.userId ?? "");
   const [borrower, setBorrower] = useState(borrowerId ?? partners.find((p) => p.userId !== (lenderId ?? owner?.userId))?.userId ?? "");
-  const [amount, setAmount] = useState(repay && maxCents ? centsToInput(maxCents) : "");
-  const [accountId, setAccountId] = useState("");
-  const [date, setDate] = useState(todayIso());
+  const [amount, setAmount] = useState(shortfall ? centsToInput(shortfall.cents) : repay && maxCents ? centsToInput(maxCents) : "");
+  const [accountId, setAccountId] = useState(shortfall?.accountId ?? "");
+  const [date, setDate] = useState(shortfall?.date ?? todayIso());
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -69,14 +71,25 @@ export function LoanForm({ mode, partners, lenderId, borrowerId, maxCents, onClo
 
   const nameOf = (id: string) => partners.find((p) => p.userId === id)?.name ?? "";
   return (
-    <Modal title={repay ? `${nameOf(borrower)} · borç ödemesi` : "Borç ver"} open onClose={onClose}
+    <Modal title={repay ? `${nameOf(borrower)} · borç ödemesi` : shortfall ? "Kimden borç alsın?" : "Borç ver"} open onClose={onClose}
       footer={<>
         <Button variant="secondary" type="button" onClick={onClose}>Vazgeç</Button>
-        <Button type="submit" form="loan-form" disabled={saving}>{saving ? "Kaydediliyor…" : repay ? "Öde" : "Borç ver"}</Button>
+        <Button type="submit" form="loan-form" disabled={saving}>
+          {saving ? "Kaydediliyor…" : repay ? "Öde" : shortfall ? "Borç ver ve devam et" : "Borç ver"}
+        </Button>
       </>}>
       <form id="loan-form" onSubmit={submit} className="space-y-4">
         <ErrorBox message={error} />
-        {repay ? (
+        {shortfall && <div className="text-[14px] text-murekkep-2">{shortfall.intro}</div>}
+        {shortfall ? (
+          <Field label={`Borç veren (borç alan: ${nameOf(borrower)})`}>
+            <select className={inputClass} value={lender} onChange={(e) => setLender(e.target.value)}>
+              {partners.filter((p) => p.userId !== borrower).map((p) => (
+                <option key={p.userId} value={p.userId}>{p.name}{p.owner ? " (dükkân sahibi)" : ""}</option>
+              ))}
+            </select>
+          </Field>
+        ) : repay ? (
           <p className="text-[14px] text-murekkep-2">
             Alacaklı: <span className="font-semibold text-murekkep">{nameOf(lender)}</span> · kalan borç{" "}
             <span className="sayi font-semibold text-murekkep">{tl(maxCents ?? 0)}</span>.

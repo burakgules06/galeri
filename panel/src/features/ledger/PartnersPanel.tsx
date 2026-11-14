@@ -10,6 +10,8 @@ import { PartnerCapitalCard } from "../home/PartnerCapitalCard";
 import { NumberInput } from "../../shared/ui/NumberInput";
 import { confirmOwnerCash } from "../../shared/ownerCash";
 import { LoanForm } from "./LoanForm";
+import { ShortfallLoanDialog } from "./ShortfallLoanDialog";
+import { useShortfallLoan } from "./useShortfallLoan";
 
 const BASES: { value: CapitalBase; label: string }[] = [
   { value: "ALL", label: "Tüm varlık" }, { value: "VEHICLES", label: "Araçlar" }, { value: "CASH", label: "Nakit" },
@@ -99,7 +101,7 @@ export function PartnersPanel({ onChange }: { onChange: () => void }) {
                     </Button>
                   )}
                   <Button variant="secondary" className="h-9 px-3 text-[14px]" onClick={() => setMoving({ partner: p, direction: "IN" })}>Sermaye girişi</Button>
-                  <Button variant="secondary" className="h-9 px-3 text-[14px]" disabled={!p.owner && (h?.cashCents ?? 0) <= 0}
+                  <Button variant="secondary" className="h-9 px-3 text-[14px]"
                     onClick={() => setMoving({ partner: p, direction: "OUT" })}>Çekiş</Button>
                   {!p.owner && <Button variant="quiet" className="h-9 px-3 text-[14px] text-tehlike" onClick={() => {
                     const back = h && h.cashCents > 0 ? ` ${tl(h.cashCents)} girdiği hesaplara geri ödenir.` : "";
@@ -124,11 +126,10 @@ export function PartnersPanel({ onChange }: { onChange: () => void }) {
   );
 }
 
-/** Sermayedar en fazla nakitteki parasini cekip aktarabilir; dukkan sahibi sinirsiz ama kasadaki payi biterse uyarilir. */
-async function allowed(partner: Partner, holder: Holder | undefined, cents: number): Promise<string | null | false> {
-  if (partner.owner) return (await confirmOwnerCash(cents)) ? null : false;
-  const max = holder?.cashCents ?? 0;
-  return cents > max ? `${partner.name} en fazla ${tl(Math.max(0, max))} verebilir (nakitteki parası).` : null;
+/** Dukkan sahibi sinirsiz ama kasadaki payi biterse uyarilir. Sermayedarin nakdi yetmezse sunucu eksik tutari doner,
+ *  "Kimden borc alsin?" sorulur (useShortfallLoan). */
+async function allowed(partner: Partner, cents: number): Promise<boolean> {
+  return partner.owner ? confirmOwnerCash(cents) : true;
 }
 
 function CapitalMovementForm({ partner, holder, direction, onClose, onSaved }: {
@@ -143,20 +144,18 @@ function CapitalMovementForm({ partner, holder, direction, onClose, onSaved }: {
   const accounts = useLoad(() => api.accounts(), []);
   const selected = accountId || accounts.data?.[0]?.id || "";
   const into = direction === "IN";
+  const loan = useShortfallLoan();
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const cents = tlToCents(amount);
     if (cents == null || Number.isNaN(cents) || cents <= 0) return setError("Tutarı 1.000.000 gibi yaz.");
-    if (!into) {
-      const check = await allowed(partner, holder, cents);
-      if (check === false) return;
-      if (check) return setError(check);
-    }
+    if (!into && !(await allowed(partner, cents))) return;
     setSaving(true);
     setError(null);
     try {
-      await api.moveCapital(partner.userId, { direction, accountId: selected, date, amountCents: cents, description: description.trim() || null });
+      const request = { direction, accountId: selected, date, amountCents: cents, description: description.trim() || null };
+      await loan.run(() => api.moveCapital(partner.userId, request), { accountId: selected, date });
       onSaved();
     } catch (err) {
       setError(errorMessage(err));
@@ -177,6 +176,9 @@ function CapitalMovementForm({ partner, holder, direction, onClose, onSaved }: {
           <NumberInput className={`${inputClass} font-cond text-[18px]`} value={amount} onValueChange={setAmount}
             placeholder="1.000.000" autoFocus />
         </Field>
+        {!into && holder && !partner.owner && (
+          <p className="text-[13px] text-murekkep-2 -mt-2">Nakitteki parası {tl(Math.max(0, holder.cashCents))}; fazlası için borç sorulur.</p>
+        )}
         <Field label={into ? "Hangi hesaba girdi" : "Hangi hesaptan çıktı"}>
           {accounts.data && (
             <Segment<string> value={selected} onChange={setAccountId}
@@ -188,6 +190,7 @@ function CapitalMovementForm({ partner, holder, direction, onClose, onSaved }: {
           <Field label="Açıklama"><input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="İsteğe bağlı" /></Field>
         </div>
       </form>
+      <ShortfallLoanDialog prompt={loan.prompt} />
     </Modal>
   );
 }
@@ -203,6 +206,7 @@ function TransferForm({ partners, holders, onClose, onSaved }: {
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const loan = useShortfallLoan();
   const label = (p: Partner) => {
     const h = holders.find((x) => x.userId === p.userId);
     return `${p.name} · ${tl(h?.cashCents ?? 0)}`;
@@ -214,13 +218,12 @@ function TransferForm({ partners, holders, onClose, onSaved }: {
     if (cents == null || Number.isNaN(cents) || cents <= 0) return setError("Tutarı 1.000.000 gibi yaz.");
     if (!from || !to || from === to) return setError("Gönderen ve alan farklı kişiler olmalı.");
     const sender = partners.find((p) => p.userId === from)!;
-    const check = await allowed(sender, holders.find((h) => h.userId === from), cents);
-    if (check === false) return;
-    if (check) return setError(check);
+    if (!(await allowed(sender, cents))) return;
     setSaving(true);
     setError(null);
     try {
-      await api.capitalTransfer({ fromUserId: from, toUserId: to, date, amountCents: cents, description: description.trim() || null });
+      const request = { fromUserId: from, toUserId: to, date, amountCents: cents, description: description.trim() || null };
+      await loan.run(() => api.capitalTransfer(request), { date });
       onSaved();
     } catch (err) {
       setError(errorMessage(err));
@@ -257,6 +260,7 @@ function TransferForm({ partners, holders, onClose, onSaved }: {
           <Field label="Açıklama"><input className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="İsteğe bağlı" /></Field>
         </div>
       </form>
+      <ShortfallLoanDialog prompt={loan.prompt} />
     </Modal>
   );
 }

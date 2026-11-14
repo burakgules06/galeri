@@ -148,7 +148,9 @@ class ConsignmentCostIT {
     @Test
     void sermayedenAlis_nakdiYetmezseReddedilir() {
         assertThatThrownBy(() -> vehicleService.create(consignment(1_200_000 * TL, null, CommissionType.RATE, 300, null)))
-                .isInstanceOf(InsufficientCapitalException.class);
+                .isInstanceOfSatisfying(InsufficientCapitalException.class, e ->
+                        assertThat(e.getData()).as("eksik tutar: 1.200.000 - 1.000.000")
+                                .isEqualTo(new com.galeri.app.model.response.Shortfall(zeki, "Zeki", 200_000 * TL)));
     }
 
     @Test

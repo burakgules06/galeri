@@ -63,7 +63,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     throw new ApiError(401, "Oturum süresi doldu");
   }
   if (!res.ok || !body || !body.success) {
-    throw new ApiError(res.status, body?.message ?? "Beklenmeyen bir hata oluştu", body?.code ?? null);
+    throw new ApiError(res.status, body?.message ?? "Beklenmeyen bir hata oluştu", body?.code ?? null, body?.data ?? null);
   }
   return body.data;
 }
@@ -85,7 +85,7 @@ export async function publicFetch<T>(path: string): Promise<T> {
   }
   const body = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
   if (!res.ok || !body || !body.success) {
-    throw new ApiError(res.status, body?.message ?? "Beklenmeyen bir hata oluştu", body?.code ?? null);
+    throw new ApiError(res.status, body?.message ?? "Beklenmeyen bir hata oluştu", body?.code ?? null, body?.data ?? null);
   }
   return body.data;
 }

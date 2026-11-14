@@ -301,7 +301,8 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         if (vehicle.getOwnership() != Ownership.CONSIGNMENT || vehicle.getConsignor() == null
                 || vehicle.getActualPurchaseCents() == null || vehicle.getStatus() != VehicleStatus.IN_STOCK) return;
         entryRepository.flush();
-        if (cashCapital(vehicle.getConsignor()) < 0) throw new InsufficientCapitalException(vehicle.getConsignor().getFullName());
+        long cash = cashCapital(vehicle.getConsignor());
+        if (cash < 0) throw new InsufficientCapitalException(vehicle.getConsignor(), -cash);
     }
 
     @Override
@@ -323,7 +324,7 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
             if (o.isPool()) continue;
             Account account = capitalAccount(o.getUser());
             long cash = capital.getOrDefault(account.getId(), 0L) - bound.getOrDefault(o.getUser().getId(), 0L);
-            if (cash < 0) throw new InsufficientCapitalException(o.getUser().getFullName());
+            if (cash < 0) throw new InsufficientCapitalException(o.getUser(), -cash);
         }
     }
 

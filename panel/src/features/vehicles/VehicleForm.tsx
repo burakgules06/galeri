@@ -21,6 +21,8 @@ import { Button, ErrorBox, Field, inputClass, Modal, Segment } from "../../share
 import { ContactPicker } from "../contacts/ContactPicker";
 import { row, rowProblem, toRequest, usePlan, type PlanRow } from "../payments/plan";
 import { useAuth } from "../../auth/useAuth";
+import { ShortfallLoanDialog } from "../ledger/ShortfallLoanDialog";
+import { useShortfallLoan } from "../ledger/useShortfallLoan";
 import { PlanBuilder, PlanSummary } from "../payments/PlanBuilder";
 import { EndorsedInstruments } from "../payments/EndorsedInstruments";
 import { endorsedRequest, endorsedTotal, type EndorsedRow } from "../payments/endorsedRows";
@@ -88,7 +90,8 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const [pocket, setPocket] = useState(() => (existing?.pocketCents ?? 0) > 0);
   const [pocketAmount, setPocketAmount] = useState(() => existing && existing.pocketCents > 0 && existing.pocketCents !== existing.actualPurchaseCents
     ? centsToInput(existing.pocketCents) : "");
-  const { isInvestor, canTrade } = useAuth();   // sermayedar: her zaman ortakli alim, payi kendi sermayesinden, kasa secmez
+  const { isInvestor, canTrade } = useAuth();
+  const loan = useShortfallLoan();   // sermayedar: her zaman ortakli alim, payi kendi sermayesinden, kasa secmez
   // Yetkili calisan: sadece galeri adina pesin alim (satici kisi, tamami secilen kasa / bankadan); tutarlari sonra goremez
   const staffMode = canTrade;
   const [ownership, setOwnership] = useState<Ownership>(v?.ownership ?? (isInvestor ? "CO_OWNED" : "DEALER"));
@@ -244,7 +247,9 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
     setSaving(true);
     setError(null);
     try {
-      onSaved(v ? await api.updateVehicle(v.id, request) : await api.addVehicle(request));
+      // Ortak / konsinye alista bir kisinin nakdi yetmezse yoneticiye "Kimden borc alsin?" sorulur, sonra kayit tekrar denenir
+      onSaved(await loan.run(() => (v ? api.updateVehicle(v.id, request) : api.addVehicle(request)),
+        { accountId: request.purchaseAccountId, date: purchaseDate }));
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -457,6 +462,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
           </div>
         </details>
       </form>
+      <ShortfallLoanDialog prompt={loan.prompt} />
     </Modal>
   );
 }

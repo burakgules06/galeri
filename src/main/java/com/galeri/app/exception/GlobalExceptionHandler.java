@@ -33,7 +33,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<GenericResponse<Object>> handleApplicationRuntimeException(ApplicationRuntimeException e) {
         log.warn("Is kurali hatasi [{}]: {}", e.getError_code(), e.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(genericResponseService.createResponseWithError(e.getMessage(), e.getError_code()));
+                .body(genericResponseService.createResponse(false, e.getMessage(), e.getData(), e.getError_code()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
