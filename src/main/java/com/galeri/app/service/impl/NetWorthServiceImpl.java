@@ -227,6 +227,16 @@ public class NetWorthServiceImpl implements NetWorthService {
             if (parts != null) parts.forEach((user, cents) -> { if (investors.containsKey(user)) here.merge(user, cents, Long::sum); });
         }
 
+        // Kisiler arasi borc / geri odeme (V33): kasaya dokunmaz ama para loan_account_id hesabinda el degistirir.
+        // Kaynak (sermayesi artan) kisinin o hesaptaki payi artar, hedefinki azalir; dukkan sahibi kalan oldugu icin yazilmaz.
+        for (LedgerEntry e : entries.loanEntries(tenant)) {
+            Map<UUID, Long> here = e.getLoanAccountId() == null ? null : held.get(e.getLoanAccountId());
+            if (here == null) continue;
+            UUID gains = e.getSourceAccount().getUserId(), loses = e.getTargetAccount().getUserId();
+            if (gains != null && investors.containsKey(gains)) here.merge(gains, e.getAmountCents(), Long::sum);
+            if (loses != null && investors.containsKey(loses)) here.merge(loses, -e.getAmountCents(), Long::sum);
+        }
+
         // Kasa / bankaya dokunmadan sermayesi degisen kisim (sermaye devri, sermayeye eklenen kar payi ...): hicbir hesaba
         // dagitilmaz, "hesabi belli olmayan" olarak ayri doner. Dukkan sahibinin kalaninda da ayni tutar ters isaretle durur.
         List<AccountHoldings.Part> unassigned = new ArrayList<>();

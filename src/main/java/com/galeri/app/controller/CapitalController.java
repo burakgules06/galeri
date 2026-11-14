@@ -27,6 +27,7 @@ public class CapitalController {
     private final CapitalService capitalService;
     private final LedgerService ledgerService;
     private final GenericResponseService responseService;
+    private final com.galeri.app.service.LoanService loanService;
 
     @GetMapping("/partners")
     @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")   // sermayedar: ortak secmek icin isimler; baskasinin parasi donmez
@@ -47,6 +48,23 @@ public class CapitalController {
     @PutMapping("/partners/{userId}/base")
     public GenericResponse<CapitalResponses.Partner> setBase(@PathVariable UUID userId, @Valid @RequestBody CapitalRequests.Base request) {
         return responseService.success(capitalService.setBase(userId, request));
+    }
+
+    // Kisiler arasi borc (V33): sadece dukkan sahibi girer; sermayedar kendi taraf oldugu acik borclari gorur
+    @GetMapping("/loans")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVESTOR')")
+    public GenericResponse<List<com.galeri.app.model.response.LoanBalance>> loans() {
+        return responseService.success(loanService.balances());
+    }
+
+    @PostMapping("/loans")
+    public GenericResponse<LedgerEntryResponse> lend(@Valid @RequestBody com.galeri.app.model.request.LoanRequest request) {
+        return responseService.success(loanService.lend(request));
+    }
+
+    @PostMapping("/loans/repayments")
+    public GenericResponse<LedgerEntryResponse> repay(@Valid @RequestBody com.galeri.app.model.request.LoanRequest request) {
+        return responseService.success(loanService.repay(request));
     }
 
     @PostMapping("/capital-transfers")

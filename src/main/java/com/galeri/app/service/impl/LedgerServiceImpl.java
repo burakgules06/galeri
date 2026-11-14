@@ -873,6 +873,7 @@ public class LedgerServiceImpl implements LedgerService {
         reversal.setDescription("Düzeltme" + (original.getDescription() == null ? "" : ": " + original.getDescription()));
         reversal.setCorrectedEntryId(original.getId());
         reversal.setTransferHolderId(original.getTransferHolderId());   // sermayedarin transferi terslenince payi geri doner
+        reversal.setLoanAccountId(original.getLoanAccountId());         // borc terslenince paylar ayni hesapta geri doner
         return entryRepository.save(reversal);
     }
 
@@ -1022,7 +1023,7 @@ public class LedgerServiceImpl implements LedgerService {
     }
 
     private static AccountSummary accountSummary(Account a) {
-        return new AccountSummary(a.getId(), a.getType(), a.getName());
+        return new AccountSummary(a.getId(), a.getType(), a.getName(), a.getUserId());
     }
 
     /** "kaporta" -> "Kaporta", "ışık" -> "Işık" (Turkce buyuk harf). */
