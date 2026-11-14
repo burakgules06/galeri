@@ -873,6 +873,7 @@ public class LedgerServiceImpl implements LedgerService {
         reversal.setDescription("Düzeltme" + (original.getDescription() == null ? "" : ": " + original.getDescription()));
         reversal.setCorrectedEntryId(original.getId());
         reversal.setTransferHolderId(original.getTransferHolderId());   // sermayedarin transferi terslenince payi geri doner
+        reversal.setLoanAccountId(original.getLoanAccountId());         // borc terslenince paylar ayni hesapta geri doner
         return entryRepository.save(reversal);
     }
 

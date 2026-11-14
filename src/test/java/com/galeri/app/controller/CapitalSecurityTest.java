@@ -33,7 +33,10 @@ class CapitalSecurityTest {
         @Bean com.galeri.app.service.NetWorthService netWorthService() { return Mockito.mock(com.galeri.app.service.NetWorthService.class); }
         @Bean NetWorthController netWorthController(com.galeri.app.service.NetWorthService s, GenericResponseService r) { return new NetWorthController(s, r); }
         @Bean GenericResponseService genericResponseService() { return new GenericResponseService(); }
-        @Bean CapitalController capitalController(CapitalService c, LedgerService l, GenericResponseService r) { return new CapitalController(c, l, r); }
+        @Bean com.galeri.app.service.LoanService loanService() { return Mockito.mock(com.galeri.app.service.LoanService.class); }
+        @Bean CapitalController capitalController(CapitalService c, LedgerService l, GenericResponseService r, com.galeri.app.service.LoanService loans) {
+            return new CapitalController(c, l, r, loans);
+        }
     }
 
     @Autowired private CapitalController capital;
@@ -60,6 +63,13 @@ class CapitalSecurityTest {
         assertThatThrownBy(() -> capital.allocate(new CapitalRequests.Allocation(id, DAY, 1L, DAY, DAY))).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> capital.transfer(new CapitalRequests.Transfer(id, id, DAY, 1L, null))).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> capital.openingBalance(new CapitalRequests.Opening(id, null, null, DAY, 1L))).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> capital.loans()).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> capital.lend(loan(id))).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> capital.repay(loan(id))).isInstanceOf(AccessDeniedException.class);
+    }
+
+    private static com.galeri.app.model.request.LoanRequest loan(UUID id) {
+        return new com.galeri.app.model.request.LoanRequest(id, id, id, DAY, 1L, null);
     }
 
     @Test
@@ -75,6 +85,10 @@ class CapitalSecurityTest {
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> capital.periodProfit(DAY, DAY)).isInstanceOf(AccessDeniedException.class);
         // Hesaplar arasi transfer sermayedara acik (V32): sadece kendi parasini, kendi payi kadar tasir (HolderTransferIT)
+        // Borc: kendi taraf oldugu borclari gorur, borc giremez
+        assertThatCode(() -> capital.loans()).doesNotThrowAnyException();
+        assertThatThrownBy(() -> capital.lend(loan(id))).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> capital.repay(loan(id))).isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
