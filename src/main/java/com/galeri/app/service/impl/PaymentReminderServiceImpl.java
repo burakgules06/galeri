@@ -19,7 +19,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.text.NumberFormat;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -162,10 +161,7 @@ public class PaymentReminderServiceImpl implements PaymentReminderService {
     }
 
     static String tl(long cents) {
-        NumberFormat f = NumberFormat.getNumberInstance(TURKISH);
-        f.setMinimumFractionDigits(cents % 100 == 0 ? 0 : 2);
-        f.setMaximumFractionDigits(2);
-        return f.format(cents / 100.0) + " TL";
+        return com.galeri.app.util.MoneyText.tl(cents);
     }
 
     // ---- Turkce ek: ozel isme kesme isaretiyle, unlu uyumu ve sert unsuzle

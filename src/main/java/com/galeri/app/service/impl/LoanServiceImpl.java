@@ -11,7 +11,9 @@ import com.galeri.app.model.entity.Account;
 import com.galeri.app.model.entity.LedgerEntry;
 import com.galeri.app.model.entity.PanelUser;
 import com.galeri.app.model.enums.LedgerEntryType;
+import com.galeri.app.model.request.CapitalRequests;
 import com.galeri.app.model.request.LoanRequest;
+import com.galeri.app.model.request.OwnerLoan;
 import com.galeri.app.model.response.LedgerEntryResponse;
 import com.galeri.app.model.response.LoanBalance;
 import com.galeri.app.repository.AccountRepository;
@@ -26,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -96,7 +99,45 @@ public class LoanServiceImpl implements LoanService {
         return result;
     }
 
+    @Override
+    @Transactional
+    public void lendFromOwner(UUID borrowerUserId, long amountCents, OwnerLoan loan, LocalDate date, String description) {
+        PanelUser owner = panelUserRepository.findPoolOwner(CurrentUser.tenantId()).orElseThrow(NotAPartnerException::new);
+        if (owner.getId().equals(borrowerUserId)) throw new SameAccountException();
+        moneyAccount(loan.accountId());
+        if (loan.pocket()) {
+            capitalService.move(owner.getId(), new CapitalRequests.Movement(CapitalRequests.Direction.IN, loan.accountId(), date,
+                    amountCents, "Borç için cepten: " + owner.getFullName()));
+        }
+        lend(new LoanRequest(owner.getId(), borrowerUserId, loan.accountId(), date, amountCents, description));
+    }
+
+    @Override
+    @Transactional
+    public LedgerEntryResponse move(UUID userId, CapitalRequests.Movement r) {
+        if (r.ownerLoan() != null && r.direction() == CapitalRequests.Direction.OUT) {
+            coverShortfall(userId, r.amountCents(), r.ownerLoan(), r.date(), "Sermaye çekişi için borç");
+        }
+        return capitalService.move(userId, r);
+    }
+
+    @Override
+    @Transactional
+    public LedgerEntryResponse transferCapital(CapitalRequests.CapitalTransfer r) {
+        if (r.ownerLoan() != null) coverShortfall(r.fromUserId(), r.amountCents(), r.ownerLoan(), r.date(), "Sermaye aktarımı için borç");
+        return capitalService.transferCapital(r);
+    }
+
     // ------------------------------------------------------------------ yardimcilar
+
+    /** Sermayedarin nakdi amount'a yetmiyorsa eksik kadar dukkan sahibi borc verir (dukkan sahibine sinir yok, borc yazilmaz). */
+    private void coverShortfall(UUID userId, long amount, OwnerLoan loan, LocalDate date, String description) {
+        PanelUser user = holder(userId);
+        if (user.isOwner()) return;
+        accountRepository.lockById(capitalService.capitalAccountId(userId));
+        long missing = amount - coOwnershipService.cashCapital(user);
+        if (missing > 0) lendFromOwner(userId, missing, loan, date, description);
+    }
 
     /** borclu -> alacakli -> brut tutar. Her LOAN / LOAN_REPAYMENT hareketinde kaynak hesabin sahibi hedefin sahibine borclanir
      *  (borc: alan -> veren; geri odeme ve terslemeler ters yonde oldugu icin netlenince duser). */

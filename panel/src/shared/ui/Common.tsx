@@ -58,6 +58,8 @@ export function Segment<T extends string>({ value, options, onChange }: {
   );
 }
 
+const openModals: symbol[] = [];
+
 /** Telefonda alttan acilan tam ekran sayfa, genis ekranda ortada pencere. */
 export function Modal({ title, open, onClose, children, footer, wide = false, size }: {
   title: string; open: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean;
@@ -65,9 +67,15 @@ export function Modal({ title, open, onClose, children, footer, wide = false, si
 }) {
   useEffect(() => {
     if (!open) return;
-    const onEsc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    // Ust uste acik pencerelerde Esc sadece en ustekini kapatir (or. arac formunun ustundeki borc sorusu)
+    const id = Symbol();
+    openModals.push(id);
+    const onEsc = (e: KeyboardEvent) => e.key === "Escape" && openModals[openModals.length - 1] === id && onClose();
     window.addEventListener("keydown", onEsc);
-    return () => window.removeEventListener("keydown", onEsc);
+    return () => {
+      window.removeEventListener("keydown", onEsc);
+      openModals.splice(openModals.indexOf(id), 1);
+    };
   }, [open, onClose]);
   if (!open) return null;
   return (

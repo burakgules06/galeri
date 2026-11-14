@@ -1,5 +1,6 @@
 package com.galeri.app.service.impl;
 
+import com.galeri.app.exception.runtime.InsufficientCapitalException;
 import com.galeri.app.exception.runtime.PocketPurchaseNotAllowedException;
 import com.galeri.app.exception.runtime.StaffCashOnlyException;
 import com.galeri.app.exception.runtime.InvalidBasketException;
@@ -66,6 +67,8 @@ import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -86,6 +89,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final CatalogService catalogService;
     private final CoOwnershipService coOwnershipService;
     private final CapitalService capitalService;
+    private final com.galeri.app.service.LoanService loanService;
     private final Clock clock;
 
     // ------------------------------------------------------------------ okuma
@@ -234,8 +238,9 @@ public class VehicleServiceImpl implements VehicleService {
         syncPurchase(saved, request);
         syncSellerCapital(saved, request);
         syncPocket(saved);
-        coOwnershipService.syncContributions(saved);   // ortak aracta cepten katki ve nakit sermaye kontrolu
-        if (saved.getActualPurchaseCents() != null) coOwnershipService.checkConsignorCash(saved);   // konsinye: sermayeden kisim yetmeli
+        coOwnershipService.syncContributions(saved, false);   // ortak aracta cepten katki; nakit kontrolu asagida
+        // Ortaklarin / konsinye sahibinin nakdi katkiya yetmeli; yetmeyene istenmisse dukkan sahibi borc verir
+        coverShortfalls(saved, request, saved.getActualPurchaseCents() != null);
         return toAdmin(saved, toDetail(saved));
     }
 
@@ -264,12 +269,11 @@ public class VehicleServiceImpl implements VehicleService {
         syncPurchase(vehicle, request);
         syncSellerCapital(vehicle, request);
         syncPocket(vehicle);
-        if (vehicle.getActualPurchaseCents() != null
-                && !consignmentBefore.equals(consignmentFunding(vehicle, vehicle.getPurchaseCapitalEntryId()))) {
-            coOwnershipService.checkConsignorCash(vehicle);
-        }
-        // Ortak aracta katkilar; satilmissa kar paylari da yeniden yazilir
-        coOwnershipService.syncContributions(vehicle);
+        boolean consignorChanged = vehicle.getActualPurchaseCents() != null
+                && !consignmentBefore.equals(consignmentFunding(vehicle, vehicle.getPurchaseCapitalEntryId()));
+        // Ortak aracta katkilar; satilmissa kar paylari da yeniden yazilir. Nakit kontrolu (ve istenmisse borc) sonra
+        coOwnershipService.syncContributions(vehicle, false);
+        coverShortfalls(vehicle, request, consignorChanged);
         // Satilmis aracta sahiplik ya da komisyon degistiyse sahibine borc yeniden yazilir
         if (vehicle.getStatus() != VehicleStatus.IN_STOCK) ledgerService.syncConsignmentSettlement(vehicle);
         return toAdmin(vehicle, toDetail(vehicle));
@@ -510,6 +514,30 @@ public class VehicleServiceImpl implements VehicleService {
     private static List<Object> consignmentFunding(Vehicle v, UUID capitalEntryId) {
         return java.util.Arrays.asList(v.getOwnership(), v.getConsignor() == null ? null : v.getConsignor().getId(),
                 v.getActualPurchaseCents(), v.getPurchaseDate(), capitalEntryId);
+    }
+
+    // ------------------------------------------------------------------ borcla alis
+
+    /**
+     * Katki yapanlardan nakdi eksiye dusen varsa: istekte o kisi icin borc secenegi varsa (sadece yonetici) eksik kadar dukkan
+     * sahibi borc verir; kalan eksikler tek hatada (1042, kisiler ve tutarlar) doner. Hata tum kaydi (borclar dahil) geri alir.
+     */
+    private void coverShortfalls(Vehicle vehicle, VehicleRequest r, boolean consignor) {
+        List<com.galeri.app.model.response.Shortfall> shortfalls = coOwnershipService.shortfalls(vehicle, consignor);
+        if (shortfalls.isEmpty()) return;
+        Map<UUID, com.galeri.app.model.request.ShortfallLoan> loans = new HashMap<>();
+        if (CurrentUser.isAdmin() && r.shortfallLoans() != null) r.shortfallLoans().forEach(l -> loans.putIfAbsent(l.userId(), l));
+        List<com.galeri.app.model.response.Shortfall> uncovered = new ArrayList<>();
+        for (var s : shortfalls) {
+            var loan = loans.get(s.userId());
+            if (loan == null) {
+                uncovered.add(s);
+                continue;
+            }
+            loanService.lendFromOwner(s.userId(), s.shortfallCents(), loan.loan(), vehicle.getPurchaseDate(),
+                    "Araç alışı için borç: " + vehicle.getPlate());
+        }
+        if (!uncovered.isEmpty()) throw new InsufficientCapitalException(uncovered);
     }
 
     // ------------------------------------------------------------------ cepten alis (V31)

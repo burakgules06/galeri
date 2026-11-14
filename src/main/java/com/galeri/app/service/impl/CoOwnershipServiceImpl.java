@@ -3,6 +3,7 @@ package com.galeri.app.service.impl;
 import com.galeri.app.exception.runtime.ClosedAccountException;
 import com.galeri.app.exception.runtime.CommissionExceedsSaleException;
 import com.galeri.app.exception.runtime.InsufficientCapitalException;
+import com.galeri.app.model.response.Shortfall;
 import com.galeri.app.exception.runtime.InvalidAccountException;
 import com.galeri.app.exception.runtime.InvalidOwnerReturnException;
 import com.galeri.app.exception.runtime.InvalidSharesException;
@@ -186,6 +187,12 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
     @Override
     @Transactional
     public void syncContributions(Vehicle vehicle) {
+        syncContributions(vehicle, true);
+    }
+
+    @Override
+    @Transactional
+    public void syncContributions(Vehicle vehicle, boolean check) {
         if (vehicle == null) return;   // aracsiz plan (gecmis senet / cek)
         List<VehicleShare> owners = owners(vehicle.getId(), vehicle.getOwnership());
         List<Wanted> wanted = new ArrayList<>();
@@ -216,7 +223,7 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
                 .filter(e -> e.getSourceAccount().getType() == AccountType.CAPITAL).toList();
         apply(vehicle, LedgerEntryType.CAPITAL, existing, wanted);
 
-        if (!owners.isEmpty()) checkCashCapital(vehicle.getTenantId(), owners);
+        if (check && !owners.isEmpty()) checkCashCapital(vehicle.getTenantId(), owners);
         if (vehicle.getStatus() != VehicleStatus.IN_STOCK) resyncProfitShares(vehicle);
     }
 
@@ -301,7 +308,8 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         if (vehicle.getOwnership() != Ownership.CONSIGNMENT || vehicle.getConsignor() == null
                 || vehicle.getActualPurchaseCents() == null || vehicle.getStatus() != VehicleStatus.IN_STOCK) return;
         entryRepository.flush();
-        if (cashCapital(vehicle.getConsignor()) < 0) throw new InsufficientCapitalException(vehicle.getConsignor().getFullName());
+        long cash = cashCapital(vehicle.getConsignor());
+        if (cash < 0) throw new InsufficientCapitalException(List.of(shortfall(vehicle.getConsignor(), -cash)));
     }
 
     @Override
@@ -315,16 +323,41 @@ public class CoOwnershipServiceImpl implements CoOwnershipService {
         return capital - boundCapital(tenantId, today()).getOrDefault(user.getId(), 0L);
     }
 
-    /** Ortaklarin nakitteki sermayesi (sermaye - araclarda bagli) eksiye dusmemeli. */
+    @Override
+    @Transactional
+    public List<Shortfall> shortfalls(Vehicle vehicle, boolean consignor) {
+        entryRepository.flush();
+        List<Shortfall> result = new ArrayList<>(ownerShortfalls(vehicle.getTenantId(), owners(vehicle.getId(), vehicle.getOwnership())));
+        if (consignor && vehicle.getOwnership() == Ownership.CONSIGNMENT && vehicle.getConsignor() != null
+                && vehicle.getActualPurchaseCents() != null && vehicle.getStatus() == VehicleStatus.IN_STOCK) {
+            long cash = cashCapital(vehicle.getConsignor());
+            if (cash < 0) result.add(shortfall(vehicle.getConsignor(), -cash));
+        }
+        return result;
+    }
+
+    /** Ortaklarin nakitteki sermayesi (sermaye - araclarda bagli) eksiye dusmemeli; dusen herkes tek hatada doner. */
     private void checkCashCapital(UUID tenantId, List<VehicleShare> owners) {
+        List<Shortfall> shortfalls = ownerShortfalls(tenantId, owners);
+        if (!shortfalls.isEmpty()) throw new InsufficientCapitalException(shortfalls);
+    }
+
+    private List<Shortfall> ownerShortfalls(UUID tenantId, List<VehicleShare> owners) {
+        List<Shortfall> result = new ArrayList<>();
+        if (owners.isEmpty()) return result;
         Map<UUID, Long> capital = CapitalServiceImpl.capitalByAccount(entryRepository.touchingType(tenantId, AccountType.CAPITAL), null);
         Map<UUID, Long> bound = boundCapital(tenantId, today());
         for (VehicleShare o : owners) {
             if (o.isPool()) continue;
             Account account = capitalAccount(o.getUser());
             long cash = capital.getOrDefault(account.getId(), 0L) - bound.getOrDefault(o.getUser().getId(), 0L);
-            if (cash < 0) throw new InsufficientCapitalException(o.getUser().getFullName());
+            if (cash < 0) result.add(shortfall(o.getUser(), -cash));
         }
+        return result;
+    }
+
+    private static Shortfall shortfall(PanelUser user, long cents) {
+        return new Shortfall(user.getId(), user.getFullName(), cents);
     }
 
     // ------------------------------------------------------------------ satis

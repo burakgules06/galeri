@@ -39,6 +39,10 @@ import com.galeri.app.repository.VehicleRepository;
 import com.galeri.app.service.CoOwnershipService;
 import com.galeri.app.service.LedgerService;
 import com.galeri.app.service.PaymentPlanService;
+import com.galeri.app.model.request.ShortfallLoan;
+import com.galeri.app.model.request.OwnerLoan;
+import com.galeri.app.model.response.Shortfall;
+import com.galeri.app.exception.runtime.InsufficientCapitalException;
 import com.galeri.app.support.TestSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,6 +66,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -79,6 +86,7 @@ class VehicleServiceImplTest {
     @Mock private PaymentPlanService paymentPlanService;
     @Mock private CoOwnershipService coOwnershipService;
     @Mock private com.galeri.app.service.CapitalService capitalService;
+    @Mock private com.galeri.app.service.LoanService loanService;
     @Mock private CatalogEntryRepository catalogEntryRepository;
     private CatalogServiceImpl catalog;
 
@@ -95,7 +103,7 @@ class VehicleServiceImplTest {
     void setUp() {
         catalog = new CatalogServiceImpl(catalogEntryRepository);   // gercek katalog (vehicles.json), eklemeler mock
         service = new VehicleServiceImpl(vehicleRepository, vehiclePartRepository, contactRepository, panelUserRepository,
-                ledgerService, paymentPlanService, catalog, coOwnershipService, capitalService, clock);
+                ledgerService, paymentPlanService, catalog, coOwnershipService, capitalService, loanService, clock);
         buyer = new Contact();
         buyer.setId(UUID.randomUUID());
         buyer.setTenantId(tenantId);
@@ -454,7 +462,44 @@ class VehicleServiceImplTest {
         assertThat(v.getSeller()).isNull();
         assertThat(result.consignor().name()).isEqualTo("Burak Gules");
         verify(paymentPlanService).syncPurchase(v, cashId, null);   // maliyet kasadan araca, planli alis yok
-        verify(coOwnershipService).checkConsignorCash(v);           // sermayeden kisim sahibinin nakdine yetmeli
+        verify(coOwnershipService).shortfalls(v, true);              // sermayeden kisim sahibinin nakdine yetmeli
+    }
+
+    @Test
+    void ortakAlis_nakdiYetmeyeneBorcSecildiyse_dukkanSahibiBorcVerir_secilmeyenlerTekHatadaDoner() {
+        savesWithId();
+        UUID burak = UUID.randomUUID();
+        UUID yusuf = UUID.randomUUID();
+        List<ShareRequest> owners = List.of(new ShareRequest(null, 5000), new ShareRequest(burak, 2500), new ShareRequest(yusuf, 2500));
+        when(coOwnershipService.shortfalls(any(Vehicle.class), anyBoolean()))
+                .thenReturn(List.of(new Shortfall(burak, "Burak", 5000000L), new Shortfall(yusuf, "Yusuf", 100L)));
+        VehicleRequest request = withLoans(ownershipRequest(Ownership.CO_OWNED, null, null, null, null, owners),
+                List.of(new ShortfallLoan(burak, cashId, true)));
+
+        assertThatThrownBy(() -> service.create(request)).isInstanceOfSatisfying(InsufficientCapitalException.class,
+                e -> assertThat(e.getData()).isEqualTo(List.of(new Shortfall(yusuf, "Yusuf", 100L))));
+        verify(loanService).lendFromOwner(eq(burak), eq(5000000L), eq(new OwnerLoan(cashId, true)), eq(LocalDate.of(2026, 6, 1)), any());
+        verify(loanService, never()).lendFromOwner(eq(yusuf), anyLong(), any(), any(), any());
+    }
+
+    @Test
+    void borcSecenegi_parasiYetenIcinYokSayilir() {
+        savesWithId();
+        UUID burak = UUID.randomUUID();
+        List<ShareRequest> owners = List.of(new ShareRequest(null, 5000), new ShareRequest(burak, 5000));
+        VehicleRequest request = withLoans(ownershipRequest(Ownership.CO_OWNED, null, null, null, null, owners),
+                List.of(new ShortfallLoan(burak, cashId, false)));
+
+        service.create(request);   // shortfalls bos: herkesin parasi yetiyor
+        verify(loanService, never()).lendFromOwner(any(), anyLong(), any(), any(), any());
+    }
+
+    private static VehicleRequest withLoans(VehicleRequest r, List<ShortfallLoan> loans) {
+        return new VehicleRequest(r.plate(), r.make(), r.model(), r.modelYear(), r.fuel(), r.transmission(), r.mileageKm(), r.color(),
+                r.tramerCents(), r.notes(), r.purchaseDate(), r.sellerId(), r.boughtById(), r.actualPurchaseCents(),
+                r.officialPurchaseCents(), r.purchaseAccountId(), r.purchasePlan(), r.ownership(), r.consignorId(), r.commissionType(),
+                r.commissionRateBp(), r.commissionCents(), r.shares(), r.addToCatalog(), r.catalogModel(), r.shopCutType(),
+                r.shopCutRateBp(), r.shopCutCents(), r.sellerUserId(), r.sellerCapitalCents(), r.pocketCents(), loans);
     }
 
     @Test
@@ -478,7 +523,8 @@ class VehicleServiceImplTest {
         InOrder order = inOrder(coOwnershipService, paymentPlanService);
         order.verify(coOwnershipService).syncOwners(saved.getValue(), owners);
         order.verify(paymentPlanService).syncPurchase(saved.getValue(), cashId, null);
-        order.verify(coOwnershipService).syncContributions(saved.getValue());   // cepten katki alis hareketinden sonra
+        order.verify(coOwnershipService).syncContributions(saved.getValue(), false);   // cepten katki alis hareketinden sonra
+        order.verify(coOwnershipService).shortfalls(saved.getValue(), true);          // nakit kontrolu en sonda (maliyet girili)
     }
 
     @Test

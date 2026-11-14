@@ -1,13 +1,16 @@
 package com.galeri.app;
 
+import com.galeri.app.exception.runtime.CapitalExceededException;
 import com.galeri.app.exception.runtime.LoanExceededException;
 import com.galeri.app.model.enums.AccountType;
 import com.galeri.app.model.request.AccountRequest;
 import com.galeri.app.model.request.CapitalRequests;
 import com.galeri.app.model.request.LoanRequest;
+import com.galeri.app.model.request.OwnerLoan;
 import com.galeri.app.model.response.AccountHoldings;
 import com.galeri.app.model.response.CapitalResponses;
 import com.galeri.app.model.response.LoanBalance;
+import com.galeri.app.model.response.Shortfall;
 import com.galeri.app.service.CapitalService;
 import com.galeri.app.service.LedgerService;
 import com.galeri.app.service.LoanService;
@@ -165,6 +168,63 @@ class LoanIT {
                 .satisfies(b -> assertThat(b.borrowerUserId()).isEqualTo(yusuf));
         asAdmin();
         assertThat(loanService.balances()).hasSize(2);
+    }
+
+    @Test
+    void cekisYetmezse_borcSecilmediyseEksikTutarDoner_secildiyseEksikKadarBorclaTekIslemde() {
+        assertThatThrownBy(() -> loanService.move(burak,
+                new CapitalRequests.Movement(CapitalRequests.Direction.OUT, cash, today, 350_000 * TL, null)))
+                .isInstanceOfSatisfying(CapitalExceededException.class, e ->
+                        assertThat(e.getData()).isEqualTo(new Shortfall(burak, "Burak", 50_000 * TL)));
+        assertThat(loanService.balances()).isEmpty();
+
+        long cashBefore = cashBalance();
+        loanService.move(burak, new CapitalRequests.Movement(CapitalRequests.Direction.OUT, cash, today, 350_000 * TL, null,
+                new OwnerLoan(cash, false)));
+
+        assertThat(cashBalance()).isEqualTo(cashBefore - 350_000 * TL);
+        assertThat(capital(burak)).isZero();
+        assertThat(part(cash, burak)).isZero();
+        assertThat(outstanding(burak, furkan)).as("sadece eksik kadar").isEqualTo(50_000 * TL);
+        assertThat(capital(furkan)).isEqualTo(1_950_000 * TL);
+        check("borcla cekis");
+    }
+
+    @Test
+    void parasiYetenCekiste_borcSecenegiYokSayilir() {
+        loanService.move(burak, new CapitalRequests.Movement(CapitalRequests.Direction.OUT, cash, today, 100_000 * TL, null,
+                new OwnerLoan(cash, false)));
+
+        assertThat(loanService.balances()).isEmpty();
+        assertThat(capital(burak)).isEqualTo(200_000 * TL);
+        check("borcsuz cekis");
+    }
+
+    @Test
+    void aktarimda_cepten_borc_kasayaDukkanSahibininParasiGirer_sermayesiDegismez() {
+        long cashBefore = cashBalance();
+
+        loanService.transferCapital(new CapitalRequests.CapitalTransfer(yusuf, burak, today, 70_000 * TL, null, new OwnerLoan(cash, true)));
+
+        assertThat(cashBalance()).as("dukkan sahibi cebinden 20.000 koydu").isEqualTo(cashBefore + 20_000 * TL);
+        assertThat(capital(furkan)).as("koydugu kadar borc verdi").isEqualTo(2_000_000 * TL);
+        assertThat(capital(yusuf)).isZero();
+        assertThat(capital(burak)).isEqualTo(370_000 * TL);
+        assertThat(outstanding(yusuf, furkan)).isEqualTo(20_000 * TL);
+        check("cepten borcla aktarim");
+    }
+
+    @Test
+    void islemHataVerirseBorcDaGeriAlinir() {
+        UUID staff = TestUsers.add(jdbc, tenant, "Calisan", "STAFF");
+
+        assertThatThrownBy(() -> loanService.transferCapital(
+                new CapitalRequests.CapitalTransfer(yusuf, staff, today, 70_000 * TL, null, new OwnerLoan(cash, false))))
+                .as("calisana sermaye aktarilamaz");
+
+        assertThat(loanService.balances()).as("borc yazilmadi").isEmpty();
+        assertThat(capital(yusuf)).isEqualTo(50_000 * TL);
+        check("geri alindi");
     }
 
     // ------------------------------------------------------------------ yardimcilar

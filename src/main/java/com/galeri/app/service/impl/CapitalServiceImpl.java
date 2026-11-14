@@ -182,7 +182,7 @@ public class CapitalServiceImpl implements CapitalService {
             long cash = capitalByAccount(entryRepository.touchingType(tenantId, AccountType.CAPITAL), null)
                     .getOrDefault(fromCapital.getId(), 0L)
                     - coOwnershipService.boundCapital(tenantId, today()).getOrDefault(from.getId(), 0L);
-            if (r.amountCents() > cash) throw new CapitalExceededException();
+            if (r.amountCents() > cash) throw new CapitalExceededException(from, r.amountCents() - cash);
         }
         LedgerEntry e = newEntry(LedgerEntryType.CAPITAL_TRANSFER, toCapital, fromCapital, r.amountCents(), r.date());
         String description = blankToNull(r.description());
@@ -206,7 +206,7 @@ public class CapitalServiceImpl implements CapitalService {
             long current = capitalByAccount(entryRepository.touchingType(tenantId, AccountType.CAPITAL), null)
                     .getOrDefault(capital.getId(), 0L)
                     - coOwnershipService.boundCapital(tenantId, today()).getOrDefault(contact.getId(), 0L);
-            if (r.amountCents() > current) throw new CapitalExceededException();
+            if (r.amountCents() > current) throw new CapitalExceededException(contact, r.amountCents() - current);
         }
         LedgerEntry e = in
                 ? newEntry(LedgerEntryType.CAPITAL, capital, money, r.amountCents(), r.date())
