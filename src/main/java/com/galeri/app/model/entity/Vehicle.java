@@ -56,6 +56,14 @@ public class Vehicle extends BaseModel {
     @Column(name = "tramer_cents")
     private Long tramerCents;
 
+    // Ithalat durumu (V37, serbest metin, or. "Distribütör", "Yerli üretim"); bos ise ilan aciklamasinda kart cikmaz
+    @Column(name = "import_status", length = 60)
+    private String importStatus;
+
+    // Muayene bitisi (V37): ayin ilk gunu tutulur, ay/yil gosterilir
+    @Column(name = "inspection_valid_until")
+    private java.time.LocalDate inspectionValidUntil;
+
     @Column(columnDefinition = "text")
     private String notes;
 

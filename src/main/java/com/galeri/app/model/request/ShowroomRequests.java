@@ -19,9 +19,14 @@ public final class ShowroomRequests {
     public record Reorder(@NotNull @Size(max = 20) List<UUID> photoIds) {}
 
     /** Bos: vitrinde WhatsApp / ara butonu cikmaz. Rakam, bosluk ve + kabul edilir; kaydederken sadece rakam tutulur. */
-    public record Settings(@Pattern(regexp = "^[0-9 +()-]{0,20}$") String phone, @Size(max = 300) String address) {
+    public record Settings(@Pattern(regexp = "^[0-9 +()-]{0,20}$") String phone, @Size(max = 300) String address,
+                           @Size(max = 40) String dealerLicenseNo) {
         public Settings(String phone) {
-            this(phone, null);
+            this(phone, null, null);
+        }
+
+        public Settings(String phone, String address) {
+            this(phone, address, null);
         }
     }
 }

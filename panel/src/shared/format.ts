@@ -43,6 +43,13 @@ export function formatDate(iso: string | null | undefined): string {
   return new Date(y, m - 1, d).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
 }
 
+/** "2027-05-01" -> "05/2027" (muayene bitisi gibi ay/yil bilgileri). */
+export function monthYear(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const [y, m] = iso.split("-");
+  return `${m}/${y}`;
+}
+
 export function shortDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("tr-TR", { day: "numeric", month: "short" });

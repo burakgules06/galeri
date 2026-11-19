@@ -169,6 +169,27 @@ class ShowroomIT {
     }
 
     @Test
+    void ilanBilgileri_ithalatMuayeneVeYetkiBelgesi_temizlenipKaydedilir() {
+        TestSession.open(owner, tenant, "ADMIN");
+        UUID cash = ledgerService.moneyAccounts().stream().filter(a -> a.type() == AccountType.CASH).findFirst().orElseThrow().id();
+        capitalService.move(CurrentUser(), new CapitalRequests.Movement(CapitalRequests.Direction.IN, cash, today, 600_000 * TL, null));
+        UUID seller = contactService.create(new ContactRequest("Satıcı İlan", null, ContactType.PERSON, null)).id();
+        UUID v = vehicleService.create(new VehicleRequest("34 IL " + ThreadLocalRandom.current().nextInt(1000, 9999), "Renault", "Clio",
+                (short) 2021, Fuel.GASOLINE, Transmission.MANUAL, 40_000, null, null, null, today, seller, null, 500_000 * TL, 500_000 * TL,
+                cash, null, Ownership.DEALER, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                "  Distribütör   (Türkiye) ", java.time.LocalDate.of(2027, 5, 17))).vehicle().id();
+
+        com.galeri.app.model.response.VehicleDetail detail = vehicleDetail(v);
+        assertThat(detail.importStatus()).as("bosluklar toplanir").isEqualTo("Distribütör (Türkiye)");
+        assertThat(detail.inspectionValidUntil()).as("ayin ilk gunu tutulur").isEqualTo(java.time.LocalDate.of(2027, 5, 1));
+
+        ShowroomResponses.Settings saved = showroomService.updateSettings(new ShowroomRequests.Settings(null, null, "  06-1234   AB "));
+        assertThat(saved.dealerLicenseNo()).isEqualTo("06-1234 AB");
+        assertThat(showroomService.updateSettings(new ShowroomRequests.Settings(null, null, "   ")).dealerLicenseNo())
+                .as("bos gonderilince silinir").isNull();
+    }
+
+    @Test
     void vitrin_sadeceIsaretliStokAraclariniGosterir_satilaninKaldirir() throws Exception {
         TestSession.open(owner, tenant, "ADMIN");
         UUID shown = vehicle("Renault", "Clio");

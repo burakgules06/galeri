@@ -2,7 +2,7 @@
 // gibi duzenli bir aciklama uretir. Iki bicim birlikte kopyalanir: zengin metin (HTML; aciklama editoru bicimi destekliyorsa
 // tablolar ve renkler korunur) ve duz metin (desteklemiyorsa ya da telefondan yapistirilirsa bu kullanilir).
 // Ilan sitesi bizim CSS'imizi gormez: renkler tema degiskenlerinden (index.css @theme) okunup satir ici yazilir.
-import { BODY_PART, formatPhone, FUEL, PART_CONDITION, TRANSMISSION, tl } from "../../shared/format";
+import { BODY_PART, formatPhone, FUEL, monthYear, PART_CONDITION, TRANSMISSION, tl } from "../../shared/format";
 import type { BodyPart, PartCondition, VehicleDetail } from "../../shared/types";
 import { SHAPE } from "./damageShapes";
 import { groupEquipment } from "../../shared/equipment";
@@ -12,6 +12,7 @@ export interface ListingTextInput {
   galleryName: string;
   phone: string | null;
   address: string | null;     // dukkan adresi (vitrin ayarlari); bos ise yazilmaz
+  dealerLicenseNo?: string | null;   // yetki belge no (vitrin ayarlari); bos ise kart cikmaz
   logoUrl: string | null;     // galeri logosu, tam adres (https://...); ilan sitesi resmi kabul ederse en ustte banner olur
   logoSize?: { width: number; height: number } | null;   // logonun gercek boyutu: banner'a orani bozulmadan sigdirmak icin
   description: string;        // vitrindeki ilan aciklamasi (kaydedilmemis hali de olabilir)
@@ -66,6 +67,9 @@ function specs(i: ListingTextInput): [string, string][] {
   ];
   if (v.color) rows.push(["Renk", v.color]);
   if (i.showPlate && v.plate) rows.push(["Plaka", v.plate]);
+  if (v.importStatus) rows.push(["İthalat", v.importStatus]);
+  if (v.inspectionValidUntil) rows.push(["Muayene", monthYear(v.inspectionValidUntil)]);
+  if (i.dealerLicenseNo) rows.push(["Yetki belge no", i.dealerLicenseNo]);
   return rows;
 }
 
@@ -128,17 +132,21 @@ export function listingHtml(i: ListingTextInput): string {
   <tr><td width="${W}" style="${widthStyle(100)}background:${ink};padding:0 20px 18px 20px;font-family:${font};font-size:19px;line-height:24px;font-weight:bold;color:${white};">${esc(v.model)}</td></tr>
 </table>`;
 
-  // Bilgi kartlari: koyu baslik + acik deger, satirda 4 tane (Borusan / kurumsal ilan duzeni)
+  // Bilgi kartlari: koyu baslik + acik deger, satirda 3 tane (9 kart tam 3 satir: yil, km, yakit / vites, renk, plaka /
+  // ithalat, muayene, yetki belge no)
+  const PER_ROW = 3;
+  const cellPx = Math.floor(W / PER_ROW);
+  const cellPct = Math.round(10000 / PER_ROW) / 100;
   const cells = specs(i);
   const rows: string[] = [];
-  for (let r = 0; r < cells.length; r += 4) {
-    const chunk = cells.slice(r, r + 4);
-    while (chunk.length < 4) chunk.push(["", ""]);
+  for (let r = 0; r < cells.length; r += PER_ROW) {
+    const chunk = cells.slice(r, r + PER_ROW);
+    while (chunk.length < PER_ROW) chunk.push(["", ""]);
     const cell = ([label, value]: [string, string], head: boolean) => label === ""
-      ? `<td width="${W / 4}" style="${widthStyle(25)}padding:0 3px;"></td>`
+      ? `<td width="${cellPx}" style="${widthStyle(cellPct)}padding:0 3px;"></td>`
       : head
-        ? `<td width="${W / 4}" align="center" style="${widthStyle(25)}padding:7px 4px;background:${ink};color:${white};font-family:${font};font-size:12px;font-weight:bold;letter-spacing:.5px;border-left:3px solid ${white};border-right:3px solid ${white};">${esc(label.toLocaleUpperCase("tr-TR"))}</td>`
-        : `<td width="${W / 4}" align="center" style="${widthStyle(25)}padding:11px 4px;background:${soft};color:${ink};font-family:${font};font-size:16px;font-weight:bold;border-left:3px solid ${white};border-right:3px solid ${white};border-bottom:6px solid ${white};">${esc(value)}</td>`;
+        ? `<td width="${cellPx}" align="center" style="${widthStyle(cellPct)}padding:7px 4px;background:${ink};color:${white};font-family:${font};font-size:12px;font-weight:bold;letter-spacing:.5px;border-left:3px solid ${white};border-right:3px solid ${white};">${esc(label.toLocaleUpperCase("tr-TR"))}</td>`
+        : `<td width="${cellPx}" align="center" style="${widthStyle(cellPct)}padding:11px 4px;background:${soft};color:${ink};font-family:${font};font-size:16px;font-weight:bold;border-left:3px solid ${white};border-right:3px solid ${white};border-bottom:6px solid ${white};">${esc(value)}</td>`;
     rows.push(`<tr>${chunk.map((c) => cell(c, true)).join("")}</tr><tr>${chunk.map((c) => cell(c, false)).join("")}</tr>`);
   }
   const grid = `<table ${tableAttrs(W)} style="${widthStyle(100)}border-collapse:collapse;margin:0 auto 14px auto;">${rows.join("")}</table>`;
