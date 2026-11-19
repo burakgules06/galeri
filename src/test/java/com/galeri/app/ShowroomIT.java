@@ -113,8 +113,8 @@ class ShowroomIT {
     @Test
     void logoYuklenir_saydamPngKalir_yenisiEskisiniSiler_kaldirilinca_bosalir() throws Exception {
         TestSession.open(owner, tenant, "ADMIN");
-        BufferedImage transparent = new BufferedImage(1200, 400, BufferedImage.TYPE_INT_ARGB);
-        transparent.getGraphics().fillRect(0, 0, 600, 200);
+        BufferedImage transparent = new BufferedImage(2400, 400, BufferedImage.TYPE_INT_ARGB);   // ince uzun logo
+        transparent.getGraphics().fillRect(0, 0, 1200, 200);
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         ImageIO.write(transparent, "png", bytes);
 
@@ -124,7 +124,8 @@ class ShowroomIT {
         Path firstFile = showroomService.logoFile(firstId);
         assertThat(firstFile).isNotNull();
         BufferedImage stored = ImageIO.read(firstFile.toFile());
-        assertThat(stored.getWidth()).as("uzun kenar 600").isEqualTo(600);
+        assertThat(stored.getWidth()).as("uzun kenar 1200").isEqualTo(1200);
+        assertThat(stored.getHeight()).as("oran korunur").isEqualTo(200);
         assertThat(stored.getColorModel().hasAlpha()).as("saydamlik korunur").isTrue();
 
         ShowroomResponses.Settings second = showroomService.uploadLogo(image(300, 100));
