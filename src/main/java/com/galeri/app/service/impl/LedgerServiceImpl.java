@@ -244,16 +244,19 @@ public class LedgerServiceImpl implements LedgerService {
 
     private LedgerEntry writeExpense(ExpenseRequest r) {
         UUID tenantId = CurrentUser.tenantId();
-        boolean pocket = Boolean.TRUE.equals(r.paidByOwner()) && r.vehicleId() == null;
+        Vehicle vehicle = r.vehicleId() != null ? getVehicle(r.vehicleId()) : null;
+        // Cepten (dukkan sahibinin cebinden, elden): kasa / banka degismez, kaynak dukkan sahibinin sermayesi. Genel giderde
+        // kimsenin sermayesi dusmez; galeri / ortak arac masrafinda (Kasim 2026) arac maliyetine eklenir, dukkan sahibinin
+        // sermayesi o kadar artar (cepten alis gibi). Konsinye araca cepten ayri uctan yazilir (sadece takip), burada sayilmaz.
+        boolean pocket = Boolean.TRUE.equals(r.paidByOwner())
+                && (vehicle == null || vehicle.getOwnership() != Ownership.CONSIGNMENT);
         if (!pocket && r.sourceAccountId() == null) throw new InvalidAccountException();
         Account source = pocket ? ownerCapitalAccount(tenantId) : getMoneyAccount(r.sourceAccountId());
 
-        Vehicle vehicle = null;
         Account target;
         ExpenseRoot root;
         LedgerEntryType type;
-        if (r.vehicleId() != null) {
-            vehicle = getVehicle(r.vehicleId());
+        if (vehicle != null) {
             root = ExpenseRoot.VEHICLE;
             type = LedgerEntryType.VEHICLE_EXPENSE;
             // Konsinye arac (Kasim 2026): masraf girildigi anda secilen kasa / bankadan, sahibinin sermayesinden duser
