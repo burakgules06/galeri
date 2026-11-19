@@ -9,13 +9,14 @@ import { apiUrl } from "../../api/client";
 import { damageImage } from "./damageImage";
 import { listingHtml, listingPlainText } from "./listingText";
 
-export function ListingTextModal({ vehicle, galleryName, phone, address, logoUrl, dealerLicenseNo, description, onClose }: {
+export function ListingTextModal({ vehicle, galleryName, phone, address, logoUrl, footerBannerUrl, dealerLicenseNo, description, onClose }: {
   vehicle: VehicleDetail;
   galleryName: string;
   phone: string | null;
   address: string | null;
   logoUrl: string | null;     // vitrin ayarlarindaki logo (API yolu)
   dealerLicenseNo: string | null;
+  footerBannerUrl: string | null;   // alt banner (API yolu)
   description: string;
   onClose: () => void;
 }) {
@@ -28,7 +29,10 @@ export function ListingTextModal({ vehicle, galleryName, phone, address, logoUrl
   // Ilan sitesi resmi bizim sunucudan ceker: tam adres gerekir
   const logoAbsolute = logoUrl ? new URL(apiUrl(logoUrl), window.location.origin).href : null;
   const logoSize = useLogoSize(logoAbsolute);
-  const input = { vehicle, galleryName, phone, address, dealerLicenseNo, logoUrl: logoAbsolute, logoSize, description, showPlate, showPhone };
+  const footerBannerAbsolute = footerBannerUrl ? new URL(apiUrl(footerBannerUrl), window.location.origin).href : null;
+  const footerBannerSize = useLogoSize(footerBannerAbsolute);
+  const input = { vehicle, galleryName, phone, address, dealerLicenseNo, logoUrl: logoAbsolute, logoSize,
+    footerBannerUrl: footerBannerAbsolute, footerBannerSize, description, showPlate, showPhone };
   const html = listingHtml(input);
   const text = listingPlainText(input);
 

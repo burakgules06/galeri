@@ -112,6 +112,32 @@ class ShowroomIT {
     }
 
     @Test
+    void altBanner_logodanAyriYuklenir_yenisiEskisiniSiler_kaldirilinca_bosalir() throws Exception {
+        TestSession.open(owner, tenant, "ADMIN");
+        ShowroomResponses.Settings logo = showroomService.uploadLogo(image(300, 100));
+
+        ShowroomResponses.Settings first = showroomService.uploadFooterBanner(image(1600, 400));
+        assertThat(first.footerBannerUrl()).matches("/api/public/banners/[0-9a-f-]{36}\\.png");
+        assertThat(first.logoUrl()).as("logo yerinde kalir").isEqualTo(logo.logoUrl());
+        UUID firstId = UUID.fromString(first.footerBannerUrl().substring("/api/public/banners/".length(), first.footerBannerUrl().length() - 4));
+        Path firstFile = showroomService.footerBannerFile(firstId);
+        assertThat(firstFile).isNotNull();
+        assertThat(ImageIO.read(firstFile.toFile()).getWidth()).as("uzun kenar 1200").isEqualTo(1200);
+        UUID logoId = UUID.fromString(logo.logoUrl().substring("/api/public/logos/".length(), logo.logoUrl().length() - 4));
+        assertThat(showroomService.footerBannerFile(logoId)).as("logo id'si banner adresinden acilmaz").isNull();
+
+        ShowroomResponses.Settings second = showroomService.uploadFooterBanner(image(1200, 300));
+        assertThat(second.footerBannerUrl()).isNotEqualTo(first.footerBannerUrl());
+        assertThat(Files.exists(firstFile)).as("eski banner dosyasi silinir").isFalse();
+        assertThatThrownBy(() -> showroomService.uploadFooterBanner("resim degil".getBytes())).isInstanceOf(InvalidPhotoException.class);
+
+        ShowroomResponses.Settings cleared = showroomService.deleteFooterBanner();
+        assertThat(cleared.footerBannerUrl()).isNull();
+        assertThat(cleared.logoUrl()).isEqualTo(logo.logoUrl());
+        showroomService.deleteLogo();
+    }
+
+    @Test
     void logoYuklenir_saydamPngKalir_yenisiEskisiniSiler_kaldirilinca_bosalir() throws Exception {
         TestSession.open(owner, tenant, "ADMIN");
         BufferedImage transparent = new BufferedImage(2400, 400, BufferedImage.TYPE_INT_ARGB);   // ince uzun logo

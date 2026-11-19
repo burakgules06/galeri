@@ -496,6 +496,7 @@ export interface ShowroomListing {
 export interface ShowroomSettings {
   slug: string; phone: string | null; address: string | null;
   dealerLicenseNo: string | null;   // yetki belge no; sahibinden aciklamasinda bilgi karti
+  footerBannerUrl: string | null;   // alt banner (herkese acik adres, apiUrl ile); yoksa null
   logoUrl: string | null;   // galeri logosu (herkese acik adres, apiUrl ile); yoksa null
 }
 export interface PublicShowroomCard {

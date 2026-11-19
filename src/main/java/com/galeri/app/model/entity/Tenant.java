@@ -62,4 +62,8 @@ public class Tenant extends BaseModel {
     // Galeri logosu (V35): PNG dosyasinin id'si; bos ise logo yok
     @Column(name = "logo_id")
     private UUID logoId;
+
+    // Alt banner (V38): sahibinden aciklamasinin en altindaki gorsel; dosyasi logo gibi saklanir. Bos ise yok
+    @Column(name = "footer_banner_id")
+    private UUID footerBannerId;
 }

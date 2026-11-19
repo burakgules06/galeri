@@ -77,4 +77,19 @@ public class ShowroomController {
     public GenericResponse<ShowroomResponses.Settings> deleteLogo() {
         return responses.success(showroomService.deleteLogo());
     }
+
+    // Alt banner: sahibinden aciklamasinin en altinda, logo banner'iyla ayni genislikte
+    @PostMapping("/api/settings/showroom/footer-banner")
+    public GenericResponse<ShowroomResponses.Settings> uploadFooterBanner(@RequestParam("file") MultipartFile file) {
+        try {
+            return responses.success(showroomService.uploadFooterBanner(file.getBytes()));
+        } catch (IOException e) {
+            throw new InvalidPhotoException();
+        }
+    }
+
+    @DeleteMapping("/api/settings/showroom/footer-banner")
+    public GenericResponse<ShowroomResponses.Settings> deleteFooterBanner() {
+        return responses.success(showroomService.deleteFooterBanner());
+    }
 }
