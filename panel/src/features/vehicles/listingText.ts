@@ -71,9 +71,16 @@ function specs(i: ListingTextInput): [string, string][] {
 
 // ------------------------------------------------------------------ zengin metin (HTML)
 
+// Genislikler piksel olarak hem width ozelligine hem stile yazilir: sahibinden editoru yuzde genislikleri (width="100%")
+// tasimiyor, tablolar icerik kadar daralip kuculuyordu. Aciklama alani yaklasik 740 px; biraz pay birakildi.
+const W = 720;                       // tum kartlarin genisligi
+const BOX_INNER = W - 2 - 32;        // kutu icindeki alan (1 px kenarlik + 16 px ic bosluk, iki yanda)
+const tableAttrs = (width: number) => `width="${width}" cellpadding="0" cellspacing="0"`;
+const widthStyle = (width: number) => `width:${width}px;`;
+
 // Banner'daki logo: kartin tam genisligine kadar buyutulur (kenardan kenara, orani korunarak). Kare / dik logolar dev
-// olmasin diye yukseklik en fazla BANNER_MAX_H; o zaman ortada durur. Dar ekranda max-width ile oranini koruyarak kuculur.
-const BANNER_W = 760;        // aciklamanin genisligi (max-width)
+// olmasin diye yukseklik en fazla BANNER_MAX_H; o zaman ortada durur.
+const BANNER_W = W;
 const BANNER_MAX_H = 220;
 
 function logoImg(i: ListingTextInput): string {
@@ -81,15 +88,15 @@ function logoImg(i: ListingTextInput): string {
   const alt = esc(i.galleryName);
   const size = i.logoSize;
   if (!size || size.width <= 0 || size.height <= 0) {
-    return `<img src="${src}" alt="${alt}" style="display:block;margin:0 auto;width:100%;max-width:100%;height:auto;max-height:${BANNER_MAX_H}px;object-fit:contain;">`;
+    return `<img src="${src}" alt="${alt}" width="${BANNER_W}" style="display:block;margin:0 auto;max-width:${BANNER_W}px;height:auto;max-height:${BANNER_MAX_H}px;object-fit:contain;">`;
   }
   const aspect = size.width / size.height;
   if (BANNER_W / aspect <= BANNER_MAX_H) {
     // Genis logo: kartin tamami
-    return `<img src="${src}" alt="${alt}" width="${BANNER_W}" height="${Math.round(BANNER_W / aspect)}" style="display:block;width:100%;height:auto;">`;
+    return `<img src="${src}" alt="${alt}" width="${BANNER_W}" height="${Math.round(BANNER_W / aspect)}" style="display:block;width:${BANNER_W}px;height:${Math.round(BANNER_W / aspect)}px;">`;
   }
   const w = Math.round(BANNER_MAX_H * aspect);
-  return `<img src="${src}" alt="${alt}" width="${w}" height="${BANNER_MAX_H}" style="display:block;margin:0 auto;width:${w}px;max-width:100%;height:auto;">`;
+  return `<img src="${src}" alt="${alt}" width="${w}" height="${BANNER_MAX_H}" style="display:block;margin:0 auto;width:${w}px;height:${BANNER_MAX_H}px;">`;
 }
 
 export function listingHtml(i: ListingTextInput): string {
@@ -104,7 +111,7 @@ export function listingHtml(i: ListingTextInput): string {
   const font = "Arial, Helvetica, sans-serif";
 
   const box = (title: string, body: string) => `
-<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid ${line};margin:0 0 14px 0;">
+<table ${tableAttrs(W)} style="${widthStyle(W)}border-collapse:collapse;border:1px solid ${line};margin:0 0 14px 0;">
   <tr><td style="padding:14px 16px;font-family:${font};">
     <div style="font-size:16px;font-weight:bold;color:${ink};margin:0 0 10px 0;">${esc(title)}</div>
     ${body}
@@ -114,17 +121,17 @@ export function listingHtml(i: ListingTextInput): string {
   // Ust serit: galeri adi, arac, kisa ozet
   // En ustte galeri logosu: kartin genisligine kadar buyutulmus banner (logo yoksa yok)
   const banner = i.logoUrl ? `
-<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${white};margin:0 0 10px 0;">
-  <tr><td align="center" valign="middle" style="padding:0;">
+<table ${tableAttrs(W)} style="${widthStyle(W)}border-collapse:collapse;background:${white};margin:0 0 10px 0;">
+  <tr><td width="${W}" align="center" valign="middle" style="${widthStyle(W)}padding:0;">
     ${logoImg(i)}
   </td></tr>
 </table>` : "";
 
   // Ust satir (simsiyah zemin, beyaz yazi, tam genislik): marka ve model. Yil / km / yakit / vites altta bilgi kartlarinda.
   const header = `${banner}
-<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 14px 0;">
+<table ${tableAttrs(W)} style="${widthStyle(W)}border-collapse:collapse;margin:0 0 14px 0;">
   <tr>
-    <td valign="middle" style="background:${ink};padding:18px 20px;font-family:${font};color:${white};">
+    <td width="${W}" valign="middle" style="${widthStyle(W)}background:${ink};padding:18px 20px;font-family:${font};color:${white};">
       <div style="font-size:30px;font-weight:bold;letter-spacing:.5px;color:${white};">${esc(v.make)}</div>
       <div style="font-size:19px;font-weight:bold;margin:2px 0 0 0;color:${white};">${esc(v.model)}</div>
     </td>
@@ -138,27 +145,27 @@ export function listingHtml(i: ListingTextInput): string {
     const chunk = cells.slice(r, r + 4);
     while (chunk.length < 4) chunk.push(["", ""]);
     const cell = ([label, value]: [string, string], head: boolean) => label === ""
-      ? `<td width="25%" style="padding:0 3px;"></td>`
+      ? `<td width="${W / 4}" style="${widthStyle(W / 4)}padding:0 3px;"></td>`
       : head
-        ? `<td width="25%" align="center" style="padding:7px 4px;background:${ink};color:${white};font-family:${font};font-size:12px;font-weight:bold;letter-spacing:.5px;border-left:3px solid ${white};border-right:3px solid ${white};">${esc(label.toLocaleUpperCase("tr-TR"))}</td>`
-        : `<td width="25%" align="center" style="padding:11px 4px;background:${soft};color:${ink};font-family:${font};font-size:16px;font-weight:bold;border-left:3px solid ${white};border-right:3px solid ${white};border-bottom:6px solid ${white};">${esc(value)}</td>`;
+        ? `<td width="${W / 4}" align="center" style="${widthStyle(W / 4)}padding:7px 4px;background:${ink};color:${white};font-family:${font};font-size:12px;font-weight:bold;letter-spacing:.5px;border-left:3px solid ${white};border-right:3px solid ${white};">${esc(label.toLocaleUpperCase("tr-TR"))}</td>`
+        : `<td width="${W / 4}" align="center" style="${widthStyle(W / 4)}padding:11px 4px;background:${soft};color:${ink};font-family:${font};font-size:16px;font-weight:bold;border-left:3px solid ${white};border-right:3px solid ${white};border-bottom:6px solid ${white};">${esc(value)}</td>`;
     rows.push(`<tr>${chunk.map((c) => cell(c, true)).join("")}</tr><tr>${chunk.map((c) => cell(c, false)).join("")}</tr>`);
   }
-  const grid = `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 14px 0;">${rows.join("")}</table>`;
+  const grid = `<table ${tableAttrs(W)} style="${widthStyle(W)}border-collapse:collapse;margin:0 0 14px 0;">${rows.join("")}</table>`;
 
   // Ekspertiz: durum sayilari (renkli kare) ve hasarli parcalar
   const summary = damageSummary(v.parts);
   const damageRows = summary.map((s, k) => `
     <tr style="background:${k % 2 ? soft : white};">
       <td style="padding:8px 10px;font-family:${font};font-size:15px;color:${ink};"><span style="color:${conditionColor(s.condition)};font-size:16px;">■</span>&nbsp;${esc(PART_CONDITION[s.condition])}</td>
-      <td align="right" style="padding:8px 10px;font-family:${font};font-size:15px;font-weight:bold;color:${ink};">${s.count}</td>
+      <td width="60" align="right" style="width:60px;padding:8px 10px;font-family:${font};font-size:15px;font-weight:bold;color:${ink};">${s.count}</td>
     </tr>`).join("");
   const damagedParts = summary.filter((s) => s.parts.length > 0)
     .map((s) => `<div style="font-family:${font};font-size:14px;color:${ink};margin:8px 0 0 0;"><span style="color:${conditionColor(s.condition)};">■</span>&nbsp;<b>${esc(PART_CONDITION[s.condition])}:</b> ${esc(s.parts.join(", "))}</div>`)
     .join("");
   const clean = summary.every((s) => s.condition === "ORIGINAL" || s.count === 0);
   const expertise = box("Ekspertiz Bilgisi", `
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${damageRows}</table>
+    <table ${tableAttrs(BOX_INNER)} style="${widthStyle(BOX_INNER)}border-collapse:collapse;">${damageRows}</table>
     ${clean ? `<div style="font-family:${font};font-size:14px;font-weight:bold;color:${brand};margin:8px 0 0 0;">Boyasız, değişensiz.</div>` : damagedParts}`);
 
   const tramer = tramerText(v.tramerCents);
@@ -169,20 +176,20 @@ export function listingHtml(i: ListingTextInput): string {
   const equipmentBox = equipmentGroups.length === 0 ? "" : box("Donanım", equipmentGroups.map((g, k) => {
     const rows: string[] = [];
     for (let r = 0; r < g.items.length; r += 2) {
-      rows.push(`<tr>${[g.items[r], g.items[r + 1]].map((item) => item == null ? `<td width="50%"></td>`
-        : `<td width="50%" valign="top" style="padding:3px 8px 3px 0;font-family:${font};font-size:15px;color:${ink};"><span style="color:${brand};font-weight:bold;">✓</span>&nbsp;${esc(item)}</td>`).join("")}</tr>`);
+      rows.push(`<tr>${[g.items[r], g.items[r + 1]].map((item) => item == null ? `<td width="${BOX_INNER / 2}" style="${widthStyle(BOX_INNER / 2)}"></td>`
+        : `<td width="${BOX_INNER / 2}" valign="top" style="${widthStyle(BOX_INNER / 2)}padding:3px 8px 3px 0;font-family:${font};font-size:15px;color:${ink};"><span style="color:${brand};font-weight:bold;">✓</span>&nbsp;${esc(item)}</td>`).join("")}</tr>`);
     }
     return `<div style="font-family:${font};font-size:13px;font-weight:bold;letter-spacing:.5px;color:${ink2};margin:${k ? 12 : 0}px 0 4px 0;">${esc(g.title.toLocaleUpperCase("tr-TR"))}</div>
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${rows.join("")}</table>`;
+    <table ${tableAttrs(BOX_INNER)} style="${widthStyle(BOX_INNER)}border-collapse:collapse;">${rows.join("")}</table>`;
   }).join(""));
 
   const text = i.description.trim();
   const descriptionBox = text ? box("Açıklama", text.split(/\n{2,}/).map((p) =>
     `<p style="font-family:${font};font-size:15px;line-height:1.5;color:${ink};margin:0 0 8px 0;">${esc(p).replace(/\n/g, "<br>")}</p>`).join("")) : "";
 
-  const footer = `<div style="font-family:${font};font-size:13px;color:${ink2};background:${brandLight};padding:10px 14px;">Bilgiler galerimizin kayıtlarından hazırlanmıştır. Ekspertiz ve detaylı bilgi için bizi arayabilirsiniz.</div>`;
+  const footer = `<table ${tableAttrs(W)} style="${widthStyle(W)}border-collapse:collapse;"><tr><td width="${W}" style="${widthStyle(W)}font-family:${font};font-size:13px;color:${ink2};background:${brandLight};padding:10px 14px;">Bilgiler galerimizin kayıtlarından hazırlanmıştır. Ekspertiz ve detaylı bilgi için bizi arayabilirsiniz.</td></tr></table>`;
 
-  return `<div style="font-family:${font};color:${ink};max-width:760px;">${header}${grid}${expertise}${tramerBox}${equipmentBox}${descriptionBox}${footer}</div>`;
+  return `<div style="font-family:${font};color:${ink};width:${W}px;">${header}${grid}${expertise}${tramerBox}${equipmentBox}${descriptionBox}${footer}</div>`;
 }
 
 // ------------------------------------------------------------------ duz metin
