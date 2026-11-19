@@ -52,6 +52,8 @@ export const api = {
     return apiFetch<VehicleSummary[]>(`/api/vehicles?${p}`);
   },
   vehicle: (id: string) => apiFetch<VehicleDetail | VehicleDetailAdmin>(`/api/vehicles/${id}`),
+  // Donanim listesinin tamami (yonetici ve arac giren calisan); temizlenmis liste doner
+  updateEquipment: (id: string, items: string[]) => apiFetch<string[]>(`/api/vehicles/${id}/equipment`, json({ items }, "PUT")),
   // Calisana (STAFF) tutarsiz VehicleDetail doner
   addVehicle: (request: VehicleRequest) => apiFetch<VehicleDetailAdmin | VehicleDetail>("/api/vehicles", json(request)),
   updateVehicle: (id: string, request: VehicleRequest) => apiFetch<VehicleDetailAdmin>(`/api/vehicles/${id}`, json(request, "PUT")),

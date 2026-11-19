@@ -12,6 +12,7 @@ import com.galeri.app.model.enums.Transmission;
 import com.galeri.app.model.request.CapitalRequests;
 import com.galeri.app.model.request.ContactRequest;
 import com.galeri.app.model.request.ShowroomRequests;
+import com.galeri.app.model.request.VehicleEquipmentRequest;
 import com.galeri.app.model.request.VehicleRequest;
 import com.galeri.app.model.response.ShowroomResponses;
 import com.galeri.app.service.CapitalService;
@@ -140,6 +141,23 @@ class ShowroomIT {
     }
 
     @Test
+    void donanimlar_temizlenipSirasiylaKaydedilir_detaydaVeVitrindeGorunur_bastanYazilir() throws Exception {
+        TestSession.open(owner, tenant, "ADMIN");
+        UUID v = vehicle("Renault", "Clio");
+        List<String> saved = vehicleService.updateEquipment(v, new VehicleEquipmentRequest(
+                List.of("Cam tavan", "  360°  kamera ", "", "cam TAVAN", "19 inç AMG jant")));
+        assertThat(saved).as("bosluk toplanir, bos ve tekrar atlanir").containsExactly("Cam tavan", "360° kamera", "19 inç AMG jant");
+
+        showroomService.updateListing(v, new ShowroomRequests.Listing(true, null, null));
+        showroomService.addPhoto(v, image(400, 300));
+        assertThat(vehicleDetail(v).equipment()).containsExactly("Cam tavan", "360° kamera", "19 inç AMG jant");
+
+        vehicleService.updateEquipment(v, new VehicleEquipmentRequest(List.of("Premium ses sistemi")));
+        TestSession.close();
+        assertThat(showroomService.publicVehicle(slug, v).equipment()).as("bastan yazilir").containsExactly("Premium ses sistemi");
+    }
+
+    @Test
     void resimOlmayanDosya_veYirmidenFazlaFotograf_reddedilir() throws Exception {
         TestSession.open(owner, tenant, "ADMIN");
         UUID car = vehicle("Fiat", "Egea");
@@ -197,6 +215,10 @@ class ShowroomIT {
         assertThatThrownBy(() -> showroomService.deletePhoto(car, photo)).isInstanceOf(SourceNotBelongToTenantException.class);
         assertThatThrownBy(() -> showroomService.updateListing(car, new ShowroomRequests.Listing(true, null, null)))
                 .isInstanceOf(SourceNotBelongToTenantException.class);
+    }
+
+    private com.galeri.app.model.response.VehicleDetail vehicleDetail(UUID id) {
+        return ((com.galeri.app.model.response.VehicleDetailAdmin) vehicleService.detail(id)).vehicle();
     }
 
     private UUID vehicle(String make, String model) {

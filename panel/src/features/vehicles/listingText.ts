@@ -5,6 +5,7 @@
 import { BODY_PART, formatPhone, FUEL, PART_CONDITION, TRANSMISSION, tl } from "../../shared/format";
 import type { BodyPart, PartCondition, VehicleDetail } from "../../shared/types";
 import { SHAPE } from "./damageShapes";
+import { groupEquipment } from "../../shared/equipment";
 
 export interface ListingTextInput {
   vehicle: VehicleDetail;
@@ -163,13 +164,25 @@ export function listingHtml(i: ListingTextInput): string {
   const tramer = tramerText(v.tramerCents);
   const tramerBox = tramer ? box("Tramer Bilgisi", `<div style="font-family:${font};font-size:15px;color:${ink};">${esc(tramer)}</div>`) : "";
 
+  // Donanim: grup basligi ve altinda iki sutun, her ozellik onay isaretiyle
+  const equipmentGroups = groupEquipment(v.equipment ?? []);
+  const equipmentBox = equipmentGroups.length === 0 ? "" : box("Donanım", equipmentGroups.map((g, k) => {
+    const rows: string[] = [];
+    for (let r = 0; r < g.items.length; r += 2) {
+      rows.push(`<tr>${[g.items[r], g.items[r + 1]].map((item) => item == null ? `<td width="50%"></td>`
+        : `<td width="50%" valign="top" style="padding:3px 8px 3px 0;font-family:${font};font-size:15px;color:${ink};"><span style="color:${brand};font-weight:bold;">✓</span>&nbsp;${esc(item)}</td>`).join("")}</tr>`);
+    }
+    return `<div style="font-family:${font};font-size:13px;font-weight:bold;letter-spacing:.5px;color:${ink2};margin:${k ? 12 : 0}px 0 4px 0;">${esc(g.title.toLocaleUpperCase("tr-TR"))}</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${rows.join("")}</table>`;
+  }).join(""));
+
   const text = i.description.trim();
   const descriptionBox = text ? box("Açıklama", text.split(/\n{2,}/).map((p) =>
     `<p style="font-family:${font};font-size:15px;line-height:1.5;color:${ink};margin:0 0 8px 0;">${esc(p).replace(/\n/g, "<br>")}</p>`).join("")) : "";
 
   const footer = `<div style="font-family:${font};font-size:13px;color:${ink2};background:${brandLight};padding:10px 14px;">Bilgiler galerimizin kayıtlarından hazırlanmıştır. Ekspertiz ve detaylı bilgi için bizi arayabilirsiniz.</div>`;
 
-  return `<div style="font-family:${font};color:${ink};max-width:760px;">${header}${grid}${expertise}${tramerBox}${descriptionBox}${footer}</div>`;
+  return `<div style="font-family:${font};color:${ink};max-width:760px;">${header}${grid}${expertise}${tramerBox}${equipmentBox}${descriptionBox}${footer}</div>`;
 }
 
 // ------------------------------------------------------------------ duz metin
@@ -193,6 +206,12 @@ export function listingPlainText(i: ListingTextInput): string {
   if (tramer) {
     section("Tramer bilgisi");
     out.push(`▪ ${tramer}`);
+  }
+
+  const equipmentGroups = groupEquipment(v.equipment ?? []);
+  if (equipmentGroups.length > 0) {
+    section("Donanım");
+    for (const g of equipmentGroups) out.push(`▪ ${g.title}: ${g.items.join(", ")}`);
   }
 
   if (i.description.trim()) {

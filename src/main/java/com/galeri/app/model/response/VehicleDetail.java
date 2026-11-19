@@ -30,5 +30,6 @@ public record VehicleDetail(
         LocalDate saleDate,
         long daysInStock,
         Map<BodyPart, PartCondition> parts,
-        Ownership ownership       // rozet icin; para ya da kisi bilgisi icermez
+        Ownership ownership,      // rozet icin; para ya da kisi bilgisi icermez
+        java.util.List<String> equipment   // donanimlar (V36), girildigi sirayla
 ) {}

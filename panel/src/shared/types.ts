@@ -91,6 +91,7 @@ export interface VehicleDetail {
   daysInStock: number;
   parts: Record<BodyPart, PartCondition>;
   ownership: Ownership;
+  equipment: string[];   // donanimlar (cam tavan, 360° kamera ...), girildigi sirayla
 }
 
 export interface ContactSummary { id: string; name: string; phone: string | null }
@@ -501,4 +502,5 @@ export interface PublicVehicle {
   id: string; plate: string; make: string; model: string; modelYear: number; mileageKm: number; fuel: Fuel; transmission: Transmission;
   color: string | null; priceCents: number | null; tramerCents: number | null; description: string | null;
   parts: { part: BodyPart; condition: PartCondition }[]; photos: ShowroomPhoto[]; galleryName: string; phone: string | null;
+  equipment: string[];
 }

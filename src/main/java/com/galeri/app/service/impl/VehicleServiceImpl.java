@@ -82,6 +82,7 @@ public class VehicleServiceImpl implements VehicleService {
 
     private final VehicleRepository vehicleRepository;
     private final VehiclePartRepository vehiclePartRepository;
+    private final com.galeri.app.repository.VehicleEquipmentRepository equipmentRepository;
     private final ContactRepository contactRepository;
     private final PanelUserRepository panelUserRepository;
     private final LedgerService ledgerService;
@@ -698,6 +699,8 @@ public class VehicleServiceImpl implements VehicleService {
             copy.setCondition(p.getCondition());
             vehiclePartRepository.save(copy);
         }
+        writeEquipment(saved, equipmentRepository.findByVehicleIdOrderByPositionAsc(sold.getId()).stream()
+                .map(com.galeri.app.model.entity.VehicleEquipment::getName).toList());
         coOwnershipService.syncOwners(saved, buyer.isOwner() ? null : List.of(new ShareRequest(buyer.getId(), 10000)));
         ledgerService.syncVehiclePurchase(saved, cash);
         coOwnershipService.syncContributions(saved);   // sermayedarin nakitteki sermayesi bedeli karsilamali
@@ -787,15 +790,45 @@ public class VehicleServiceImpl implements VehicleService {
                 admin ? contactSummary(v.getBuyer()) : null, v.getOwnership());
     }
 
+    @Override
+    @Transactional
+    public List<String> updateEquipment(UUID id, com.galeri.app.model.request.VehicleEquipmentRequest request) {
+        Vehicle vehicle = getVehicle(id);
+        return writeEquipment(vehicle, request.items());
+    }
+
+    /** Donanim listesini bastan yazar: bosluklar toplanir, bos ve tekrar eden (buyuk / kucuk harf fark etmez) atlanir. */
+    private List<String> writeEquipment(Vehicle vehicle, List<String> items) {
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        List<String> clean = new ArrayList<>();
+        for (String item : items) {
+            String name = item == null ? "" : item.trim().replaceAll("\\s+", " ");
+            if (name.isEmpty()) continue;
+            if (seen.add(name.toLowerCase(java.util.Locale.forLanguageTag("tr")))) clean.add(name);
+        }
+        equipmentRepository.deleteAllOfVehicle(vehicle.getId());
+        for (int i = 0; i < clean.size(); i++) {
+            com.galeri.app.model.entity.VehicleEquipment e = new com.galeri.app.model.entity.VehicleEquipment();
+            e.setTenantId(vehicle.getTenantId());
+            e.setVehicleId(vehicle.getId());
+            e.setName(clean.get(i));
+            e.setPosition(i);
+            equipmentRepository.save(e);
+        }
+        return clean;
+    }
+
     private VehicleDetail toDetail(Vehicle v) {
         Map<BodyPart, PartCondition> parts = new EnumMap<>(BodyPart.class);
         for (BodyPart p : BodyPart.values()) parts.put(p, PartCondition.ORIGINAL);
         if (v.getId() != null) {
             vehiclePartRepository.findByVehicleId(v.getId()).forEach(p -> parts.put(p.getPart(), p.getCondition()));
         }
+        List<String> equipment = v.getId() == null ? List.of()
+                : equipmentRepository.findByVehicleIdOrderByPositionAsc(v.getId()).stream().map(com.galeri.app.model.entity.VehicleEquipment::getName).toList();
         return new VehicleDetail(v.getId(), v.getPlate(), v.getMake(), v.getModel(), v.getModelYear(), v.getMileageKm(),
                 v.getFuel(), v.getTransmission(), v.getColor(), v.getTramerCents(), v.getNotes(), v.getStatus(),
-                v.getPurchaseDate(), v.getSaleDate(), daysInStock(v, today()), parts, v.getOwnership());
+                v.getPurchaseDate(), v.getSaleDate(), daysInStock(v, today()), parts, v.getOwnership(), equipment);
     }
 
     private VehicleDetailAdmin toAdmin(Vehicle v, VehicleDetail detail) {
