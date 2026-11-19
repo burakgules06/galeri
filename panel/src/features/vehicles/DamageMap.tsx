@@ -4,7 +4,7 @@
 import { useState } from "react";
 import type { BodyPart, PartCondition } from "../../shared/types";
 import { BODY_PART, PART_CONDITION } from "../../shared/format";
-import { GLASS, SHAPE } from "./damageShapes";
+import { GLASS, MIRRORS, SHAPE, WHEELS } from "./damageShapes";
 
 const FILL: Record<PartCondition, string> = {
   ORIGINAL: "var(--color-orijinal)",
@@ -37,6 +37,8 @@ export function DamageMap({ parts, editable = false, onChange }: {
           <text x="110" y="-4" textAnchor="middle" className="fill-murekkep-3" fontSize="11">Ön</text>
           <text x="6" y="210" className="fill-murekkep-3" fontSize="11" transform="rotate(-90 6 210)" textAnchor="middle">Sol</text>
           <text x="214" y="210" className="fill-murekkep-3" fontSize="11" transform="rotate(90 214 210)" textAnchor="middle">Sağ</text>
+          {WHEELS.map(([x, y, w, h]) => <rect key={`${x}-${y}`} x={x} y={y} width={w} height={h} rx="5" fill="var(--color-murekkep-2)" />)}
+          {MIRRORS.map((d) => <path key={d} d={d} fill="var(--color-cizgi-2)" stroke="white" strokeWidth="1.5" />)}
           {GLASS.map((d) => <path key={d} d={d} fill="var(--color-plaka-acik)" stroke="white" strokeWidth="2" />)}
           {(Object.keys(SHAPE) as BodyPart[]).map((p) => (
             <path

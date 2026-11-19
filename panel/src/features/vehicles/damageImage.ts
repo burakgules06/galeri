@@ -2,7 +2,7 @@
 // Renkler tema degiskenlerinden okunur.
 import { PART_CONDITION } from "../../shared/format";
 import type { BodyPart, PartCondition } from "../../shared/types";
-import { GLASS, SHAPE } from "./damageShapes";
+import { GLASS, MIRRORS, SHAPE, WHEELS } from "./damageShapes";
 import { conditionColor, damageSummary, token } from "./listingText";
 
 // Yatay resim: solda ustten arac cizimi, sagda baslik, durum sayilari ve hasarli parcalar (ilan fotografina uygun oran).
@@ -48,6 +48,8 @@ function svgSource(parts: Record<BodyPart, PartCondition>, title: string): { svg
     + text(110, -10, "Ön", `font-size="12" text-anchor="middle" fill="${ink3}"`)
     + `<text x="-4" y="200" font-family="${font}" font-size="12" text-anchor="middle" fill="${ink3}" transform="rotate(-90 -4 200)">Sol</text>`
     + `<text x="226" y="200" font-family="${font}" font-size="12" text-anchor="middle" fill="${ink3}" transform="rotate(90 226 200)">Sağ</text>`
+    + WHEELS.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="5" fill="${token("--color-murekkep-2")}"/>`).join("")
+    + MIRRORS.map((d) => `<path d="${d}" fill="${token("--color-cizgi-2")}" stroke="${white}" stroke-width="1.5"/>`).join("")
     + GLASS.map((d) => `<path d="${d}" fill="${glass}" stroke="${white}" stroke-width="2"/>`).join("")
     + paths + `</g>`;
 
