@@ -165,7 +165,7 @@ public class VehicleServiceImpl implements VehicleService {
         return new VehicleRequest(r.plate(), r.make(), r.model(), r.modelYear(), r.fuel(), r.transmission(), r.mileageKm(), r.color(),
                 r.tramerCents(), r.notes(), r.purchaseDate(), r.sellerId(), me, r.actualPurchaseCents(), r.officialPurchaseCents(),
                 r.purchaseAccountId(), null, Ownership.DEALER, null, null, null, null, null, r.addToCatalog(),
-                r.catalogModel(), null, null, null, null, null);
+                r.catalogModel(), null, null, null, null, null, null, null, r.importStatus(), r.inspectionValidUntil());
     }
 
     /**
@@ -197,7 +197,8 @@ public class VehicleServiceImpl implements VehicleService {
         return new VehicleRequest(r.plate(), r.make(), r.model(), r.modelYear(), r.fuel(), r.transmission(), r.mileageKm(), r.color(),
                 r.tramerCents(), r.notes(), r.purchaseDate(), r.sellerId(), me, r.actualPurchaseCents(), r.officialPurchaseCents(),
                 ledgerService.cashAccountId(), null, Ownership.CO_OWNED, null, null, null, null, r.shares(), r.addToCatalog(),
-                r.catalogModel(), null, null, null, r.sellerUserId(), r.sellerCapitalCents());
+                r.catalogModel(), null, null, null, r.sellerUserId(), r.sellerCapitalCents(), null, null,
+                r.importStatus(), r.inspectionValidUntil());
     }
 
     /**
@@ -426,6 +427,9 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setMileageKm(r.mileageKm());
         vehicle.setColor(NameUtil.normalize(blankToNull(r.color())));
         vehicle.setTramerCents(r.tramerCents());
+        String importStatus = r.importStatus() == null ? null : blankToNull(r.importStatus().trim().replaceAll("\\s+", " "));
+        vehicle.setImportStatus(importStatus);
+        vehicle.setInspectionValidUntil(r.inspectionValidUntil() == null ? null : r.inspectionValidUntil().withDayOfMonth(1));
         vehicle.setNotes(blankToNull(r.notes()));
         vehicle.setPurchaseDate(r.purchaseDate());
         vehicle.setBoughtBy(getStaff(r.boughtById(), vehicle.getTenantId()));
@@ -683,6 +687,8 @@ public class VehicleServiceImpl implements VehicleService {
         t.setMileageKm(sold.getMileageKm());
         t.setColor(sold.getColor());
         t.setTramerCents(sold.getTramerCents());
+        t.setImportStatus(sold.getImportStatus());
+        t.setInspectionValidUntil(sold.getInspectionValidUntil());
         t.setNotes(sold.getNotes());
         t.setPurchaseDate(date);
         t.setBoughtBy(sold.getSoldBy());
@@ -828,7 +834,8 @@ public class VehicleServiceImpl implements VehicleService {
                 : equipmentRepository.findByVehicleIdOrderByPositionAsc(v.getId()).stream().map(com.galeri.app.model.entity.VehicleEquipment::getName).toList();
         return new VehicleDetail(v.getId(), v.getPlate(), v.getMake(), v.getModel(), v.getModelYear(), v.getMileageKm(),
                 v.getFuel(), v.getTransmission(), v.getColor(), v.getTramerCents(), v.getNotes(), v.getStatus(),
-                v.getPurchaseDate(), v.getSaleDate(), daysInStock(v, today()), parts, v.getOwnership(), equipment);
+                v.getPurchaseDate(), v.getSaleDate(), daysInStock(v, today()), parts, v.getOwnership(), equipment,
+                v.getImportStatus(), v.getInspectionValidUntil());
     }
 
     private VehicleDetailAdmin toAdmin(Vehicle v, VehicleDetail detail) {

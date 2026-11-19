@@ -55,6 +55,10 @@ public class Tenant extends BaseModel {
     @Column(name = "showroom_address", length = 300)
     private String showroomAddress;
 
+    // Ikinci el arac ticareti yetki belgesi numarasi (V37): ilan aciklamasindaki bilgi kartlarinda; bos ise gosterilmez
+    @Column(name = "dealer_license_no", length = 40)
+    private String dealerLicenseNo;
+
     // Galeri logosu (V35): PNG dosyasinin id'si; bos ise logo yok
     @Column(name = "logo_id")
     private UUID logoId;

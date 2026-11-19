@@ -73,6 +73,8 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
   const [mileage, setMileage] = useState(v ? formatNumber(v.mileageKm) : "");
   const [color, setColor] = useState(v?.color ?? "");
   const [tramer, setTramer] = useState(centsToInput(v?.tramerCents));
+  const [importStatus, setImportStatus] = useState(v?.importStatus ?? "");
+  const [inspection, setInspection] = useState(v?.inspectionValidUntil?.slice(0, 7) ?? "");   // YYYY-MM
   const [notes, setNotes] = useState(v?.notes ?? "");
   const [purchaseDate, setPurchaseDate] = useState(v?.purchaseDate ?? todayIso());
   const [seller, setSeller] = useState<ContactSummary | null>(existing?.seller ?? null);
@@ -229,6 +231,7 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
     const request: VehicleRequest = {
       plate, make: makeModel.make, model: makeModel.model, modelYear: yearNumber, fuel, transmission, mileageKm: mileageNumber,
       color: color.trim() || null, tramerCents: amounts[0], notes: notes.trim() || null,
+      importStatus: importStatus.trim() || null, inspectionValidUntil: inspection ? `${inspection}-01` : null,
       purchaseDate, sellerId: userSale ? null : seller?.id ?? null, boughtById: boughtById || null,
       sellerUserId: userSale ? sellerUserId : null,
       sellerCapitalCents: consignment ? (consignPocketCents > 0 ? consignPocketCents : null)
@@ -475,6 +478,12 @@ function VehicleFormContent({ onClose, onSaved, existing, purchasePlan }: Props 
           <div className="space-y-3 pt-2">
             <Field label="Renk"><input className={inputClass} value={color} onChange={e => setColor(e.target.value)} placeholder="Beyaz" /></Field>
             <Field label="Tramer (hasar kaydı)"><NumberInput value={tramer} onValueChange={setTramer} placeholder="18.500" /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="İthalat durumu"><input className={inputClass} maxLength={60} value={importStatus}
+                onChange={e => setImportStatus(e.target.value)} placeholder="Distribütör" /></Field>
+              <Field label="Muayene bitişi"><input type="month" className={inputClass} value={inspection}
+                onChange={e => setInspection(e.target.value)} /></Field>
+            </div>
             <Field label="Notlar"><textarea className={`${inputClass} h-24 py-2`} value={notes} onChange={e => setNotes(e.target.value)} /></Field>
             <Field label="Alan çalışan"><select className={inputClass} value={boughtById} onChange={e => setBoughtBy(e.target.value)}>
               <option value="">Seçilmedi</option>

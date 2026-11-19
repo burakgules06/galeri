@@ -92,6 +92,8 @@ export interface VehicleDetail {
   parts: Record<BodyPart, PartCondition>;
   ownership: Ownership;
   equipment: string[];   // donanimlar (cam tavan, 360° kamera ...), girildigi sirayla
+  importStatus: string | null;          // ithalat durumu, serbest metin
+  inspectionValidUntil: string | null;  // muayene bitisi (ayin ilk gunu, YYYY-MM-01)
 }
 
 export interface ContactSummary { id: string; name: string; phone: string | null }
@@ -191,6 +193,8 @@ export interface VehicleRequest {
   notes: string | null;
   purchaseDate: string;
   sellerId: string | null;
+  importStatus?: string | null;
+  inspectionValidUntil?: string | null;   // YYYY-MM-01
   boughtById: string | null;
   actualPurchaseCents: number | null;
   officialPurchaseCents: number | null;
@@ -491,6 +495,7 @@ export interface ShowroomListing {
 }
 export interface ShowroomSettings {
   slug: string; phone: string | null; address: string | null;
+  dealerLicenseNo: string | null;   // yetki belge no; sahibinden aciklamasinda bilgi karti
   logoUrl: string | null;   // galeri logosu (herkese acik adres, apiUrl ile); yoksa null
 }
 export interface PublicShowroomCard {

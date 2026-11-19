@@ -35,8 +35,8 @@ export const api = {
   },
   deleteLogo: () => apiFetch<ShowroomSettings>("/api/settings/showroom/logo", { method: "DELETE" }),
   // Telefon ve adres birlikte gonderilir (bos gelen silinir)
-  updateShowroomSettings: (phone: string | null, address: string | null) =>
-    apiFetch<ShowroomSettings>("/api/settings/showroom", json({ phone, address }, "PUT")),
+  updateShowroomSettings: (phone: string | null, address: string | null, dealerLicenseNo: string | null) =>
+    apiFetch<ShowroomSettings>("/api/settings/showroom", json({ phone, address, dealerLicenseNo }, "PUT")),
   // Herkese acik vitrin (giris yok)
   publicGallery: (slug: string) => publicFetch<PublicGallery>(`/api/public/showroom/${encodeURIComponent(slug)}`),
   publicVehicle: (slug: string, id: string) => publicFetch<PublicVehicle>(`/api/public/showroom/${encodeURIComponent(slug)}/vehicles/${id}`),

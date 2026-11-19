@@ -31,5 +31,7 @@ public record VehicleDetail(
         long daysInStock,
         Map<BodyPart, PartCondition> parts,
         Ownership ownership,      // rozet icin; para ya da kisi bilgisi icermez
-        java.util.List<String> equipment   // donanimlar (V36), girildigi sirayla
+        java.util.List<String> equipment,  // donanimlar (V36), girildigi sirayla
+        String importStatus,               // ithalat durumu (V37), serbest metin
+        LocalDate inspectionValidUntil     // muayene bitisi (V37), ayin ilk gunu
 ) {}

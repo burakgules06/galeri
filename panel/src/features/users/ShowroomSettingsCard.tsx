@@ -31,6 +31,8 @@ function SettingsForm({ initial }: { initial: ShowroomSettings }) {
   const [savedPhone, setSavedPhone] = useState(initial.phone ?? "");
   const [address, setAddress] = useState(initial.address ?? "");
   const [savedAddress, setSavedAddress] = useState(initial.address ?? "");
+  const [license, setLicense] = useState(initial.dealerLicenseNo ?? "");
+  const [savedLicense, setSavedLicense] = useState(initial.dealerLicenseNo ?? "");
   const [logoUrl, setLogoUrl] = useState(initial.logoUrl);
   const logoInput = useRef<HTMLInputElement>(null);
 
@@ -59,10 +61,12 @@ function SettingsForm({ initial }: { initial: ShowroomSettings }) {
     setBusy(true);
     setError(null);
     try {
-      const saved = await api.updateShowroomSettings(digits || null, address.trim() || null);
+      const saved = await api.updateShowroomSettings(digits || null, address.trim() || null, license.trim() || null);
       setSavedPhone(saved.phone ?? "");
       setSavedAddress(saved.address ?? "");
       setAddress(saved.address ?? "");
+      setSavedLicense(saved.dealerLicenseNo ?? "");
+      setLicense(saved.dealerLicenseNo ?? "");
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -104,8 +108,12 @@ function SettingsForm({ initial }: { initial: ShowroomSettings }) {
         <textarea className={`${inputClass} h-auto min-h-20 py-2`} rows={2} maxLength={300} value={address}
           onChange={(e) => setAddress(e.target.value)} placeholder="Saracalar Mah. Özal Blv. No:228 Akyurt / Ankara" />
       </Field>
+      <Field label="Yetki belge no" hint="İkinci el araç ticareti yetki belgesi. Sahibinden açıklamasındaki bilgi kartlarında çıkar. Boşsa çıkmaz.">
+        <input className={inputClass} maxLength={40} value={license} onChange={(e) => setLicense(e.target.value)} placeholder="06-123456" />
+      </Field>
       <div className="flex justify-end">
-        <Button onClick={() => void save()} disabled={busy || (digits === savedPhone && address.trim() === savedAddress)}>Kaydet</Button>
+        <Button onClick={() => void save()}
+          disabled={busy || (digits === savedPhone && address.trim() === savedAddress && license.trim() === savedLicense)}>Kaydet</Button>
       </div>
     </div>
   );

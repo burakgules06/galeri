@@ -62,8 +62,27 @@ public record VehicleRequest(
         @PositiveOrZero Long pocketCents,
         // Ortak / konsinye alista bir kisinin nakdi katkisina yetmezse eksik kadar dukkan sahibi borc verir (ayni kayitta).
         // Sadece yonetici; kisinin parasi yetiyorsa yok sayilir.
-        List<@Valid ShortfallLoan> shortfallLoans
+        List<@Valid ShortfallLoan> shortfallLoans,
+        // Ilan bilgileri (V37, istege bagli): ithalat durumu serbest metin; muayene bitisi ay olarak (gun yok sayilir, ayin
+        // ilk gunu tutulur)
+        @Size(max = 60) String importStatus,
+        LocalDate inspectionValidUntil
 ) {
+    /** Ilan bilgileri olmadan (eski cagrilar). */
+    public VehicleRequest(String plate, String make, String model, Short modelYear, Fuel fuel, Transmission transmission,
+                          Integer mileageKm, String color, Long tramerCents, String notes, LocalDate purchaseDate,
+                          UUID sellerId, UUID boughtById, Long actualPurchaseCents, Long officialPurchaseCents,
+                          UUID purchaseAccountId, List<InstallmentRequest> purchasePlan, Ownership ownership, UUID consignorId,
+                          CommissionType commissionType, Integer commissionRateBp, Long commissionCents,
+                          List<ShareRequest> shares, Boolean addToCatalog, String catalogModel,
+                          CommissionType shopCutType, Integer shopCutRateBp, Long shopCutCents,
+                          UUID sellerUserId, Long sellerCapitalCents, Long pocketCents, List<ShortfallLoan> shortfallLoans) {
+        this(plate, make, model, modelYear, fuel, transmission, mileageKm, color, tramerCents, notes, purchaseDate, sellerId,
+                boughtById, actualPurchaseCents, officialPurchaseCents, purchaseAccountId, purchasePlan, ownership, consignorId,
+                commissionType, commissionRateBp, commissionCents, shares, addToCatalog, catalogModel,
+                shopCutType, shopCutRateBp, shopCutCents, sellerUserId, sellerCapitalCents, pocketCents, shortfallLoans, null, null);
+    }
+
     /** Borcsuz (eski cagrilar). */
     public VehicleRequest(String plate, String make, String model, Short modelYear, Fuel fuel, Transmission transmission,
                           Integer mileageKm, String color, Long tramerCents, String notes, LocalDate purchaseDate,

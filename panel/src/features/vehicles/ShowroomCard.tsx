@@ -30,13 +30,15 @@ export function ShowroomCard({ vehicle }: { vehicle: VehicleDetail }) {
       </div>
       {listing.error && <ErrorBox message={listing.error} />}
       {listing.data && <ShowroomEditor key={vehicleId} vehicle={vehicle} initial={listing.data} phone={settings.data?.phone ?? null}
-        address={settings.data?.address ?? null} logoUrl={settings.data?.logoUrl ?? null} />}
+        address={settings.data?.address ?? null} logoUrl={settings.data?.logoUrl ?? null}
+        dealerLicenseNo={settings.data?.dealerLicenseNo ?? null} />}
     </section>
   );
 }
 
-function ShowroomEditor({ vehicle, initial, phone, address, logoUrl }: {
+function ShowroomEditor({ vehicle, initial, phone, address, logoUrl, dealerLicenseNo }: {
   vehicle: VehicleDetail; initial: ShowroomListing; phone: string | null; address: string | null; logoUrl: string | null;
+  dealerLicenseNo: string | null;
 }) {
   const vehicleId = vehicle.id;
   const { auth } = useAuth();
@@ -153,7 +155,7 @@ function ShowroomEditor({ vehicle, initial, phone, address, logoUrl }: {
         <Button onClick={() => void save()} disabled={busy || !dirty}>{busy ? "Kaydediliyor…" : "Kaydet"}</Button>
       </div>
       {listingText && (
-        <ListingTextModal vehicle={vehicle} galleryName={auth?.tenantName || "Galeri"} phone={phone} address={address} logoUrl={logoUrl} description={description}
+        <ListingTextModal vehicle={vehicle} galleryName={auth?.tenantName || "Galeri"} phone={phone} address={address} logoUrl={logoUrl} dealerLicenseNo={dealerLicenseNo} description={description}
           onClose={() => setListingText(false)} />
       )}
     </div>

@@ -9,12 +9,13 @@ import { apiUrl } from "../../api/client";
 import { damageImage } from "./damageImage";
 import { listingHtml, listingPlainText } from "./listingText";
 
-export function ListingTextModal({ vehicle, galleryName, phone, address, logoUrl, description, onClose }: {
+export function ListingTextModal({ vehicle, galleryName, phone, address, logoUrl, dealerLicenseNo, description, onClose }: {
   vehicle: VehicleDetail;
   galleryName: string;
   phone: string | null;
   address: string | null;
   logoUrl: string | null;     // vitrin ayarlarindaki logo (API yolu)
+  dealerLicenseNo: string | null;
   description: string;
   onClose: () => void;
 }) {
@@ -27,7 +28,7 @@ export function ListingTextModal({ vehicle, galleryName, phone, address, logoUrl
   // Ilan sitesi resmi bizim sunucudan ceker: tam adres gerekir
   const logoAbsolute = logoUrl ? new URL(apiUrl(logoUrl), window.location.origin).href : null;
   const logoSize = useLogoSize(logoAbsolute);
-  const input = { vehicle, galleryName, phone, address, logoUrl: logoAbsolute, logoSize, description, showPlate, showPhone };
+  const input = { vehicle, galleryName, phone, address, dealerLicenseNo, logoUrl: logoAbsolute, logoSize, description, showPlate, showPhone };
   const html = listingHtml(input);
   const text = listingPlainText(input);
 

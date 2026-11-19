@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { api, isAdminDetail } from "../../api/galeri";
-import { formatDate, formatNumber, FUEL, percent, STATUS, tl, TRANSMISSION } from "../../shared/format";
+import { formatDate, formatNumber, FUEL, monthYear, percent, STATUS, tl, TRANSMISSION } from "../../shared/format";
 import type { BodyPart, ContactSummary, PocketExpenseResponse, ShareResponse, PartCondition, VehicleDetail, VehicleDetailAdmin, VehicleStatus } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Plate } from "../../shared/ui/Plate";
@@ -99,6 +99,8 @@ export function VehicleDetailPage({ id }: { id: string }) {
               <Info label="Vites" value={TRANSMISSION[v.transmission]} />
               <Info label="Renk" value={v.color ?? "—"} />
               <Info label="Tramer" value={v.tramerCents ? tl(v.tramerCents) : "Yok"} numeric />
+              {v.importStatus && <Info label="İthalat" value={v.importStatus} />}
+              {v.inspectionValidUntil && <Info label="Muayene bitişi" value={monthYear(v.inspectionValidUntil)} numeric />}
               <Info label="Alış tarihi" value={formatDate(v.purchaseDate)} />
               {v.saleDate && <Info label="Satış tarihi" value={formatDate(v.saleDate)} />}
             </dl>

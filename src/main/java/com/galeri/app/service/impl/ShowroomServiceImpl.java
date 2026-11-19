@@ -139,7 +139,7 @@ public class ShowroomServiceImpl implements ShowroomService {
 
     private static ShowroomResponses.Settings settingsOf(Tenant t) {
         return new ShowroomResponses.Settings(t.getSlug(), t.getShowroomPhone(), t.getShowroomAddress(),
-                t.getLogoId() == null ? null : "/api/public/logos/" + t.getLogoId() + ".png");
+                t.getLogoId() == null ? null : "/api/public/logos/" + t.getLogoId() + ".png", t.getDealerLicenseNo());
     }
 
     @Override
@@ -158,6 +158,8 @@ public class ShowroomServiceImpl implements ShowroomService {
         // Adres: bosluklar toplanir, bos ise silinir (panel telefon ve adresi birlikte gonderir)
         String address = request.address() == null ? "" : request.address().trim().replaceAll("\\s+", " ");
         t.setShowroomAddress(address.isEmpty() ? null : address);
+        String license = request.dealerLicenseNo() == null ? "" : request.dealerLicenseNo().trim().replaceAll("\\s+", " ");
+        t.setDealerLicenseNo(license.isEmpty() ? null : license);
         return settingsOf(t);
     }
 
