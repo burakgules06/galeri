@@ -29,12 +29,15 @@ export function ShowroomCard({ vehicle }: { vehicle: VehicleDetail }) {
         )}
       </div>
       {listing.error && <ErrorBox message={listing.error} />}
-      {listing.data && <ShowroomEditor key={vehicleId} vehicle={vehicle} initial={listing.data} phone={settings.data?.phone ?? null} />}
+      {listing.data && <ShowroomEditor key={vehicleId} vehicle={vehicle} initial={listing.data} phone={settings.data?.phone ?? null}
+        address={settings.data?.address ?? null} />}
     </section>
   );
 }
 
-function ShowroomEditor({ vehicle, initial, phone }: { vehicle: VehicleDetail; initial: ShowroomListing; phone: string | null }) {
+function ShowroomEditor({ vehicle, initial, phone, address }: {
+  vehicle: VehicleDetail; initial: ShowroomListing; phone: string | null; address: string | null;
+}) {
   const vehicleId = vehicle.id;
   const { auth } = useAuth();
   const [listingText, setListingText] = useState(false);
@@ -150,7 +153,7 @@ function ShowroomEditor({ vehicle, initial, phone }: { vehicle: VehicleDetail; i
         <Button onClick={() => void save()} disabled={busy || !dirty}>{busy ? "Kaydediliyor…" : "Kaydet"}</Button>
       </div>
       {listingText && (
-        <ListingTextModal vehicle={vehicle} galleryName={auth?.tenantName || "Galeri"} phone={phone} description={description}
+        <ListingTextModal vehicle={vehicle} galleryName={auth?.tenantName || "Galeri"} phone={phone} address={address} description={description}
           onClose={() => setListingText(false)} />
       )}
     </div>

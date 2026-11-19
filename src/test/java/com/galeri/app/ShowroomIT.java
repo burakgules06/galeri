@@ -130,7 +130,10 @@ class ShowroomIT {
         showroomService.addPhoto(shown, image(400, 300));
         showroomService.updateListing(shown, new ShowroomRequests.Listing(true, 850_000 * TL, "  Hatasız, servis bakımlı  "));
         showroomService.updateListing(sold, new ShowroomRequests.Listing(true, null, null));
-        showroomService.updateSettings(new ShowroomRequests.Settings("0532 111 22 33"));
+        ShowroomResponses.Settings saved = showroomService.updateSettings(
+                new ShowroomRequests.Settings("0532 111 22 33", "  Saracalar Mah. Özal Blv.\n No:228  Akyurt/Ankara "));
+        assertThat(saved.address()).as("bosluklar toplanir").isEqualTo("Saracalar Mah. Özal Blv. No:228 Akyurt/Ankara");
+        assertThat(showroomService.settings().address()).isEqualTo(saved.address());
         jdbc.update("update vehicle set status = 'SOLD', sale_date = ? where id = ?", today, sold);
         TestSession.close();
 

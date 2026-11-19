@@ -42,15 +42,15 @@ function svgSource(parts: Record<BodyPart, PartCondition>, title: string): { svg
     `<text x="${x}" y="${y}" font-family="${font}" ${attrs}>${escape(value)}</text>`;
 
   const paths = (Object.keys(SHAPE) as BodyPart[])
-    .map((p) => `<path d="${SHAPE[p]}" fill="${conditionColor(parts[p] ?? "ORIGINAL")}" stroke="${white}" stroke-width="2.5" stroke-linejoin="round"/>`)
+    .map((p) => `<path d="${SHAPE[p]}" fill="${conditionColor(parts[p] ?? "ORIGINAL")}" stroke="${ink3}" stroke-width="1.3" stroke-linejoin="round"/>`)
     .join("");
   const map = `<g transform="translate(${MAP_X} ${MAP_Y})">`
     + text(110, -10, "Ön", `font-size="12" text-anchor="middle" fill="${ink3}"`)
     + `<text x="-4" y="200" font-family="${font}" font-size="12" text-anchor="middle" fill="${ink3}" transform="rotate(-90 -4 200)">Sol</text>`
     + `<text x="226" y="200" font-family="${font}" font-size="12" text-anchor="middle" fill="${ink3}" transform="rotate(90 226 200)">Sağ</text>`
-    + WHEELS.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="5" fill="${token("--color-murekkep-2")}"/>`).join("")
-    + MIRRORS.map((d) => `<path d="${d}" fill="${token("--color-cizgi-2")}" stroke="${white}" stroke-width="1.5"/>`).join("")
-    + GLASS.map((d) => `<path d="${d}" fill="${glass}" stroke="${white}" stroke-width="2"/>`).join("")
+    + WHEELS.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="5" fill="${white}" stroke="${ink3}" stroke-width="1.3"/>`).join("")
+    + MIRRORS.map((d) => `<path d="${d}" fill="${conditionColor("ORIGINAL")}" stroke="${ink3}" stroke-width="1.3" stroke-linejoin="round"/>`).join("")
+    + GLASS.map((d) => `<path d="${d}" fill="${glass}" stroke="${ink3}" stroke-width="1.3" stroke-linejoin="round"/>`).join("")
     + paths + `</g>`;
 
   // Sag panel: baslik, arac adi, durum sayilari, hasarli parcalar
@@ -65,7 +65,7 @@ function svgSource(parts: Record<BodyPart, PartCondition>, title: string): { svg
   const summary = damageSummary(parts);
   for (const s of summary) {
     y += 34;
-    panel += `<rect x="${PANEL_X}" y="${y - 15}" width="18" height="18" rx="4" fill="${conditionColor(s.condition)}"/>`
+    panel += `<rect x="${PANEL_X}" y="${y - 15}" width="18" height="18" rx="4" fill="${conditionColor(s.condition)}" stroke="${ink3}" stroke-opacity=".4"/>`
       + text(PANEL_X + 28, y, PART_CONDITION[s.condition], `font-size="17" fill="${ink}"`)
       + text(WIDTH - 24, y, String(s.count), `font-size="18" font-weight="bold" text-anchor="end" fill="${ink}"`);
   }

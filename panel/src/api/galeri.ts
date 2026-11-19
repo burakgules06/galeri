@@ -28,7 +28,9 @@ export const api = {
   reorderPhotos: (vehicleId: string, photoIds: string[]) =>
     apiFetch<ShowroomListing>(`/api/vehicles/${vehicleId}/photos/order`, json({ photoIds }, "PUT")),
   showroomSettings: () => apiFetch<ShowroomSettings>("/api/settings/showroom"),
-  updateShowroomSettings: (phone: string | null) => apiFetch<ShowroomSettings>("/api/settings/showroom", json({ phone }, "PUT")),
+  // Telefon ve adres birlikte gonderilir (bos gelen silinir)
+  updateShowroomSettings: (phone: string | null, address: string | null) =>
+    apiFetch<ShowroomSettings>("/api/settings/showroom", json({ phone, address }, "PUT")),
   // Herkese acik vitrin (giris yok)
   publicGallery: (slug: string) => publicFetch<PublicGallery>(`/api/public/showroom/${encodeURIComponent(slug)}`),
   publicVehicle: (slug: string, id: string) => publicFetch<PublicVehicle>(`/api/public/showroom/${encodeURIComponent(slug)}/vehicles/${id}`),

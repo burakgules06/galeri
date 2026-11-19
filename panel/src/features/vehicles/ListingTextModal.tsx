@@ -8,10 +8,11 @@ import { Button, ErrorBox, Modal } from "../../shared/ui/Common";
 import { damageImage } from "./damageImage";
 import { listingHtml, listingPlainText } from "./listingText";
 
-export function ListingTextModal({ vehicle, galleryName, phone, description, onClose }: {
+export function ListingTextModal({ vehicle, galleryName, phone, address, description, onClose }: {
   vehicle: VehicleDetail;
   galleryName: string;
   phone: string | null;
+  address: string | null;
   description: string;
   onClose: () => void;
 }) {
@@ -21,7 +22,7 @@ export function ListingTextModal({ vehicle, galleryName, phone, description, onC
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const input = { vehicle, galleryName, phone, description, showPlate, showPhone };
+  const input = { vehicle, galleryName, phone, address, description, showPlate, showPhone };
   const html = listingHtml(input);
   const text = listingPlainText(input);
 
@@ -70,6 +71,7 @@ export function ListingTextModal({ vehicle, galleryName, phone, description, onC
               onChange={(e) => setShowPhone(e.target.checked)} />
             Telefonu göster{!phone && " (vitrin ayarlarında telefon yok)"}
           </label>
+          {!address && <span className="text-[13.5px] text-murekkep-2">Dükkân adresi yok: Hesabım › Müşteri vitrini'nden eklenir.</span>}
         </div>
         <ErrorBox message={error} />
         {done && <p role="status" className="text-[14px] font-semibold text-basari">{done}</p>}

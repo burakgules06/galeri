@@ -2,7 +2,7 @@
 // gibi duzenli bir aciklama uretir. Iki bicim birlikte kopyalanir: zengin metin (HTML; aciklama editoru bicimi destekliyorsa
 // tablolar ve renkler korunur) ve duz metin (desteklemiyorsa ya da telefondan yapistirilirsa bu kullanilir).
 // Ilan sitesi bizim CSS'imizi gormez: renkler tema degiskenlerinden (index.css @theme) okunup satir ici yazilir.
-import { BODY_PART, FUEL, PART_CONDITION, TRANSMISSION, tl } from "../../shared/format";
+import { BODY_PART, formatPhone, FUEL, PART_CONDITION, TRANSMISSION, tl } from "../../shared/format";
 import type { BodyPart, PartCondition, VehicleDetail } from "../../shared/types";
 import { SHAPE } from "./damageShapes";
 
@@ -10,6 +10,7 @@ export interface ListingTextInput {
   vehicle: VehicleDetail;
   galleryName: string;
   phone: string | null;
+  address: string | null;     // dukkan adresi (vitrin ayarlari); bos ise yazilmaz
   description: string;        // vitrindeki ilan aciklamasi (kaydedilmemis hali de olabilir)
   showPlate: boolean;
   showPhone: boolean;
@@ -87,13 +88,25 @@ export function listingHtml(i: ListingTextInput): string {
 </table>`;
 
   // Ust serit: galeri adi, arac, kisa ozet
+  // Ust satir: solda marka ve arac (mavi serit), sagda galeri karti (ad, adres, telefon)
+  const phoneLine = i.showPhone && i.phone ? formatPhone(i.phone) : null;
+  const galleryCard = `
+    <div style="font-size:12px;font-weight:bold;letter-spacing:.5px;color:${ink2};">GALERİ</div>
+    <div style="font-size:17px;font-weight:bold;color:${ink};margin:3px 0 0 0;">${esc(i.galleryName)}</div>
+    ${i.address ? `<div style="font-size:14px;line-height:1.4;color:${ink2};margin:6px 0 0 0;">${esc(i.address)}</div>` : ""}
+    ${phoneLine ? `<div style="font-size:15px;font-weight:bold;color:${brand};margin:6px 0 0 0;">${esc(phoneLine)}</div>` : ""}`;
   const header = `
-<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${brand};margin:0 0 14px 0;">
-  <tr><td style="padding:18px 20px;font-family:${font};color:${white};">
-    <div style="font-size:14px;font-weight:bold;letter-spacing:.5px;">${esc(i.galleryName)}</div>
-    <div style="font-size:26px;font-weight:bold;margin:4px 0 2px 0;">${esc(`${v.make} ${v.model}`)}</div>
-    <div style="font-size:15px;">${esc([String(v.modelYear), km(v.mileageKm), FUEL[v.fuel], TRANSMISSION[v.transmission]].join(" · "))}</div>
-  </td></tr>
+<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 14px 0;">
+  <tr>
+    <td width="62%" valign="middle" style="background:${brand};padding:18px 20px;font-family:${font};color:${white};">
+      <div style="font-size:30px;font-weight:bold;letter-spacing:.5px;">${esc(v.make)}</div>
+      <div style="font-size:19px;font-weight:bold;margin:2px 0 6px 0;">${esc(v.model)}</div>
+      <div style="font-size:15px;">${esc([String(v.modelYear), km(v.mileageKm), FUEL[v.fuel], TRANSMISSION[v.transmission]].join(" · "))}</div>
+    </td>
+    <td width="2%"></td>
+    <td width="36%" valign="middle" style="border:1px solid ${line};padding:14px 16px;font-family:${font};">${galleryCard}
+    </td>
+  </tr>
 </table>`;
 
   // Bilgi kartlari: koyu baslik + acik deger, satirda 4 tane (Borusan / kurumsal ilan duzeni)
@@ -133,13 +146,9 @@ export function listingHtml(i: ListingTextInput): string {
   const descriptionBox = text ? box("Açıklama", text.split(/\n{2,}/).map((p) =>
     `<p style="font-family:${font};font-size:15px;line-height:1.5;color:${ink};margin:0 0 8px 0;">${esc(p).replace(/\n/g, "<br>")}</p>`).join("")) : "";
 
-  const contact = box("Satıcı", `
-    <div style="font-family:${font};font-size:15px;font-weight:bold;color:${ink};">${esc(i.galleryName)}</div>
-    ${i.showPhone && i.phone ? `<div style="font-family:${font};font-size:15px;color:${ink2};margin:4px 0 0 0;">Telefon: <b style="color:${ink};">${esc(i.phone)}</b></div>` : ""}`);
-
   const footer = `<div style="font-family:${font};font-size:13px;color:${ink2};background:${brandLight};padding:10px 14px;">Bilgiler galerimizin kayıtlarından hazırlanmıştır. Ekspertiz ve detaylı bilgi için bizi arayabilirsiniz.</div>`;
 
-  return `<div style="font-family:${font};color:${ink};max-width:760px;">${header}${grid}${expertise}${tramerBox}${descriptionBox}${contact}${footer}</div>`;
+  return `<div style="font-family:${font};color:${ink};max-width:760px;">${header}${grid}${expertise}${tramerBox}${descriptionBox}${footer}</div>`;
 }
 
 // ------------------------------------------------------------------ duz metin
@@ -172,6 +181,7 @@ export function listingPlainText(i: ListingTextInput): string {
 
   section("Satıcı");
   out.push(i.galleryName);
-  if (i.showPhone && i.phone) out.push(`Telefon: ${i.phone}`);
+  if (i.address) out.push(`Adres: ${i.address}`);
+  if (i.showPhone && i.phone) out.push(`Telefon: ${formatPhone(i.phone)}`);
   return out.join("\n");
 }

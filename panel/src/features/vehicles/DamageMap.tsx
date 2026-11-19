@@ -37,16 +37,17 @@ export function DamageMap({ parts, editable = false, onChange }: {
           <text x="110" y="-4" textAnchor="middle" className="fill-murekkep-3" fontSize="11">Ön</text>
           <text x="6" y="210" className="fill-murekkep-3" fontSize="11" transform="rotate(-90 6 210)" textAnchor="middle">Sol</text>
           <text x="214" y="210" className="fill-murekkep-3" fontSize="11" transform="rotate(90 214 210)" textAnchor="middle">Sağ</text>
-          {WHEELS.map(([x, y, w, h]) => <rect key={`${x}-${y}`} x={x} y={y} width={w} height={h} rx="5" fill="var(--color-murekkep-2)" />)}
-          {MIRRORS.map((d) => <path key={d} d={d} fill="var(--color-cizgi-2)" stroke="white" strokeWidth="1.5" />)}
-          {GLASS.map((d) => <path key={d} d={d} fill="var(--color-plaka-acik)" stroke="white" strokeWidth="2" />)}
+          {/* Ince cizgili kroki: tekerlek, ayna ve camlar sadece gorunum */}
+          {WHEELS.map(([x, y, w, h]) => <rect key={`${x}-${y}`} x={x} y={y} width={w} height={h} rx="5" fill="var(--color-yuzey)" stroke="var(--color-murekkep-3)" strokeWidth="1.3" />)}
+          {MIRRORS.map((d) => <path key={d} d={d} fill="var(--color-orijinal)" stroke="var(--color-murekkep-3)" strokeWidth="1.3" strokeLinejoin="round" />)}
+          {GLASS.map((d) => <path key={d} d={d} fill="var(--color-plaka-acik)" stroke="var(--color-murekkep-3)" strokeWidth="1.3" strokeLinejoin="round" />)}
           {(Object.keys(SHAPE) as BodyPart[]).map((p) => (
             <path
               key={p}
               d={SHAPE[p]}
               fill={FILL[parts[p]]}
-              stroke="white"
-              strokeWidth="2.5"
+              stroke="var(--color-murekkep-3)"
+              strokeWidth="1.3"
               strokeLinejoin="round"
               role={editable ? "button" : undefined}
               tabIndex={editable ? 0 : undefined}
@@ -75,7 +76,7 @@ export function DamageMap({ parts, editable = false, onChange }: {
                 selected ? "border-murekkep bg-yuzey-2" : "border-cizgi bg-yuzey"
               }`}
             >
-              <span className="w-4 h-4 rounded-[4px] shrink-0" style={{ background: FILL[c] }} />
+              <span className="w-4 h-4 rounded-[4px] shrink-0 border border-murekkep-3/40" style={{ background: FILL[c] }} />
               <span className="grow">{PART_CONDITION[c]}</span>
               <span className="font-cond text-[17px] text-murekkep-2">{n}</span>
             </button>

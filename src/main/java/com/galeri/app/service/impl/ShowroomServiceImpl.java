@@ -111,7 +111,7 @@ public class ShowroomServiceImpl implements ShowroomService {
     @Transactional(readOnly = true)
     public ShowroomResponses.Settings settings() {
         Tenant t = tenantRepository.findById(CurrentUser.tenantId()).orElseThrow(RecordNotFoundException::new);
-        return new ShowroomResponses.Settings(t.getSlug(), t.getShowroomPhone());
+        return new ShowroomResponses.Settings(t.getSlug(), t.getShowroomPhone(), t.getShowroomAddress());
     }
 
     @Override
@@ -120,7 +120,10 @@ public class ShowroomServiceImpl implements ShowroomService {
         Tenant t = tenantRepository.findById(CurrentUser.tenantId()).orElseThrow(RecordNotFoundException::new);
         String digits = request.phone() == null ? "" : request.phone().replaceAll("\\D", "");
         t.setShowroomPhone(digits.isEmpty() ? null : digits);
-        return new ShowroomResponses.Settings(t.getSlug(), t.getShowroomPhone());
+        // Adres: bosluklar toplanir, bos ise silinir (panel telefon ve adresi birlikte gonderir)
+        String address = request.address() == null ? "" : request.address().trim().replaceAll("\\s+", " ");
+        t.setShowroomAddress(address.isEmpty() ? null : address);
+        return new ShowroomResponses.Settings(t.getSlug(), t.getShowroomPhone(), t.getShowroomAddress());
     }
 
     @Override

@@ -24,7 +24,7 @@ public final class ShowroomResponses {
                           boolean inStock) {}
 
     /** Panel: vitrin linki ve WhatsApp numarasi. */
-    public record Settings(String slug, String phone) {}
+    public record Settings(String slug, String phone, String address) {}
 
     public record PublicGallery(String name, String phone, List<PublicCard> vehicles) {}
 

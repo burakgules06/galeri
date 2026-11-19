@@ -488,7 +488,7 @@ export interface ShowroomPhoto { id: string; url: string; thumbUrl: string; widt
 export interface ShowroomListing {
   showInShowroom: boolean; listingPriceCents: number | null; listingDescription: string | null; photos: ShowroomPhoto[]; inStock: boolean;
 }
-export interface ShowroomSettings { slug: string; phone: string | null }
+export interface ShowroomSettings { slug: string; phone: string | null; address: string | null }
 export interface PublicShowroomCard {
   id: string; make: string; model: string; modelYear: number; mileageKm: number; fuel: Fuel; transmission: Transmission;
   color: string | null; priceCents: number | null; cover: ShowroomPhoto | null; photoCount: number; paintedParts: number; replacedParts: number;
