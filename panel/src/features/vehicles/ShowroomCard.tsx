@@ -1,18 +1,22 @@
 // Arac detayinda "Vitrin" karti (sadece dukkan sahibi): fotograflar, vitrinde gosterme, ilan fiyati ve aciklamasi.
 // Fotograflar yuklenince hemen kaydedilir; diger alanlar "Kaydet" ile. Ilk fotograf kapak olur.
+// "Sahibinden açıklaması": arac bilgilerinden ilan aciklamasi (ListingTextModal), kopyalanip ilana yapistirilir.
 import { useRef, useState } from "react";
 import { api } from "../../api/galeri";
 import { apiUrl } from "../../api/client";
 import { centsToInput, tlToCents } from "../../shared/format";
 import { shrinkImage } from "../../shared/image/shrinkImage";
-import type { ShowroomListing, ShowroomPhoto } from "../../shared/types";
+import { useAuth } from "../../auth/useAuth";
+import type { ShowroomListing, ShowroomPhoto, VehicleDetail } from "../../shared/types";
 import { errorMessage, useLoad } from "../../shared/useLoad";
 import { Button, ErrorBox, Field, inputClass } from "../../shared/ui/Common";
 import { NumberInput } from "../../shared/ui/NumberInput";
+import { ListingTextModal } from "./ListingTextModal";
 
 const MAX_PHOTOS = 20;
 
-export function ShowroomCard({ vehicleId }: { vehicleId: string }) {
+export function ShowroomCard({ vehicle }: { vehicle: VehicleDetail }) {
+  const vehicleId = vehicle.id;
   const listing = useLoad(() => api.listing(vehicleId), [vehicleId]);
   const settings = useLoad(() => api.showroomSettings(), []);
   return (
@@ -25,12 +29,15 @@ export function ShowroomCard({ vehicleId }: { vehicleId: string }) {
         )}
       </div>
       {listing.error && <ErrorBox message={listing.error} />}
-      {listing.data && <ShowroomEditor key={vehicleId} vehicleId={vehicleId} initial={listing.data} />}
+      {listing.data && <ShowroomEditor key={vehicleId} vehicle={vehicle} initial={listing.data} phone={settings.data?.phone ?? null} />}
     </section>
   );
 }
 
-function ShowroomEditor({ vehicleId, initial }: { vehicleId: string; initial: ShowroomListing }) {
+function ShowroomEditor({ vehicle, initial, phone }: { vehicle: VehicleDetail; initial: ShowroomListing; phone: string | null }) {
+  const vehicleId = vehicle.id;
+  const { auth } = useAuth();
+  const [listingText, setListingText] = useState(false);
   const [listing, setListing] = useState(initial);
   const [show, setShow] = useState(initial.showInShowroom);
   const [price, setPrice] = useState(initial.listingPriceCents ? centsToInput(initial.listingPriceCents) : "");
@@ -137,10 +144,15 @@ function ShowroomEditor({ vehicleId, initial }: { vehicleId: string; initial: Sh
           placeholder="Servis bakımlı, ilk sahibinden, yeni muayeneli…" />
       </Field>
 
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <Button variant="secondary" className="mr-auto" onClick={() => setListingText(true)}>Sahibinden açıklaması</Button>
         {saved && !dirty && <span role="status" className="text-[14px] font-semibold text-basari">Kaydedildi</span>}
         <Button onClick={() => void save()} disabled={busy || !dirty}>{busy ? "Kaydediliyor…" : "Kaydet"}</Button>
       </div>
+      {listingText && (
+        <ListingTextModal vehicle={vehicle} galleryName={auth?.tenantName || "Galeri"} phone={phone} description={description}
+          onClose={() => setListingText(false)} />
+      )}
     </div>
   );
 }

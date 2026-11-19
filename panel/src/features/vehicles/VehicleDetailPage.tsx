@@ -180,7 +180,7 @@ export function VehicleDetailPage({ id }: { id: string }) {
               onSaved={setData}
             />
           </Card>
-          {admin && !isInvestor && <ShowroomCard vehicleId={v.id} />}
+          {admin && !isInvestor && <ShowroomCard vehicle={v} />}
         </div>
       </div>
 

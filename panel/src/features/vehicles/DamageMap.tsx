@@ -4,6 +4,7 @@
 import { useState } from "react";
 import type { BodyPart, PartCondition } from "../../shared/types";
 import { BODY_PART, PART_CONDITION } from "../../shared/format";
+import { GLASS, SHAPE } from "./damageShapes";
 
 const FILL: Record<PartCondition, string> = {
   ORIGINAL: "var(--color-orijinal)",
@@ -13,28 +14,6 @@ const FILL: Record<PartCondition, string> = {
 };
 
 const CONDITIONS: PartCondition[] = ["ORIGINAL", "LOCALLY_PAINTED", "PAINTED", "REPLACED"];
-
-// viewBox 0 0 220 400, on taraf yukarida. Sol taraf aracin sol yani.
-const SHAPE: Record<BodyPart, string> = {
-  FRONT_BUMPER: "M58 14 Q110 2 162 14 L166 34 L54 34 Z",
-  HOOD: "M54 38 L166 38 L162 118 L58 118 Z",
-  ROOF: "M64 176 L156 176 L156 268 L64 268 Z",
-  TRUNK_LID: "M58 302 L162 302 L166 352 L54 352 Z",
-  REAR_BUMPER: "M54 356 L166 356 L162 380 Q110 392 58 380 Z",
-  LEFT_FRONT_FENDER: "M22 54 Q24 38 50 36 L52 120 L20 120 Z",
-  LEFT_FRONT_DOOR: "M20 124 L52 124 L52 210 L20 210 Z",
-  LEFT_REAR_DOOR: "M20 214 L52 214 L52 296 L20 296 Z",
-  LEFT_REAR_FENDER: "M20 300 L52 300 L50 358 Q24 356 22 342 Z",
-  RIGHT_FRONT_FENDER: "M198 54 Q196 38 170 36 L168 120 L200 120 Z",
-  RIGHT_FRONT_DOOR: "M168 124 L200 124 L200 210 L168 210 Z",
-  RIGHT_REAR_DOOR: "M168 214 L200 214 L200 296 L168 296 Z",
-  RIGHT_REAR_FENDER: "M168 300 L200 300 L198 342 Q196 356 170 358 Z",
-};
-
-const GLASS = [
-  "M60 124 L160 124 L154 170 L66 170 Z", // on cam
-  "M66 274 L154 274 L160 296 L60 296 Z", // arka cam
-];
 
 export function DamageMap({ parts, editable = false, onChange }: {
   parts: Record<BodyPart, PartCondition>;
