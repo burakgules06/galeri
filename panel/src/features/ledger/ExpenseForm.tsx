@@ -1,6 +1,7 @@
 // Masraf girisi: araca bagliysa aracin maliyetine eklenir, degilse genel gider. Odeme kasadan ya da bankadan.
 // Konsinye aracta masraf secilen kasa / bankadan sahibinin sermayesinden duser (nakdi yetmezse onay sorulur, eksiye dusebilir);
-// "Cepten" secilirse para hareketi olmaz, masraf sadece aracta gorunur.
+// "Cepten" secilirse para hareketi olmaz, masraf sadece aracta gorunur. Galeri / ortak aracta (dukkan sahibi) cepten masraf
+// maliyete eklenir, kasa degismez, dukkan sahibinin sermayesi artar.
 // Yetkili calisan (canAddExpense): sadece arac masrafi, kasa / banka secer (bakiyesiz); cepten ve duzenleme yok.
 // existing verilirse duzenleme: form mevcut degerlerle acilir, kaydedince eski kayit terslenir, yenisi yazilir (PUT /api/expenses/{id}).
 import { useState, type FormEvent } from "react";
@@ -59,7 +60,11 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing,
   const ownership = vehicle?.ownership ?? stock.data?.find((v) => v.id === vehicleId)?.ownership;
   const consignment = root === "VEHICLE" && ownership === "CONSIGNMENT";
   const selectedAccount = accountId || (isInvestor ? HOUSE_CASH : (accounts.data?.find((a) => a.type === "CASH") ?? accounts.data?.[0])?.id || "");
-  const pocket = !staff && (root === "GENERAL" || (consignment && !locked)) && selectedAccount === POCKET;
+  // Cepten: dukkan gideri, konsinye araca (sadece takip) ve dukkan sahibi icin galeri / ortak arac masrafi (maliyete eklenir,
+  // kasa degismez, sermayesi artar). Calisan secemez; sermayedar sadece konsinye aracinda.
+  const pocketVehicleCost = root === "VEHICLE" && !consignment && !isInvestor;
+  const pocketAllowed = !staff && (root === "GENERAL" || (consignment && !locked) || pocketVehicleCost);
+  const pocket = pocketAllowed && selectedAccount === POCKET;
   const pocketVehicle = pocket && consignment;   // konsinye araca cepten: sadece takip, para hareketi yok
 
   const submit = async (e: FormEvent) => {
@@ -140,9 +145,10 @@ function ExpenseFormContent({ onClose, onSaved, vehicle: fixedVehicle, existing,
             : accounts.data && (
               <Segment<string> value={selectedAccount} onChange={setAccountId}
                 options={[...accounts.data.map((a) => ({ value: a.id, label: staff ? a.name : `${a.name} · ${tl(a.balanceCents)}` })),
-                  ...(!staff && (root === "GENERAL" || (consignment && !locked)) ? [{ value: POCKET, label: root === "GENERAL" ? "Cepten (elden ödendi)" : "Cepten" }] : [])]} />
+                  ...(pocketAllowed ? [{ value: POCKET, label: root === "GENERAL" ? "Cepten (elden ödendi)" : "Cepten" }] : [])]} />
             )}
-          {pocket && !pocketVehicle && <p className="text-[13px] text-murekkep-2 mt-1.5">Kasa ve banka değişmez, kimsenin sermayesinden düşmez; gider olarak kaydedilir.</p>}
+          {pocket && root === "GENERAL" && <p className="text-[13px] text-murekkep-2 mt-1.5">Kasa ve banka değişmez, kimsenin sermayesinden düşmez; gider olarak kaydedilir.</p>}
+          {pocket && pocketVehicleCost && <p className="text-[13px] text-murekkep-2 mt-1.5">Kasa ve banka değişmez; masraf aracın maliyetine eklenir, dükkân sahibinin sermayesi o kadar artar.</p>}
         </Field>}
 
         <div className="grid grid-cols-2 gap-3">

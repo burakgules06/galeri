@@ -21,8 +21,9 @@ public record ExpenseRequest(
         // Sadece konsinye aracta (Kasim 2026): masraf her zaman sahibinin sermayesinden duser. Nakitteki parasi yetmiyorsa
         // istek 1061 ile reddedilir; kullanici "eksiye dusecek, devam?" sorusunu onaylarsa true gelir ve eksiye duser.
         Boolean confirmNegative,
-        // Dukkan gideri cepten (elden) odendi: kasa / banka degismez, kimsenin sermayesi dusmez. Defterde dukkan sahibinin
-        // sermaye hesabindan gidere yazilir (sermayesi o kadar artar, gider kadar azalir). Sadece genel giderde.
+        // Cepten (elden) odendi: kasa / banka degismez, defterde kaynak dukkan sahibinin sermaye hesabi. Genel giderde kimsenin
+        // sermayesi dusmez (sermayesi o kadar artar, gider kadar azalir); galeri / ortak arac masrafinda arac maliyetine eklenir,
+        // dukkan sahibinin sermayesi artar. Konsinye aracta sayilmaz (ayri uc). Sermayedar ve calisan gonderemez.
         Boolean paidByOwner
 ) {
     public ExpenseRequest(LocalDate date, UUID sourceAccountId, Long amountCents, UUID vehicleId, UUID categoryId, String categoryName,

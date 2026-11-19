@@ -197,6 +197,26 @@ class HoldersIT {
     }
 
     @Test
+    void cepten_aracMasrafi_kasaDegismez_aracMaliyetineEklenir_dukkanSahibininSermayesiArtar() {
+        UUID shared = vehicle(4 * M, List.of(new ShareRequest(furkan, 5000), new ShareRequest(burak, 5000, null, ContributionSource.CAPITAL, null)));
+        UUID own = vehicle(1 * M, null);
+        long cashBefore = cashBalance();
+        CapitalResponses.Holder ownerBefore = holder(furkan), burakBefore = holder(burak);
+
+        ledgerService.addExpense(new ExpenseRequest(today, null, 50 * K, shared, null, "Boya", null, null, null, true));
+        ledgerService.addExpense(new ExpenseRequest(today, null, 20 * K, own, null, "Lastik", null, null, null, true));
+
+        assertThat(cashBalance()).as("kasa").isEqualTo(cashBefore);
+        assertThat(holder(furkan).capitalCents()).as("dukkan sahibi cebinden koydu").isEqualTo(ownerBefore.capitalCents() + 70 * K);
+        assertThat(holder(burak).capitalCents()).as("ortak arac masrafi katki degil").isEqualTo(burakBefore.capitalCents());
+        assertThat(ledgerService.expenses(today, today)).filteredOn(e -> e.vehicle() != null).hasSize(2).allSatisfy(e -> {
+            assertThat(e.source().type()).isEqualTo(AccountType.CAPITAL);
+            assertThat(e.target().type()).isEqualTo(AccountType.VEHICLE);
+        });
+        check("cepten arac masrafi");
+    }
+
+    @Test
     void sermayedar_sadeceKendiSermayesiniVeKasadakiPayiniGorur() {
         TestSession.close();
         TestSession.open(burak, tenant, "INVESTOR");
