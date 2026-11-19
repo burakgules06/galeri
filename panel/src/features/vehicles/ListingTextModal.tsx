@@ -1,7 +1,7 @@
 // "Sahibinden açıklaması": aracin bilgilerinden kurumsal ilan duzeninde aciklama. Kopyala ile sahibinden'in aciklama alanina
 // yapistirilir (bicim destekleniyorsa tablolar / renkler, desteklenmiyorsa duzenli duz metin gelir). Hasar semasi ayrica resim
 // olarak indirilip ilana fotograf olarak eklenir.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { copyRich, copyText, saveFile } from "../../shared/clipboard";
 import type { VehicleDetail } from "../../shared/types";
 import { Button, ErrorBox, Modal } from "../../shared/ui/Common";
@@ -26,7 +26,8 @@ export function ListingTextModal({ vehicle, galleryName, phone, address, logoUrl
 
   // Ilan sitesi resmi bizim sunucudan ceker: tam adres gerekir
   const logoAbsolute = logoUrl ? new URL(apiUrl(logoUrl), window.location.origin).href : null;
-  const input = { vehicle, galleryName, phone, address, logoUrl: logoAbsolute, description, showPlate, showPhone };
+  const logoSize = useLogoSize(logoAbsolute);
+  const input = { vehicle, galleryName, phone, address, logoUrl: logoAbsolute, logoSize, description, showPlate, showPhone };
   const html = listingHtml(input);
   const text = listingPlainText(input);
 
@@ -98,4 +99,17 @@ async function loadLogo(url: string | null): Promise<ImageBitmap | null> {
   } catch {
     return null;
   }
+}
+
+// Logonun gercek boyutu (banner'a sigdirmak icin). Yuklenene kadar null: HTML boyutsuz, en fazla 150 px yukseklikle yazilir.
+function useLogoSize(url: string | null): { width: number; height: number } | null {
+  const [size, setSize] = useState<{ url: string; width: number; height: number } | null>(null);
+  useEffect(() => {
+    if (!url) return;
+    const img = new Image();
+    img.onload = () => setSize({ url, width: img.naturalWidth, height: img.naturalHeight });
+    img.src = url;
+    return () => { img.onload = null; };
+  }, [url]);
+  return size && size.url === url ? { width: size.width, height: size.height } : null;
 }

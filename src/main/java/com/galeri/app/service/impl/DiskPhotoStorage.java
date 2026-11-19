@@ -29,7 +29,7 @@ public class DiskPhotoStorage implements PhotoStorage {
 
     static final int MAX_SIDE = 1600;
     static final int THUMB_SIDE = 480;
-    static final int LOGO_SIDE = 600;
+    static final int LOGO_SIDE = 1200;   // ince uzun logolar banner genisligine buyutulunce net kalsin
     private static final long MAX_PIXELS = 50_000_000L;   // bozuk / kotu niyetli dev resimlere karsi
 
     private final Path root;

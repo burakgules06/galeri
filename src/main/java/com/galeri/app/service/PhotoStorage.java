@@ -16,7 +16,7 @@ public interface PhotoStorage {
     /** thumb: liste icin kucuk boy. Dosya yoksa null. */
     Path path(UUID tenantId, UUID photoId, boolean thumb);
 
-    /** Galeri logosu: saydamlik korunur, uzun kenar en fazla 600 px, PNG. Resim degilse InvalidPhotoException. */
+    /** Galeri logosu: saydamlik korunur, uzun kenar en fazla 1200 px, PNG. Resim degilse InvalidPhotoException. */
     Stored saveLogo(UUID tenantId, UUID logoId, byte[] content);
 
     void deleteLogo(UUID tenantId, UUID logoId);

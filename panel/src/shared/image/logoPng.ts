@@ -1,6 +1,6 @@
-// Galeri logosunu yuklemeden once tarayicida PNG'ye cevirir: saydamlik korunur, uzun kenar en fazla 600 px.
+// Galeri logosunu yuklemeden once tarayicida PNG'ye cevirir: saydamlik korunur, uzun kenar en fazla 1200 px.
 // WebP gibi sunucunun okuyamadigi bicimler de boylece PNG olur. Tarayici acamazsa dosya oldugu gibi gider.
-const MAX_SIDE = 600;
+const MAX_SIDE = 1200;
 
 export async function logoPng(file: File): Promise<Blob> {
   let bitmap: ImageBitmap;

@@ -11,7 +11,8 @@ export interface ListingTextInput {
   galleryName: string;
   phone: string | null;
   address: string | null;     // dukkan adresi (vitrin ayarlari); bos ise yazilmaz
-  logoUrl: string | null;     // galeri logosu, tam adres (https://...); ilan sitesi resmi kabul ederse karti ustunde gorunur
+  logoUrl: string | null;     // galeri logosu, tam adres (https://...); ilan sitesi resmi kabul ederse en ustte banner olur
+  logoSize?: { width: number; height: number } | null;   // logonun gercek boyutu: banner'a orani bozulmadan sigdirmak icin
   description: string;        // vitrindeki ilan aciklamasi (kaydedilmemis hali de olabilir)
   showPlate: boolean;
   showPhone: boolean;
@@ -69,6 +70,24 @@ function specs(i: ListingTextInput): [string, string][] {
 
 // ------------------------------------------------------------------ zengin metin (HTML)
 
+// Banner'daki logo kutusu: logo bu alana orani korunarak sigdirilir, kucukse buyutulur (kare logo 150x150,
+// ince uzun logo 700 px genislige kadar). Dar ekranda max-width ile oranini koruyarak kuculur.
+const BANNER_W = 700;
+const BANNER_H = 150;
+
+function logoImg(i: ListingTextInput): string {
+  const src = esc(i.logoUrl ?? "");
+  const alt = esc(i.galleryName);
+  const size = i.logoSize;
+  if (!size || size.width <= 0 || size.height <= 0) {
+    return `<img src="${src}" alt="${alt}" style="display:block;margin:0 auto;max-width:100%;max-height:${BANNER_H}px;width:auto;height:auto;">`;
+  }
+  const ratio = Math.min(BANNER_W / size.width, BANNER_H / size.height);
+  const w = Math.round(size.width * ratio);
+  const h = Math.round(size.height * ratio);
+  return `<img src="${src}" alt="${alt}" width="${w}" height="${h}" style="display:block;margin:0 auto;width:${w}px;max-width:100%;height:auto;">`;
+}
+
 export function listingHtml(i: ListingTextInput): string {
   const v = i.vehicle;
   const ink = token("--color-murekkep");
@@ -93,7 +112,7 @@ export function listingHtml(i: ListingTextInput): string {
   const banner = i.logoUrl ? `
 <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid ${line};background:${white};margin:0 0 10px 0;">
   <tr><td align="center" valign="middle" style="padding:22px 16px;">
-    <img src="${esc(i.logoUrl)}" alt="${esc(i.galleryName)}" height="150" style="display:block;margin:0 auto;height:150px;width:auto;max-width:100%;">
+    ${logoImg(i)}
   </td></tr>
 </table>` : "";
 
