@@ -78,25 +78,17 @@ const BOX_INNER = W - 2 - 32;        // kutu icindeki alan (1 px kenarlik + 16 p
 const tableAttrs = (width: number) => `width="${width}" cellpadding="0" cellspacing="0"`;
 const widthStyle = (width: number) => `width:${width}px;`;
 
-// Banner'daki logo: kartin tam genisligine kadar buyutulur (kenardan kenara, orani korunarak). Kare / dik logolar dev
-// olmasin diye yukseklik en fazla BANNER_MAX_H; o zaman ortada durur.
-const BANNER_W = W;
-const BANNER_MAX_H = 220;
-
+// Banner'daki logo: oranini koruyarak kartin tam genisligine (W) buyutulur, ortada durur. Yukseklik logonun oranindan gelir
+// (genis logo ince bir serit, kare logo W x W olur).
 function logoImg(i: ListingTextInput): string {
   const src = esc(i.logoUrl ?? "");
   const alt = esc(i.galleryName);
   const size = i.logoSize;
   if (!size || size.width <= 0 || size.height <= 0) {
-    return `<img src="${src}" alt="${alt}" width="${BANNER_W}" style="display:block;margin:0 auto;max-width:${BANNER_W}px;height:auto;max-height:${BANNER_MAX_H}px;object-fit:contain;">`;
+    return `<img src="${src}" alt="${alt}" width="${W}" style="display:block;margin:0 auto;width:${W}px;height:auto;">`;
   }
-  const aspect = size.width / size.height;
-  if (BANNER_W / aspect <= BANNER_MAX_H) {
-    // Genis logo: kartin tamami
-    return `<img src="${src}" alt="${alt}" width="${BANNER_W}" height="${Math.round(BANNER_W / aspect)}" style="display:block;width:${BANNER_W}px;height:${Math.round(BANNER_W / aspect)}px;">`;
-  }
-  const w = Math.round(BANNER_MAX_H * aspect);
-  return `<img src="${src}" alt="${alt}" width="${w}" height="${BANNER_MAX_H}" style="display:block;margin:0 auto;width:${w}px;height:${BANNER_MAX_H}px;">`;
+  const h = Math.round(W * size.height / size.width);
+  return `<img src="${src}" alt="${alt}" width="${W}" height="${h}" style="display:block;margin:0 auto;width:${W}px;height:${h}px;">`;
 }
 
 export function listingHtml(i: ListingTextInput): string {
