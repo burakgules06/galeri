@@ -15,6 +15,8 @@ import java.util.UUID;
 public interface TenantRepository extends JpaRepository<Tenant, UUID> {
     Optional<Tenant> findBySlug(String slug);
 
+    Optional<Tenant> findByLogoId(UUID logoId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select t from Tenant t where t.reminderTime <= :time and (t.reminderSentOn is null or t.reminderSentOn <> :today) order by t.id")
     List<Tenant> findDueReminders(LocalDate today, LocalTime time);

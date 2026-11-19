@@ -24,7 +24,8 @@ public final class ShowroomResponses {
                           boolean inStock) {}
 
     /** Panel: vitrin linki ve WhatsApp numarasi. */
-    public record Settings(String slug, String phone) {}
+    // logoUrl: herkese acik logo adresi (/api/public/logos/{id}.png); logo yoksa null
+    public record Settings(String slug, String phone, String address, String logoUrl) {}
 
     public record PublicGallery(String name, String phone, List<PublicCard> vehicles) {}
 

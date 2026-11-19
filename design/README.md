@@ -29,7 +29,7 @@ Kalınlık, incelik ve renk birlikte hiyerarşi kurar: etiket soluk ve küçük,
 - Gelen / olumlu / alacak: **yeşil** (`basari`, çubukta `basari-canli`)
 - Giden / sorunlu / verecek: **kırmızı** (`tehlike`, çubukta `tehlike-canli`)
 - Bekleyen / uyarı (30+ gün stok): **turuncu** (`uyari`)
-- Hasar şeması: **boyalı mavi** (`boyali`), lokal boyalı sarı, değişen kırmızı, orijinal gri.
+- Hasar şeması: ince çizgili kroki (parça kenarları `murekkep-3`, tekerlek ve camlar da çizgili); **boyalı mavi** (`boyali`), lokal boyalı sarı, değişen kırmızı, orijinal açık gri.
 - Onaylı / stokta / seçili: **mavi** (`plaka`)
 - İptal / kapandı / pasif: **gri**
 - Durum rengi asla tek başına anlam taşımaz: yanında etiket ya da işaret (+/−) olur.

@@ -111,6 +111,34 @@ class ShowroomIT {
     }
 
     @Test
+    void logoYuklenir_saydamPngKalir_yenisiEskisiniSiler_kaldirilinca_bosalir() throws Exception {
+        TestSession.open(owner, tenant, "ADMIN");
+        BufferedImage transparent = new BufferedImage(1200, 400, BufferedImage.TYPE_INT_ARGB);
+        transparent.getGraphics().fillRect(0, 0, 600, 200);
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        ImageIO.write(transparent, "png", bytes);
+
+        ShowroomResponses.Settings first = showroomService.uploadLogo(bytes.toByteArray());
+        assertThat(first.logoUrl()).matches("/api/public/logos/[0-9a-f-]{36}\\.png");
+        UUID firstId = UUID.fromString(first.logoUrl().substring("/api/public/logos/".length(), first.logoUrl().length() - 4));
+        Path firstFile = showroomService.logoFile(firstId);
+        assertThat(firstFile).isNotNull();
+        BufferedImage stored = ImageIO.read(firstFile.toFile());
+        assertThat(stored.getWidth()).as("uzun kenar 600").isEqualTo(600);
+        assertThat(stored.getColorModel().hasAlpha()).as("saydamlik korunur").isTrue();
+
+        ShowroomResponses.Settings second = showroomService.uploadLogo(image(300, 100));
+        assertThat(second.logoUrl()).isNotEqualTo(first.logoUrl());
+        assertThat(Files.exists(firstFile)).as("eski logo dosyasi silinir").isFalse();
+        assertThat(showroomService.logoFile(firstId)).isNull();
+        assertThatThrownBy(() -> showroomService.uploadLogo("logo degil".getBytes())).isInstanceOf(InvalidPhotoException.class);
+        assertThat(showroomService.settings().logoUrl()).as("hatali yukleme eskisini bozmaz").isEqualTo(second.logoUrl());
+
+        assertThat(showroomService.deleteLogo().logoUrl()).isNull();
+        assertThat(showroomService.settings().logoUrl()).isNull();
+    }
+
+    @Test
     void resimOlmayanDosya_veYirmidenFazlaFotograf_reddedilir() throws Exception {
         TestSession.open(owner, tenant, "ADMIN");
         UUID car = vehicle("Fiat", "Egea");
@@ -130,7 +158,10 @@ class ShowroomIT {
         showroomService.addPhoto(shown, image(400, 300));
         showroomService.updateListing(shown, new ShowroomRequests.Listing(true, 850_000 * TL, "  Hatasız, servis bakımlı  "));
         showroomService.updateListing(sold, new ShowroomRequests.Listing(true, null, null));
-        showroomService.updateSettings(new ShowroomRequests.Settings("0532 111 22 33"));
+        ShowroomResponses.Settings saved = showroomService.updateSettings(
+                new ShowroomRequests.Settings("0532 111 22 33", "  Saracalar Mah. Özal Blv.\n No:228  Akyurt/Ankara "));
+        assertThat(saved.address()).as("bosluklar toplanir").isEqualTo("Saracalar Mah. Özal Blv. No:228 Akyurt/Ankara");
+        assertThat(showroomService.settings().address()).isEqualTo(saved.address());
         jdbc.update("update vehicle set status = 'SOLD', sale_date = ? where id = ?", today, sold);
         TestSession.close();
 

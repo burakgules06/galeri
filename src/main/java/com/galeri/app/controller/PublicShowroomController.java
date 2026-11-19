@@ -38,6 +38,17 @@ public class PublicShowroomController {
         return responses.success(showroomService.publicVehicle(slug, id));
     }
 
+    // Galeri logosu (sahibinden aciklamasindaki <img> buraya bakar). Her yuklemede yeni id: uzun sure onbellekte kalabilir.
+    @GetMapping("/logos/{file:[0-9a-fA-F-]{36}\\.png}")
+    public ResponseEntity<Resource> logo(@PathVariable String file) {
+        Path path = showroomService.logoFile(UUID.fromString(file.substring(0, 36)));
+        if (path == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable())
+                .body(new FileSystemResource(path));
+    }
+
     // Dosya adi: {id}.jpg (buyuk) ya da {id}_t.jpg (kucuk). Icerik degismedigi icin uzun sure onbellekte kalir.
     @GetMapping("/photos/{file:[0-9a-fA-F-]{36}(?:_t)?\\.jpg}")
     public ResponseEntity<Resource> photo(@PathVariable String file) {

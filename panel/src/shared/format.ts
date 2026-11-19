@@ -132,7 +132,7 @@ export function percent(basisPoints: number, digits = 1): string {
 /** Telefon: 905301112233 -> "0530 111 22 33" */
 export function formatPhone(phone: string | null | undefined): string {
   if (!phone) return "";
-  const d = phone.replace(/\D/g, "").replace(/^90/, "");
+  const d = phone.replace(/\D/g, "").replace(/^90/, "").replace(/^0/, "");   // 0532..., 90532..., 532... ayni bicim
   return d.length === 10 ? `0${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8)}` : phone;
 }
 

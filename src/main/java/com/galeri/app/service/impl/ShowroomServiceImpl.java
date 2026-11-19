@@ -108,10 +108,44 @@ public class ShowroomServiceImpl implements ShowroomService {
     }
 
     @Override
+    @Transactional
+    public ShowroomResponses.Settings uploadLogo(byte[] content) {
+        Tenant t = tenantRepository.findById(CurrentUser.tenantId()).orElseThrow(RecordNotFoundException::new);
+        UUID id = UUID.randomUUID();
+        storage.saveLogo(t.getId(), id, content);
+        afterRollback(() -> storage.deleteLogo(t.getId(), id));
+        UUID old = t.getLogoId();
+        t.setLogoId(id);
+        if (old != null) afterCommit(() -> storage.deleteLogo(t.getId(), old));
+        return settingsOf(t);
+    }
+
+    @Override
+    @Transactional
+    public ShowroomResponses.Settings deleteLogo() {
+        Tenant t = tenantRepository.findById(CurrentUser.tenantId()).orElseThrow(RecordNotFoundException::new);
+        UUID old = t.getLogoId();
+        t.setLogoId(null);
+        if (old != null) afterCommit(() -> storage.deleteLogo(t.getId(), old));
+        return settingsOf(t);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Path logoFile(UUID logoId) {
+        return tenantRepository.findByLogoId(logoId).map(t -> storage.logoPath(t.getId(), logoId)).orElse(null);
+    }
+
+    private static ShowroomResponses.Settings settingsOf(Tenant t) {
+        return new ShowroomResponses.Settings(t.getSlug(), t.getShowroomPhone(), t.getShowroomAddress(),
+                t.getLogoId() == null ? null : "/api/public/logos/" + t.getLogoId() + ".png");
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public ShowroomResponses.Settings settings() {
         Tenant t = tenantRepository.findById(CurrentUser.tenantId()).orElseThrow(RecordNotFoundException::new);
-        return new ShowroomResponses.Settings(t.getSlug(), t.getShowroomPhone());
+        return settingsOf(t);
     }
 
     @Override
@@ -120,7 +154,10 @@ public class ShowroomServiceImpl implements ShowroomService {
         Tenant t = tenantRepository.findById(CurrentUser.tenantId()).orElseThrow(RecordNotFoundException::new);
         String digits = request.phone() == null ? "" : request.phone().replaceAll("\\D", "");
         t.setShowroomPhone(digits.isEmpty() ? null : digits);
-        return new ShowroomResponses.Settings(t.getSlug(), t.getShowroomPhone());
+        // Adres: bosluklar toplanir, bos ise silinir (panel telefon ve adresi birlikte gonderir)
+        String address = request.address() == null ? "" : request.address().trim().replaceAll("\\s+", " ");
+        t.setShowroomAddress(address.isEmpty() ? null : address);
+        return settingsOf(t);
     }
 
     @Override
