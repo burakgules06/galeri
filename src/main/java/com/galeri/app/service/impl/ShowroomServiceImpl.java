@@ -137,9 +137,40 @@ public class ShowroomServiceImpl implements ShowroomService {
         return tenantRepository.findByLogoId(logoId).map(t -> storage.logoPath(t.getId(), logoId)).orElse(null);
     }
 
+    // Alt banner: logo ile ayni saklama (PNG, saydamlik korunur), ayri id
+    @Override
+    @Transactional
+    public ShowroomResponses.Settings uploadFooterBanner(byte[] content) {
+        Tenant t = tenantRepository.findById(CurrentUser.tenantId()).orElseThrow(RecordNotFoundException::new);
+        UUID id = UUID.randomUUID();
+        storage.saveLogo(t.getId(), id, content);
+        afterRollback(() -> storage.deleteLogo(t.getId(), id));
+        UUID old = t.getFooterBannerId();
+        t.setFooterBannerId(id);
+        if (old != null) afterCommit(() -> storage.deleteLogo(t.getId(), old));
+        return settingsOf(t);
+    }
+
+    @Override
+    @Transactional
+    public ShowroomResponses.Settings deleteFooterBanner() {
+        Tenant t = tenantRepository.findById(CurrentUser.tenantId()).orElseThrow(RecordNotFoundException::new);
+        UUID old = t.getFooterBannerId();
+        t.setFooterBannerId(null);
+        if (old != null) afterCommit(() -> storage.deleteLogo(t.getId(), old));
+        return settingsOf(t);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Path footerBannerFile(UUID bannerId) {
+        return tenantRepository.findByFooterBannerId(bannerId).map(t -> storage.logoPath(t.getId(), bannerId)).orElse(null);
+    }
+
     private static ShowroomResponses.Settings settingsOf(Tenant t) {
         return new ShowroomResponses.Settings(t.getSlug(), t.getShowroomPhone(), t.getShowroomAddress(),
-                t.getLogoId() == null ? null : "/api/public/logos/" + t.getLogoId() + ".png", t.getDealerLicenseNo());
+                t.getLogoId() == null ? null : "/api/public/logos/" + t.getLogoId() + ".png", t.getDealerLicenseNo(),
+                t.getFooterBannerId() == null ? null : "/api/public/banners/" + t.getFooterBannerId() + ".png");
     }
 
     @Override

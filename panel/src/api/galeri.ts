@@ -34,6 +34,12 @@ export const api = {
     return apiFetch<ShowroomSettings>("/api/settings/showroom/logo", { method: "POST", body });
   },
   deleteLogo: () => apiFetch<ShowroomSettings>("/api/settings/showroom/logo", { method: "DELETE" }),
+  uploadFooterBanner: (file: Blob) => {
+    const body = new FormData();
+    body.append("file", file, "banner.png");
+    return apiFetch<ShowroomSettings>("/api/settings/showroom/footer-banner", { method: "POST", body });
+  },
+  deleteFooterBanner: () => apiFetch<ShowroomSettings>("/api/settings/showroom/footer-banner", { method: "DELETE" }),
   // Telefon ve adres birlikte gonderilir (bos gelen silinir)
   updateShowroomSettings: (phone: string | null, address: string | null, dealerLicenseNo: string | null) =>
     apiFetch<ShowroomSettings>("/api/settings/showroom", json({ phone, address, dealerLicenseNo }, "PUT")),

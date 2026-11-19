@@ -31,6 +31,14 @@ public interface ShowroomService {
     /** Herkese acik logo dosyasi; yoksa null. */
     java.nio.file.Path logoFile(UUID logoId);
 
+    /** Alt banner'i yukler (eskisi silinir); sahibinden aciklamasinin en altinda. */
+    ShowroomResponses.Settings uploadFooterBanner(byte[] content);
+
+    ShowroomResponses.Settings deleteFooterBanner();
+
+    /** Herkese acik alt banner dosyasi; yoksa null. */
+    java.nio.file.Path footerBannerFile(UUID bannerId);
+
     /** Herkese acik: galerinin vitrindeki stok araclari. Galeri yoksa / pasifse RecordNotFoundException. */
     ShowroomResponses.PublicGallery publicGallery(String slug);
 

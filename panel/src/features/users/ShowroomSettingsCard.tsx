@@ -1,5 +1,6 @@
 // Hesabim > Vitrin (dukkan sahibi): musteri sayfasinin linki (kopyala / paylas / ac), WhatsApp numarasi ve dukkan adresi
-// (sahibinden aciklamasindaki galeri kartinda) ve galeri logosu (aciklamada ve hasar resminde).
+// (sahibinden aciklamasindaki galeri kartinda), galeri logosu (aciklamada ve hasar resminde) ve alt banner (aciklamanin en
+// altinda, logo ile ayni genislikte).
 import { useRef, useState } from "react";
 import { apiUrl } from "../../api/client";
 import { logoPng } from "../../shared/image/logoPng";
@@ -34,24 +35,25 @@ function SettingsForm({ initial }: { initial: ShowroomSettings }) {
   const [license, setLicense] = useState(initial.dealerLicenseNo ?? "");
   const [savedLicense, setSavedLicense] = useState(initial.dealerLicenseNo ?? "");
   const [logoUrl, setLogoUrl] = useState(initial.logoUrl);
-  const logoInput = useRef<HTMLInputElement>(null);
+  const [footerBannerUrl, setFooterBannerUrl] = useState(initial.footerBannerUrl);
 
-  const logo = async (action: () => Promise<{ logoUrl: string | null }>) => {
+  // Logo ve alt banner ayni sekilde yuklenir: PNG'ye cevrilir, cevaptaki adresler guncellenir
+  const image = async (action: () => Promise<ShowroomSettings>) => {
     setBusy(true);
     setError(null);
     try {
-      setLogoUrl((await action()).logoUrl);
+      const saved = await action();
+      setLogoUrl(saved.logoUrl);
+      setFooterBannerUrl(saved.footerBannerUrl);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
       setBusy(false);
-      if (logoInput.current) logoInput.current.value = "";
     }
   };
-  const pickLogo = (file: File | undefined) => {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return setError("Logo en fazla 5 MB olabilir.");
-    void logo(async () => api.uploadLogo(await logoPng(file)));
+  const pick = (file: File, upload: (png: Blob) => Promise<ShowroomSettings>) => {
+    if (file.size > 5 * 1024 * 1024) return setError("Görsel en fazla 5 MB olabilir.");
+    void image(async () => upload(await logoPng(file)));
   };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,28 +84,14 @@ function SettingsForm({ initial }: { initial: ShowroomSettings }) {
       <Field label="WhatsApp numarası" hint="Müşteri bu numaraya yazar ya da arar. Boşsa buton çıkmaz.">
         <NumberInput kind="phone" value={phone} onValueChange={setPhone} placeholder="0530 111 22 33" />
       </Field>
-      <div>
-        <p className="etiket mb-1.5">Galeri logosu</p>
-        <div className="flex items-center gap-3">
-          <div className="w-32 h-16 shrink-0 rounded-lg border border-cizgi bg-yuzey grid place-items-center overflow-hidden">
-            {logoUrl ? <img src={apiUrl(logoUrl)} alt="Galeri logosu" className="max-w-full max-h-full object-contain p-1" />
-              : <span className="text-[12.5px] text-murekkep-3">Logo yok</span>}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" type="button" disabled={busy} onClick={() => logoInput.current?.click()}>
-              {logoUrl ? "Değiştir" : "Logo yükle"}
-            </Button>
-            {logoUrl && (
-              <Button variant="secondary" type="button" disabled={busy}
-                onClick={() => { if (window.confirm("Logo kaldırılsın mı?")) void logo(() => api.deleteLogo()); }}>
-                Kaldır
-              </Button>
-            )}
-          </div>
-        </div>
-        <p className="text-[13px] text-murekkep-2 mt-1.5">Sahibinden açıklamasında ve hasar resminde çıkar. Arka planı saydam PNG en iyi görünür.</p>
-        <input ref={logoInput} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => pickLogo(e.target.files?.[0])} />
-      </div>
+      <ImageField label="Galeri logosu" url={logoUrl} busy={busy} boxClass="w-32 h-16"
+        hint="Sahibinden açıklamasında ve hasar resminde çıkar. Arka planı saydam PNG en iyi görünür."
+        onPick={(f) => pick(f, api.uploadLogo)}
+        onRemove={() => { if (window.confirm("Logo kaldırılsın mı?")) void image(() => api.deleteLogo()); }} />
+      <ImageField label="Alt banner" url={footerBannerUrl} busy={busy} boxClass="w-48 h-16"
+        hint="Sahibinden açıklamasının en altında, üstteki logo ile aynı genişlikte çıkar. Yatay (geniş) görsel en iyi görünür."
+        onPick={(f) => pick(f, api.uploadFooterBanner)}
+        onRemove={() => { if (window.confirm("Alt banner kaldırılsın mı?")) void image(() => api.deleteFooterBanner()); }} />
       <Field label="Dükkân adresi" hint="Sahibinden açıklamasının düz metin halinde (Satıcı bölümü) yazılır. Boşsa yazılmaz.">
         <textarea className={`${inputClass} h-auto min-h-20 py-2`} rows={2} maxLength={300} value={address}
           onChange={(e) => setAddress(e.target.value)} placeholder="Saracalar Mah. Özal Blv. No:228 Akyurt / Ankara" />
@@ -115,6 +103,33 @@ function SettingsForm({ initial }: { initial: ShowroomSettings }) {
         <Button onClick={() => void save()}
           disabled={busy || (digits === savedPhone && address.trim() === savedAddress && license.trim() === savedLicense)}>Kaydet</Button>
       </div>
+    </div>
+  );
+}
+
+function ImageField({ label, url, hint, busy, boxClass, onPick, onRemove }: {
+  label: string; url: string | null; hint: string; busy: boolean; boxClass: string;
+  onPick: (file: File) => void; onRemove: () => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <div>
+      <p className="etiket mb-1.5">{label}</p>
+      <div className="flex items-center gap-3">
+        <div className={`${boxClass} shrink-0 rounded-lg border border-cizgi bg-yuzey grid place-items-center overflow-hidden`}>
+          {url ? <img src={apiUrl(url)} alt={label} className="max-w-full max-h-full object-contain p-1" />
+            : <span className="text-[12.5px] text-murekkep-3">Yok</span>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" type="button" disabled={busy} onClick={() => input.current?.click()}>
+            {url ? "Değiştir" : "Yükle"}
+          </Button>
+          {url && <Button variant="secondary" type="button" disabled={busy} onClick={onRemove}>Kaldır</Button>}
+        </div>
+      </div>
+      <p className="text-[13px] text-murekkep-2 mt-1.5">{hint}</p>
+      <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" hidden
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onPick(f); }} />
     </div>
   );
 }

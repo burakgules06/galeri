@@ -14,7 +14,9 @@ export interface ListingTextInput {
   address: string | null;     // dukkan adresi (vitrin ayarlari); bos ise yazilmaz
   dealerLicenseNo?: string | null;   // yetki belge no (vitrin ayarlari); bos ise kart cikmaz
   logoUrl: string | null;     // galeri logosu, tam adres (https://...); ilan sitesi resmi kabul ederse en ustte banner olur
-  logoSize?: { width: number; height: number } | null;   // logonun gercek boyutu: banner'a orani bozulmadan sigdirmak icin
+  logoSize?: { width: number; height: number } | null;
+  footerBannerUrl?: string | null;   // alt banner, tam adres; en altta logo ile ayni genislikte
+  footerBannerSize?: { width: number; height: number } | null;   // logonun gercek boyutu: banner'a orani bozulmadan sigdirmak icin
   description: string;        // vitrindeki ilan aciklamasi (kaydedilmemis hali de olabilir)
   showPlate: boolean;
   showPhone: boolean;
@@ -83,12 +85,11 @@ const BOX_INNER = W - 2 - 32;        // kutu icindeki alan (1 px kenarlik + 16 p
 const tableAttrs = (width: number) => `width="${width}" align="center" cellpadding="0" cellspacing="0"`;
 const widthStyle = (percent: number) => `width:${percent}%;`;
 
-// Banner'daki logo: oranini koruyarak kartin tam genisligine buyutulur, ortada durur. Yukseklik logonun oranindan gelir
-// (genis logo ince bir serit, kare logo W x W olur).
-function logoImg(i: ListingTextInput): string {
-  const src = esc(i.logoUrl ?? "");
-  const alt = esc(i.galleryName);
-  const size = i.logoSize;
+// Banner gorseli (ustte logo, altta alt banner): oranini koruyarak kartin tam genisligine buyutulur, ortada durur.
+// Yukseklik gorselin oranindan gelir (genis gorsel ince bir serit, kare gorsel W x W olur).
+function bannerImg(url: string, galleryName: string, size: { width: number; height: number } | null | undefined): string {
+  const src = esc(url);
+  const alt = esc(galleryName);
   if (!size || size.width <= 0 || size.height <= 0) {
     return `<img src="${src}" alt="${alt}" width="${W}" style="display:block;margin:0 auto;width:100%;height:auto;">`;
   }
@@ -117,12 +118,16 @@ export function listingHtml(i: ListingTextInput): string {
 
   // Ust serit: galeri adi, arac, kisa ozet
   // En ustte galeri logosu: kartin genisligine kadar buyutulmus banner (logo yoksa yok)
-  const banner = i.logoUrl ? `
-<table ${tableAttrs(W)} style="${widthStyle(100)}border-collapse:collapse;background:${white};margin:0 auto 10px auto;">
+  const bannerTable = (img: string, margin: string) => `
+<table ${tableAttrs(W)} style="${widthStyle(100)}border-collapse:collapse;background:${white};margin:${margin};">
   <tr><td width="${W}" align="center" valign="middle" style="${widthStyle(100)}padding:0;">
-    ${logoImg(i)}
+    ${img}
   </td></tr>
-</table>` : "";
+</table>`;
+  const banner = i.logoUrl ? bannerTable(bannerImg(i.logoUrl, i.galleryName, i.logoSize), "0 auto 10px auto") : "";
+  // En altta alt banner: ustteki logo ile ayni genislik
+  const footerBanner = i.footerBannerUrl
+    ? bannerTable(bannerImg(i.footerBannerUrl, i.galleryName, i.footerBannerSize), "14px auto 0 auto") : "";
 
   // Ust satir (simsiyah zemin, beyaz yazi, tam genislik): marka ve model ayri satirlarda, satir yuksekligi acik yazili
 // (editorun kendi satir yuksekligiyle iki satir ust uste biniyordu). Yil / km / yakit / vites altta bilgi kartlarinda.
@@ -188,7 +193,7 @@ export function listingHtml(i: ListingTextInput): string {
   const footer = `<table ${tableAttrs(W)} style="${widthStyle(100)}border-collapse:collapse;margin:0 auto;"><tr><td width="${W}" style="${widthStyle(100)}font-family:${font};font-size:13px;color:${ink2};background:${brandLight};padding:10px 14px;">Bilgiler galerimizin kayıtlarından hazırlanmıştır. Ekspertiz ve detaylı bilgi için bizi arayabilirsiniz.</td></tr></table>`;
 
   // Sira: arac, donanim, aciklama; ekspertiz ve tramer en altta
-  return `<div style="font-family:${font};color:${ink};width:100%;">${header}${grid}${equipmentBox}${descriptionBox}${expertise}${tramerBox}${footer}</div>`;
+  return `<div style="font-family:${font};color:${ink};width:100%;">${header}${grid}${equipmentBox}${descriptionBox}${expertise}${tramerBox}${footer}${footerBanner}</div>`;
 }
 
 // ------------------------------------------------------------------ duz metin
