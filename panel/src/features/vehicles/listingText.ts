@@ -71,24 +71,25 @@ function specs(i: ListingTextInput): [string, string][] {
 
 // ------------------------------------------------------------------ zengin metin (HTML)
 
-// Genislikler piksel olarak hem width ozelligine hem stile yazilir: sahibinden editoru yuzde genislikleri (width="100%")
-// tasimiyor, tablolar icerik kadar daralip kuculuyordu. Aciklama alani yaklasik 740 px; biraz pay birakildi.
-const W = 720;                       // tum kartlarin genisligi
+// Genislik iki katmanli: stilde yuzde (width:100%, hucrelerde 25% / 50%) aciklama alanini doldurur, bilgisayarda genis
+// ekrana, telefonda dar ekrana sigar. width ozelligindeki piksel deger yedektir: editor yuzde stilini silerse kartlar en
+// azindan W genisliginde ve ortali kalir (ilk surumde sadece width="100%" vardi, editor onu tasimadi, kartlar daraldi).
+const W = 720;                       // yedek genislik (px)
 const BOX_INNER = W - 2 - 32;        // kutu icindeki alan (1 px kenarlik + 16 px ic bosluk, iki yanda)
-const tableAttrs = (width: number) => `width="${width}" cellpadding="0" cellspacing="0"`;
-const widthStyle = (width: number) => `width:${width}px;`;
+const tableAttrs = (width: number) => `width="${width}" align="center" cellpadding="0" cellspacing="0"`;
+const widthStyle = (percent: number) => `width:${percent}%;`;
 
-// Banner'daki logo: oranini koruyarak kartin tam genisligine (W) buyutulur, ortada durur. Yukseklik logonun oranindan gelir
+// Banner'daki logo: oranini koruyarak kartin tam genisligine buyutulur, ortada durur. Yukseklik logonun oranindan gelir
 // (genis logo ince bir serit, kare logo W x W olur).
 function logoImg(i: ListingTextInput): string {
   const src = esc(i.logoUrl ?? "");
   const alt = esc(i.galleryName);
   const size = i.logoSize;
   if (!size || size.width <= 0 || size.height <= 0) {
-    return `<img src="${src}" alt="${alt}" width="${W}" style="display:block;margin:0 auto;width:${W}px;height:auto;">`;
+    return `<img src="${src}" alt="${alt}" width="${W}" style="display:block;margin:0 auto;width:100%;height:auto;">`;
   }
   const h = Math.round(W * size.height / size.width);
-  return `<img src="${src}" alt="${alt}" width="${W}" height="${h}" style="display:block;margin:0 auto;width:${W}px;height:${h}px;">`;
+  return `<img src="${src}" alt="${alt}" width="${W}" height="${h}" style="display:block;margin:0 auto;width:100%;height:auto;">`;
 }
 
 export function listingHtml(i: ListingTextInput): string {
@@ -103,7 +104,7 @@ export function listingHtml(i: ListingTextInput): string {
   const font = "Arial, Helvetica, sans-serif";
 
   const box = (title: string, body: string) => `
-<table ${tableAttrs(W)} style="${widthStyle(W)}border-collapse:collapse;border:1px solid ${line};margin:0 0 14px 0;">
+<table ${tableAttrs(W)} style="${widthStyle(100)}border-collapse:collapse;border:1px solid ${line};margin:0 auto 14px auto;">
   <tr><td style="padding:14px 16px;font-family:${font};">
     <div style="font-size:16px;font-weight:bold;color:${ink};margin:0 0 10px 0;">${esc(title)}</div>
     ${body}
@@ -113,21 +114,18 @@ export function listingHtml(i: ListingTextInput): string {
   // Ust serit: galeri adi, arac, kisa ozet
   // En ustte galeri logosu: kartin genisligine kadar buyutulmus banner (logo yoksa yok)
   const banner = i.logoUrl ? `
-<table ${tableAttrs(W)} style="${widthStyle(W)}border-collapse:collapse;background:${white};margin:0 0 10px 0;">
-  <tr><td width="${W}" align="center" valign="middle" style="${widthStyle(W)}padding:0;">
+<table ${tableAttrs(W)} style="${widthStyle(100)}border-collapse:collapse;background:${white};margin:0 auto 10px auto;">
+  <tr><td width="${W}" align="center" valign="middle" style="${widthStyle(100)}padding:0;">
     ${logoImg(i)}
   </td></tr>
 </table>` : "";
 
-  // Ust satir (simsiyah zemin, beyaz yazi, tam genislik): marka ve model. Yil / km / yakit / vites altta bilgi kartlarinda.
+  // Ust satir (simsiyah zemin, beyaz yazi, tam genislik): marka ve model ayri satirlarda, satir yuksekligi acik yazili
+// (editorun kendi satir yuksekligiyle iki satir ust uste biniyordu). Yil / km / yakit / vites altta bilgi kartlarinda.
   const header = `${banner}
-<table ${tableAttrs(W)} style="${widthStyle(W)}border-collapse:collapse;margin:0 0 14px 0;">
-  <tr>
-    <td width="${W}" valign="middle" style="${widthStyle(W)}background:${ink};padding:18px 20px;font-family:${font};color:${white};">
-      <div style="font-size:30px;font-weight:bold;letter-spacing:.5px;color:${white};">${esc(v.make)}</div>
-      <div style="font-size:19px;font-weight:bold;margin:2px 0 0 0;color:${white};">${esc(v.model)}</div>
-    </td>
-  </tr>
+<table ${tableAttrs(W)} style="${widthStyle(100)}border-collapse:collapse;margin:0 auto 14px auto;background:${ink};">
+  <tr><td width="${W}" style="${widthStyle(100)}background:${ink};padding:18px 20px 2px 20px;font-family:${font};font-size:30px;line-height:36px;font-weight:bold;letter-spacing:.5px;color:${white};">${esc(v.make)}</td></tr>
+  <tr><td width="${W}" style="${widthStyle(100)}background:${ink};padding:0 20px 18px 20px;font-family:${font};font-size:19px;line-height:24px;font-weight:bold;color:${white};">${esc(v.model)}</td></tr>
 </table>`;
 
   // Bilgi kartlari: koyu baslik + acik deger, satirda 4 tane (Borusan / kurumsal ilan duzeni)
@@ -137,27 +135,27 @@ export function listingHtml(i: ListingTextInput): string {
     const chunk = cells.slice(r, r + 4);
     while (chunk.length < 4) chunk.push(["", ""]);
     const cell = ([label, value]: [string, string], head: boolean) => label === ""
-      ? `<td width="${W / 4}" style="${widthStyle(W / 4)}padding:0 3px;"></td>`
+      ? `<td width="${W / 4}" style="${widthStyle(25)}padding:0 3px;"></td>`
       : head
-        ? `<td width="${W / 4}" align="center" style="${widthStyle(W / 4)}padding:7px 4px;background:${ink};color:${white};font-family:${font};font-size:12px;font-weight:bold;letter-spacing:.5px;border-left:3px solid ${white};border-right:3px solid ${white};">${esc(label.toLocaleUpperCase("tr-TR"))}</td>`
-        : `<td width="${W / 4}" align="center" style="${widthStyle(W / 4)}padding:11px 4px;background:${soft};color:${ink};font-family:${font};font-size:16px;font-weight:bold;border-left:3px solid ${white};border-right:3px solid ${white};border-bottom:6px solid ${white};">${esc(value)}</td>`;
+        ? `<td width="${W / 4}" align="center" style="${widthStyle(25)}padding:7px 4px;background:${ink};color:${white};font-family:${font};font-size:12px;font-weight:bold;letter-spacing:.5px;border-left:3px solid ${white};border-right:3px solid ${white};">${esc(label.toLocaleUpperCase("tr-TR"))}</td>`
+        : `<td width="${W / 4}" align="center" style="${widthStyle(25)}padding:11px 4px;background:${soft};color:${ink};font-family:${font};font-size:16px;font-weight:bold;border-left:3px solid ${white};border-right:3px solid ${white};border-bottom:6px solid ${white};">${esc(value)}</td>`;
     rows.push(`<tr>${chunk.map((c) => cell(c, true)).join("")}</tr><tr>${chunk.map((c) => cell(c, false)).join("")}</tr>`);
   }
-  const grid = `<table ${tableAttrs(W)} style="${widthStyle(W)}border-collapse:collapse;margin:0 0 14px 0;">${rows.join("")}</table>`;
+  const grid = `<table ${tableAttrs(W)} style="${widthStyle(100)}border-collapse:collapse;margin:0 auto 14px auto;">${rows.join("")}</table>`;
 
   // Ekspertiz: durum sayilari (renkli kare) ve hasarli parcalar
   const summary = damageSummary(v.parts);
   const damageRows = summary.map((s, k) => `
     <tr style="background:${k % 2 ? soft : white};">
       <td style="padding:8px 10px;font-family:${font};font-size:15px;color:${ink};"><span style="color:${conditionColor(s.condition)};font-size:16px;">■</span>&nbsp;${esc(PART_CONDITION[s.condition])}</td>
-      <td width="60" align="right" style="width:60px;padding:8px 10px;font-family:${font};font-size:15px;font-weight:bold;color:${ink};">${s.count}</td>
+      <td width="60" align="right" style="width:60px;white-space:nowrap;padding:8px 10px;font-family:${font};font-size:15px;font-weight:bold;color:${ink};">${s.count}</td>
     </tr>`).join("");
   const damagedParts = summary.filter((s) => s.parts.length > 0)
     .map((s) => `<div style="font-family:${font};font-size:14px;color:${ink};margin:8px 0 0 0;"><span style="color:${conditionColor(s.condition)};">■</span>&nbsp;<b>${esc(PART_CONDITION[s.condition])}:</b> ${esc(s.parts.join(", "))}</div>`)
     .join("");
   const clean = summary.every((s) => s.condition === "ORIGINAL" || s.count === 0);
   const expertise = box("Ekspertiz Bilgisi", `
-    <table ${tableAttrs(BOX_INNER)} style="${widthStyle(BOX_INNER)}border-collapse:collapse;">${damageRows}</table>
+    <table ${tableAttrs(BOX_INNER)} style="${widthStyle(100)}border-collapse:collapse;">${damageRows}</table>
     ${clean ? `<div style="font-family:${font};font-size:14px;font-weight:bold;color:${brand};margin:8px 0 0 0;">Boyasız, değişensiz.</div>` : damagedParts}`);
 
   const tramer = tramerText(v.tramerCents);
@@ -168,20 +166,21 @@ export function listingHtml(i: ListingTextInput): string {
   const equipmentBox = equipmentGroups.length === 0 ? "" : box("Donanım", equipmentGroups.map((g, k) => {
     const rows: string[] = [];
     for (let r = 0; r < g.items.length; r += 2) {
-      rows.push(`<tr>${[g.items[r], g.items[r + 1]].map((item) => item == null ? `<td width="${BOX_INNER / 2}" style="${widthStyle(BOX_INNER / 2)}"></td>`
-        : `<td width="${BOX_INNER / 2}" valign="top" style="${widthStyle(BOX_INNER / 2)}padding:3px 8px 3px 0;font-family:${font};font-size:15px;color:${ink};">${esc(item)}</td>`).join("")}</tr>`);
+      rows.push(`<tr>${[g.items[r], g.items[r + 1]].map((item) => item == null ? `<td width="${BOX_INNER / 2}" style="${widthStyle(50)}"></td>`
+        : `<td width="${BOX_INNER / 2}" valign="top" style="${widthStyle(50)}padding:3px 8px 3px 0;font-family:${font};font-size:15px;color:${ink};">${esc(item)}</td>`).join("")}</tr>`);
     }
     return `<div style="font-family:${font};font-size:13px;font-weight:bold;letter-spacing:.5px;color:${ink2};margin:${k ? 12 : 0}px 0 4px 0;">${esc(g.title.toLocaleUpperCase("tr-TR"))}</div>
-    <table ${tableAttrs(BOX_INNER)} style="${widthStyle(BOX_INNER)}border-collapse:collapse;">${rows.join("")}</table>`;
+    <table ${tableAttrs(BOX_INNER)} style="${widthStyle(100)}border-collapse:collapse;">${rows.join("")}</table>`;
   }).join(""));
 
   const text = i.description.trim();
   const descriptionBox = text ? box("Açıklama", text.split(/\n{2,}/).map((p) =>
     `<p style="font-family:${font};font-size:15px;line-height:1.5;color:${ink};margin:0 0 8px 0;">${esc(p).replace(/\n/g, "<br>")}</p>`).join("")) : "";
 
-  const footer = `<table ${tableAttrs(W)} style="${widthStyle(W)}border-collapse:collapse;"><tr><td width="${W}" style="${widthStyle(W)}font-family:${font};font-size:13px;color:${ink2};background:${brandLight};padding:10px 14px;">Bilgiler galerimizin kayıtlarından hazırlanmıştır. Ekspertiz ve detaylı bilgi için bizi arayabilirsiniz.</td></tr></table>`;
+  const footer = `<table ${tableAttrs(W)} style="${widthStyle(100)}border-collapse:collapse;margin:0 auto;"><tr><td width="${W}" style="${widthStyle(100)}font-family:${font};font-size:13px;color:${ink2};background:${brandLight};padding:10px 14px;">Bilgiler galerimizin kayıtlarından hazırlanmıştır. Ekspertiz ve detaylı bilgi için bizi arayabilirsiniz.</td></tr></table>`;
 
-  return `<div style="font-family:${font};color:${ink};width:${W}px;">${header}${grid}${expertise}${tramerBox}${equipmentBox}${descriptionBox}${footer}</div>`;
+  // Sira: arac, donanim, aciklama; ekspertiz ve tramer en altta
+  return `<div style="font-family:${font};color:${ink};width:100%;">${header}${grid}${equipmentBox}${descriptionBox}${expertise}${tramerBox}${footer}</div>`;
 }
 
 // ------------------------------------------------------------------ duz metin
@@ -196,17 +195,6 @@ export function listingPlainText(i: ListingTextInput): string {
   section("Araç bilgileri");
   for (const [label, value] of specs(i)) out.push(`▪ ${label}: ${value}`);
 
-  section("Ekspertiz bilgisi");
-  for (const s of damageSummary(v.parts)) {
-    out.push(`▪ ${PART_CONDITION[s.condition]}: ${s.count}${s.parts.length ? ` (${s.parts.join(", ")})` : ""}`);
-  }
-
-  const tramer = tramerText(v.tramerCents);
-  if (tramer) {
-    section("Tramer bilgisi");
-    out.push(`▪ ${tramer}`);
-  }
-
   const equipmentGroups = groupEquipment(v.equipment ?? []);
   if (equipmentGroups.length > 0) {
     section("Donanım");
@@ -216,6 +204,17 @@ export function listingPlainText(i: ListingTextInput): string {
   if (i.description.trim()) {
     section("Açıklama");
     out.push(i.description.trim());
+  }
+
+  section("Ekspertiz bilgisi");
+  for (const s of damageSummary(v.parts)) {
+    out.push(`▪ ${PART_CONDITION[s.condition]}: ${s.count}${s.parts.length ? ` (${s.parts.join(", ")})` : ""}`);
+  }
+
+  const tramer = tramerText(v.tramerCents);
+  if (tramer) {
+    section("Tramer bilgisi");
+    out.push(`▪ ${tramer}`);
   }
 
   section("Satıcı");
