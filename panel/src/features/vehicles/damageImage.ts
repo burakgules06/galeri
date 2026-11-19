@@ -76,7 +76,7 @@ function svgSource(parts: Record<BodyPart, PartCondition>, title: string): { svg
     for (const s of damaged) {
       for (const l of wrap(`${PART_CONDITION[s.condition]}: ${s.parts.join(", ")}`, 34)) {
         y += 21;
-        if (y > HEIGHT - 12) break;
+        if (y > HEIGHT - 90) break;   // sag altta logo icin yer
         panel += text(PANEL_X, y, l, `font-size="14" fill="${ink}"`);
       }
     }
@@ -90,8 +90,8 @@ function svgSource(parts: Record<BodyPart, PartCondition>, title: string): { svg
   return { svg, width: WIDTH, height: HEIGHT };
 }
 
-/** PNG olarak hasar semasi. */
-export async function damageImage(parts: Record<BodyPart, PartCondition>, title: string): Promise<Blob> {
+/** PNG olarak hasar semasi. logo verilirse sag alt koseye (galeri logosu). */
+export async function damageImage(parts: Record<BodyPart, PartCondition>, title: string, logo?: ImageBitmap | null): Promise<Blob> {
   const { svg, width, height } = svgSource(parts, title);
   const img = new Image();
   img.decoding = "async";
@@ -104,5 +104,12 @@ export async function damageImage(parts: Record<BodyPart, PartCondition>, title:
   if (!ctx) throw new Error("Resim hazırlanamadı");
   ctx.scale(SCALE, SCALE);
   ctx.drawImage(img, 0, 0, width, height);
+  if (logo) {
+    // Sag panelin altinda, oranini koruyarak en fazla 180x64 alana sigdirilir, saga yaslanir
+    const ratio = Math.min(180 / logo.width, 64 / logo.height, 1);
+    const w = logo.width * ratio;
+    const h = logo.height * ratio;
+    ctx.drawImage(logo, WIDTH - 24 - w, HEIGHT - 20 - h, w, h);
+  }
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Resim hazırlanamadı"))), "image/png"));
 }

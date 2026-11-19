@@ -54,4 +54,8 @@ public class Tenant extends BaseModel {
     // Dukkan adresi (V34): sahibinden aciklamasindaki galeri kartinda; bos ise gosterilmez
     @Column(name = "showroom_address", length = 300)
     private String showroomAddress;
+
+    // Galeri logosu (V35): PNG dosyasinin id'si; bos ise logo yok
+    @Column(name = "logo_id")
+    private UUID logoId;
 }

@@ -23,6 +23,14 @@ public interface ShowroomService {
 
     ShowroomResponses.Settings updateSettings(ShowroomRequests.Settings request);
 
+    /** Galeri logosunu yukler (eskisi silinir). */
+    ShowroomResponses.Settings uploadLogo(byte[] content);
+
+    ShowroomResponses.Settings deleteLogo();
+
+    /** Herkese acik logo dosyasi; yoksa null. */
+    java.nio.file.Path logoFile(UUID logoId);
+
     /** Herkese acik: galerinin vitrindeki stok araclari. Galeri yoksa / pasifse RecordNotFoundException. */
     ShowroomResponses.PublicGallery publicGallery(String slug);
 

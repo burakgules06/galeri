@@ -5,14 +5,16 @@ import { useState } from "react";
 import { copyRich, copyText, saveFile } from "../../shared/clipboard";
 import type { VehicleDetail } from "../../shared/types";
 import { Button, ErrorBox, Modal } from "../../shared/ui/Common";
+import { apiUrl } from "../../api/client";
 import { damageImage } from "./damageImage";
 import { listingHtml, listingPlainText } from "./listingText";
 
-export function ListingTextModal({ vehicle, galleryName, phone, address, description, onClose }: {
+export function ListingTextModal({ vehicle, galleryName, phone, address, logoUrl, description, onClose }: {
   vehicle: VehicleDetail;
   galleryName: string;
   phone: string | null;
   address: string | null;
+  logoUrl: string | null;     // vitrin ayarlarindaki logo (API yolu)
   description: string;
   onClose: () => void;
 }) {
@@ -22,7 +24,9 @@ export function ListingTextModal({ vehicle, galleryName, phone, address, descrip
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const input = { vehicle, galleryName, phone, address, description, showPlate, showPhone };
+  // Ilan sitesi resmi bizim sunucudan ceker: tam adres gerekir
+  const logoAbsolute = logoUrl ? new URL(apiUrl(logoUrl), window.location.origin).href : null;
+  const input = { vehicle, galleryName, phone, address, logoUrl: logoAbsolute, description, showPlate, showPhone };
   const html = listingHtml(input);
   const text = listingPlainText(input);
 
@@ -46,7 +50,9 @@ export function ListingTextModal({ vehicle, galleryName, phone, address, descrip
     <Modal title="Sahibinden açıklaması" open onClose={onClose} wide
       footer={<>
         <Button variant="secondary" type="button" disabled={busy}
-          onClick={() => act("Hasar şeması hazır", async () => saveFile(await damageImage(vehicle.parts, `${vehicle.make} ${vehicle.model} · ${vehicle.modelYear}`), `${plateFile}-hasar.png`))}>
+          onClick={() => act("Hasar şeması hazır", async () => saveFile(
+            await damageImage(vehicle.parts, `${vehicle.make} ${vehicle.model} · ${vehicle.modelYear}`, await loadLogo(logoAbsolute)),
+            `${plateFile}-hasar.png`))}>
           Hasar resmi
         </Button>
         <Button variant="secondary" type="button" disabled={busy} onClick={() => act("Düz metin kopyalandı", () => copyText(text))}>
@@ -80,4 +86,16 @@ export function ListingTextModal({ vehicle, galleryName, phone, address, descrip
       </div>
     </Modal>
   );
+}
+
+// Logo resme cizilmek uzere indirilir (blob: tuvali kirletmez). Indirilemezse logosuz devam edilir.
+async function loadLogo(url: string | null): Promise<ImageBitmap | null> {
+  if (!url) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await createImageBitmap(await res.blob());
+  } catch {
+    return null;
+  }
 }

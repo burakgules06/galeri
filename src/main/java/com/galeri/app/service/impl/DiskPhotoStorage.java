@@ -29,6 +29,7 @@ public class DiskPhotoStorage implements PhotoStorage {
 
     static final int MAX_SIDE = 1600;
     static final int THUMB_SIDE = 480;
+    static final int LOGO_SIDE = 600;
     private static final long MAX_PIXELS = 50_000_000L;   // bozuk / kotu niyetli dev resimlere karsi
 
     private final Path root;
@@ -59,6 +60,65 @@ public class DiskPhotoStorage implements PhotoStorage {
         }
         log.info("Fotograf kaydedildi: {} ({}x{}, {} bayt)", photoId, large.getWidth(), large.getHeight(), largeJpeg.length);
         return new Stored(large.getWidth(), large.getHeight(), largeJpeg.length);
+    }
+
+    @Override
+    public Stored saveLogo(UUID tenantId, UUID logoId, byte[] content) {
+        BufferedImage logo = scaleKeepAlpha(read(content), LOGO_SIDE);
+        ByteArrayOutputStream png = new ByteArrayOutputStream();
+        try {
+            ImageIO.write(logo, "png", png);
+            Path dir = Files.createDirectories(root.resolve(tenantId.toString()));
+            Files.write(dir.resolve(logoFile(logoId)), png.toByteArray());
+        } catch (IOException e) {
+            throw new UncheckedIOException("Logo diske yazilamadi", e);
+        }
+        log.info("Logo kaydedildi: {} ({}x{}, {} bayt)", logoId, logo.getWidth(), logo.getHeight(), png.size());
+        return new Stored(logo.getWidth(), logo.getHeight(), png.size());
+    }
+
+    @Override
+    public void deleteLogo(UUID tenantId, UUID logoId) {
+        try {
+            Files.deleteIfExists(root.resolve(tenantId.toString()).resolve(logoFile(logoId)));
+        } catch (IOException e) {
+            log.warn("Logo dosyasi silinemedi: {} | {}", logoId, e.getMessage());
+        }
+    }
+
+    @Override
+    public Path logoPath(UUID tenantId, UUID logoId) {
+        Path p = root.resolve(tenantId.toString()).resolve(logoFile(logoId));
+        return Files.isRegularFile(p) ? p : null;
+    }
+
+    private static String logoFile(UUID logoId) {
+        return "logo-" + logoId + ".png";
+    }
+
+    private static BufferedImage read(byte[] content) {
+        BufferedImage source;
+        try {
+            source = ImageIO.read(new ByteArrayInputStream(content));
+        } catch (IOException | RuntimeException e) {
+            throw new InvalidPhotoException();
+        }
+        if (source == null || (long) source.getWidth() * source.getHeight() > MAX_PIXELS) throw new InvalidPhotoException();
+        return source;
+    }
+
+    /** Uzun kenar en fazla max (buyutmez); saydam alanlar korunur (logo). */
+    static BufferedImage scaleKeepAlpha(BufferedImage src, int max) {
+        double ratio = Math.min(1.0, (double) max / Math.max(src.getWidth(), src.getHeight()));
+        int w = Math.max(1, (int) Math.round(src.getWidth() * ratio));
+        int h = Math.max(1, (int) Math.round(src.getHeight() * ratio));
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g.drawImage(src, 0, 0, w, h, null);
+        g.dispose();
+        return out;
     }
 
     @Override

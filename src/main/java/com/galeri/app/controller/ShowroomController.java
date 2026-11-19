@@ -62,4 +62,19 @@ public class ShowroomController {
     public GenericResponse<ShowroomResponses.Settings> updateSettings(@Valid @RequestBody ShowroomRequests.Settings request) {
         return responses.success(showroomService.updateSettings(request));
     }
+
+    // Galeri logosu: sahibinden aciklamasinda ve hasar resminde kullanilir
+    @PostMapping("/api/settings/showroom/logo")
+    public GenericResponse<ShowroomResponses.Settings> uploadLogo(@RequestParam("file") MultipartFile file) {
+        try {
+            return responses.success(showroomService.uploadLogo(file.getBytes()));
+        } catch (IOException e) {
+            throw new InvalidPhotoException();
+        }
+    }
+
+    @DeleteMapping("/api/settings/showroom/logo")
+    public GenericResponse<ShowroomResponses.Settings> deleteLogo() {
+        return responses.success(showroomService.deleteLogo());
+    }
 }

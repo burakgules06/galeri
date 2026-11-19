@@ -11,6 +11,7 @@ export interface ListingTextInput {
   galleryName: string;
   phone: string | null;
   address: string | null;     // dukkan adresi (vitrin ayarlari); bos ise yazilmaz
+  logoUrl: string | null;     // galeri logosu, tam adres (https://...); ilan sitesi resmi kabul ederse karti ustunde gorunur
   description: string;        // vitrindeki ilan aciklamasi (kaydedilmemis hali de olabilir)
   showPlate: boolean;
   showPhone: boolean;
@@ -91,6 +92,7 @@ export function listingHtml(i: ListingTextInput): string {
   // Ust satir: solda marka ve arac (mavi serit), sagda galeri karti (ad, adres, telefon)
   const phoneLine = i.showPhone && i.phone ? formatPhone(i.phone) : null;
   const galleryCard = `
+    ${i.logoUrl ? `<img src="${esc(i.logoUrl)}" alt="${esc(i.galleryName)}" style="display:block;max-width:180px;max-height:56px;margin:0 0 10px 0;">` : ""}
     <div style="font-size:12px;font-weight:bold;letter-spacing:.5px;color:${ink2};">GALERİ</div>
     <div style="font-size:17px;font-weight:bold;color:${ink};margin:3px 0 0 0;">${esc(i.galleryName)}</div>
     ${i.address ? `<div style="font-size:14px;line-height:1.4;color:${ink2};margin:6px 0 0 0;">${esc(i.address)}</div>` : ""}

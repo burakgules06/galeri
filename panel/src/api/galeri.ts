@@ -28,6 +28,12 @@ export const api = {
   reorderPhotos: (vehicleId: string, photoIds: string[]) =>
     apiFetch<ShowroomListing>(`/api/vehicles/${vehicleId}/photos/order`, json({ photoIds }, "PUT")),
   showroomSettings: () => apiFetch<ShowroomSettings>("/api/settings/showroom"),
+  uploadLogo: (file: Blob) => {
+    const body = new FormData();
+    body.append("file", file, "logo.png");
+    return apiFetch<ShowroomSettings>("/api/settings/showroom/logo", { method: "POST", body });
+  },
+  deleteLogo: () => apiFetch<ShowroomSettings>("/api/settings/showroom/logo", { method: "DELETE" }),
   // Telefon ve adres birlikte gonderilir (bos gelen silinir)
   updateShowroomSettings: (phone: string | null, address: string | null) =>
     apiFetch<ShowroomSettings>("/api/settings/showroom", json({ phone, address }, "PUT")),

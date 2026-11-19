@@ -30,13 +30,13 @@ export function ShowroomCard({ vehicle }: { vehicle: VehicleDetail }) {
       </div>
       {listing.error && <ErrorBox message={listing.error} />}
       {listing.data && <ShowroomEditor key={vehicleId} vehicle={vehicle} initial={listing.data} phone={settings.data?.phone ?? null}
-        address={settings.data?.address ?? null} />}
+        address={settings.data?.address ?? null} logoUrl={settings.data?.logoUrl ?? null} />}
     </section>
   );
 }
 
-function ShowroomEditor({ vehicle, initial, phone, address }: {
-  vehicle: VehicleDetail; initial: ShowroomListing; phone: string | null; address: string | null;
+function ShowroomEditor({ vehicle, initial, phone, address, logoUrl }: {
+  vehicle: VehicleDetail; initial: ShowroomListing; phone: string | null; address: string | null; logoUrl: string | null;
 }) {
   const vehicleId = vehicle.id;
   const { auth } = useAuth();
@@ -153,7 +153,7 @@ function ShowroomEditor({ vehicle, initial, phone, address }: {
         <Button onClick={() => void save()} disabled={busy || !dirty}>{busy ? "Kaydediliyor…" : "Kaydet"}</Button>
       </div>
       {listingText && (
-        <ListingTextModal vehicle={vehicle} galleryName={auth?.tenantName || "Galeri"} phone={phone} address={address} description={description}
+        <ListingTextModal vehicle={vehicle} galleryName={auth?.tenantName || "Galeri"} phone={phone} address={address} logoUrl={logoUrl} description={description}
           onClose={() => setListingText(false)} />
       )}
     </div>
