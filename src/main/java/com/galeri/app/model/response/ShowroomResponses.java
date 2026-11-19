@@ -37,5 +37,6 @@ public final class ShowroomResponses {
 
     public record PublicVehicle(UUID id, String plate, String make, String model, short modelYear, int mileageKm, Fuel fuel,
                                 Transmission transmission, String color, Long priceCents, Long tramerCents, String description,
-                                List<PublicPart> parts, List<Photo> photos, String galleryName, String phone) {}
+                                List<PublicPart> parts, List<Photo> photos, String galleryName, String phone,
+                                List<String> equipment) {}
 }

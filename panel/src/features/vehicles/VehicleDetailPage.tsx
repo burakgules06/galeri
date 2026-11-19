@@ -7,6 +7,7 @@ import { Plate } from "../../shared/ui/Plate";
 import { Button, ErrorBox } from "../../shared/ui/Common";
 import { DamageMap } from "./DamageMap";
 import { DaysInStock } from "./DaysInStock";
+import { EquipmentCard } from "./EquipmentCard";
 import { OwnershipBadge } from "./OwnershipBadge";
 import { PaymentPlanCard } from "./PaymentPlanCard";
 import { SaleForm } from "./SaleForm";
@@ -31,7 +32,7 @@ export function VehicleDetailPage({ id }: { id: string }) {
   const [form, setForm] = useState<"edit" | "sell" | null>(null);
   const [staffExpense, setStaffExpense] = useState(false);   // yetkili calisan: araca masraf (tutari sonra gormez)
   const [staffExpenseSaved, setStaffExpenseSaved] = useState(false);
-  const { isInvestor, canTrade, canAddExpense } = useAuth();   // sermayedar kendi aracini fiyatlariyla gorur; sadece satar ve masraf ekler
+  const { isAdmin, isInvestor, canTrade, canAddExpense } = useAuth();   // sermayedar kendi aracini fiyatlariyla gorur; sadece satar ve masraf ekler
   const [removeError, setRemoveError] = useState<string | null>(null);
 
   if (error) return <ErrorBox message={error} />;
@@ -180,6 +181,8 @@ export function VehicleDetailPage({ id }: { id: string }) {
               onSaved={setData}
             />
           </Card>
+          <EquipmentCard vehicleId={v.id} equipment={v.equipment ?? []} editable={!isInvestor && (isAdmin || canTrade)}
+            onSaved={(equipment) => setData(admin ? { ...admin, vehicle: { ...v, equipment } } : { ...v, equipment })} />
           {admin && !isInvestor && <ShowroomCard vehicle={v} />}
         </div>
       </div>

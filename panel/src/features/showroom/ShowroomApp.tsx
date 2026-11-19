@@ -7,6 +7,7 @@ import { BODY_PART, formatNumber, FUEL, tl, TRANSMISSION } from "../../shared/fo
 import type { BodyPart, PartCondition, PublicGallery, PublicShowroomCard, PublicVehicle } from "../../shared/types";
 import { useLoad } from "../../shared/useLoad";
 import { DamageMap } from "../vehicles/DamageMap";
+import { groupEquipment } from "../../shared/equipment";
 import { parseShowroomPath, telLink, whatsappLink } from "./showroomLinks";
 
 function usePath() {
@@ -132,9 +133,30 @@ function VehiclePage({ slug, id, onBack }: { slug: string; id: string; onBack: (
             <h2 className="etiket mb-3">Boya ve değişen</h2>
             <DamageMap parts={parts} />
           </section>
+          {(v.equipment ?? []).length > 0 && <Equipment items={v.equipment} />}
         </div>
       </div>
     </Shell>
+  );
+}
+
+function Equipment({ items }: { items: string[] }) {
+  return (
+    <section className="kart p-4 md:p-5">
+      <h2 className="etiket mb-3">Donanım</h2>
+      <div className="space-y-3">
+        {groupEquipment(items).map((g) => (
+          <div key={g.title}>
+            <p className="text-[13px] font-semibold text-murekkep-2 mb-1">{g.title}</p>
+            <ul className="flex flex-wrap gap-1.5">
+              {g.items.map((i) => (
+                <li key={i} className="h-8 px-3 rounded-full border border-cizgi bg-yuzey-2 text-[14px] font-medium grid place-items-center">{i}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

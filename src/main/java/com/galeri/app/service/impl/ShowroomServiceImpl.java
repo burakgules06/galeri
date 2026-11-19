@@ -41,6 +41,7 @@ public class ShowroomServiceImpl implements ShowroomService {
     private final VehiclePartRepository partRepository;
     private final TenantRepository tenantRepository;
     private final PhotoStorage storage;
+    private final com.galeri.app.repository.VehicleEquipmentRepository equipmentRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -199,7 +200,8 @@ public class ShowroomServiceImpl implements ShowroomService {
                 .map(ShowroomServiceImpl::photo).toList();
         return new ShowroomResponses.PublicVehicle(v.getId(), v.getPlate(), v.getMake(), v.getModel(), v.getModelYear(),
                 v.getMileageKm(), v.getFuel(), v.getTransmission(), v.getColor(), v.getListingPriceCents(), v.getTramerCents(),
-                v.getListingDescription(), parts, photos, t.getDisplayName(), t.getShowroomPhone());
+                v.getListingDescription(), parts, photos, t.getDisplayName(), t.getShowroomPhone(),
+                equipmentRepository.findByVehicleIdOrderByPositionAsc(v.getId()).stream().map(com.galeri.app.model.entity.VehicleEquipment::getName).toList());
     }
 
     @Override

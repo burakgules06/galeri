@@ -54,6 +54,14 @@ public class VehicleController {
         return responseService.success(vehicleService.update(id, request));
     }
 
+    // Donanimlar: para bilgisi yok, arac giren calisan da girer
+    @PutMapping("/{id}/equipment")
+    @PreAuthorize("hasRole('ADMIN') or @staffTrade.allowed()")
+    public GenericResponse<java.util.List<String>> updateEquipment(@PathVariable UUID id,
+                                                                  @Valid @RequestBody com.galeri.app.model.request.VehicleEquipmentRequest request) {
+        return responseService.success(vehicleService.updateEquipment(id, request));
+    }
+
     @PutMapping("/{id}/parts")
     @PreAuthorize("hasRole('ADMIN')")
     public GenericResponse<VehicleDetailAdmin> updateParts(@PathVariable UUID id,

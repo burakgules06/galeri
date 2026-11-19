@@ -80,6 +80,7 @@ class VehicleServiceImplTest {
 
     @Mock private VehicleRepository vehicleRepository;
     @Mock private VehiclePartRepository vehiclePartRepository;
+    @Mock private com.galeri.app.repository.VehicleEquipmentRepository equipmentRepository;
     @Mock private ContactRepository contactRepository;
     @Mock private PanelUserRepository panelUserRepository;
     @Mock private LedgerService ledgerService;
@@ -102,7 +103,7 @@ class VehicleServiceImplTest {
     @BeforeEach
     void setUp() {
         catalog = new CatalogServiceImpl(catalogEntryRepository);   // gercek katalog (vehicles.json), eklemeler mock
-        service = new VehicleServiceImpl(vehicleRepository, vehiclePartRepository, contactRepository, panelUserRepository,
+        service = new VehicleServiceImpl(vehicleRepository, vehiclePartRepository, equipmentRepository, contactRepository, panelUserRepository,
                 ledgerService, paymentPlanService, catalog, coOwnershipService, capitalService, loanService, clock);
         buyer = new Contact();
         buyer.setId(UUID.randomUUID());

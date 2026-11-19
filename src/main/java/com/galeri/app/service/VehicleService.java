@@ -24,6 +24,9 @@ public interface VehicleService {
 
     VehicleDetailAdmin update(UUID id, VehicleRequest request);
 
+    /** Aracin donanim listesini bastan yazar; temizlenmis listeyi doner (yonetici ve arac giren calisan). */
+    java.util.List<String> updateEquipment(java.util.UUID id, com.galeri.app.model.request.VehicleEquipmentRequest request);
+
     VehicleDetailAdmin updateParts(UUID id, VehiclePartsRequest request);
 
     /** Satis + odeme plani; satis deftere odeyen basina yazilir (bkz. PaymentPlanService.recordSale). */
