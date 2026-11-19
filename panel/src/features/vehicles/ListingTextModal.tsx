@@ -76,9 +76,8 @@ export function ListingTextModal({ vehicle, galleryName, phone, address, logoUrl
           <label className={`flex items-center gap-2 text-[14px] ${phone ? "cursor-pointer" : "opacity-60"}`}>
             <input type="checkbox" className="w-5 h-5 accent-plaka" checked={showPhone && !!phone} disabled={!phone}
               onChange={(e) => setShowPhone(e.target.checked)} />
-            Telefonu göster{!phone && " (vitrin ayarlarında telefon yok)"}
+            Düz metne telefonu ekle{!phone && " (vitrin ayarlarında telefon yok)"}
           </label>
-          {!address && <span className="text-[13.5px] text-murekkep-2">Dükkân adresi yok: Hesabım › Müşteri vitrini'nden eklenir.</span>}
         </div>
         <ErrorBox message={error} />
         {done && <p role="status" className="text-[14px] font-semibold text-basari">{done}</p>}
