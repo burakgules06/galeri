@@ -163,13 +163,13 @@ export function listingHtml(i: ListingTextInput): string {
   const tramer = tramerText(v.tramerCents);
   const tramerBox = tramer ? box("Tramer Bilgisi", `<div style="font-family:${font};font-size:15px;color:${ink};">${esc(tramer)}</div>`) : "";
 
-  // Donanim: grup basligi ve altinda iki sutun, her ozellik onay isaretiyle
+  // Donanim: grup basligi ve altinda iki sutun
   const equipmentGroups = groupEquipment(v.equipment ?? []);
   const equipmentBox = equipmentGroups.length === 0 ? "" : box("Donanım", equipmentGroups.map((g, k) => {
     const rows: string[] = [];
     for (let r = 0; r < g.items.length; r += 2) {
       rows.push(`<tr>${[g.items[r], g.items[r + 1]].map((item) => item == null ? `<td width="${BOX_INNER / 2}" style="${widthStyle(BOX_INNER / 2)}"></td>`
-        : `<td width="${BOX_INNER / 2}" valign="top" style="${widthStyle(BOX_INNER / 2)}padding:3px 8px 3px 0;font-family:${font};font-size:15px;color:${ink};"><span style="color:${brand};font-weight:bold;">✓</span>&nbsp;${esc(item)}</td>`).join("")}</tr>`);
+        : `<td width="${BOX_INNER / 2}" valign="top" style="${widthStyle(BOX_INNER / 2)}padding:3px 8px 3px 0;font-family:${font};font-size:15px;color:${ink};">${esc(item)}</td>`).join("")}</tr>`);
     }
     return `<div style="font-family:${font};font-size:13px;font-weight:bold;letter-spacing:.5px;color:${ink2};margin:${k ? 12 : 0}px 0 4px 0;">${esc(g.title.toLocaleUpperCase("tr-TR"))}</div>
     <table ${tableAttrs(BOX_INNER)} style="${widthStyle(BOX_INNER)}border-collapse:collapse;">${rows.join("")}</table>`;
