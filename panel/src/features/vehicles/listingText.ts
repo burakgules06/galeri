@@ -89,24 +89,33 @@ export function listingHtml(i: ListingTextInput): string {
 </table>`;
 
   // Ust serit: galeri adi, arac, kisa ozet
-  // Ust satir: solda marka ve arac (mavi serit), sagda galeri karti (ad, adres, telefon)
+  // En ustte galeri logosu: ortada, buyutulmus, tam genislik banner (logo yoksa yok)
+  const banner = i.logoUrl ? `
+<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid ${line};background:${white};margin:0 0 10px 0;">
+  <tr><td align="center" valign="middle" style="padding:22px 16px;">
+    <img src="${esc(i.logoUrl)}" alt="${esc(i.galleryName)}" height="150" style="display:block;margin:0 auto;height:150px;width:auto;max-width:100%;">
+  </td></tr>
+</table>` : "";
+
+  // Ust satir (simsiyah zemin, beyaz yazi): solda marka ve arac, sagda galeri karti (ad, adres, telefon)
+  const dark = ink;
+  const light = token("--color-cizgi-2");
   const phoneLine = i.showPhone && i.phone ? formatPhone(i.phone) : null;
   const galleryCard = `
-    ${i.logoUrl ? `<img src="${esc(i.logoUrl)}" alt="${esc(i.galleryName)}" style="display:block;max-width:180px;max-height:56px;margin:0 0 10px 0;">` : ""}
-    <div style="font-size:12px;font-weight:bold;letter-spacing:.5px;color:${ink2};">GALERİ</div>
-    <div style="font-size:17px;font-weight:bold;color:${ink};margin:3px 0 0 0;">${esc(i.galleryName)}</div>
-    ${i.address ? `<div style="font-size:14px;line-height:1.4;color:${ink2};margin:6px 0 0 0;">${esc(i.address)}</div>` : ""}
-    ${phoneLine ? `<div style="font-size:15px;font-weight:bold;color:${brand};margin:6px 0 0 0;">${esc(phoneLine)}</div>` : ""}`;
-  const header = `
+    <div style="font-size:12px;font-weight:bold;letter-spacing:.5px;color:${light};">GALERİ</div>
+    <div style="font-size:17px;font-weight:bold;color:${white};margin:3px 0 0 0;">${esc(i.galleryName)}</div>
+    ${i.address ? `<div style="font-size:14px;line-height:1.4;color:${light};margin:6px 0 0 0;">${esc(i.address)}</div>` : ""}
+    ${phoneLine ? `<div style="font-size:16px;font-weight:bold;color:${white};margin:8px 0 0 0;">${esc(phoneLine)}</div>` : ""}`;
+  const header = `${banner}
 <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 14px 0;">
   <tr>
-    <td width="62%" valign="middle" style="background:${brand};padding:18px 20px;font-family:${font};color:${white};">
-      <div style="font-size:30px;font-weight:bold;letter-spacing:.5px;">${esc(v.make)}</div>
-      <div style="font-size:19px;font-weight:bold;margin:2px 0 6px 0;">${esc(v.model)}</div>
-      <div style="font-size:15px;">${esc([String(v.modelYear), km(v.mileageKm), FUEL[v.fuel], TRANSMISSION[v.transmission]].join(" · "))}</div>
+    <td width="62%" valign="middle" style="background:${dark};padding:18px 20px;font-family:${font};color:${white};">
+      <div style="font-size:30px;font-weight:bold;letter-spacing:.5px;color:${white};">${esc(v.make)}</div>
+      <div style="font-size:19px;font-weight:bold;margin:2px 0 6px 0;color:${white};">${esc(v.model)}</div>
+      <div style="font-size:15px;color:${light};">${esc([String(v.modelYear), km(v.mileageKm), FUEL[v.fuel], TRANSMISSION[v.transmission]].join(" · "))}</div>
     </td>
     <td width="2%"></td>
-    <td width="36%" valign="middle" style="border:1px solid ${line};padding:14px 16px;font-family:${font};">${galleryCard}
+    <td width="36%" valign="middle" style="background:${dark};padding:16px 18px;font-family:${font};">${galleryCard}
     </td>
   </tr>
 </table>`;
