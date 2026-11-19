@@ -143,7 +143,7 @@ class ShowroomIT {
     @Test
     void donanimlar_temizlenipSirasiylaKaydedilir_detaydaVeVitrindeGorunur_bastanYazilir() throws Exception {
         TestSession.open(owner, tenant, "ADMIN");
-        UUID v = vehicle("Mercedes", "GLA");
+        UUID v = vehicle("Renault", "Clio");
         List<String> saved = vehicleService.updateEquipment(v, new VehicleEquipmentRequest(
                 List.of("Cam tavan", "  360°  kamera ", "", "cam TAVAN", "19 inç AMG jant")));
         assertThat(saved).as("bosluk toplanir, bos ve tekrar atlanir").containsExactly("Cam tavan", "360° kamera", "19 inç AMG jant");
