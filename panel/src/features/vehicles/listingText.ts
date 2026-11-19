@@ -70,22 +70,25 @@ function specs(i: ListingTextInput): [string, string][] {
 
 // ------------------------------------------------------------------ zengin metin (HTML)
 
-// Banner'daki logo kutusu: logo bu alana orani korunarak sigdirilir, kucukse buyutulur (kare logo 150x150,
-// ince uzun logo 700 px genislige kadar). Dar ekranda max-width ile oranini koruyarak kuculur.
-const BANNER_W = 700;
-const BANNER_H = 150;
+// Banner'daki logo: kartin tam genisligine kadar buyutulur (kenardan kenara, orani korunarak). Kare / dik logolar dev
+// olmasin diye yukseklik en fazla BANNER_MAX_H; o zaman ortada durur. Dar ekranda max-width ile oranini koruyarak kuculur.
+const BANNER_W = 760;        // aciklamanin genisligi (max-width)
+const BANNER_MAX_H = 220;
 
 function logoImg(i: ListingTextInput): string {
   const src = esc(i.logoUrl ?? "");
   const alt = esc(i.galleryName);
   const size = i.logoSize;
   if (!size || size.width <= 0 || size.height <= 0) {
-    return `<img src="${src}" alt="${alt}" style="display:block;margin:0 auto;max-width:100%;max-height:${BANNER_H}px;width:auto;height:auto;">`;
+    return `<img src="${src}" alt="${alt}" style="display:block;margin:0 auto;width:100%;max-width:100%;height:auto;max-height:${BANNER_MAX_H}px;object-fit:contain;">`;
   }
-  const ratio = Math.min(BANNER_W / size.width, BANNER_H / size.height);
-  const w = Math.round(size.width * ratio);
-  const h = Math.round(size.height * ratio);
-  return `<img src="${src}" alt="${alt}" width="${w}" height="${h}" style="display:block;margin:0 auto;width:${w}px;max-width:100%;height:auto;">`;
+  const aspect = size.width / size.height;
+  if (BANNER_W / aspect <= BANNER_MAX_H) {
+    // Genis logo: kartin tamami
+    return `<img src="${src}" alt="${alt}" width="${BANNER_W}" height="${Math.round(BANNER_W / aspect)}" style="display:block;width:100%;height:auto;">`;
+  }
+  const w = Math.round(BANNER_MAX_H * aspect);
+  return `<img src="${src}" alt="${alt}" width="${w}" height="${BANNER_MAX_H}" style="display:block;margin:0 auto;width:${w}px;max-width:100%;height:auto;">`;
 }
 
 export function listingHtml(i: ListingTextInput): string {
@@ -108,10 +111,10 @@ export function listingHtml(i: ListingTextInput): string {
 </table>`;
 
   // Ust serit: galeri adi, arac, kisa ozet
-  // En ustte galeri logosu: ortada, buyutulmus, tam genislik banner (logo yoksa yok)
+  // En ustte galeri logosu: kartin genisligine kadar buyutulmus banner (logo yoksa yok)
   const banner = i.logoUrl ? `
-<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid ${line};background:${white};margin:0 0 10px 0;">
-  <tr><td align="center" valign="middle" style="padding:22px 16px;">
+<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${white};margin:0 0 10px 0;">
+  <tr><td align="center" valign="middle" style="padding:0;">
     ${logoImg(i)}
   </td></tr>
 </table>` : "";

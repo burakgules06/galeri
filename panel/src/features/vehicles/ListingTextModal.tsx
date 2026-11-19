@@ -101,7 +101,7 @@ async function loadLogo(url: string | null): Promise<ImageBitmap | null> {
   }
 }
 
-// Logonun gercek boyutu (banner'a sigdirmak icin). Yuklenene kadar null: HTML boyutsuz, en fazla 150 px yukseklikle yazilir.
+// Logonun gercek boyutu (banner'a sigdirmak icin). Yuklenene kadar null: HTML boyutsuz yazilir (genislik %100, en fazla 220 px yukseklik).
 function useLogoSize(url: string | null): { width: number; height: number } | null {
   const [size, setSize] = useState<{ url: string; width: number; height: number } | null>(null);
   useEffect(() => {
