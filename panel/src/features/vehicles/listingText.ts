@@ -119,25 +119,13 @@ export function listingHtml(i: ListingTextInput): string {
   </td></tr>
 </table>` : "";
 
-  // Ust satir (simsiyah zemin, beyaz yazi): solda marka ve arac, sagda galeri karti (ad, adres, telefon)
-  const dark = ink;
-  const light = token("--color-cizgi-2");
-  const phoneLine = i.showPhone && i.phone ? formatPhone(i.phone) : null;
-  const galleryCard = `
-    <div style="font-size:12px;font-weight:bold;letter-spacing:.5px;color:${light};">GALERİ</div>
-    <div style="font-size:17px;font-weight:bold;color:${white};margin:3px 0 0 0;">${esc(i.galleryName)}</div>
-    ${i.address ? `<div style="font-size:14px;line-height:1.4;color:${light};margin:6px 0 0 0;">${esc(i.address)}</div>` : ""}
-    ${phoneLine ? `<div style="font-size:16px;font-weight:bold;color:${white};margin:8px 0 0 0;">${esc(phoneLine)}</div>` : ""}`;
+  // Ust satir (simsiyah zemin, beyaz yazi, tam genislik): marka ve model. Yil / km / yakit / vites altta bilgi kartlarinda.
   const header = `${banner}
 <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 14px 0;">
   <tr>
-    <td width="62%" valign="middle" style="background:${dark};padding:18px 20px;font-family:${font};color:${white};">
+    <td valign="middle" style="background:${ink};padding:18px 20px;font-family:${font};color:${white};">
       <div style="font-size:30px;font-weight:bold;letter-spacing:.5px;color:${white};">${esc(v.make)}</div>
-      <div style="font-size:19px;font-weight:bold;margin:2px 0 6px 0;color:${white};">${esc(v.model)}</div>
-      <div style="font-size:15px;color:${light};">${esc([String(v.modelYear), km(v.mileageKm), FUEL[v.fuel], TRANSMISSION[v.transmission]].join(" · "))}</div>
-    </td>
-    <td width="2%"></td>
-    <td width="36%" valign="middle" style="background:${dark};padding:16px 18px;font-family:${font};">${galleryCard}
+      <div style="font-size:19px;font-weight:bold;margin:2px 0 0 0;color:${white};">${esc(v.model)}</div>
     </td>
   </tr>
 </table>`;
