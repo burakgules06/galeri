@@ -161,6 +161,36 @@ public class ShowroomServiceImpl implements ShowroomService {
         return settingsOf(t);
     }
 
+    // Iletisim karti: alt banner ile ayni saklama, ayri id
+    @Override
+    @Transactional
+    public ShowroomResponses.Settings uploadContactCard(byte[] content) {
+        Tenant t = tenantRepository.findById(CurrentUser.tenantId()).orElseThrow(RecordNotFoundException::new);
+        UUID id = UUID.randomUUID();
+        storage.saveLogo(t.getId(), id, content);
+        afterRollback(() -> storage.deleteLogo(t.getId(), id));
+        UUID old = t.getContactCardId();
+        t.setContactCardId(id);
+        if (old != null) afterCommit(() -> storage.deleteLogo(t.getId(), old));
+        return settingsOf(t);
+    }
+
+    @Override
+    @Transactional
+    public ShowroomResponses.Settings deleteContactCard() {
+        Tenant t = tenantRepository.findById(CurrentUser.tenantId()).orElseThrow(RecordNotFoundException::new);
+        UUID old = t.getContactCardId();
+        t.setContactCardId(null);
+        if (old != null) afterCommit(() -> storage.deleteLogo(t.getId(), old));
+        return settingsOf(t);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Path contactCardFile(UUID cardId) {
+        return tenantRepository.findByContactCardId(cardId).map(t -> storage.logoPath(t.getId(), cardId)).orElse(null);
+    }
+
     @Override
     @Transactional(readOnly = true)
     public Path footerBannerFile(UUID bannerId) {
@@ -170,7 +200,8 @@ public class ShowroomServiceImpl implements ShowroomService {
     private static ShowroomResponses.Settings settingsOf(Tenant t) {
         return new ShowroomResponses.Settings(t.getSlug(), t.getShowroomPhone(), t.getShowroomAddress(),
                 t.getLogoId() == null ? null : "/api/public/logos/" + t.getLogoId() + ".png", t.getDealerLicenseNo(),
-                t.getFooterBannerId() == null ? null : "/api/public/banners/" + t.getFooterBannerId() + ".png");
+                t.getFooterBannerId() == null ? null : "/api/public/banners/" + t.getFooterBannerId() + ".png",
+                t.getContactCardId() == null ? null : "/api/public/contact-cards/" + t.getContactCardId() + ".png");
     }
 
     @Override

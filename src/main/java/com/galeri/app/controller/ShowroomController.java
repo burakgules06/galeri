@@ -92,4 +92,19 @@ public class ShowroomController {
     public GenericResponse<ShowroomResponses.Settings> deleteFooterBanner() {
         return responses.success(showroomService.deleteFooterBanner());
     }
+
+    // Iletisim karti gorseli: aciklamada logonun hemen altinda, logoyla ayni en ve boyda
+    @PostMapping("/api/settings/showroom/contact-card")
+    public GenericResponse<ShowroomResponses.Settings> uploadContactCard(@RequestParam("file") MultipartFile file) {
+        try {
+            return responses.success(showroomService.uploadContactCard(file.getBytes()));
+        } catch (IOException e) {
+            throw new InvalidPhotoException();
+        }
+    }
+
+    @DeleteMapping("/api/settings/showroom/contact-card")
+    public GenericResponse<ShowroomResponses.Settings> deleteContactCard() {
+        return responses.success(showroomService.deleteContactCard());
+    }
 }

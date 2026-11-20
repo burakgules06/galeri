@@ -66,4 +66,8 @@ public class Tenant extends BaseModel {
     // Alt banner (V38): sahibinden aciklamasinin en altindaki gorsel; dosyasi logo gibi saklanir. Bos ise yok
     @Column(name = "footer_banner_id")
     private UUID footerBannerId;
+
+    // Iletisim karti gorseli (V39): aciklamada logonun hemen altinda, logoyla ayni en ve boyda. Bos ise yok
+    @Column(name = "contact_card_id")
+    private UUID contactCardId;
 }

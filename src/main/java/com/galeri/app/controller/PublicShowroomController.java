@@ -60,6 +60,17 @@ public class PublicShowroomController {
                 .body(new FileSystemResource(path));
     }
 
+    // Iletisim karti gorseli (aciklamada logonun altinda). Logo gibi her yuklemede yeni id.
+    @GetMapping("/contact-cards/{file:[0-9a-fA-F-]{36}\\.png}")
+    public ResponseEntity<Resource> contactCard(@PathVariable String file) {
+        Path path = showroomService.contactCardFile(UUID.fromString(file.substring(0, 36)));
+        if (path == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable())
+                .body(new FileSystemResource(path));
+    }
+
     // Dosya adi: {id}.jpg (buyuk) ya da {id}_t.jpg (kucuk). Icerik degismedigi icin uzun sure onbellekte kalir.
     @GetMapping("/photos/{file:[0-9a-fA-F-]{36}(?:_t)?\\.jpg}")
     public ResponseEntity<Resource> photo(@PathVariable String file) {

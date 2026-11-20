@@ -16,7 +16,9 @@ export interface ListingTextInput {
   logoUrl: string | null;     // galeri logosu, tam adres (https://...); ilan sitesi resmi kabul ederse en ustte banner olur
   logoSize?: { width: number; height: number } | null;
   footerBannerUrl?: string | null;   // alt banner, tam adres; en altta logo ile ayni genislikte
-  footerBannerSize?: { width: number; height: number } | null;   // logonun gercek boyutu: banner'a orani bozulmadan sigdirmak icin
+  footerBannerSize?: { width: number; height: number } | null;
+  contactCardUrl?: string | null;    // iletisim karti gorseli, tam adres; logonun hemen altinda, logoyla ayni en ve boyda
+  contactCardSize?: { width: number; height: number } | null;   // logonun gercek boyutu: banner'a orani bozulmadan sigdirmak icin
   description: string;        // vitrindeki ilan aciklamasi (kaydedilmemis hali de olabilir)
   showPlate: boolean;
   showPhone: boolean;
@@ -97,6 +99,13 @@ function bannerImg(url: string, galleryName: string, size: { width: number; heig
   return `<img src="${src}" alt="${alt}" width="${W}" height="${h}" style="display:block;margin:0 auto;width:100%;height:auto;">`;
 }
 
+// Gorseli verilen kutu oranina oturtur (iletisim karti logonun boyunda): genislik tam, yukseklik orandan; oran farkliysa
+// ortadan kirpilir. Editor aspect-ratio'yu silerse gorsel kendi oraniyla gosterilir.
+function fittedImg(url: string, galleryName: string, box: { width: number; height: number }): string {
+  const h = Math.round(W * box.height / box.width);
+  return `<img src="${esc(url)}" alt="${esc(galleryName)}" width="${W}" height="${h}" style="display:block;margin:0 auto;width:100%;height:auto;aspect-ratio:${box.width} / ${box.height};object-fit:cover;">`;
+}
+
 export function listingHtml(i: ListingTextInput): string {
   const v = i.vehicle;
   const ink = token("--color-murekkep");
@@ -125,13 +134,18 @@ export function listingHtml(i: ListingTextInput): string {
   </td></tr>
 </table>`;
   const banner = i.logoUrl ? bannerTable(bannerImg(i.logoUrl, i.galleryName, i.logoSize), "0 auto 10px auto") : "";
+  // Logonun hemen altinda iletisim karti: logoyla ayni en ve boy. Kutunun orani logodan gelir; gorselin orani farkliysa
+  // object-fit:cover ile ortadan kirpilir (logo yoksa kendi oraniyla)
+  const contactCard = !i.contactCardUrl ? "" : bannerTable(i.logoUrl && i.logoSize
+    ? fittedImg(i.contactCardUrl, i.galleryName, i.logoSize)
+    : bannerImg(i.contactCardUrl, i.galleryName, i.contactCardSize), "0 auto 10px auto");
   // En altta alt banner: ustteki logo ile ayni genislik
   const footerBanner = i.footerBannerUrl
     ? bannerTable(bannerImg(i.footerBannerUrl, i.galleryName, i.footerBannerSize), "14px auto 0 auto") : "";
 
   // Ust satir (simsiyah zemin, beyaz yazi, tam genislik): marka ve model ayri satirlarda, satir yuksekligi acik yazili
 // (editorun kendi satir yuksekligiyle iki satir ust uste biniyordu). Yil / km / yakit / vites altta bilgi kartlarinda.
-  const header = `${banner}
+  const header = `${banner}${contactCard}
 <table ${tableAttrs(W)} style="${widthStyle(100)}border-collapse:collapse;margin:0 auto 14px auto;background:${ink};">
   <tr><td width="${W}" style="${widthStyle(100)}background:${ink};padding:18px 20px 2px 20px;font-family:${font};font-size:30px;line-height:36px;font-weight:bold;letter-spacing:.5px;color:${white};">${esc(v.make)}</td></tr>
   <tr><td width="${W}" style="${widthStyle(100)}background:${ink};padding:0 20px 18px 20px;font-family:${font};font-size:19px;line-height:24px;font-weight:bold;color:${white};">${esc(v.model)}</td></tr>

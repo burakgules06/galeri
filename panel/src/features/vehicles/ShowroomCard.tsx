@@ -31,14 +31,15 @@ export function ShowroomCard({ vehicle }: { vehicle: VehicleDetail }) {
       {listing.error && <ErrorBox message={listing.error} />}
       {listing.data && <ShowroomEditor key={vehicleId} vehicle={vehicle} initial={listing.data} phone={settings.data?.phone ?? null}
         address={settings.data?.address ?? null} logoUrl={settings.data?.logoUrl ?? null}
-        dealerLicenseNo={settings.data?.dealerLicenseNo ?? null} footerBannerUrl={settings.data?.footerBannerUrl ?? null} />}
+        dealerLicenseNo={settings.data?.dealerLicenseNo ?? null} footerBannerUrl={settings.data?.footerBannerUrl ?? null}
+        contactCardUrl={settings.data?.contactCardUrl ?? null} />}
     </section>
   );
 }
 
-function ShowroomEditor({ vehicle, initial, phone, address, logoUrl, dealerLicenseNo, footerBannerUrl }: {
+function ShowroomEditor({ vehicle, initial, phone, address, logoUrl, dealerLicenseNo, footerBannerUrl, contactCardUrl }: {
   vehicle: VehicleDetail; initial: ShowroomListing; phone: string | null; address: string | null; logoUrl: string | null;
-  dealerLicenseNo: string | null; footerBannerUrl: string | null;
+  dealerLicenseNo: string | null; footerBannerUrl: string | null; contactCardUrl: string | null;
 }) {
   const vehicleId = vehicle.id;
   const { auth } = useAuth();
@@ -155,7 +156,7 @@ function ShowroomEditor({ vehicle, initial, phone, address, logoUrl, dealerLicen
         <Button onClick={() => void save()} disabled={busy || !dirty}>{busy ? "Kaydediliyor…" : "Kaydet"}</Button>
       </div>
       {listingText && (
-        <ListingTextModal vehicle={vehicle} galleryName={auth?.tenantName || "Galeri"} phone={phone} address={address} logoUrl={logoUrl} dealerLicenseNo={dealerLicenseNo} footerBannerUrl={footerBannerUrl} description={description}
+        <ListingTextModal vehicle={vehicle} galleryName={auth?.tenantName || "Galeri"} phone={phone} address={address} logoUrl={logoUrl} dealerLicenseNo={dealerLicenseNo} footerBannerUrl={footerBannerUrl} contactCardUrl={contactCardUrl} description={description}
           onClose={() => setListingText(false)} />
       )}
     </div>
