@@ -112,6 +112,32 @@ class ShowroomIT {
     }
 
     @Test
+    void iletisimKarti_digerGorsellerdenAyriYuklenir_yenisiEskisiniSiler_kaldirilinca_bosalir() throws Exception {
+        TestSession.open(owner, tenant, "ADMIN");
+        ShowroomResponses.Settings banner = showroomService.uploadFooterBanner(image(1200, 300));
+
+        ShowroomResponses.Settings first = showroomService.uploadContactCard(image(1600, 900));
+        assertThat(first.contactCardUrl()).matches("/api/public/contact-cards/[0-9a-f-]{36}\\.png");
+        assertThat(first.footerBannerUrl()).as("alt banner yerinde kalir").isEqualTo(banner.footerBannerUrl());
+        UUID firstId = UUID.fromString(first.contactCardUrl().substring("/api/public/contact-cards/".length(), first.contactCardUrl().length() - 4));
+        Path firstFile = showroomService.contactCardFile(firstId);
+        assertThat(firstFile).isNotNull();
+        assertThat(ImageIO.read(firstFile.toFile()).getWidth()).as("uzun kenar 1200").isEqualTo(1200);
+        UUID bannerId = UUID.fromString(banner.footerBannerUrl().substring("/api/public/banners/".length(), banner.footerBannerUrl().length() - 4));
+        assertThat(showroomService.contactCardFile(bannerId)).as("banner id'si kart adresinden acilmaz").isNull();
+
+        ShowroomResponses.Settings second = showroomService.uploadContactCard(image(1200, 675));
+        assertThat(second.contactCardUrl()).isNotEqualTo(first.contactCardUrl());
+        assertThat(Files.exists(firstFile)).as("eski kart dosyasi silinir").isFalse();
+        assertThatThrownBy(() -> showroomService.uploadContactCard("resim degil".getBytes())).isInstanceOf(InvalidPhotoException.class);
+
+        ShowroomResponses.Settings cleared = showroomService.deleteContactCard();
+        assertThat(cleared.contactCardUrl()).isNull();
+        assertThat(cleared.footerBannerUrl()).isEqualTo(banner.footerBannerUrl());
+        showroomService.deleteFooterBanner();
+    }
+
+    @Test
     void altBanner_logodanAyriYuklenir_yenisiEskisiniSiler_kaldirilinca_bosalir() throws Exception {
         TestSession.open(owner, tenant, "ADMIN");
         ShowroomResponses.Settings logo = showroomService.uploadLogo(image(300, 100));

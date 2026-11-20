@@ -39,6 +39,14 @@ public interface ShowroomService {
     /** Herkese acik alt banner dosyasi; yoksa null. */
     java.nio.file.Path footerBannerFile(UUID bannerId);
 
+    /** Iletisim karti gorselini yukler (eskisi silinir); aciklamada logonun hemen altinda. */
+    ShowroomResponses.Settings uploadContactCard(byte[] content);
+
+    ShowroomResponses.Settings deleteContactCard();
+
+    /** Herkese acik iletisim karti dosyasi; yoksa null. */
+    java.nio.file.Path contactCardFile(UUID cardId);
+
     /** Herkese acik: galerinin vitrindeki stok araclari. Galeri yoksa / pasifse RecordNotFoundException. */
     ShowroomResponses.PublicGallery publicGallery(String slug);
 

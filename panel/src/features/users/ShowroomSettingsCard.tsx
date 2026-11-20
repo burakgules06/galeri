@@ -1,6 +1,6 @@
 // Hesabim > Vitrin (dukkan sahibi): musteri sayfasinin linki (kopyala / paylas / ac), WhatsApp numarasi ve dukkan adresi
 // (sahibinden aciklamasindaki galeri kartinda), galeri logosu (aciklamada ve hasar resminde) ve alt banner (aciklamanin en
-// altinda, logo ile ayni genislikte).
+// altinda, logo ile ayni genislikte) ve iletisim karti gorseli (logonun hemen altinda, logoyla ayni en ve boyda).
 import { useRef, useState } from "react";
 import { apiUrl } from "../../api/client";
 import { logoPng } from "../../shared/image/logoPng";
@@ -36,6 +36,8 @@ function SettingsForm({ initial }: { initial: ShowroomSettings }) {
   const [savedLicense, setSavedLicense] = useState(initial.dealerLicenseNo ?? "");
   const [logoUrl, setLogoUrl] = useState(initial.logoUrl);
   const [footerBannerUrl, setFooterBannerUrl] = useState(initial.footerBannerUrl);
+  const [contactCardUrl, setContactCardUrl] = useState(initial.contactCardUrl);
+  const [logoSize, setLogoSize] = useState<{ width: number; height: number } | null>(null);
 
   // Logo ve alt banner ayni sekilde yuklenir: PNG'ye cevrilir, cevaptaki adresler guncellenir
   const image = async (action: () => Promise<ShowroomSettings>) => {
@@ -45,6 +47,7 @@ function SettingsForm({ initial }: { initial: ShowroomSettings }) {
       const saved = await action();
       setLogoUrl(saved.logoUrl);
       setFooterBannerUrl(saved.footerBannerUrl);
+      setContactCardUrl(saved.contactCardUrl);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -86,8 +89,14 @@ function SettingsForm({ initial }: { initial: ShowroomSettings }) {
       </Field>
       <ImageField label="Galeri logosu" url={logoUrl} busy={busy} boxClass="w-32 h-16"
         hint="Sahibinden açıklamasında ve hasar resminde çıkar. Arka planı saydam PNG en iyi görünür."
-        onPick={(f) => pick(f, api.uploadLogo)}
+        onPick={(f) => pick(f, api.uploadLogo)} onSize={setLogoSize}
         onRemove={() => { if (window.confirm("Logo kaldırılsın mı?")) void image(() => api.deleteLogo()); }} />
+      <ImageField label="İletişim kartı" url={contactCardUrl} busy={busy} boxClass="w-32 h-16"
+        hint={`Sahibinden açıklamasında logonun hemen altında, logoyla aynı en ve boyda çıkar.${logoUrl && logoSize
+          ? ` Logoyla aynı oranda hazırla (${logoSize.width}×${logoSize.height} px), oran farklıysa kenarlardan kırpılır.`
+          : " Logoyla aynı oranda hazırlanmış görsel birebir oturur."}`}
+        onPick={(f) => pick(f, api.uploadContactCard)}
+        onRemove={() => { if (window.confirm("İletişim kartı kaldırılsın mı?")) void image(() => api.deleteContactCard()); }} />
       <ImageField label="Alt banner" url={footerBannerUrl} busy={busy} boxClass="w-48 h-16"
         hint="Sahibinden açıklamasının en altında, üstteki logo ile aynı genişlikte çıkar. Yatay (geniş) görsel en iyi görünür."
         onPick={(f) => pick(f, api.uploadFooterBanner)}
@@ -107,9 +116,10 @@ function SettingsForm({ initial }: { initial: ShowroomSettings }) {
   );
 }
 
-function ImageField({ label, url, hint, busy, boxClass, onPick, onRemove }: {
+function ImageField({ label, url, hint, busy, boxClass, onPick, onRemove, onSize }: {
   label: string; url: string | null; hint: string; busy: boolean; boxClass: string;
   onPick: (file: File) => void; onRemove: () => void;
+  onSize?: (size: { width: number; height: number }) => void;   // yuklu gorselin gercek boyutu
 }) {
   const input = useRef<HTMLInputElement>(null);
   return (
@@ -117,7 +127,8 @@ function ImageField({ label, url, hint, busy, boxClass, onPick, onRemove }: {
       <p className="etiket mb-1.5">{label}</p>
       <div className="flex items-center gap-3">
         <div className={`${boxClass} shrink-0 rounded-lg border border-cizgi bg-yuzey grid place-items-center overflow-hidden`}>
-          {url ? <img src={apiUrl(url)} alt={label} className="max-w-full max-h-full object-contain p-1" />
+          {url ? <img src={apiUrl(url)} alt={label} className="max-w-full max-h-full object-contain p-1"
+            onLoad={(e) => onSize?.({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })} />
             : <span className="text-[12.5px] text-murekkep-3">Yok</span>}
         </div>
         <div className="flex flex-wrap gap-2">

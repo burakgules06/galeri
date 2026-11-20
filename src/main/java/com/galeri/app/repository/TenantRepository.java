@@ -19,6 +19,8 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
 
     Optional<Tenant> findByFooterBannerId(UUID footerBannerId);
 
+    Optional<Tenant> findByContactCardId(UUID contactCardId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select t from Tenant t where t.reminderTime <= :time and (t.reminderSentOn is null or t.reminderSentOn <> :today) order by t.id")
     List<Tenant> findDueReminders(LocalDate today, LocalTime time);

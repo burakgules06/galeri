@@ -9,7 +9,7 @@ import { apiUrl } from "../../api/client";
 import { damageImage } from "./damageImage";
 import { listingHtml, listingPlainText } from "./listingText";
 
-export function ListingTextModal({ vehicle, galleryName, phone, address, logoUrl, footerBannerUrl, dealerLicenseNo, description, onClose }: {
+export function ListingTextModal({ vehicle, galleryName, phone, address, logoUrl, footerBannerUrl, contactCardUrl, dealerLicenseNo, description, onClose }: {
   vehicle: VehicleDetail;
   galleryName: string;
   phone: string | null;
@@ -17,6 +17,7 @@ export function ListingTextModal({ vehicle, galleryName, phone, address, logoUrl
   logoUrl: string | null;     // vitrin ayarlarindaki logo (API yolu)
   dealerLicenseNo: string | null;
   footerBannerUrl: string | null;   // alt banner (API yolu)
+  contactCardUrl: string | null;    // iletisim karti gorseli (API yolu)
   description: string;
   onClose: () => void;
 }) {
@@ -31,8 +32,11 @@ export function ListingTextModal({ vehicle, galleryName, phone, address, logoUrl
   const logoSize = useLogoSize(logoAbsolute);
   const footerBannerAbsolute = footerBannerUrl ? new URL(apiUrl(footerBannerUrl), window.location.origin).href : null;
   const footerBannerSize = useLogoSize(footerBannerAbsolute);
+  const contactCardAbsolute = contactCardUrl ? new URL(apiUrl(contactCardUrl), window.location.origin).href : null;
+  const contactCardSize = useLogoSize(contactCardAbsolute);
   const input = { vehicle, galleryName, phone, address, dealerLicenseNo, logoUrl: logoAbsolute, logoSize,
-    footerBannerUrl: footerBannerAbsolute, footerBannerSize, description, showPlate, showPhone };
+    footerBannerUrl: footerBannerAbsolute, footerBannerSize, contactCardUrl: contactCardAbsolute, contactCardSize,
+    description, showPlate, showPhone };
   const html = listingHtml(input);
   const text = listingPlainText(input);
 

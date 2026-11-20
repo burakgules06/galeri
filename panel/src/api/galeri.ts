@@ -40,6 +40,12 @@ export const api = {
     return apiFetch<ShowroomSettings>("/api/settings/showroom/footer-banner", { method: "POST", body });
   },
   deleteFooterBanner: () => apiFetch<ShowroomSettings>("/api/settings/showroom/footer-banner", { method: "DELETE" }),
+  uploadContactCard: (file: Blob) => {
+    const body = new FormData();
+    body.append("file", file, "contact-card.png");
+    return apiFetch<ShowroomSettings>("/api/settings/showroom/contact-card", { method: "POST", body });
+  },
+  deleteContactCard: () => apiFetch<ShowroomSettings>("/api/settings/showroom/contact-card", { method: "DELETE" }),
   // Telefon ve adres birlikte gonderilir (bos gelen silinir)
   updateShowroomSettings: (phone: string | null, address: string | null, dealerLicenseNo: string | null) =>
     apiFetch<ShowroomSettings>("/api/settings/showroom", json({ phone, address, dealerLicenseNo }, "PUT")),
